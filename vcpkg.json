@@ -1,0 +1,27 @@
+{
+  "name": "bz3",
+  "version": "0.1.0",
+  "dependencies": [
+    "glfw3",
+    "glm",
+    "bullet3",
+    "assimp",
+    "opengl",
+    "miniaudio",
+    "miniz",
+    "cxxopts",
+    {
+      "name": "imgui",
+      "version>=": "1.90.7",
+      "features": [
+        "glfw-binding",
+        "opengl3-binding"
+      ]
+    },
+    "spdlog",
+    "nlohmann-json",
+    "protobuf",
+    "curl"
+  ],
+  "builtin-baseline": "76a382b7b8ce7ed30bbf976aa9aecae868594d5e"
+}

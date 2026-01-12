@@ -1,0 +1,50 @@
+#pragma once
+#include <GLFW/glfw3.h>
+#include <imgui.h>
+#include <imgui_internal.h>
+#include <imgui_impl_glfw.h>      // your platform backend
+#include <imgui_impl_opengl3.h>   // your renderer backend
+#include <vector>
+#include <string>
+#include <array>
+#include <cstdint>
+
+#include "engine/components/gui/server_browser.hpp"
+
+class GUI {
+    friend class ClientEngine;
+
+public:
+    gui::ServerBrowserView &serverBrowser();
+    const gui::ServerBrowserView &serverBrowser() const;
+
+private:
+    GLFWwindow *window;
+    ImFont* bigFont;
+    gui::ServerBrowserView serverBrowserView;
+
+    void update();
+    std::vector<std::string> scoreboardPlayerNames;
+    std::vector<std::string> consoleLines;
+
+    std::array<char, 256> chatInputBuffer{};
+    std::string submittedInputBuffer;
+    bool chatFocus = false;
+
+    void drawTexture(unsigned int textureId);
+    void drawConsolePanel();
+    void drawDeathScreen();
+    bool drawDeathScreenFlag = false;
+
+    GUI(GLFWwindow *window);
+    ~GUI();
+
+public:
+    void setScoreboardPlayerNames(const std::vector<std::string> &names);
+    void addConsoleLine(const std::string &playerName, const std::string &line);
+    std::string getChatInputBuffer() const;
+    void clearChatInputBuffer();
+    void focusChatInput();
+    bool getChatInputFocus() const;
+    void displayDeathScreen(bool show);
+};

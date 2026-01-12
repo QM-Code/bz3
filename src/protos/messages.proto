@@ -1,0 +1,202 @@
+syntax = "proto3";
+
+package bz;
+
+// =====================
+// Math types (glm)
+// =====================
+
+message Vec3 {
+  float x = 1;
+  float y = 2;
+  float z = 3;
+}
+
+message Quat {
+  float x = 1;
+  float y = 2;
+  float z = 3;
+  float w = 4;
+}
+
+// =====================
+// Game state
+// =====================
+
+message PlayerParameters {
+  map<string, float> params = 1;
+}
+
+message PlayerState {
+  string name = 1;
+  Vec3 position = 2;
+  Quat rotation = 3;
+  Vec3 velocity = 4;
+  bool alive = 5;
+  PlayerParameters params = 6;
+}
+
+// =====================
+// Server -> Client
+// =====================
+
+message ServerMsg_PlayerJoin {
+  uint32 client_id = 1;
+  PlayerState state = 2;
+}
+
+message ServerMsg_PlayerLeave {
+  uint32 client_id = 1;
+}
+
+message ServerMsg_PlayerState {
+  uint32 client_id = 1;
+  PlayerState state = 2;
+}
+
+message ServerMsg_PlayerParameters {
+  uint32 client_id = 1;
+  PlayerParameters params = 2;
+}
+
+message ServerMsg_PlayerLocation {
+  uint32 client_id = 1;
+  Vec3 position = 2;
+  Quat rotation = 3;
+  Vec3 velocity = 4;
+}
+
+message ServerMsg_PlayerSpawn {
+  uint32 client_id = 1;
+  Vec3 position = 2;
+  Quat rotation = 3;
+  Vec3 velocity = 4;
+}
+
+message ServerMsg_PlayerDeath {
+  uint32 client_id = 1;
+}
+
+message ServerMsg_CreateShot {
+  uint32 global_shot_id = 1;
+  Vec3 position = 2;
+  Vec3 velocity = 3;
+}
+
+message ServerMsg_RemoveShot {
+  uint32 shot_id = 1;
+  bool is_global_id = 2;
+}
+
+message ServerMsg_Chat {
+  uint32 from_id = 1;
+  uint32 to_id = 2;
+  string text = 3;
+}
+
+message ServerMsg_Init {
+  uint32 client_id = 1;
+  string server_name = 2;
+  PlayerParameters default_player_params = 3;
+  bytes world_data = 4; // zipped/map/etc
+  string world_name = 5;
+  uint32 protocol_version = 6;
+  repeated string features = 7;
+}
+
+// Wrapper for "ServerMsg { type; }"
+message ServerMsg {
+  enum Type {
+    TYPE_UNSPECIFIED = 0;
+    PLAYER_JOIN = 1;
+    PLAYER_LEAVE = 2;
+    PLAYER_STATE = 3;
+    PLAYER_PARAMETERS = 4;
+    PLAYER_LOCATION = 5;
+    PLAYER_SPAWN = 6;
+    PLAYER_DEATH = 7;
+    CREATE_SHOT = 8;
+    REMOVE_SHOT = 9;
+    INIT = 10;
+    CHAT = 11;
+  }
+
+  // Optional: keep a type field if you want quick switching/logging.
+  Type type = 1;
+
+  oneof payload {
+    ServerMsg_PlayerJoin player_join = 2;
+    ServerMsg_PlayerLeave player_leave = 3;
+    ServerMsg_PlayerState player_state = 4;
+    ServerMsg_PlayerParameters player_parameters = 5;
+    ServerMsg_PlayerLocation player_location = 6;
+    ServerMsg_PlayerSpawn player_spawn = 7;
+    ServerMsg_PlayerDeath player_death = 8;
+    ServerMsg_CreateShot create_shot = 9;
+    ServerMsg_RemoveShot remove_shot = 10;
+    ServerMsg_Init init = 11;
+    ServerMsg_Chat chat = 12;
+  }
+}
+
+// =====================
+// Client -> Server
+// =====================
+
+message ClientMsg_PlayerJoin {
+  string ip = 1;
+}
+
+message ClientMsg_PlayerLeave {
+}
+
+message ClientMsg_Init {
+  string name = 1;
+  uint32 protocol_version = 2;
+}
+
+message ClientMsg_RequestPlayerSpawn {
+}
+
+message ClientMsg_PlayerLocation {
+  Vec3 position = 1;
+  Quat rotation = 2;
+}
+
+message ClientMsg_CreateShot {
+  uint32 local_shot_id = 1;
+  Vec3 position = 2;
+  Vec3 velocity = 3;
+}
+
+message ClientMsg_Chat {
+  uint32 to_id = 1;
+  string text = 2;
+}
+
+// Wrapper for "ClientMsg { type; clientId; }"
+message ClientMsg {
+  enum Type {
+    TYPE_UNSPECIFIED = 0;
+    PLAYER_JOIN = 1;
+    PLAYER_LEAVE = 2;
+    INIT = 3;
+    REQUEST_PLAYER_SPAWN = 4;
+    PLAYER_LOCATION = 5;
+    CREATE_SHOT = 6;
+    CHAT = 7;
+  }
+
+  Type type = 1;
+  uint32 client_id = 2;
+
+  oneof payload {
+    ClientMsg_PlayerJoin player_join = 3;
+    ClientMsg_PlayerLeave player_leave = 4;
+    ClientMsg_Init init = 5;
+    ClientMsg_RequestPlayerSpawn request_player_spawn = 6;
+    ClientMsg_PlayerLocation player_location = 7;
+    ClientMsg_CreateShot create_shot = 8;
+    ClientMsg_Chat chat = 9;
+  }
+}

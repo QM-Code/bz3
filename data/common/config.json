@@ -1,0 +1,22 @@
+{
+    "network" : {
+        "ServerPort" : 1234,
+        "ConnectTimeoutMs" : 2000
+    },
+    "assets": {
+        "models" : {
+            "world": "models/world.glb",
+            "playerModel": "models/tank/tank.glb",
+            "shotModel": "models/shot.glb"
+        },
+        "fonts" : {
+            "guiBigFont": "fonts/ShareTech.ttf"
+        },
+        "shaders" : {
+            "radar" : {
+                "vertex": "shaders/radar.vert",
+                "fragment": "shaders/radar.frag"
+            }
+        }
+    }
+}

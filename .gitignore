@@ -1,0 +1,8 @@
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+vcpkg_installed/
+build/
+_deps/
+vcpkg/
