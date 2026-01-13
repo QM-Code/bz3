@@ -15,7 +15,7 @@ Player::Player(Game &game,
     : game(game),
       clientId(id),
       grounded(false),
-      physics(game.engine.physics->createPlayer(glm::vec3(1.0f, 2.0f, 1.0f))),
+            physics(&game.engine.physics->createPlayer()),
       audioEngine(*game.engine.audio),
     jumpAudio(audioEngine.loadClip(game.world->getAssetPath("audio.player.Jump"), 5)),
     dieAudio(audioEngine.loadClip(game.world->getAssetPath("audio.player.Die"), 1)),
@@ -33,11 +33,15 @@ Player::Player(Game &game,
     initMsg.name = name;
     initMsg.protocolVersion = NET_PROTOCOL_VERSION;
     game.engine.network->send<ClientMsg_Init>(initMsg);
+
+    // Initialize controller extents from parameters once params are set
+    setExtents(glm::vec3(
+        getParameter("x_extent"),
+        getParameter("y_extent"),
+        getParameter("z_extent")));
 }
 
-Player::~Player() {
-    physics.destroy();
-}
+Player::~Player() = default;
 
 float Player::getParameter(const std::string &paramName) const {
     auto it = state.params.find(paramName);
@@ -50,7 +54,13 @@ float Player::getParameter(const std::string &paramName) const {
 }
 
 glm::vec3 Player::getForwardVector() const {
-    return physics.getForwardVector();
+    return physics->getForwardVector();
+}
+
+void Player::setExtents(const glm::vec3& extents) {
+    if (physics) {
+        physics->setHalfExtents(extents * 0.5f);
+    }
 }
 
 void Player::earlyUpdate() {
@@ -58,19 +68,19 @@ void Player::earlyUpdate() {
         game.engine.gui->displayDeathScreen(false);
 
         bool wasGrounded = grounded;
-        grounded = physics.isGrounded(glm::vec3(1.0f, 2.0f, 1.0f));
+        grounded = physics->isGrounded();
         
         if (grounded) {
             glm::vec2 movement(0.0f);
             if (game.getFocusState() == FOCUS_STATE_GAME)
                 movement = game.engine.input->getInputState().movement;
-            glm::vec3 movementVector = physics.getForwardVector();
+            glm::vec3 movementVector = physics->getForwardVector();
             movementVector *= movement.y * getParameter("speed");
-            movementVector.y = physics.getVelocity().y;
+            movementVector.y = physics->getVelocity().y;
 
-            physics.setVelocity(movementVector);
+            physics->setVelocity(movementVector);
 
-            physics.setAngularVelocity(glm::vec3(
+            physics->setAngularVelocity(glm::vec3(
                 0.0f,
                 -movement.x * getParameter("turnSpeed"),
                 0.0f
@@ -78,9 +88,9 @@ void Player::earlyUpdate() {
 
             if (game.getFocusState() == FOCUS_STATE_GAME) {
                 if (grounded && game.engine.input->getInputState().jump && TimeUtils::GetElapsedTime(lastJumpTime, TimeUtils::GetCurrentTime()) >= jumpCooldown) {
-                    glm::vec3 velocity = physics.getVelocity();
+                    glm::vec3 velocity = physics->getVelocity();
                     velocity.y = getParameter("jumpSpeed");
-                    physics.setVelocity(velocity);
+                    physics->setVelocity(velocity);
                     lastJumpTime = TimeUtils::GetCurrentTime();
                     grounded = false;
                     jumpAudio.play(state.position);
@@ -113,9 +123,9 @@ void Player::earlyUpdate() {
 }
 
 void Player::lateUpdate() {
-    state.position = physics.getPosition();
-    state.rotation = physics.getRotation();
-    state.velocity = physics.getVelocity();
+    state.position = physics->getPosition();
+    state.rotation = physics->getRotation();
+    state.velocity = physics->getVelocity();
     game.engine.render->setCameraPosition(state.position);
     game.engine.render->setCameraRotation(state.rotation);
 
@@ -151,8 +161,8 @@ void Player::handleDeath() {
 void Player::handleSpawn(const ServerMsg_PlayerSpawn &msg) {
     spawnAudio.play(msg.position);
     state.alive = true;
-    physics.setPosition(msg.position);
-    physics.setRotation(msg.rotation);
-    physics.setVelocity(glm::vec3(0.0f));
-    physics.setAngularVelocity(glm::vec3(0.0f));
+    physics->setPosition(msg.position);
+    physics->setRotation(msg.rotation);
+    physics->setVelocity(glm::vec3(0.0f));
+    physics->setAngularVelocity(glm::vec3(0.0f));
 }

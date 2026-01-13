@@ -10,12 +10,13 @@ Shot::Shot(Game &game,
     : game(game),
       id(id),
       isGlobalId(isGlobalId),
-      position(position),
-      velocity(velocity),
-      renderId(game.engine.render->create(game.world->getAssetPath("shotModel").string())),
-            audioEngine(*game.engine.audio),
-            fireAudio(audioEngine.loadClip(game.world->getAssetPath("audio.shot.Fire").string(), 20)),
-            ricochetAudio(audioEngine.loadClip(game.world->getAssetPath("audio.shot.Ricochet").string(), 20)) {
+    position(position),
+    prevPosition(position),
+    velocity(velocity),
+    renderId(game.engine.render->create(game.world->getAssetPath("shotModel").string())),
+    audioEngine(*game.engine.audio),
+    fireAudio(audioEngine.loadClip(game.world->getAssetPath("audio.shot.Fire").string(), 20)),
+    ricochetAudio(audioEngine.loadClip(game.world->getAssetPath("audio.shot.Ricochet").string(), 20)) {
     game.engine.render->setPosition(renderId, position);
     game.engine.render->setScale(renderId, glm::vec3(0.6f));
     game.engine.render->setTransparency(renderId, true);
@@ -40,15 +41,33 @@ Shot::~Shot() {
 }
 
 void Shot::update(TimeUtils::duration deltaTime) {
+    // Cast across the full frame segment to avoid tunneling.
+    const glm::vec3 start = position;
+    const glm::vec3 end = position + velocity * deltaTime;
+
     glm::vec3 hitPoint, hitNormal;
-    if (game.engine.physics->raycast(position, position + velocity * deltaTime, hitPoint, hitNormal)) {
-        velocity = glm::reflect(velocity, hitNormal);
+    if (game.engine.physics->raycast(start, end, hitPoint, hitNormal)) {
+        const float speed = glm::length(velocity);
+        const glm::vec3 n = glm::normalize(hitNormal);
+        const glm::vec3 dir = speed > 0.f ? glm::normalize(velocity) : velocity;
+
+        // Snap to contact and nudge off the surface slightly to avoid re-hit next frame.
+        constexpr float EPS = 1e-3f;
+        position = hitPoint + n * EPS;
+        velocity = glm::reflect(dir, n) * speed;
+
         ricochetAudio.play(hitPoint);
+        spdlog::trace(
+            "Shot::update: Shot {} ricocheted at point ({:.6f}, {:.6f}, {:.6f}) with normal ({:.6f}, {:.6f}, {:.6f})",
+            id,
+            hitPoint.x, hitPoint.y, hitPoint.z,
+            hitNormal.x, hitNormal.y, hitNormal.z);
+    } else {
+        position = end;
     }
 
-    position += velocity * deltaTime;
-
     game.engine.render->setPosition(renderId, position);
+    prevPosition = position; // track last position for potential future use
 }
 
 bool Shot::isEqual(shot_id otherId, bool otherIsGlobalId) {

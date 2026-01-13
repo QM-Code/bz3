@@ -2,22 +2,37 @@
 #include "threepp/loaders/AssimpLoader.hpp"
 #include "spdlog/spdlog.h"
 #include "engine/user_pointer.hpp"
+#include <array>
 
-Render::Render(GLFWwindow *window) : renderer({800, 600}) {
+Render::Render(GLFWwindow *window) :
+    window(window),
+    renderer({1, 1}) {
+
     scene = threepp::Scene::create();
-    camera = threepp::PerspectiveCamera::create(CAMERA_FOV, SCREEN_WIDTH/SCREEN_HEIGHT, 0.1f, 1000.f);
 
+    int fbWidth = 800, fbHeight = 600;
+    glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+    if (fbHeight == 0) fbHeight = 1; // guard against zero height
+    renderer.setSize({fbWidth, fbHeight});
+
+    camera = threepp::PerspectiveCamera::create(
+        CAMERA_FOV,
+        static_cast<float>(fbWidth) / static_cast<float>(fbHeight),
+        0.1f,
+        1000.f
+    );
+    camera->updateProjectionMatrix();
+
+    // Setup resize callback
     auto* userPointer = static_cast<GLFWUserPointer*>(glfwGetWindowUserPointer(window));
     userPointer->resizeCallback = [this](int width, int height) {
         this->resizeCallback(width, height);
     };
-
     glfwSetFramebufferSizeCallback(window, [](GLFWwindow* w, int width, int height) {
         auto* userPointer = static_cast<GLFWUserPointer*>(glfwGetWindowUserPointer(w));
         userPointer->resizeCallback(width, height);
     });
     
-    this->window = window;
     renderer.setClearColor(threepp::Color(0x3399ff));
     renderer.shadowMap().enabled = true;
     renderer.shadowMap().type = threepp::ShadowMap::PFCSoft;
