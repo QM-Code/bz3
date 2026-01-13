@@ -44,11 +44,10 @@ private:
 
     float gravity = -9.8f; // downward acceleration (m/s^2)
 
-    // Controller shape (half extents) for ground checks and skin offset.
+    // Controller shape (half extents) for sweeps and separation.
     glm::vec3 halfExtents{0.5f, 1.0f, 0.5f};
-    float skin = 0.02f;
 
     // Internal helpers
-    bool sweepTo(const glm::vec3& target, glm::vec3& outHitPoint, glm::vec3& outHitNormal) const;
-    void resolveGround();
+    void resolvePenetrations();
+    bool findDeepestPenetration(glm::vec3& outNormal, float& outDepth) const;
 };

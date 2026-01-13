@@ -1,6 +1,10 @@
 #include "engine/physics/player_controller.hpp"
 #include "engine/physics/physics_world.hpp"
 #include <btBulletDynamicsCommon.h>
+#include <BulletCollision/NarrowPhaseCollision/btGjkEpaPenetrationDepthSolver.h>
+#include <BulletCollision/NarrowPhaseCollision/btGjkPairDetector.h>
+#include <BulletCollision/NarrowPhaseCollision/btPointCollector.h>
+#include <BulletCollision/NarrowPhaseCollision/btVoronoiSimplexSolver.h>
 
 namespace {
 // Convert stored glm quaternion to Bullet's quaternion (x, y, z, w order).
@@ -29,7 +33,6 @@ PhysicsPlayerController& PhysicsPlayerController::operator=(PhysicsPlayerControl
 		velocity = other.velocity;
 		angularVelocity = other.angularVelocity;
 		halfExtents = other.halfExtents;
-		skin = other.skin;
 	}
 	return *this;
 }
@@ -55,61 +58,10 @@ void PhysicsPlayerController::setAngularVelocity(const glm::vec3& w) { angularVe
 
 bool PhysicsPlayerController::isGrounded() const {
 	if (!world || !world->world_) return false;
-	// Allow a small upward tolerance so slight bounces don't report airborne.
-	if (velocity.y > 0.5f) return false;
 
-	btVector3 half(halfExtents.x, halfExtents.y, halfExtents.z);
-	btBoxShape boxShape(half);
-	boxShape.setMargin(0.0f);
-
-	btTransform from = makeTransform(position, rotation);
-	btTransform to   = from;
-	to.setOrigin(from.getOrigin() - btVector3(0, 0.05f, 0));
-
-	btCollisionWorld::ClosestConvexResultCallback cb(from.getOrigin(), to.getOrigin());
-	cb.m_collisionFilterGroup = btBroadphaseProxy::DefaultFilter;
-	cb.m_collisionFilterMask = btBroadphaseProxy::AllFilter;
-
-	world->world_->convexSweepTest(&boxShape, from, to, cb);
-
-	return cb.hasHit() && cb.m_hitNormalWorld.dot(btVector3(0, 1, 0)) > 0.7f;
-}
-
-bool PhysicsPlayerController::sweepTo(const glm::vec3& target, glm::vec3& outHitPoint, glm::vec3& outHitNormal) const {
-	if (!world || !world->world_) return false;
-
-	btVector3 half(halfExtents.x, halfExtents.y, halfExtents.z);
-	btBoxShape boxShape(half);
-	boxShape.setMargin(0.0f);
-
-	btTransform from = makeTransform(position, rotation);
-	btTransform to   = makeTransform(target, rotation);
-
-	btCollisionWorld::ClosestConvexResultCallback cb(from.getOrigin(), to.getOrigin());
-	cb.m_collisionFilterGroup = btBroadphaseProxy::DefaultFilter;
-	cb.m_collisionFilterMask = btBroadphaseProxy::AllFilter;
-
-	world->world_->convexSweepTest(&boxShape, from, to, cb);
-
-	if (cb.hasHit()) {
-		outHitPoint = glm::vec3(cb.m_hitPointWorld.x(), cb.m_hitPointWorld.y(), cb.m_hitPointWorld.z());
-		btVector3 n = cb.m_hitNormalWorld;
-		btScalar len = n.length();
-		if (len > btScalar(0)) n /= len;
-		outHitNormal = glm::vec3(n.x(), n.y(), n.z());
-		return true;
-	}
-	return false;
-}
-
-void PhysicsPlayerController::resolveGround() {
-	if (!world) return;
-	// Only resolve toward the ground when moving downward or resting; while ascending (jumping)
-	// we skip this to avoid snapping back to the floor immediately, but allow a small tolerance to
-	// still catch gentle landings.
-	if (velocity.y > 0.5f) return;
-	// Sweep slightly downward to find support
-	btVector3 half(halfExtents.x, halfExtents.y, halfExtents.z);
+	// Slightly shrink lateral extents to avoid sticking when brushing walls mid-jump.
+	const glm::vec3 groundedHalfExtents = glm::max(halfExtents - glm::vec3(0.02f, 0.0f, 0.02f), glm::vec3(0.01f));
+	btVector3 half(groundedHalfExtents.x, groundedHalfExtents.y, groundedHalfExtents.z);
 	btBoxShape boxShape(half);
 	boxShape.setMargin(0.0f);
 
@@ -119,12 +71,9 @@ void PhysicsPlayerController::resolveGround() {
 	btCollisionWorld::ClosestConvexResultCallback cb(from.getOrigin(), to.getOrigin());
 	cb.m_collisionFilterGroup = btBroadphaseProxy::DefaultFilter;
 	cb.m_collisionFilterMask = btBroadphaseProxy::AllFilter;
-	world->world_->convexSweepTest(&boxShape, from, to, cb);
 
-	if (cb.hasHit() && cb.m_hitNormalWorld.dot(btVector3(0,1,0)) > 0.1f) {
-		position.y = cb.m_hitPointWorld.y() + halfExtents.y + skin;
-		if (velocity.y < 0.0f) velocity.y = 0.0f;
-	}
+	world->world_->convexSweepTest(&boxShape, from, to, cb);
+	return cb.hasHit();
 }
 
 void PhysicsPlayerController::update(float dt) {
@@ -134,17 +83,17 @@ void PhysicsPlayerController::update(float dt) {
 	// Apply gravity
 	velocity.y += gravity * dt;
 
+	btVector3 half(halfExtents.x, halfExtents.y, halfExtents.z);
+	btBoxShape boxShape(half);
+	boxShape.setMargin(0.0f);
+
 	float remaining = dt;
-	const int maxIter = 3;
-	for (int i = 0; i < maxIter && remaining > 0.f; ++i) {
-		glm::vec3 target = position + velocity * remaining;
+	const int maxIters = 3;
+	for (int iter = 0; iter < maxIters && remaining > 0.f; ++iter) {
+		const glm::vec3 start = position;
+		const glm::vec3 target = start + velocity * remaining;
 
-		// Full sweep to get hit fraction and normal
-		btVector3 half(halfExtents.x, halfExtents.y, halfExtents.z);
-		btBoxShape boxShape(half);
-		boxShape.setMargin(0.0f);
-
-		btTransform from = makeTransform(position, rotation);
+		btTransform from = makeTransform(start, rotation);
 		btTransform to   = makeTransform(target, rotation);
 
 		btCollisionWorld::ClosestConvexResultCallback cb(from.getOrigin(), to.getOrigin());
@@ -153,75 +102,103 @@ void PhysicsPlayerController::update(float dt) {
 
 		world->world_->convexSweepTest(&boxShape, from, to, cb);
 
-		float frac = cb.hasHit() ? cb.m_closestHitFraction : 1.0f;
-		frac = glm::clamp(frac, 0.0f, 1.0f);
-		position = position + velocity * (remaining * frac);
+		float fraction = cb.hasHit() ? cb.m_closestHitFraction : 1.0f;
+		fraction = glm::clamp(fraction, 0.0f, 1.0f);
+		position = start + (target - start) * fraction;
 
-		bool validHit = cb.hasHit() && frac < 0.999f;
+		if (!cb.hasHit()) break;
+
 		btVector3 nbt = cb.m_hitNormalWorld;
-		btScalar len = nbt.length();
-		if (len > btScalar(0)) nbt /= len; else validHit = false;
+		if (nbt.length2() <= btScalar(0)) break;
+		nbt.normalize();
 		glm::vec3 n(nbt.x(), nbt.y(), nbt.z());
+
 		const float vn = glm::dot(velocity, n);
-		if (validHit && vn > 0.0f) validHit = false; // moving away
+		velocity -= vn * n; // slide by removing normal component
 
-		if (validHit) {
-			// Scale the separation by how directly we’re hitting the surface to reduce jitter on shallow glances
-			const float speed = glm::length(velocity);
-			const float pushScale = (speed > 1e-4f) ? glm::clamp(std::abs(vn) / speed, 0.0f, 1.0f) : 0.0f;
-			const float push = skin * pushScale;
-			position += n * push;
-
-			if (vn < 0.0f) {
-				velocity -= vn * n; // slide: drop normal component
-			}
-			remaining *= (1.0f - frac);
-		} else {
-			remaining = 0.f;
-		}
+		remaining *= (1.0f - fraction);
+		if (remaining <= 0.f) break;
+		if (glm::dot(velocity, velocity) < 1e-6f) break;
 	}
 
-	resolveGround();
-	if (isGrounded() && velocity.y < 0.0f) {
-		velocity.y = 0.0f;
-	}
-
-	// Apply angular velocity to rotation (simple integrator) and resolve any wall contact caused by rotation alone.
-	const glm::quat prevRotation = rotation;
+	// Apply angular velocity to rotation (simple integrator).
 	if (glm::dot(angularVelocity, angularVelocity) > 0.f) {
 		glm::quat dq = glm::quat(0, angularVelocity.x, angularVelocity.y, angularVelocity.z) * rotation;
 		rotation = glm::normalize(rotation + 0.5f * dq * dt);
 	}
 
-	// Rotational sweep to avoid embedding when turning in place against geometry.
-	if (world && glm::dot(angularVelocity, angularVelocity) > 0.f) {
-		btVector3 half(halfExtents.x, halfExtents.y, halfExtents.z);
-		btBoxShape boxShape(half);
-		boxShape.setMargin(0.0f);
+	resolvePenetrations();
+}
 
-		btTransform from = makeTransform(position, prevRotation);
-		btTransform to   = makeTransform(position, rotation);
+void PhysicsPlayerController::resolvePenetrations() {
+	if (!world || !world->world_) return;
 
-		btCollisionWorld::ClosestConvexResultCallback cb(from.getOrigin(), to.getOrigin());
-		cb.m_collisionFilterGroup = btBroadphaseProxy::DefaultFilter;
-		cb.m_collisionFilterMask = btBroadphaseProxy::AllFilter;
+	const int maxIterations = 6;
+	for (int i = 0; i < maxIterations; ++i) {
+		glm::vec3 normal;
+		float depth = 0.0f;
+		if (!findDeepestPenetration(normal, depth)) break;
+		if (depth >= 0.0f) break;
 
-		world->world_->convexSweepTest(&boxShape, from, to, cb);
+		const float push = -depth;
+		position += normal * push;
 
-		if (cb.hasHit()) {
-			btVector3 nbt = cb.m_hitNormalWorld;
-			btScalar len = nbt.length();
-			if (len > btScalar(0)) {
-				nbt /= len;
-				glm::vec3 n(nbt.x(), nbt.y(), nbt.z());
-				position += n * (skin + 0.002f);
-				float vn = glm::dot(velocity, n);
-				if (vn < 0.0f) {
-					velocity -= vn * n;
-				}
-			}
+		const float vn = glm::dot(velocity, normal);
+		if (vn < 0.0f) {
+			velocity -= vn * normal; // keep moving instead of re-embedding
 		}
 	}
+}
+
+bool PhysicsPlayerController::findDeepestPenetration(glm::vec3& outNormal, float& outDepth) const {
+	if (!world || !world->world_) return false;
+
+	btVector3 half(halfExtents.x, halfExtents.y, halfExtents.z);
+	btBoxShape playerShape(half);
+	playerShape.setMargin(0.0f);
+
+	btTransform playerTransform = makeTransform(position, rotation);
+
+	struct DeepestContactCallback : btCollisionWorld::ContactResultCallback {
+		float deepest = 0.0f; // most negative
+		btVector3 normal{0,0,0};
+		bool found = false;
+		btScalar addSingleResult(btManifoldPoint& cp,
+			const btCollisionObjectWrapper* colObj0Wrap,int /*partId0*/,int /*index0*/,const btCollisionObjectWrapper* /*colObj1Wrap*/,int /*partId1*/,int /*index1*/) override {
+			if (cp.m_distance1 < deepest) {
+				deepest = cp.m_distance1;
+				normal = cp.m_normalWorldOnB; // points from B to A
+				found = true;
+			}
+			return 0.0f;
+		}
+	};
+
+	btCollisionObject playerObj;
+	playerObj.setCollisionShape(&playerShape);
+	playerObj.setWorldTransform(playerTransform);
+	playerObj.setCollisionFlags(playerObj.getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
+
+	DeepestContactCallback cb;
+	cb.m_collisionFilterGroup = btBroadphaseProxy::DefaultFilter;
+	cb.m_collisionFilterMask = btBroadphaseProxy::AllFilter;
+
+	const int count = world->world_->getNumCollisionObjects();
+	for (int i = 0; i < count; ++i) {
+		btCollisionObject* obj = world->world_->getCollisionObjectArray()[i];
+		if (!obj) continue;
+
+		world->world_->contactPairTest(&playerObj, obj, cb);
+	}
+
+	if (!cb.found || cb.deepest >= 0.0f) return false;
+
+	btVector3 n = cb.normal;
+	if (n.length2() <= btScalar(0)) return false;
+	n.normalize();
+	outNormal = glm::vec3(n.x(), n.y(), n.z());
+	outDepth = cb.deepest;
+	return true;
 }
 
 void PhysicsPlayerController::destroy() {
