@@ -105,6 +105,7 @@ set(ENGINE_CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/engine/components/gui/server_browser.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/physics/physics_world.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/physics/rigid_body.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/physics/player_controller.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/physics/compound_body.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/components/audio.cpp
 )
@@ -117,6 +118,7 @@ set(ENGINE_SERVER_SOURCES
     ${PROJECT_SOURCE_DIR}/src/network/proto_codec.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/physics/physics_world.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/physics/rigid_body.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/physics/player_controller.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/physics/compound_body.cpp
 )
 

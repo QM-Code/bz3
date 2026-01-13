@@ -2,7 +2,7 @@
 #include <glm/glm.hpp>
 #include <string>
 #include "engine/types.hpp"
-#include "engine/physics/rigid_body.hpp"
+#include "engine/physics/player_controller.hpp"
 #include "engine/components/audio.hpp"
 #include <spdlog/spdlog.h>
 
@@ -17,7 +17,7 @@ private:
     client_id clientId;
     bool grounded;
 
-    PhysicsRigidBody physics;
+    PhysicsPlayerController* physics = nullptr;
     Audio& audioEngine;
     AudioClip jumpAudio;
     AudioClip dieAudio;
@@ -45,6 +45,8 @@ public:
     glm::vec3 getVelocity() const { return state.velocity; }
     glm::quat getRotation() const { return state.rotation; }
     glm::vec3 getForwardVector() const;
+
+    void setExtents(const glm::vec3& extents);
 
     void handleParameters(const ServerMsg_PlayerParameters &msg);
     void handleDeath();
