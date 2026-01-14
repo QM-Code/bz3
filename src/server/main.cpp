@@ -132,6 +132,12 @@ int main(int argc, char *argv[]) {
 
     spdlog::trace("Loading plugins...");
     py::scoped_interpreter guard{};
+
+    // Prevent Python from writing .pyc files into data/plugins/__pycache__ when plugins are loaded
+    {
+        py::module_ sys = py::module_::import("sys");
+        sys.attr("dont_write_bytecode") = true;
+    }
     PluginAPI::loadPythonPlugins(mergedConfig);
     spdlog::trace("Plugins loaded successfully");
 

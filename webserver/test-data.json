@@ -1,0 +1,432 @@
+{
+  "users": [
+    {
+      "username": "Grue",
+      "email": "karmak@gmail.com",
+      "password": "gruepass",
+      "admin_list": [
+        "FluxRider",
+        "CinderFox",
+        "GaleStrike"
+      ]
+    },
+    {
+      "username": "karmak",
+      "email": "karmak@karmak.org",
+      "password": "karmakpass",
+      "admin_list": [
+        "Grue",
+        "FluxRider",
+        "CinderFox",
+        "GaleStrike"
+      ]
+    },
+    {
+      "username": "Whammo",
+      "email": "whammo@bzflag.org",
+      "password": "whammopass",
+      "admin_list": [
+        "CinderFox",
+        "OnyxPulse",
+        "ZephyrShade"
+      ]
+    },
+    {
+      "username": "allejo",
+      "email": "admin@allejo.net",
+      "password": "allejopss",
+      "admin_list": [
+        "FluxRider",
+        "CinderFox",
+        "GaleStrike",
+        "DriftManta",
+        "EchoNox",
+        "OnyxPulse",
+        "SolarDusk"
+      ]
+    },
+    {
+      "username": "AstraVex",
+      "email": "astravex@bz3.test",
+      "password": "AstraVex#1",
+      "admin_list": [
+        "FluxRider",
+        "CinderFox",
+        "GaleStrike"
+      ]
+    },
+    {
+      "username": "BlitzRook",
+      "email": "blitzrook@bz3.test",
+      "password": "BlitzRook#1"
+    },
+    {
+      "username": "CinderFox",
+      "email": "cinderfox@bz3.test",
+      "password": "CinderFox#1",
+      "admin_list": [
+        "AstraVex",
+        "FluxRider"
+      ]
+    },
+    {
+      "username": "DriftManta",
+      "email": "driftmanta@bz3.test",
+      "password": "DriftManta#1"
+    },
+    {
+      "username": "EchoNox",
+      "email": "echonox@bz3.test",
+      "password": "EchoNox#1",
+      "admin_list": [
+        "FluxRider",
+        "GaleStrike"
+      ]
+    },
+    {
+      "username": "FluxRider",
+      "email": "fluxrider@bz3.test",
+      "password": "FluxRider#1",
+      "admin_list": [
+        "AstraVex",
+        "CinderFox",
+        "DriftManta",
+        "EchoNox",
+        "OnyxPulse",
+        "SolarDusk"
+      ]
+    },
+    {
+      "username": "GaleStrike",
+      "email": "galestrike@bz3.test",
+      "password": "GaleStrike#1",
+      "admin_list": [
+        "FluxRider",
+        "AstraVex"
+      ]
+    },
+    {
+      "username": "HollowKite",
+      "email": "hollowkite@bz3.test",
+      "password": "HollowKite#1"
+    },
+    {
+      "username": "IonGlide",
+      "email": "ionglide@bz3.test",
+      "password": "IonGlide#1"
+    },
+    {
+      "username": "JadeVortex",
+      "email": "jadevortex@bz3.test",
+      "password": "JadeVortex#1",
+      "admin_list": [
+        "FluxRider",
+        "KarmaQuill",
+        "OnyxPulse"
+      ]
+    },
+    {
+      "username": "KarmaQuill",
+      "email": "karmaquill@bz3.test",
+      "password": "KarmaQuill#1",
+      "admin_list": [
+        "FluxRider",
+        "JadeVortex"
+      ]
+    },
+    {
+      "username": "LumenForge",
+      "email": "lumenforge@bz3.test",
+      "password": "LumenForge#1"
+    },
+    {
+      "username": "NovaSable",
+      "email": "novasable@bz3.test",
+      "password": "NovaSable#1",
+      "admin_list": [
+        "FluxRider",
+        "AstraVex",
+        "GaleStrike",
+        "JadeVortex",
+        "KarmaQuill",
+        "OnyxPulse",
+        "SolarDusk",
+        "ZephyrShade"
+      ]
+    },
+    {
+      "username": "OnyxPulse",
+      "email": "onyxpulse@bz3.test",
+      "password": "OnyxPulse#1",
+      "admin_list": [
+        "FluxRider",
+        "AstraVex"
+      ]
+    },
+    {
+      "username": "PyreWisp",
+      "email": "pyrewisp@bz3.test",
+      "password": "PyreWisp#1"
+    },
+    {
+      "username": "QuantaRift",
+      "email": "quantarift@bz3.test",
+      "password": "QuantaRift#1"
+    },
+    {
+      "username": "RiftWarden",
+      "email": "riftwarden@bz3.test",
+      "password": "RiftWarden#1"
+    },
+    {
+      "username": "SolarDusk",
+      "email": "solardusk@bz3.test",
+      "password": "SolarDusk#1",
+      "admin_list": [
+        "FluxRider",
+        "OnyxPulse",
+        "ZephyrShade"
+      ]
+    },
+    {
+      "username": "ValkenRush",
+      "email": "valkenrush@bz3.test",
+      "password": "ValkenRush#1"
+    },
+    {
+      "username": "ZephyrShade",
+      "email": "zephyrshade@bz3.test",
+      "password": "ZephyrShade#1",
+      "admin_list": [
+        "FluxRider",
+        "AstraVex"
+      ]
+    }
+  ],
+  "servers": [
+    {
+      "name": "Crater Loop",
+      "description": "Wide crater bowl with high arcs and long glide lanes.",
+      "host": "192.168.1.40",
+      "port": "5154",
+      "max_players": "24",
+      "num_players": "8",
+      "owner": "Grue",
+      "approved": false
+    },
+    {
+      "name": "Salt Flats",
+      "description": "Ultra-fast open flats with minimal cover and clean sightlines.",
+      "host": "192.168.1.41",
+      "port": "5155",
+      "max_players": "30",
+      "num_players": "12",
+      "owner": "Grue",
+      "approved": false
+    },
+    {
+      "name": "Night Relay",
+      "description": "Tight relay tunnels with short boost windows.",
+      "host": "192.168.1.42",
+      "port": "5156",
+      "max_players": "18",
+      "num_players": "6",
+      "owner": "Grue"
+    },
+    {
+      "name": "Sky Pier",
+      "description": "Floating docks and risky drop shots into the void.",
+      "host": "192.168.1.43",
+      "port": "5157",
+      "max_players": "20",
+      "num_players": "5",
+      "owner": "Grue",
+      "approved": false
+    },
+    {
+      "name": "Glass Harbor",
+      "description": "Reflective lanes that reward precision and punish hesitation.",
+      "host": "192.168.1.44",
+      "port": "5158",
+      "max_players": "22",
+      "num_players": "9",
+      "owner": "karmak",
+      "approved": false
+    },
+    {
+      "name": "Iron Circuit",
+      "description": "Industrial platforms with tight boosts and heavy collisions.",
+      "host": "192.168.1.45",
+      "port": "5159",
+      "max_players": "16",
+      "num_players": "4",
+      "owner": "FluxRider"
+    },
+    {
+      "name": "Nimbus Exchange",
+      "description": "Layered ramps with midair duels across the center span.",
+      "host": "192.168.1.46",
+      "port": "5160",
+      "max_players": "24",
+      "num_players": "11",
+      "owner": "FluxRider",
+      "approved": false
+    },
+    {
+      "name": "Ashen Run",
+      "description": "Low-visibility ash fields with risky chase routes.",
+      "host": "192.168.1.47",
+      "port": "5161",
+      "max_players": "20",
+      "num_players": "7",
+      "owner": "FluxRider"
+    },
+    {
+      "name": "Cobalt Ridge",
+      "description": "Ridge line skirmishes and long drift corners.",
+      "host": "192.168.1.48",
+      "port": "5162",
+      "max_players": "26",
+      "num_players": "10",
+      "owner": "FluxRider"
+    },
+    {
+      "name": "Halo Gate",
+      "description": "Circular gate hubs with rapid rotations.",
+      "host": "192.168.1.49",
+      "port": "5163",
+      "max_players": "18",
+      "num_players": "5",
+      "owner": "FluxRider"
+    },
+    {
+      "name": "Frostline Pass",
+      "description": "Icy lanes with hard turns and late braking.",
+      "host": "192.168.1.50",
+      "port": "5164",
+      "max_players": "20",
+      "num_players": "6",
+      "owner": "FluxRider"
+    },
+    {
+      "name": "Quarry Shift",
+      "description": "Layered quarry walls with vertical cut-throughs.",
+      "host": "192.168.1.51",
+      "port": "5165",
+      "max_players": "24",
+      "num_players": "9",
+      "owner": "FluxRider"
+    },
+    {
+      "name": "Sunken Switch",
+      "description": "Flooded corridors with slick entries.",
+      "host": "192.168.1.60",
+      "port": "5166",
+      "max_players": "16",
+      "num_players": "3",
+      "owner": "AstraVex",
+      "approved": false
+    },
+    {
+      "name": "Raven Spire",
+      "description": "High spire duels and choke-point ladders.",
+      "host": "192.168.1.61",
+      "port": "5167",
+      "max_players": "18",
+      "num_players": "4",
+      "owner": "AstraVex"
+    },
+    {
+      "name": "Copper Arches",
+      "description": "Curved arches with aggressive midlines.",
+      "host": "192.168.1.62",
+      "port": "5168",
+      "max_players": "22",
+      "num_players": "8",
+      "owner": "CinderFox",
+      "approved": false
+    },
+    {
+      "name": "Thresher Bay",
+      "description": "Open bay with tidal ramps and risky flanks.",
+      "host": "192.168.1.63",
+      "port": "5169",
+      "max_players": "20",
+      "num_players": "6",
+      "owner": "CinderFox"
+    },
+    {
+      "name": "Obsidian Run",
+      "description": "Black stone channels with tight dodge windows.",
+      "host": "192.168.1.64",
+      "port": "5170",
+      "max_players": "16",
+      "num_players": "5",
+      "owner": "EchoNox"
+    },
+    {
+      "name": "Driftwell",
+      "description": "Long drift straights with late apex cutbacks.",
+      "host": "192.168.1.65",
+      "port": "5171",
+      "max_players": "24",
+      "num_players": "9",
+      "owner": "GaleStrike"
+    },
+    {
+      "name": "Glasswind",
+      "description": "Wind corridors that reward stable lines.",
+      "host": "192.168.1.66",
+      "port": "5172",
+      "max_players": "20",
+      "num_players": "7",
+      "owner": "GaleStrike"
+    },
+    {
+      "name": "Jade Circuit",
+      "description": "Sharp circuit with mirrored corners and fast resets.",
+      "host": "192.168.1.67",
+      "port": "5173",
+      "max_players": "18",
+      "num_players": "4",
+      "owner": "JadeVortex"
+    },
+    {
+      "name": "Vapor Kiosks",
+      "description": "Dense kiosks with surprise cross lanes.",
+      "host": "192.168.1.68",
+      "port": "5174",
+      "max_players": "22",
+      "num_players": "6",
+      "owner": "KarmaQuill"
+    },
+    {
+      "name": "Onyx Relay",
+      "description": "Granite relay map with hard reversals.",
+      "host": "192.168.1.69",
+      "port": "5175",
+      "max_players": "20",
+      "num_players": "5",
+      "owner": "OnyxPulse",
+      "approved": false
+    },
+    {
+      "name": "Solar Delta",
+      "description": "Hot delta with midrange brawls.",
+      "host": "192.168.1.70",
+      "port": "5176",
+      "max_players": "24",
+      "num_players": "10",
+      "owner": "SolarDusk"
+    },
+    {
+      "name": "Zephyr Docks",
+      "description": "Windy docks with aggressive outer lanes.",
+      "host": "192.168.1.71",
+      "port": "5177",
+      "max_players": "18",
+      "num_players": "4",
+      "owner": "ZephyrShade"
+    }
+  ]
+}
