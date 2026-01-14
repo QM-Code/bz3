@@ -6,6 +6,7 @@
 #include "engine/components/input.hpp"
 #include "engine/components/gui.hpp"
 #include "engine/components/audio.hpp"
+#include "engine/components/particle_effect_system.hpp"
 #include "engine/user_pointer.hpp"
 #include <string>
 
@@ -21,6 +22,7 @@ public:
     Input *input;
     GUI *gui;
     Audio *audio;
+    ParticleEngine *particles;
 
     ClientEngine(GLFWwindow *window);
     ~ClientEngine();

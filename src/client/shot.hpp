@@ -1,6 +1,8 @@
 #pragma once
 #include "engine/types.hpp"
 #include "engine/components/audio.hpp"
+#include "engine/components/particle_effect_system.hpp"
+#include <optional>
 
 class Game;
 
@@ -17,6 +19,7 @@ private:
     Audio& audioEngine;
     AudioClip fireAudio;
     AudioClip ricochetAudio;
+    std::optional<ParticleEffect> trailEffect;
 
     shot_id getNextLocalShotId() {
         static shot_id nextId = 1;

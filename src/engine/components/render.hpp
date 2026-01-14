@@ -2,6 +2,7 @@
 #include <threepp/threepp.hpp>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
+#include <glm/mat4x4.hpp>
 #include <map>
 #include <string>
 #include <map>
@@ -38,4 +39,11 @@ public:
     void setTransparency(render_id id, bool transparency);
     void setCameraPosition(const glm::vec3 &position);
     void setCameraRotation(const glm::quat &rotation);
+
+    // Camera state for downstream systems (e.g., particle renderer).
+    glm::mat4 getViewProjectionMatrix() const;
+    glm::mat4 getViewMatrix() const;
+    glm::mat4 getProjectionMatrix() const;
+    glm::vec3 getCameraPosition() const;
+    glm::vec3 getCameraForward() const;
 };  

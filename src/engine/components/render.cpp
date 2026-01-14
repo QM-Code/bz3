@@ -3,6 +3,7 @@
 #include "spdlog/spdlog.h"
 #include "engine/user_pointer.hpp"
 #include <array>
+#include <glm/gtc/quaternion.hpp>
 
 Render::Render(GLFWwindow *window) :
     window(window),
@@ -181,4 +182,44 @@ void Render::setCameraPosition(const glm::vec3 &position) {
 
 void Render::setCameraRotation(const glm::quat &rotation) {
     camera->quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
+}
+
+namespace {
+glm::mat4 toGlm(const threepp::Matrix4& m) {
+    glm::mat4 out{1.0f};
+    // threepp stores column-major in elements[col*4 + row]
+    for (int c = 0; c < 4; ++c) {
+        for (int r = 0; r < 4; ++r) {
+            out[c][r] = m.elements[c * 4 + r];
+        }
+    }
+    return out;
+}
+} // namespace
+
+glm::mat4 Render::getViewProjectionMatrix() const {
+    // Ensure matrices are up to date
+    const_cast<threepp::PerspectiveCamera*>(camera.get())->updateMatrixWorld();
+    threepp::Matrix4 viewProj;
+    viewProj.multiplyMatrices(camera->projectionMatrix, camera->matrixWorldInverse);
+    return toGlm(viewProj);
+}
+
+glm::mat4 Render::getViewMatrix() const {
+    const_cast<threepp::PerspectiveCamera*>(camera.get())->updateMatrixWorld();
+    return toGlm(camera->matrixWorldInverse);
+}
+
+glm::mat4 Render::getProjectionMatrix() const {
+    return toGlm(camera->projectionMatrix);
+}
+
+glm::vec3 Render::getCameraPosition() const {
+    return {camera->position.x, camera->position.y, camera->position.z};
+}
+
+glm::vec3 Render::getCameraForward() const {
+    threepp::Vector3 dir;
+    const_cast<threepp::PerspectiveCamera*>(camera.get())->getWorldDirection(dir);
+    return {dir.x, dir.y, dir.z};
 }

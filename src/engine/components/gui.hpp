@@ -22,6 +22,7 @@ private:
     GLFWwindow *window;
     ImFont* bigFont;
     gui::ServerBrowserView serverBrowserView;
+    bool showFPS = false;
 
     void update();
     std::vector<std::string> scoreboardPlayerNames;

@@ -35,6 +35,9 @@
                 "Fire": "audio/fire.wav",
                 "Ricochet": "audio/ricochet.wav"
             }
+        },
+        "effects": {
+            "shot": "effects/orb.efkefc"
         }
     },
     "network": {
