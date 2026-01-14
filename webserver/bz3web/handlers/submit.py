@@ -55,7 +55,7 @@ def _render_form(message=None, user=None, form_data=None):
 </form>
 """
     header_html = views.header_with_title(
-        config.get_config().get("list_name", "Server List"),
+        config.get_config().get("community_name", "Server List"),
         "/submit",
         logged_in=bool(user),
         title="Add Server",
@@ -68,22 +68,22 @@ def _render_form(message=None, user=None, form_data=None):
 
 
 def _render_success(user=None):
-    body = """<p class="muted">Thanks! An administrator will review your server shortly.</p>
+    body = """<p class="muted">Thanks! Your server has been added. It will appear online after the next heartbeat.</p>
 <div class="actions">
   <a class="admin-link" href="/">Return to home</a>
   <a class="admin-link" href="/submit">Submit another server</a>
 </div>
 """
     header_html = views.header_with_title(
-        config.get_config().get("list_name", "Server List"),
+        config.get_config().get("community_name", "Server List"),
         "/submit",
         logged_in=True,
-        title="Submission received",
+        title="Server added",
         user_name=auth.display_username(user),
     )
     body = f"""{header_html}
 {body}"""
-    return views.render_page("Submission received", body)
+    return views.render_page("Server added", body)
 
 def handle(request):
     if request.method == "GET":
@@ -124,15 +124,13 @@ def handle(request):
     except ValueError:
         return _render_form("Port must be a number.", user=user, form_data=form_data)
 
-    screenshot = {"original": None, "full": None, "thumb": None}
+    screenshot_id = None
     file_item = files.get("screenshot")
     if file_item is not None and file_item.filename:
         upload_info, error = uploads.handle_upload(file_item)
         if error:
             return _render_form(error, user=user, form_data=form_data)
-        screenshot = upload_info
-
-    approved = 1 if user["auto_approve"] else 0
+        screenshot_id = upload_info.get("id")
 
     owner_username = user["username"]
 
@@ -144,13 +142,10 @@ def handle(request):
         "max_players": max_players,
         "num_players": num_players,
         "game_mode": None,
-        "approved": approved,
         "user_id": user["id"] if user else None,
         "owner_username": owner_username,
-        "screenshot_original": screenshot.get("original"),
-        "screenshot_full": screenshot.get("full"),
-        "screenshot_thumb": screenshot.get("thumb"),
-        "last_heartbeat": int(time.time()) if approved else None,
+        "screenshot_id": screenshot_id,
+        "last_heartbeat": None,
     }
 
     conn = db.connect(db.default_db_path())

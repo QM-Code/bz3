@@ -7,10 +7,10 @@ def handle(request):
         return webhttp.html_response("<h1>Method Not Allowed</h1>", status="405 Method Not Allowed")
 
     settings = config.get_config()
-    list_name = settings.get("list_name", "Server List")
+    list_name = settings.get("community_name", "Server List")
 
     conn = db.connect(db.default_db_path())
-    rows = db.list_servers(conn, approved=True)
+    rows = db.list_servers(conn)
     conn.close()
 
     servers = []
@@ -29,6 +29,8 @@ def handle(request):
             entry["max_players"] = row["max_players"]
         if row["num_players"] is not None:
             entry["num_players"] = row["num_players"]
+        if row["screenshot_id"] is not None:
+            entry["screenshot_id"] = row["screenshot_id"]
         servers.append(entry)
 
     payload = {"name": list_name, "servers": servers}

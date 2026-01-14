@@ -3,27 +3,23 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root_dir="$(cd "${script_dir}/.." && pwd)"
-data_file="${root_dir}/test-data.json"
+export PYTHONPATH="${root_dir}"
 
-if [[ ! -f "${data_file}" ]]; then
-  echo "Missing test-data.json at ${data_file}"
-  exit 1
-fi
-
-readarray -t servers < <(DATA_FILE="${data_file}" python3 - <<'PY'
-import json
-import os
+readarray -t servers < <(python3 - <<'PY'
 import random
+import sqlite3
 
-data_file = os.environ["DATA_FILE"]
-with open(data_file, "r", encoding="utf-8") as handle:
-    payload = json.load(handle)
-servers = payload.get("servers", [])
+from bz3web import db
+
+conn = db.connect(db.default_db_path())
+servers = conn.execute("SELECT host, port, max_players FROM servers ORDER BY id").fetchall()
+conn.close()
+
 for index, entry in enumerate(servers):
     if index % 2 == 0:
-        host = str(entry.get("host", "")).strip()
-        port = str(entry.get("port", "")).strip()
-        max_players = entry.get("max_players")
+        host = str(entry["host"]).strip() if entry["host"] is not None else ""
+        port = str(entry["port"]).strip() if entry["port"] is not None else ""
+        max_players = entry["max_players"]
         if max_players is None:
             max_players = random.randint(10, 32)
         if host and port:
@@ -32,7 +28,7 @@ PY
 )
 
 if [[ ${#servers[@]} -eq 0 ]]; then
-  echo "No servers found in test-data.json"
+  echo "No servers found in the database"
   exit 1
 fi
 

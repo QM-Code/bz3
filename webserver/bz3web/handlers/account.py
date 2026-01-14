@@ -1,7 +1,7 @@
 import secrets
 import time
 
-from bz3web import admin_auth, auth, config, db, lightbox, uploads, views, webhttp
+from bz3web import admin_auth, auth, config, db, lightbox, views, webhttp
 from bz3web.server_status import is_active
 
 
@@ -18,7 +18,7 @@ def _render_register(message=None, form_data=None):
     form_data = form_data or {}
     username_value = webhttp.html_escape(form_data.get("username", ""))
     email_value = webhttp.html_escape(form_data.get("email", ""))
-    body = """<form method="post" action="/register">
+    body = f"""<form method="post" action="/register">
   <div class="row">
     <div>
       <label for="username">Username</label>
@@ -42,7 +42,7 @@ def _render_register(message=None, form_data=None):
 </form>
 """
     header_html = views.header_with_title(
-        config.get_config().get("list_name", "Server List"),
+        config.get_config().get("community_name", "Server List"),
         "/register",
         logged_in=False,
         title="Create account",
@@ -60,7 +60,7 @@ def _render_login(message=None, list_name=None, logged_in=False, form_data=None)
   <div class="row">
     <div>
       <label for="email">Email or Username</label>
-      <input id="email" name="email" required value="{identifier_value}">
+      <input id="email" name="email" required value="{identifier_value}" autofocus>
     </div>
     <div>
       <label for="password">Password</label>
@@ -112,7 +112,7 @@ def _render_forgot(message=None, reset_link=None, level="info", form_data=None):
     if level in notice_kwargs:
         notice_kwargs[level] = message
     header_html = views.header_with_title(
-        config.get_config().get("list_name", "Server List"),
+        config.get_config().get("community_name", "Server List"),
         "/forgot",
         logged_in=False,
         title="Reset password",
@@ -139,7 +139,7 @@ def _render_reset(token, message=None):
 </form>
 """
     header_html = views.header_with_title(
-        config.get_config().get("list_name", "Server List"),
+        config.get_config().get("community_name", "Server List"),
         "/reset",
         logged_in=False,
         title="Set a new password",
@@ -150,7 +150,7 @@ def _render_reset(token, message=None):
     return views.render_page("Reset password", body)
 
 
-def _render_account(user, servers, admins, show_inactive=False, message=None, form_data=None):
+def _render_account(user, servers, admins, admin_list_public=False, show_inactive=False, message=None, form_data=None):
     entries = []
     settings = config.get_config()
     timeout = int(settings.get("heartbeat_timeout_seconds", 120))
@@ -168,12 +168,11 @@ def _render_account(user, servers, admins, show_inactive=False, message=None, fo
         else:
             if not active:
                 continue
-        approval_note = "" if server["approved"] else "Pending approval"
-        actions_html = f"""<form method="get" action="/account/server/edit">
+        actions_html = f"""<form method="get" action="/server/edit">
   <input type="hidden" name="id" value="{server["id"]}">
   <button type="submit" class="secondary small">Edit</button>
 </form>
-<form method="post" action="/account/server/delete">
+<form method="post" action="/server/delete" data-confirm="Delete this server permanently?">
   <input type="hidden" name="id" value="{server["id"]}">
   <button type="submit" class="secondary small">Delete</button>
 </form>"""
@@ -187,9 +186,7 @@ def _render_account(user, servers, admins, show_inactive=False, message=None, fo
                 "num_players": server["num_players"],
                 "active": active,
                 "owner": server["owner_username"] or user["username"],
-                "screenshot_thumb": server["screenshot_thumb"],
-                "screenshot_full": server["screenshot_full"],
-                "approval_note": approval_note,
+                "screenshot_id": server["screenshot_id"],
                 "actions_html": actions_html,
             }
         )
@@ -230,10 +227,22 @@ def _render_account(user, servers, admins, show_inactive=False, message=None, fo
         for admin in admins
     ) or "<tr><td colspan=\"3\">No admins assigned.</td></tr>"
 
+    public_checked = "checked" if admin_list_public else ""
     body = f"""{cards_html}
 {submit_html}
 <h2>Admins</h2>
 <p class="muted">Admins can manage your game worlds in the client/server binaries. Add trusted users here.</p>
+<form method="post" action="/account/admins/public">
+  <div class="row">
+    <div>
+      <label for="admins_public">Make Public</label>
+      <label class="switch">
+        <input id="admins_public" name="admins_public" type="checkbox" value="1" {public_checked} onchange="this.form.submit()">
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+</form>
 <table>
   <thead>
     <tr>
@@ -261,7 +270,7 @@ def _render_account(user, servers, admins, show_inactive=False, message=None, fo
 {lightbox.render_lightbox_script()}
 """
     header_html = views.header(
-        config.get_config().get("list_name", "Server List"),
+        config.get_config().get("community_name", "Server List"),
         "/account",
         logged_in=True,
         error=message,
@@ -272,66 +281,6 @@ def _render_account(user, servers, admins, show_inactive=False, message=None, fo
     return views.render_page("Servers", body)
 
 
-def _render_edit(server, message=None, form_data=None, user_info=None):
-    form_data = form_data or {}
-
-    def val(key):
-        if key in form_data:
-            return webhttp.html_escape(str(form_data.get(key) or ""))
-        return webhttp.html_escape("" if server[key] is None else str(server[key]))
-
-    body = f"""<form method="post" action="/account/server/edit" enctype="multipart/form-data">
-  <input type="hidden" name="id" value="{server["id"]}">
-  <div class="row">
-    <div>
-      <label for="host">Host</label>
-      <input id="host" name="host" required value="{val("host")}">
-    </div>
-    <div>
-      <label for="port">Port</label>
-      <input id="port" name="port" required value="{val("port")}">
-    </div>
-  </div>
-  <div>
-    <label for="name">Server Name</label>
-    <input id="name" name="name" value="{val("name")}">
-  </div>
-  <div>
-    <label for="description">Description</label>
-    <textarea id="description" name="description">{val("description")}</textarea>
-  </div>
-  <div>
-    <label for="screenshot">Replace screenshot (PNG/JPG)</label>
-    <input id="screenshot" name="screenshot" type="file" accept="image/*">
-  </div>
-  <div class="actions">
-    <button type="submit">Save changes</button>
-    <a class="admin-link align-right" href="/account">Cancel</a>
-  </div>
-</form>
-"""
-    header_html = views.header_with_title(
-        config.get_config().get("list_name", "Server List"),
-        "/account/server/edit",
-        logged_in=True,
-        title="Edit server",
-        error=message,
-        user_name=user_info,
-    )
-    body = f"""{header_html}
-{body}"""
-    return views.render_page("Edit submission", body)
-
-
-def _parse_int(value):
-    if value == "":
-        return None
-    try:
-        return int(value)
-    except ValueError:
-        return None
-
-
 def _normalize_key(value):
     return value.strip().lower()
 
@@ -340,6 +289,25 @@ def _owns_server(user, server):
     if server["owner_username"]:
         return _normalize_key(server["owner_username"]) == _normalize_key(user["username"])
     return server["user_id"] == user["id"]
+
+
+def _is_root_admin(user, settings):
+    admin_username = settings.get("admin_user", "Admin")
+    return _normalize_key(user["username"]) == _normalize_key(admin_username)
+
+
+def _sync_root_admin_privileges(conn, settings):
+    admin_username = settings.get("admin_user", "Admin")
+    root_user = db.get_user_by_username(conn, admin_username)
+    if not root_user:
+        return
+    if not root_user["is_admin"]:
+        db.set_user_admin(conn, root_user["id"], True)
+    admin_rows = db.list_user_admins(conn, root_user["id"])
+    for admin in admin_rows:
+        target = db.get_user_by_username(conn, admin["username"])
+        if target and not target["is_admin"]:
+            db.set_user_admin(conn, target["id"], True)
 
 
 def handle(request):
@@ -379,7 +347,7 @@ def handle(request):
 
         if path == "/login":
             if request.method == "GET":
-                return _render_login(list_name=settings.get("list_name", "Server List"))
+                return _render_login(list_name=settings.get("community_name", "Server List"))
             if request.method == "POST":
                 form = request.form()
                 identifier = _first(form, "email")
@@ -398,7 +366,7 @@ def handle(request):
                     else:
                         return _render_login(
                             "Login failed.",
-                            list_name=settings.get("list_name", "Server List"),
+                            list_name=settings.get("community_name", "Server List"),
                             form_data=form_data,
                         )
                 headers = []
@@ -460,116 +428,25 @@ def handle(request):
                 digest, salt = auth.new_password(password)
                 db.set_user_password(conn, reset["user_id"], digest, salt)
                 db.delete_password_reset(conn, token)
-                return _render_login("Password updated. Please sign in.", list_name=settings.get("list_name", "Server List"))
+                return _render_login("Password updated. Please sign in.", list_name=settings.get("community_name", "Server List"))
             return webhttp.html_response("<h1>Method Not Allowed</h1>", status="405 Method Not Allowed")
 
         if path == "/account":
             user = auth.get_user_from_request(request)
             if not user:
                 return webhttp.redirect("/login")
+            _sync_root_admin_privileges(conn, settings)
             servers = db.list_user_servers(conn, user["id"], user["username"])
             admins = db.list_user_admins(conn, user["id"])
+            admin_list_public = bool(user["admin_list_public"])
             show_inactive = request.query.get("show_inactive", [""])[0] == "1"
-            return _render_account(user, servers, admins, show_inactive=show_inactive)
-
-        if path == "/account/server/edit":
-            user = auth.get_user_from_request(request)
-            if not user:
-                return webhttp.redirect("/login")
-            if request.method == "GET":
-                server_id = request.query.get("id", [""])[0]
-                if not server_id.isdigit():
-                    return webhttp.redirect("/account")
-                server = db.get_server(conn, int(server_id))
-                if not server or not _owns_server(user, server):
-                    return webhttp.redirect("/account")
-                return _render_edit(server, user_info=auth.display_username(user))
-            if request.method == "POST":
-                content_length = int(request.environ.get("CONTENT_LENGTH") or 0)
-                max_bytes = int(settings.get("upload_max_bytes", 3 * 1024 * 1024))
-                form, files = request.multipart()
-                server_id = _first(form, "id")
-                if not server_id.isdigit():
-                    return webhttp.redirect("/account")
-                server = db.get_server(conn, int(server_id))
-                if not server or not _owns_server(user, server):
-                    return webhttp.redirect("/account")
-                form_data = _form_values(
-                    form,
-                    [
-                        "host",
-                        "port",
-                        "name",
-                        "description",
-                    ],
-                )
-                if content_length > max_bytes + 1024 * 1024:
-                    return _render_edit(
-                        server,
-                        "Upload too large.",
-                        form_data=form_data,
-                        user_info=auth.display_username(user),
-                    )
-                host = _first(form, "host")
-                port_text = _first(form, "port")
-                if not host or not port_text:
-                    return _render_edit(
-                        server,
-                        "Host and port are required.",
-                        form_data=form_data,
-                        user_info=auth.display_username(user),
-                    )
-                try:
-                    port = int(port_text)
-                except ValueError:
-                    return _render_edit(
-                        server,
-                        "Port must be a number.",
-                        form_data=form_data,
-                        user_info=auth.display_username(user),
-                    )
-                record = {
-                    "name": _first(form, "name") or None,
-                    "description": _first(form, "description") or None,
-                    "host": host,
-                    "port": port,
-                    "plugins": server["plugins"],
-                    "max_players": server["max_players"],
-                    "num_players": server["num_players"],
-                    "game_mode": server["game_mode"],
-                    "owner_username": server["owner_username"] or user["username"],
-                    "screenshot_original": server["screenshot_original"],
-                    "screenshot_full": server["screenshot_full"],
-                    "screenshot_thumb": server["screenshot_thumb"],
-                }
-                file_item = files.get("screenshot")
-                if file_item is not None and file_item.filename:
-                    upload_info, error = uploads.handle_upload(file_item)
-                    if error:
-                        return _render_edit(
-                            server,
-                            error,
-                            form_data=form_data,
-                            user_info=auth.display_username(user),
-                        )
-                    record["screenshot_original"] = upload_info["original"]
-                    record["screenshot_full"] = upload_info["full"]
-                    record["screenshot_thumb"] = upload_info["thumb"]
-                db.update_server(conn, int(server_id), record)
-                return webhttp.redirect("/account")
-            return webhttp.html_response("<h1>Method Not Allowed</h1>", status="405 Method Not Allowed")
-
-        if path == "/account/server/delete" and request.method == "POST":
-            user = auth.get_user_from_request(request)
-            if not user:
-                return webhttp.redirect("/login")
-            form = request.form()
-            server_id = _first(form, "id")
-            if server_id.isdigit():
-                server = db.get_server(conn, int(server_id))
-                if server and _owns_server(user, server):
-                    db.delete_server(conn, int(server_id))
-            return webhttp.redirect("/account")
+            return _render_account(
+                user,
+                servers,
+                admins,
+                admin_list_public=admin_list_public,
+                show_inactive=show_inactive,
+            )
 
         if path == "/account/admins/add" and request.method == "POST":
             user = auth.get_user_from_request(request)
@@ -592,6 +469,17 @@ def handle(request):
                 admins = db.list_user_admins(conn, user["id"])
                 return _render_account(user, servers, admins, message="User not found.", form_data=form_data)
             db.add_user_admin(conn, user["id"], admin_user["id"])
+            if _is_root_admin(user, settings):
+                db.set_user_admin(conn, admin_user["id"], True)
+            return webhttp.redirect("/account")
+
+        if path == "/account/admins/public" and request.method == "POST":
+            user = auth.get_user_from_request(request)
+            if not user:
+                return webhttp.redirect("/login")
+            form = request.form()
+            admin_list_public = form.get("admins_public", [""])[0] == "1"
+            db.set_user_admin_list_public(conn, user["id"], admin_list_public)
             return webhttp.redirect("/account")
 
         if path == "/account/admins/trust" and request.method == "POST":
@@ -619,6 +507,8 @@ def handle(request):
                 admin_user = db.get_user_by_username(conn, username)
                 if admin_user:
                     db.remove_user_admin(conn, user["id"], admin_user["id"])
+                    if _is_root_admin(user, settings):
+                        db.set_user_admin(conn, admin_user["id"], False)
             return webhttp.redirect("/account")
     finally:
         conn.close()

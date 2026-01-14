@@ -133,10 +133,27 @@ int main(int argc, char *argv[]) {
     spdlog::trace("Loading plugins...");
     py::scoped_interpreter guard{};
 
-    // Prevent Python from writing .pyc files into data/plugins/__pycache__ when plugins are loaded
+    // Redirect Python bytecode to a writable temp (or configured) directory
     {
+        namespace fs = std::filesystem;
         py::module_ sys = py::module_::import("sys");
-        sys.attr("dont_write_bytecode") = true;
+
+        fs::path pycachePrefix;
+        if (const char *envPrefix = std::getenv("BZ3_PY_CACHE_DIR")) {
+            pycachePrefix = fs::path(envPrefix);
+        } else {
+            pycachePrefix = fs::temp_directory_path() / "bz3-pycache";
+        }
+
+        std::error_code ec;
+        fs::create_directories(pycachePrefix, ec);
+        if (!ec) {
+            sys.attr("pycache_prefix") = pycachePrefix.string();
+            spdlog::info("Python bytecode cache set to {}", pycachePrefix.string());
+        } else {
+            sys.attr("dont_write_bytecode") = true;
+            spdlog::warn("Failed to create pycache dir {}; disabling bytecode write ({}).", pycachePrefix.string(), ec.message());
+        }
     }
     PluginAPI::loadPythonPlugins(mergedConfig);
     spdlog::trace("Plugins loaded successfully");

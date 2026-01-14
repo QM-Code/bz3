@@ -75,6 +75,10 @@ def ensure_admin_user(settings, conn):
     }
 
 
+def is_admin(user):
+    return bool(user and user["is_admin"])
+
+
 def display_username(user):
     if not user:
         return None

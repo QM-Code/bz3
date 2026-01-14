@@ -209,28 +209,20 @@
       "description": "Wide crater bowl with high arcs and long glide lanes.",
       "host": "192.168.1.40",
       "port": "5154",
-      "max_players": "24",
-      "num_players": "8",
-      "owner": "Grue",
-      "approved": false
+      "owner": "Grue"
     },
     {
       "name": "Salt Flats",
       "description": "Ultra-fast open flats with minimal cover and clean sightlines.",
       "host": "192.168.1.41",
       "port": "5155",
-      "max_players": "30",
-      "num_players": "12",
-      "owner": "Grue",
-      "approved": false
+      "owner": "Grue"
     },
     {
       "name": "Night Relay",
       "description": "Tight relay tunnels with short boost windows.",
       "host": "192.168.1.42",
       "port": "5156",
-      "max_players": "18",
-      "num_players": "6",
       "owner": "Grue"
     },
     {
@@ -238,28 +230,20 @@
       "description": "Floating docks and risky drop shots into the void.",
       "host": "192.168.1.43",
       "port": "5157",
-      "max_players": "20",
-      "num_players": "5",
-      "owner": "Grue",
-      "approved": false
+      "owner": "Grue"
     },
     {
       "name": "Glass Harbor",
       "description": "Reflective lanes that reward precision and punish hesitation.",
       "host": "192.168.1.44",
       "port": "5158",
-      "max_players": "22",
-      "num_players": "9",
-      "owner": "karmak",
-      "approved": false
+      "owner": "karmak"
     },
     {
       "name": "Iron Circuit",
       "description": "Industrial platforms with tight boosts and heavy collisions.",
       "host": "192.168.1.45",
       "port": "5159",
-      "max_players": "16",
-      "num_players": "4",
       "owner": "FluxRider"
     },
     {
@@ -267,18 +251,13 @@
       "description": "Layered ramps with midair duels across the center span.",
       "host": "192.168.1.46",
       "port": "5160",
-      "max_players": "24",
-      "num_players": "11",
-      "owner": "FluxRider",
-      "approved": false
+      "owner": "FluxRider"
     },
     {
       "name": "Ashen Run",
       "description": "Low-visibility ash fields with risky chase routes.",
       "host": "192.168.1.47",
       "port": "5161",
-      "max_players": "20",
-      "num_players": "7",
       "owner": "FluxRider"
     },
     {
@@ -286,8 +265,6 @@
       "description": "Ridge line skirmishes and long drift corners.",
       "host": "192.168.1.48",
       "port": "5162",
-      "max_players": "26",
-      "num_players": "10",
       "owner": "FluxRider"
     },
     {
@@ -295,8 +272,6 @@
       "description": "Circular gate hubs with rapid rotations.",
       "host": "192.168.1.49",
       "port": "5163",
-      "max_players": "18",
-      "num_players": "5",
       "owner": "FluxRider"
     },
     {
@@ -304,8 +279,6 @@
       "description": "Icy lanes with hard turns and late braking.",
       "host": "192.168.1.50",
       "port": "5164",
-      "max_players": "20",
-      "num_players": "6",
       "owner": "FluxRider"
     },
     {
@@ -313,8 +286,6 @@
       "description": "Layered quarry walls with vertical cut-throughs.",
       "host": "192.168.1.51",
       "port": "5165",
-      "max_players": "24",
-      "num_players": "9",
       "owner": "FluxRider"
     },
     {
@@ -322,18 +293,13 @@
       "description": "Flooded corridors with slick entries.",
       "host": "192.168.1.60",
       "port": "5166",
-      "max_players": "16",
-      "num_players": "3",
-      "owner": "AstraVex",
-      "approved": false
+      "owner": "AstraVex"
     },
     {
       "name": "Raven Spire",
       "description": "High spire duels and choke-point ladders.",
       "host": "192.168.1.61",
       "port": "5167",
-      "max_players": "18",
-      "num_players": "4",
       "owner": "AstraVex"
     },
     {
@@ -341,18 +307,13 @@
       "description": "Curved arches with aggressive midlines.",
       "host": "192.168.1.62",
       "port": "5168",
-      "max_players": "22",
-      "num_players": "8",
-      "owner": "CinderFox",
-      "approved": false
+      "owner": "CinderFox"
     },
     {
       "name": "Thresher Bay",
       "description": "Open bay with tidal ramps and risky flanks.",
       "host": "192.168.1.63",
       "port": "5169",
-      "max_players": "20",
-      "num_players": "6",
       "owner": "CinderFox"
     },
     {
@@ -360,8 +321,6 @@
       "description": "Black stone channels with tight dodge windows.",
       "host": "192.168.1.64",
       "port": "5170",
-      "max_players": "16",
-      "num_players": "5",
       "owner": "EchoNox"
     },
     {
@@ -369,8 +328,6 @@
       "description": "Long drift straights with late apex cutbacks.",
       "host": "192.168.1.65",
       "port": "5171",
-      "max_players": "24",
-      "num_players": "9",
       "owner": "GaleStrike"
     },
     {
@@ -378,8 +335,6 @@
       "description": "Wind corridors that reward stable lines.",
       "host": "192.168.1.66",
       "port": "5172",
-      "max_players": "20",
-      "num_players": "7",
       "owner": "GaleStrike"
     },
     {
@@ -387,8 +342,6 @@
       "description": "Sharp circuit with mirrored corners and fast resets.",
       "host": "192.168.1.67",
       "port": "5173",
-      "max_players": "18",
-      "num_players": "4",
       "owner": "JadeVortex"
     },
     {
@@ -396,8 +349,6 @@
       "description": "Dense kiosks with surprise cross lanes.",
       "host": "192.168.1.68",
       "port": "5174",
-      "max_players": "22",
-      "num_players": "6",
       "owner": "KarmaQuill"
     },
     {
@@ -405,18 +356,13 @@
       "description": "Granite relay map with hard reversals.",
       "host": "192.168.1.69",
       "port": "5175",
-      "max_players": "20",
-      "num_players": "5",
-      "owner": "OnyxPulse",
-      "approved": false
+      "owner": "OnyxPulse"
     },
     {
       "name": "Solar Delta",
       "description": "Hot delta with midrange brawls.",
       "host": "192.168.1.70",
       "port": "5176",
-      "max_players": "24",
-      "num_players": "10",
       "owner": "SolarDusk"
     },
     {
@@ -424,8 +370,6 @@
       "description": "Windy docks with aggressive outer lanes.",
       "host": "192.168.1.71",
       "port": "5177",
-      "max_players": "18",
-      "num_players": "4",
       "owner": "ZephyrShade"
     }
   ]

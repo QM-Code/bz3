@@ -7,10 +7,10 @@ def handle(request):
         return webhttp.html_response("<h1>Method Not Allowed</h1>", status="405 Method Not Allowed")
 
     settings = config.get_config()
-    list_name = settings.get("list_name", "Server List")
+    list_name = settings.get("community_name", "Server List")
 
     conn = db.connect(db.default_db_path())
-    rows = db.list_servers(conn, approved=True)
+    rows = db.list_servers(conn)
     conn.close()
 
     show_inactive = request.query.get("show_inactive", [""])[0] == "1"
@@ -39,26 +39,24 @@ def handle(request):
             entry["max_players"] = row["max_players"]
         if row["num_players"] is not None:
             entry["num_players"] = row["num_players"]
-        entry["approved"] = bool(row["approved"])
         entry["active"] = active
         entry["owner"] = row["owner_username"]
-        entry["screenshot_thumb"] = row["screenshot_thumb"]
-        entry["screenshot_full"] = row["screenshot_full"]
+        entry["screenshot_id"] = row["screenshot_id"]
         servers.append(entry)
 
     servers.sort(key=lambda item: item.get("num_players") if item.get("num_players") is not None else -1, reverse=True)
 
     user = auth.get_user_from_request(request)
-    is_admin = bool(user and user["is_admin"])
+    is_admin = auth.is_admin(user)
     for entry in servers:
         if not is_admin:
             continue
         server_id = entry.get("id")
-        entry["actions_html"] = f"""<form method="get" action="/admin/edit">
+        entry["actions_html"] = f"""<form method="get" action="/server/edit">
   <input type="hidden" name="id" value="{server_id}">
   <button type="submit" class="secondary small">Edit</button>
 </form>
-<form method="post" action="/admin/delete">
+<form method="post" action="/server/delete" data-confirm="Delete this server permanently?">
   <input type="hidden" name="id" value="{server_id}">
   <button type="submit" class="secondary small">Delete</button>
 </form>"""

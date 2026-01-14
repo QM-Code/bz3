@@ -4,7 +4,7 @@ import sqlite3
 
 def default_db_path():
     data_dir = _resolve_data_dir()
-    return os.path.join(data_dir, "serverlist.db")
+    return os.path.join(data_dir, "bz3web.db")
 
 
 def _resolve_data_dir():
@@ -32,13 +32,10 @@ def init_db(db_path):
             max_players INTEGER,
             num_players INTEGER,
             game_mode TEXT,
-            approved INTEGER NOT NULL DEFAULT 0,
             user_id INTEGER,
             owner_username TEXT COLLATE NOCASE,
             last_heartbeat INTEGER,
-            screenshot_original TEXT,
-            screenshot_full TEXT,
-            screenshot_thumb TEXT,
+            screenshot_id TEXT,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
@@ -54,6 +51,7 @@ def init_db(db_path):
             password_salt TEXT NOT NULL,
             auto_approve INTEGER NOT NULL DEFAULT 0,
             is_admin INTEGER NOT NULL DEFAULT 0,
+            admin_list_public INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
@@ -94,11 +92,10 @@ def add_server(conn, record):
     conn.execute(
         """
         INSERT INTO servers
-            (name, description, host, port, plugins, max_players, num_players, game_mode, approved, user_id,
-             owner_username,
-             screenshot_original, screenshot_full, screenshot_thumb, last_heartbeat)
+            (name, description, host, port, plugins, max_players, num_players, game_mode, user_id, owner_username,
+             screenshot_id, last_heartbeat)
         VALUES
-            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             record.get("name"),
@@ -109,12 +106,9 @@ def add_server(conn, record):
             record.get("max_players"),
             record.get("num_players"),
             record.get("game_mode"),
-            record.get("approved", 0),
             record.get("user_id"),
             record.get("owner_username"),
-            record.get("screenshot_original"),
-            record.get("screenshot_full"),
-            record.get("screenshot_thumb"),
+            record.get("screenshot_id"),
             record.get("last_heartbeat"),
         ),
     )
@@ -134,9 +128,7 @@ def update_server(conn, server_id, record):
             num_players = ?,
             game_mode = ?,
             owner_username = ?,
-            screenshot_original = ?,
-            screenshot_full = ?,
-            screenshot_thumb = ?,
+            screenshot_id = ?,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
         """,
@@ -150,19 +142,9 @@ def update_server(conn, server_id, record):
             record.get("num_players"),
             record.get("game_mode"),
             record.get("owner_username"),
-            record.get("screenshot_original"),
-            record.get("screenshot_full"),
-            record.get("screenshot_thumb"),
+            record.get("screenshot_id"),
             server_id,
         ),
-    )
-    conn.commit()
-
-
-def set_approved(conn, server_id, approved):
-    conn.execute(
-        "UPDATE servers SET approved = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-        (1 if approved else 0, server_id),
     )
     conn.commit()
 
@@ -211,15 +193,8 @@ def delete_server(conn, server_id):
     conn.commit()
 
 
-def list_servers(conn, approved=None):
-    if approved is None:
-        rows = conn.execute("SELECT * FROM servers ORDER BY created_at DESC").fetchall()
-    else:
-        rows = conn.execute(
-            "SELECT * FROM servers WHERE approved = ? ORDER BY created_at DESC",
-            (1 if approved else 0,),
-        ).fetchall()
-    return rows
+def list_servers(conn):
+    return conn.execute("SELECT * FROM servers ORDER BY created_at DESC").fetchall()
 
 
 def get_server(conn, server_id):
@@ -288,6 +263,14 @@ def update_owner_username(conn, old_username, new_username):
 def set_user_auto_approve(conn, user_id, enabled):
     conn.execute(
         "UPDATE users SET auto_approve = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        (1 if enabled else 0, user_id),
+    )
+    conn.commit()
+
+
+def set_user_admin_list_public(conn, user_id, enabled):
+    conn.execute(
+        "UPDATE users SET admin_list_public = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
         (1 if enabled else 0, user_id),
     )
     conn.commit()

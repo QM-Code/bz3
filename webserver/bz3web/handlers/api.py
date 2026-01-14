@@ -1,3 +1,4 @@
+import hmac
 import time
 import urllib.parse
 
@@ -190,11 +191,26 @@ def _handle_heartbeat(request):
 def _handle_admins(request):
     if request.method not in ("GET", "POST"):
         return webhttp.json_response({"ok": False, "error": "method_not_allowed"}, status="405 Method Not Allowed")
+    settings = config.get_config()
+    debug_auth = bool(settings.get("debug_auth", False))
     if request.method == "GET":
+        if not debug_auth:
+            return webhttp.json_response(
+                {
+                    "ok": False,
+                    "error": "method_not_allowed",
+                    "message": "GET is disabled unless debug_auth is enabled.",
+                },
+                status="405 Method Not Allowed",
+            )
         username = request.query.get("user", [""])[0].strip()
+        password_hash = request.query.get("passhash", [""])[0].strip()
+        password_text = request.query.get("password", [""])[0]
     else:
         form = request.form()
         username = form.get("user", [""])[0].strip()
+        password_hash = form.get("password", [""])[0].strip() or form.get("passhash", [""])[0].strip()
+        password_text = ""
     if not username:
         return webhttp.json_response(
             {"ok": False, "error": "missing_user", "message": "user is required"},
@@ -208,6 +224,35 @@ def _handle_admins(request):
                 {"ok": False, "error": "user_not_found", "message": f"User {username} was not found"},
                 status="404 Not Found",
             )
+        if not user["admin_list_public"]:
+            if password_text:
+                if not auth.verify_password(password_text, user["password_salt"], user["password_hash"]):
+                    return webhttp.json_response(
+                        {
+                            "ok": False,
+                            "error": "invalid_password",
+                            "message": "password did not match",
+                        },
+                        status="401 Unauthorized",
+                    )
+            elif not password_hash:
+                return webhttp.json_response(
+                    {
+                        "ok": False,
+                        "error": "missing_password",
+                        "message": "password hash is required for this user",
+                    },
+                    status="401 Unauthorized",
+                )
+            elif not hmac.compare_digest(password_hash, user["password_hash"]):
+                return webhttp.json_response(
+                    {
+                        "ok": False,
+                        "error": "invalid_password",
+                        "message": "password hash did not match",
+                    },
+                    status="401 Unauthorized",
+                )
         direct_admins = db.list_user_admins(conn, user["id"])
         admin_names = {admin["username"] for admin in direct_admins}
         for admin in direct_admins:

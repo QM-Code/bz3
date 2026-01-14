@@ -11,6 +11,62 @@ def render_page(title, body_html, message=None, header_links_html=None):
       </div>
     </div>
 """
+    confirm_html = """
+    <div class="confirm-modal" id="confirm-modal" hidden>
+      <div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+        <h3 id="confirm-title">Confirm action</h3>
+        <p id="confirm-message">Are you sure?</p>
+        <div class="actions">
+          <button type="button" class="secondary" id="confirm-cancel">Cancel</button>
+          <button type="button" id="confirm-ok">Delete</button>
+        </div>
+      </div>
+    </div>
+    <script>
+      (() => {
+        const modal = document.getElementById('confirm-modal');
+        if (!modal) return;
+        const message = document.getElementById('confirm-message');
+        const cancel = document.getElementById('confirm-cancel');
+        const ok = document.getElementById('confirm-ok');
+        let pendingForm = null;
+        document.addEventListener('submit', (event) => {
+          const form = event.target;
+          if (!(form instanceof HTMLFormElement)) return;
+          const text = form.getAttribute('data-confirm');
+          if (!text) return;
+          event.preventDefault();
+          pendingForm = form;
+          message.textContent = text;
+          modal.hidden = false;
+          cancel.focus();
+        });
+        cancel.addEventListener('click', () => {
+          modal.hidden = true;
+          pendingForm = null;
+        });
+        ok.addEventListener('click', () => {
+          if (pendingForm) {
+            pendingForm.submit();
+          }
+          modal.hidden = true;
+          pendingForm = null;
+        });
+        modal.addEventListener('click', (event) => {
+          if (event.target === modal) {
+            modal.hidden = true;
+            pendingForm = null;
+          }
+        });
+        document.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape' && !modal.hidden) {
+            modal.hidden = true;
+            pendingForm = null;
+          }
+        });
+      })();
+    </script>
+    """
     html = f"""<!doctype html>
 <html lang="en">
 <head>
@@ -23,6 +79,7 @@ def render_page(title, body_html, message=None, header_links_html=None):
     {nav_html}
     {body_html}
   </div>
+  {confirm_html}
 </body>
 </html>
 """
@@ -103,7 +160,7 @@ def header_with_title(
 
 
 def render_server_cards(servers, header_title=None, summary_text=None, toggle_url=None, toggle_label=None):
-    from bz3web import lightbox
+    from bz3web import lightbox, uploads
 
     header_html = ""
     if header_title:
@@ -133,8 +190,13 @@ def render_server_cards(servers, header_title=None, summary_text=None, toggle_ur
         approval_html = ""
         if approval_note:
             approval_html = f"<div class=\"approval-note\">{webhttp.html_escape(approval_note)}</div>"
-        screenshot = entry.get("screenshot_thumb")
-        full_image = entry.get("screenshot_full") or screenshot
+        screenshot_id = entry.get("screenshot_id")
+        screenshot = None
+        full_image = None
+        if screenshot_id:
+            urls = uploads.screenshot_urls(screenshot_id)
+            screenshot = urls.get("thumb")
+            full_image = urls.get("full") or screenshot
         actions_html = entry.get("actions_html") or ""
         actions_block = f"<div class=\"card-actions\">{actions_html}</div>" if actions_html else ""
         flags_html = ""

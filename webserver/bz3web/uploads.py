@@ -29,6 +29,21 @@ def _save_bytes(filename, data):
     return filename
 
 
+def _screenshot_names(token):
+    return {
+        "original": f"{token}_original.jpg",
+        "full": f"{token}_full.jpg",
+        "thumb": f"{token}_thumb.jpg",
+    }
+
+
+def screenshot_urls(token):
+    if not token:
+        return {}
+    names = _screenshot_names(token)
+    return {key: f"/uploads/{value}" for key, value in names.items()}
+
+
 def _scale_image(image, max_width, max_height):
     scaled = image.copy()
     scaled.thumbnail((max_width, max_height), Image.LANCZOS)
@@ -70,27 +85,21 @@ def handle_upload(file_item):
 
     ensure_upload_dir()
     token = secrets.token_hex(12)
-    original_name = f"{token}_original.jpg"
-    full_name = f"{token}_full.jpg"
-    thumb_name = f"{token}_thumb.jpg"
+    names = _screenshot_names(token)
 
     original = image.convert("RGB")
     original_bytes = io.BytesIO()
     original.save(original_bytes, format="JPEG", quality=90, optimize=True)
-    _save_bytes(original_name, original_bytes.getvalue())
+    _save_bytes(names["original"], original_bytes.getvalue())
 
     full_img = _scale_image(original, full_width, full_height)
     full_bytes = io.BytesIO()
     full_img.save(full_bytes, format="JPEG", quality=85, optimize=True)
-    _save_bytes(full_name, full_bytes.getvalue())
+    _save_bytes(names["full"], full_bytes.getvalue())
 
     thumb_img = _scale_image(original, thumb_width, thumb_height)
     thumb_bytes = io.BytesIO()
     thumb_img.save(thumb_bytes, format="JPEG", quality=80, optimize=True)
-    _save_bytes(thumb_name, thumb_bytes.getvalue())
+    _save_bytes(names["thumb"], thumb_bytes.getvalue())
 
-    return {
-        "original": f"/uploads/{original_name}",
-        "full": f"/uploads/{full_name}",
-        "thumb": f"/uploads/{thumb_name}",
-    }, None
+    return {"id": token}, None

@@ -1,7 +1,7 @@
 import os
 
 from bz3web import uploads, webhttp
-from bz3web.handlers import account, admin, api, index, servers, submit, user_profile
+from bz3web.handlers import account, api, index, servers, submit, user_profile, users, server_edit
 
 
 def _serve_static(path):
@@ -51,6 +51,10 @@ def dispatch(request):
         return servers.handle(request)
     if path == "/":
         return index.handle(request)
+    if path in ("/server/edit", "/server/delete"):
+        return server_edit.handle(request)
+    if path in ("/users", "/users/create", "/users/edit", "/users/delete"):
+        return users.handle(request)
     if path in (
         "/register",
         "/login",
@@ -58,9 +62,8 @@ def dispatch(request):
         "/forgot",
         "/reset",
         "/account",
-        "/account/server/edit",
-        "/account/server/delete",
         "/account/admins/add",
+        "/account/admins/public",
         "/account/admins/trust",
         "/account/admins/remove",
     ):
@@ -75,6 +78,4 @@ def dispatch(request):
         return _serve_upload(path)
     if path in ("/auth", "/heartbeat", "/admins"):
         return api.handle(request)
-    if path.startswith("/admin"):
-        return admin.handle(request)
     return None

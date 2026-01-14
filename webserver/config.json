@@ -1,5 +1,5 @@
 {
-  "list_name": "My Server List",
+  "community_name": "My Server List",
   "admin_user": "Admin",
   "admin_password_hash": "CHANGE_ME",
   "admin_password_salt": "CHANGE_ME",
@@ -8,8 +8,7 @@
   "port": 8080,
   "data_dir": "data",
   "uploads_dir": "uploads",
-  "debug_heartbeat": false,
-  "upload_max_bytes": 3145728,
+  "upload_max_bytes": 8388608,
   "upload_min_width": 640,
   "upload_min_height": 360,
   "upload_max_width": 3840,
@@ -18,5 +17,7 @@
   "thumbnail_height": 270,
   "fullsize_width": 1600,
   "fullsize_height": 900,
+  "debug_heartbeat": false,
+  "debug_auth": false,
   "heartbeat_timeout_seconds": 120
 }

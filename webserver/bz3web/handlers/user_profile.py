@@ -48,8 +48,7 @@ def handle(request):
             "num_players": server["num_players"],
             "active": active,
             "owner": server["owner_username"] or user["username"],
-            "screenshot_thumb": server["screenshot_thumb"],
-            "screenshot_full": server["screenshot_full"],
+            "screenshot_id": server["screenshot_id"],
         }
         entries.append(entry)
     encoded_user = quote(user["username"])
@@ -57,15 +56,15 @@ def handle(request):
     toggle_label = "Show offline servers" if not show_inactive else "Show online servers"
     summary_text = f"<strong>{active_count} online</strong> / {inactive_count} offline"
     logged_in_user = auth.get_user_from_request(request)
-    is_admin = bool(logged_in_user and logged_in_user["is_admin"])
+    is_admin = auth.is_admin(logged_in_user)
     if is_admin:
         for entry in entries:
             server_id = entry.get("id")
-            entry["actions_html"] = f"""<form method="get" action="/admin/edit">
+            entry["actions_html"] = f"""<form method="get" action="/server/edit">
   <input type="hidden" name="id" value="{server_id}">
   <button type="submit" class="secondary small">Edit</button>
 </form>
-<form method="post" action="/admin/delete">
+<form method="post" action="/server/delete" data-confirm="Delete this server permanently?">
   <input type="hidden" name="id" value="{server_id}">
   <button type="submit" class="secondary small">Delete</button>
 </form>"""
@@ -77,7 +76,7 @@ def handle(request):
         toggle_label=toggle_label,
     )
     header_html = views.header(
-        config.get_config().get("list_name", "Server List"),
+        config.get_config().get("community_name", "Server List"),
         request.path,
         logged_in=logged_in_user is not None,
         user_name=auth.display_username(logged_in_user),
