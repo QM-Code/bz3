@@ -1,6 +1,7 @@
 #include "engine/components/gui.hpp"
 #include <GLFW/glfw3.h>
 #include "common/data_path_resolver.hpp"
+#include "common/config_helpers.hpp"
 #include "spdlog/spdlog.h"
 #include <algorithm>
 
@@ -32,6 +33,8 @@ GUI::GUI(GLFWwindow *window) {
     }
 
     serverBrowserView.initializeFonts(io);
+
+	showFPS = bz::data::ReadBoolConfig({"debug.ShowFPS"}, false);
 
     io.Fonts->Build();
 }
@@ -101,6 +104,21 @@ void GUI::update() {
             0,
             1.0f
         );
+
+        if (showFPS) {
+            const float margin = 16.0f;
+            ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - margin, margin), ImGuiCond_Always, ImVec2(1.0f, 0.0f));
+            ImGui::SetNextWindowBgAlpha(0.35f);
+            ImGui::Begin("##FPSOverlay", nullptr,
+                ImGuiWindowFlags_NoTitleBar |
+                ImGuiWindowFlags_NoResize |
+                ImGuiWindowFlags_NoMove |
+                ImGuiWindowFlags_NoScrollbar |
+                ImGuiWindowFlags_NoSavedSettings |
+                ImGuiWindowFlags_AlwaysAutoResize);
+            ImGui::Text("FPS: %.1f", io.Framerate);
+            ImGui::End();
+        }
     }
 
     ImGui::Render();

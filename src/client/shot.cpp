@@ -1,6 +1,7 @@
 #include "shot.hpp"
 #include "game.hpp"
 #include "spdlog/spdlog.h"
+#include <glm/gtc/quaternion.hpp>
 
 Shot::Shot(Game &game,
            shot_id id,
@@ -21,6 +22,11 @@ Shot::Shot(Game &game,
     game.engine.render->setScale(renderId, glm::vec3(0.6f));
     game.engine.render->setTransparency(renderId, true);
 
+    trailEffect = game.engine.particles->createEffect(game.world->getAssetPath("effects.shot").string(), 0.5f);
+    if (trailEffect.has_value()) {
+        trailEffect->setPosition(position);
+    }
+
     fireAudio.play(position);
 }
 
@@ -38,6 +44,9 @@ Shot::Shot(Game &game, shot_id globalId, glm::vec3 position, glm::vec3 velocity)
 
 Shot::~Shot() {
     game.engine.render->destroy(renderId);
+    if (trailEffect.has_value()) {
+        trailEffect->stop();
+    }
 }
 
 void Shot::update(TimeUtils::duration deltaTime) {
@@ -67,6 +76,9 @@ void Shot::update(TimeUtils::duration deltaTime) {
     }
 
     game.engine.render->setPosition(renderId, position);
+    if (trailEffect.has_value()) {
+        trailEffect->setPosition(position);
+    }
     prevPosition = position; // track last position for potential future use
 }
 

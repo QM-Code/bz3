@@ -47,6 +47,18 @@ set(ENET_TEST OFF CACHE BOOL "" FORCE)
 set(ENET_SHARED OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(enet)
 
+# Effekseer (embedded copy under libs/effekseer)
+list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/libs/effekseer/cmake)
+include(FilterFolder)
+set(BUILD_EXAMPLES OFF CACHE BOOL "Disable Effekseer examples" FORCE)
+set(BUILD_VIEWER OFF CACHE BOOL "Disable Effekseer viewer" FORCE)
+set(BUILD_EDITOR OFF CACHE BOOL "Disable Effekseer editor" FORCE)
+set(BUILD_TEST OFF CACHE BOOL "Disable Effekseer tests" FORCE)
+set(BUILD_GL ON CACHE BOOL "Enable Effekseer OpenGL renderer" FORCE)
+set(BUILD_VULKAN OFF CACHE BOOL "Disable Effekseer Vulkan backend" FORCE)
+set(USE_OPENAL OFF CACHE BOOL "Prefer host audio path instead of OpenAL" FORCE)
+add_subdirectory(${PROJECT_SOURCE_DIR}/libs/effekseer/src)
+
 
 # Find external packages
 find_package(glfw3 REQUIRED)
@@ -108,6 +120,7 @@ set(ENGINE_CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/engine/physics/player_controller.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/physics/compound_body.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/components/audio.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/components/particle_effect_system.cpp
 )
 set(ENGINE_SERVER_SOURCES
     ${PROJECT_SOURCE_DIR}/src/engine/server_engine.cpp
@@ -148,6 +161,8 @@ target_include_directories(bz3 PRIVATE
     ${PROJECT_SOURCE_DIR}/src/client
     ${BULLET_INCLUDE_DIRS}
     ${enet_SOURCE_DIR}/include
+    ${PROJECT_SOURCE_DIR}/libs/effekseer/src
+    ${PROJECT_SOURCE_DIR}/libs/effekseer/src/Effekseer
     ${PROJECT_SOURCE_DIR}/include/client
 )
 target_include_directories(bz3-server PRIVATE
@@ -173,6 +188,8 @@ target_link_libraries(bz3 PRIVATE
     nlohmann_json::nlohmann_json
     proto_lib
     CURL::libcurl
+    Effekseer
+    EffekseerRendererGL
 )
 
 target_link_libraries(bz3-server PRIVATE
