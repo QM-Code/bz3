@@ -1,6 +1,10 @@
 #include "engine/physics/physics_world.hpp"
 #include "engine/mesh_loader.hpp"
-#include <bullet/btBulletDynamicsCommon.h>
+#include <btBulletDynamicsCommon.h>
+#include <BulletCollision/CollisionShapes/btTriangleInfoMap.h>
+#include <BulletCollision/CollisionShapes/btBvhTriangleMeshShape.h>
+#include <BulletCollision/CollisionShapes/btTriangleMesh.h>
+#include <BulletCollision/CollisionDispatch/btInternalEdgeUtility.h>
 #include <spdlog/spdlog.h>
 
 namespace {
@@ -27,6 +31,9 @@ PhysicsWorld::~PhysicsWorld() {
 
 void PhysicsWorld::update(float deltaTime) {
     world_->stepSimulation(deltaTime, NUM_SUBSTEPS, FIXED_TIMESTEP);
+    if (playerController_) {
+        playerController_->update(deltaTime);
+    }
 }
 
 void PhysicsWorld::setGravity(float gravity) {
@@ -62,24 +69,19 @@ PhysicsRigidBody PhysicsWorld::createBoxBody(const glm::vec3& halfExtents,
     return PhysicsRigidBody(this, body);
 }
 
-PhysicsRigidBody PhysicsWorld::createPlayer(const glm::vec3& size) {
-    glm::vec3 halfExtents = size * 0.5f;
+PhysicsPlayerController& PhysicsWorld::createPlayer(const glm::vec3& size) {
+    const glm::vec3 halfExtents = size * 0.5f;
+    PhysicsPlayerController controller(this, halfExtents, glm::vec3(0.0f, 2.0f, 0.0f));
+    controller.setRotation(glm::quat(1.0f, 0.0f, 0.0f, 0.0f));
+    controller.setVelocity(glm::vec3(0.0f));
+    controller.setAngularVelocity(glm::vec3(0.0f));
+    playerController_ = std::make_unique<PhysicsPlayerController>(std::move(controller));
+    spdlog::info("Created kinematic player controller");
+    return *playerController_;
+}
 
-    PhysicsMaterial material;
-    material.friction = 0.0f;
-    material.restitution = 0.0f;
-    material.rollingFriction = 0.0f;
-    material.spinningFriction = 0.0f;
-
-    PhysicsRigidBody body = createBoxBody(halfExtents, 1.0f, glm::vec3(0.0f, 2.0f, 0.0f), material);
-    if (btRigidBody* btBody = body.nativeHandle()) {
-        btBody->setDamping(0, 0);
-        btBody->setAngularFactor(btVector3(0, 0.1f, 0));
-        btBody->setLinearFactor(btVector3(1, 1, 1));
-    }
-
-    spdlog::info("Created player physics rigid body");
-    return body;
+PhysicsPlayerController& PhysicsWorld::createPlayer() {
+	return createPlayer(glm::vec3(1.0f, 2.0f, 1.0f));
 }
 
 PhysicsCompoundBody PhysicsWorld::createStaticMesh(const std::string& meshPath, float mass) {
@@ -89,25 +91,48 @@ PhysicsCompoundBody PhysicsWorld::createStaticMesh(const std::string& meshPath, 
         return PhysicsCompoundBody();
     }
 
+    // Static geometry should be immovable
+    if (mass > 0.0f) {
+        spdlog::warn("PhysicsWorld::createStaticMesh: mass {} ignored; static meshes must be immovable (mass=0)", mass);
+    }
+
     std::vector<btRigidBody*> bodies;
     bodies.reserve(meshes.size());
 
     for (auto& mesh : meshes) {
-        btConvexHullShape* shape = new btConvexHullShape();
-        for (const auto& v : mesh.vertices) {
-            shape->addPoint(btVector3(v.x, v.y, v.z));
+        // Build triangle mesh from indexed geometry
+        auto triMesh = new btTriangleMesh();
+        const auto& verts = mesh.vertices;
+        const auto& idx   = mesh.indices;
+
+        if (idx.size() % 3 != 0) {
+            spdlog::warn("Mesh {} has non-multiple-of-3 indices; skipping", meshPath);
+            continue;
         }
 
-        btVector3 inertia(0, 0, 0);
-        if (mass > 0.0f) {
-            shape->calculateLocalInertia(mass, inertia);
+        for (size_t i = 0; i + 2 < idx.size(); i += 3) {
+            const auto& a = verts[idx[i]];
+            const auto& b = verts[idx[i + 1]];
+            const auto& c = verts[idx[i + 2]];
+            triMesh->addTriangle(
+                btVector3(a.x, a.y, a.z),
+                btVector3(b.x, b.y, b.z),
+                btVector3(c.x, c.y, c.z),
+                /* removeDuplicateVertices */ true);
         }
 
-        btDefaultMotionState* motionState = new btDefaultMotionState(
-            btTransform(btQuaternion(0, 0, 0, 1), btVector3(0, 0, 0))
-        );
+        // Static optimized triangle mesh shape (BVH)
+        btBvhTriangleMeshShape* shape = new btBvhTriangleMeshShape(triMesh, /* useQuantizedAabbCompression */ true);
+        shape->setMargin(0.01f);  // small margin to smooth contacts
 
-        btRigidBody::btRigidBodyConstructionInfo info(mass, motionState, shape, inertia);
+        // Generate internal edge info to avoid catching on triangle edges
+        auto* triInfoMap = new btTriangleInfoMap();
+        btGenerateInternalEdgeInfo(shape, triInfoMap);
+
+        btDefaultMotionState* motionState =
+            new btDefaultMotionState(btTransform(btQuaternion(0, 0, 0, 1), btVector3(0, 0, 0)));
+
+        btRigidBody::btRigidBodyConstructionInfo info(0.0f, motionState, shape, btVector3(0, 0, 0));
         btRigidBody* body = new btRigidBody(info);
 
         body->setFriction(0.0f);
@@ -132,6 +157,10 @@ bool PhysicsWorld::raycast(const glm::vec3& from, const glm::vec3& to, glm::vec3
     if (rayCallback.hasHit()) {
         btVector3 hitPos = rayCallback.m_hitPointWorld;
         btVector3 hitNorm = rayCallback.m_hitNormalWorld;
+
+        // Normalize for stable reflections
+        const btScalar len = hitNorm.length();
+        if (len > SIMD_EPSILON) hitNorm /= len;
 
         hitPoint = glm::vec3(hitPos.x(), hitPos.y(), hitPos.z());
         hitNormal = glm::vec3(hitNorm.x(), hitNorm.y(), hitNorm.z());

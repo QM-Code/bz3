@@ -2,6 +2,8 @@
 
 #include "engine/physics/rigid_body.hpp"
 #include "engine/physics/compound_body.hpp"
+#include "engine/physics/player_controller.hpp"
+#include <memory>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <string>
@@ -38,7 +40,10 @@ public:
                                    const glm::vec3& position,
                                    const PhysicsMaterial& material);
 
-    PhysicsRigidBody createPlayer(const glm::vec3& size);
+    PhysicsPlayerController& createPlayer();
+    PhysicsPlayerController& createPlayer(const glm::vec3& size);
+
+    PhysicsPlayerController* playerController() { return playerController_.get(); }
 
     PhysicsCompoundBody createStaticMesh(const std::string& meshPath, float mass);
 
@@ -47,8 +52,11 @@ public:
 private:
     friend class PhysicsRigidBody;
     friend class PhysicsCompoundBody;
+    friend class PhysicsPlayerController;
 
     void removeBody(btRigidBody* body) const;
+
+    std::unique_ptr<PhysicsPlayerController> playerController_;
 
     btBroadphaseInterface* broadphase_ = nullptr;
     btDefaultCollisionConfiguration* collisionConfig_ = nullptr;

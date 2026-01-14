@@ -4,22 +4,6 @@
 #include "spdlog/spdlog.h"
 #include <algorithm>
 
-namespace {
-constexpr float kReferenceWindowWidth = 800.0f;
-constexpr float kReferenceWindowHeight = 600.0f;
-
-float calculateFontScale(const ImVec2 &displaySize) {
-    if (displaySize.x <= 0.0f || displaySize.y <= 0.0f) {
-        return 1.0f;
-    }
-
-    const float widthScale = displaySize.x / kReferenceWindowWidth;
-    const float heightScale = displaySize.y / kReferenceWindowHeight;
-    const float scaled = std::min(widthScale, heightScale);
-    return std::max(1.0f, scaled);
-}
-}
-
 GUI::GUI(GLFWwindow *window) {
     // Initialize ImGui context
     IMGUI_CHECKVERSION();
@@ -63,7 +47,7 @@ void GUI::update() {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGuiIO& io = ImGui::GetIO();
-    io.FontGlobalScale = calculateFontScale(io.DisplaySize);
+    io.FontGlobalScale = 1.0f; // keep text size constant across window resizes
     ImGui::NewFrame();
 
     if (serverBrowserView.isVisible()) {
