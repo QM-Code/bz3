@@ -84,6 +84,7 @@ typedef struct PlayerState {
     glm::quat rotation;
     glm::vec3 velocity;
     bool alive;
+    int score = 0;
     PlayerParameters params;
 } PlayerState;
 
@@ -100,6 +101,7 @@ enum ServerMsg_Type {
     ServerMsg_Type_PLAYER_LOCATION,
     ServerMsg_Type_PLAYER_SPAWN,
     ServerMsg_Type_PLAYER_DEATH,
+    ServerMsg_Type_SET_SCORE,
     ServerMsg_Type_CREATE_SHOT,
     ServerMsg_Type_REMOVE_SHOT,
     ServerMsg_Type_INIT,
@@ -160,6 +162,13 @@ typedef struct ServerMsg_PlayerDeath : ServerMsg {
     ServerMsg_PlayerDeath() { type = Type; }
     client_id clientId;
 } ServerMsg_PlayerDeath;
+
+typedef struct ServerMsg_SetScore : ServerMsg {
+    static constexpr ServerMsg_Type Type = ServerMsg_Type_SET_SCORE;
+    ServerMsg_SetScore() { type = Type; }
+    client_id clientId;
+    int32_t score;
+} ServerMsg_SetScore;
     
 typedef struct ServerMsg_CreateShot : ServerMsg {
     static constexpr ServerMsg_Type Type = ServerMsg_Type_CREATE_SHOT;

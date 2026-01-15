@@ -1,6 +1,7 @@
 #include "game.hpp"
 #include "spdlog/spdlog.h"
 #include <algorithm>
+#include "engine/components/gui.hpp"
 
 Game::Game(ClientEngine &engine, std::string playerName, std::string worldDir) : playerName(playerName), engine(engine) {
     world = std::make_unique<World>(*this, worldDir);
@@ -94,6 +95,16 @@ void Game::earlyUpdate(TimeUtils::duration deltaTime) {
         }
     }
 
+    for (const auto &msg : engine.network->consumeMessages<ServerMsg_SetScore>()) {
+        if (player && msg.clientId == world->playerId) {
+            player->setScore(msg.score);
+            continue;
+        }
+        if (auto *client = getClientById(msg.clientId)) {
+            client->applySetScore(msg.score);
+        }
+    }
+
     for (const auto &msg : engine.network->consumeMessages<ServerMsg_PlayerSpawn>()) {
         if (player && msg.clientId == world->playerId) {
             player->handleSpawn(msg);
@@ -141,12 +152,13 @@ void Game::lateUpdate(TimeUtils::duration deltaTime) {
         shot->update(deltaTime);
     }
 
-    std::vector<std::string> scoreboardNames;
+    std::vector<ScoreboardEntry> scoreboard;
+    scoreboard.reserve(clients.size() + 1);
     for (const auto &client : clients) {
-        scoreboardNames.push_back(client->getName());
+        scoreboard.push_back(ScoreboardEntry{client->getName(), client->getScore()});
     }
-    scoreboardNames.push_back(player->getName());
-    engine.gui->setScoreboardPlayerNames(scoreboardNames);
+    scoreboard.push_back(ScoreboardEntry{player->getName(), player->getScore()});
+    engine.gui->setScoreboardEntries(scoreboard);
 }
 
 Client *Game::getClientById(client_id id) {

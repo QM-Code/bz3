@@ -26,6 +26,7 @@ Player::Player(Game &game,
     state.params = std::move(params);
     state.name = name;
     state.alive = false;
+    state.score = 0;
     lastPosition = glm::vec3(0.0f);
     lastRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 

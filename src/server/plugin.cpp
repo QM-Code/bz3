@@ -132,6 +132,7 @@ void PluginAPI::killPlayer(client_id targetId) {
     Client *client = g_game->getClient(targetId);
 
     if (client) {
+        client->setScore(client->getScore() - 1);
         client->die();
     }
 }
