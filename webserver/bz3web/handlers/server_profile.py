@@ -56,11 +56,13 @@ def handle(request):
         }
         if is_owner or can_manage:
             server_id = server["id"]
+            csrf_html = views.csrf_input(auth.csrf_token(request))
             entry["actions_html"] = f"""<form method="get" action="/server/edit">
   <input type="hidden" name="id" value="{server_id}">
   <button type="submit" class="secondary small">Edit</button>
 </form>
 <form method="post" action="/server/delete" data-confirm="Delete this server permanently?">
+  {csrf_html}
   <input type="hidden" name="id" value="{server_id}">
   <button type="submit" class="secondary small">Delete</button>
 </form>"""

@@ -308,6 +308,11 @@ button.danger {
   box-shadow: 0 8px 20px rgba(138, 38, 38, 0.35);
 }
 
+button.success {
+  background: linear-gradient(135deg, #2d8a54 0%, #1f6a3f 100%);
+  box-shadow: 0 8px 20px rgba(31, 106, 63, 0.35);
+}
+
 a.muted {
   text-decoration: none;
   color: #9e9485;

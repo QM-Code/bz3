@@ -38,6 +38,18 @@ class Request:
             if "application/x-www-form-urlencoded" in content_type:
                 body = self.body().decode("utf-8", errors="replace")
                 self._form = urllib.parse.parse_qs(body, keep_blank_values=True)
+            elif "multipart/form-data" in content_type:
+                form = {}
+                files = {}
+                storage = cgi.FieldStorage(fp=self.environ["wsgi.input"], environ=self.environ, keep_blank_values=True)
+                if storage.list:
+                    for item in storage.list:
+                        if item.filename:
+                            files[item.name] = item
+                        else:
+                            form.setdefault(item.name, []).append(item.value)
+                self._form = form
+                self._multipart = (form, files)
             else:
                 self._form = {}
         return self._form

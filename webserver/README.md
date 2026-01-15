@@ -12,7 +12,7 @@ This folder contains a small Python webserver that hosts a server list for BZ3 c
 
 - `bz3web/`: Python package for the webserver.
 - `bin/`: helper scripts.
-- `config.json`: runtime configuration (host, port, data paths, heartbeat settings, upload limits, community name, debug auth, server auto-refresh, refresh animation, waitress threads).
+- `config.json`: runtime configuration (host, port, data paths, heartbeat settings, upload limits, community name, debug flags, server auto-refresh, refresh animation, waitress threads).
 - `data/`: database storage (configurable).
 - `uploads/`: screenshot storage (configurable).
 
@@ -34,7 +34,7 @@ The database and uploads live outside the code directory by default using `data_
 
 The server binds to `host` and `port` in `config.json` (default host is `0.0.0.0`). The site header uses `community_name`. Set `servers_auto_refresh` (seconds) to control live refresh for the server list pages; `0` disables. Set `servers_auto_refresh_animate` to `true` to animate list reordering.
 
-3) (Optional) Import users and servers from a JSON file:
+3) (Optional) Import users and servers from a JSON file (see `data/test-data.json` for an example):
 
 ```
 ./bin/import-data.sh /path/to/data/test-data.json
@@ -79,13 +79,17 @@ The import/export format is modeled after `data/test-data.json` and includes all
 - `/servers/<server>` shows a server profile page.
 - `/api/servers` returns JSON for clients.
 - `/login`, `/register`, `/forgot`, `/reset` handle account auth.
-- `/users/<username>` doubles as the signed-in user's account page when you view your own profile.
+- `/users/<username>` shows a public page of that user's servers and doubles as the signed-in user's account page when viewing your own profile.
 - `/users/<username>/edit` lets a user manage personal settings (email/password); admins can edit users here too.
-- `/users/<username>` shows a public page of that user's servers.
 - `/submit` submits a new server (login required).
 - `/server/edit?id=<id>` edits an existing server (owner or admin).
 - `/server/delete?id=<id>` deletes a server (owner or admin).
 - `/users` lists users; admins can create/edit users here.
-- `/api/admins` returns the admin list for a user.
+- `/api/admins` returns the admin list for the server identified by `host` + `port` (GET or POST).
 - `/api/heartbeat` updates server state from game servers (see `config.json` for debug/host rules).
-- `/api/auth` validates username/password for game server auth.
+- `/api/auth` validates username/password for game server auth (POST only unless `debug_auth` is enabled).
+
+## API auth parameters
+
+- `POST /api/auth`: form fields `username` or `email`, plus `passhash` (pre-hashed).
+- `GET /api/auth` (only if `debug_auth` is true): query params `username` or `email`, plus `password` (plaintext) or `passhash` (pre-hashed).

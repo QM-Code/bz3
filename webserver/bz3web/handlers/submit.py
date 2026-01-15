@@ -18,13 +18,15 @@ def _parse_int(value):
         return None
 
 
-def _render_form(message=None, user=None, form_data=None):
+def _render_form(message=None, user=None, form_data=None, csrf_token=""):
     form_data = form_data or {}
     host_value = webhttp.html_escape(form_data.get("host", ""))
     port_value = webhttp.html_escape(form_data.get("port", ""))
     name_value = webhttp.html_escape(form_data.get("name", ""))
     description_value = webhttp.html_escape(form_data.get("description", ""))
+    csrf_html = views.csrf_input(csrf_token)
     body = f"""<form method="post" action="/submit" enctype="multipart/form-data">
+  {csrf_html}
   <div class="row">
     <div>
       <label for="host">Host</label>
@@ -101,7 +103,7 @@ def handle(request):
         user = auth.get_user_from_request(request)
         if not user:
             return webhttp.redirect("/login")
-        return _render_form(user=user)
+        return _render_form(user=user, csrf_token=auth.csrf_token(request))
     if request.method != "POST":
         return webhttp.html_response("<h1>Method Not Allowed</h1>", status="405 Method Not Allowed")
 
@@ -112,6 +114,8 @@ def handle(request):
     content_length = int(request.environ.get("CONTENT_LENGTH") or 0)
     max_bytes = int(settings.get("upload_max_bytes", 3 * 1024 * 1024))
     form, files = request.multipart()
+    if not auth.verify_csrf(request, form):
+        return webhttp.html_response("<h1>Forbidden</h1>", status="403 Forbidden")
     host = _first(form, "host")
     port_text = _first(form, "port")
     name = _first(form, "name")
@@ -125,28 +129,53 @@ def handle(request):
         "description": description,
     }
     if content_length > max_bytes + 1024 * 1024:
-        return _render_form("Upload too large.", user=user, form_data=form_data)
+        return _render_form(
+            "Upload too large.",
+            user=user,
+            form_data=form_data,
+            csrf_token=auth.csrf_token(request),
+        )
 
     if not host or not port_text or not name:
-        return _render_form("Host, port, and server name are required.", user=user, form_data=form_data)
+        return _render_form(
+            "Host, port, and server name are required.",
+            user=user,
+            form_data=form_data,
+            csrf_token=auth.csrf_token(request),
+        )
 
     try:
         port = int(port_text)
     except ValueError:
-        return _render_form("Port must be a number.", user=user, form_data=form_data)
+        return _render_form(
+            "Port must be a number.",
+            user=user,
+            form_data=form_data,
+            csrf_token=auth.csrf_token(request),
+        )
 
     conn = db.connect(db.default_db_path())
     existing = db.get_server_by_name(conn, name)
     if existing:
         conn.close()
-        return _render_form("Server name is already taken.", user=user, form_data=form_data)
+        return _render_form(
+            "Server name is already taken.",
+            user=user,
+            form_data=form_data,
+            csrf_token=auth.csrf_token(request),
+        )
 
     screenshot_id = None
     file_item = files.get("screenshot")
     if file_item is not None and file_item.filename:
         upload_info, error = uploads.handle_upload(file_item)
         if error:
-            return _render_form(error, user=user, form_data=form_data)
+            return _render_form(
+                error,
+                user=user,
+                form_data=form_data,
+                csrf_token=auth.csrf_token(request),
+            )
         screenshot_id = upload_info.get("id")
 
     record = {

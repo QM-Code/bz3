@@ -59,10 +59,12 @@ def _render_users_list(
     root_admin_name="Admin",
     admin_levels=None,
     root_id=None,
+    csrf_token="",
 ):
     list_name = config.get_config().get("community_name", "Server List")
     form_data = form_data or {}
 
+    csrf_html = views.csrf_input(csrf_token)
     if show_admin_fields:
         rows = []
         for user in users:
@@ -76,6 +78,7 @@ def _render_users_list(
             lock_html = ""
             if can_lock:
                 lock_html = f"""<form method="post" action="/users/lock" class="js-toggle-form">
+      {csrf_html}
       <input type="hidden" name="id" value="{user["id"]}">
       <input type="checkbox" name="locked" value="1" {lock_checked}>
     </form>"""
@@ -123,6 +126,7 @@ def _render_users_list(
 </table>
 <h2>Add User</h2>
 <form method="post" action="/users/create">
+  {csrf_html}
   <div class="row">
     <div>
       <label for="new_username">Username</label>
@@ -187,13 +191,16 @@ def _render_user_edit(
     current_user=None,
     root_admin_name="Admin",
     admin_levels=None,
+    csrf_token="",
 ):
     form_data = form_data or {}
     username_value = form_data.get("username", user["username"])
     email_value = form_data.get("email", user["email"])
     action_url = f"/users/{urllib.parse.quote(user['username'], safe='')}/edit"
     cancel_url = f"/users/{urllib.parse.quote(user['username'], safe='')}"
+    csrf_html = views.csrf_input(csrf_token)
     body = f"""<form method="post" action="{action_url}">
+  {csrf_html}
   <input type="hidden" name="id" value="{user["id"]}">
   <div>
     <label for="username">Username</label>
@@ -214,10 +221,24 @@ def _render_user_edit(
 </form>
 """
     if auth.is_admin(current_user):
-        body += f"""<form method="post" action="/users/delete">
+        action_label = "Delete user"
+        action_class = "danger"
+        action_url = "/users/delete"
+        confirm_text = "Delete this user permanently?"
+        confirm_label = "Delete"
+        confirm_style = "danger"
+        if user["deleted"]:
+            action_label = "Reinstate user"
+            action_class = "success"
+            action_url = "/users/reinstate"
+            confirm_text = "Reinstate this user?"
+            confirm_label = "Reinstate"
+            confirm_style = "success"
+        body += f"""<form method="post" action="{action_url}" data-confirm="{confirm_text}" data-confirm-label="{confirm_label}" data-confirm-style="{confirm_style}">
+  {csrf_html}
   <input type="hidden" name="id" value="{user["id"]}">
   <div class="actions center">
-    <button type="submit" class="danger">Delete user</button>
+    <button type="submit" class="{action_class}">{action_label}</button>
   </div>
 </form>
 """
@@ -237,10 +258,12 @@ def _render_user_edit(
     return views.render_page("Edit User", body)
 
 
-def _render_user_settings(user, message=None, form_data=None, current_user=None):
+def _render_user_settings(user, message=None, form_data=None, current_user=None, csrf_token=""):
     form_data = form_data or {}
     email_value = form_data.get("email", user["email"])
+    csrf_html = views.csrf_input(csrf_token)
     body = f"""<form method="post" action="/users/{urllib.parse.quote(user["username"], safe='')}/edit">
+  {csrf_html}
   <div class="row">
     <div>
       <label for="email">Email</label>
@@ -283,6 +306,7 @@ def _handle_admin_edit(
     root_id,
     is_root_admin,
     redirect_url="/users",
+    csrf_token="",
 ):
     is_root_target = _normalize_key(target_user["username"]) == _normalize_key(admin_username)
     if not is_root_admin and is_root_target:
@@ -302,6 +326,7 @@ def _handle_admin_edit(
             current_user=current_user,
             root_admin_name=admin_username,
             admin_levels=admin_levels,
+            csrf_token=csrf_token,
         )
     if " " in username:
         return _render_user_edit(
@@ -311,6 +336,7 @@ def _handle_admin_edit(
             current_user=current_user,
             root_admin_name=admin_username,
             admin_levels=admin_levels,
+            csrf_token=csrf_token,
         )
     if _normalize_key(username) == _normalize_key(admin_username):
         return _render_user_edit(
@@ -320,6 +346,7 @@ def _handle_admin_edit(
             current_user=current_user,
             root_admin_name=admin_username,
             admin_levels=admin_levels,
+            csrf_token=csrf_token,
         )
     if is_root_target and _normalize_key(username) != _normalize_key(admin_username):
         return _render_user_edit(
@@ -329,6 +356,7 @@ def _handle_admin_edit(
             current_user=current_user,
             root_admin_name=admin_username,
             admin_levels=admin_levels,
+            csrf_token=csrf_token,
         )
     existing = db.get_user_by_username(conn, username)
     if existing and existing["id"] != target_user["id"]:
@@ -339,6 +367,7 @@ def _handle_admin_edit(
             current_user=current_user,
             root_admin_name=admin_username,
             admin_levels=admin_levels,
+            csrf_token=csrf_token,
         )
     if email != target_user["email"]:
         existing_email = db.get_user_by_email(conn, email)
@@ -350,6 +379,7 @@ def _handle_admin_edit(
                 current_user=current_user,
                 root_admin_name=admin_username,
                 admin_levels=admin_levels,
+                csrf_token=csrf_token,
             )
     db.update_user_email(conn, target_user["id"], email)
     if username != target_user["username"]:
@@ -379,6 +409,7 @@ def handle(request):
     if not current_user:
         return webhttp.redirect("/login")
     is_admin = _is_admin(current_user)
+    csrf_token = auth.csrf_token(request)
     admin_username = settings.get("admin_user", "Admin")
     is_root_admin = _is_root_admin(current_user, settings)
 
@@ -396,13 +427,15 @@ def handle(request):
                 user_id = _first(form, "id")
                 if user_id.isdigit():
                     target_user = db.get_user_by_id(conn, int(user_id))
-            if not target_user or target_user["deleted"]:
+            if not target_user:
                 return webhttp.html_response("<h1>User not found</h1>", status="404 Not Found")
             if current_user["id"] == target_user["id"]:
                 if request.method == "GET":
-                    return _render_user_settings(target_user, current_user=current_user)
+                    return _render_user_settings(target_user, current_user=current_user, csrf_token=csrf_token)
                 if request.method == "POST":
                     form = request.form()
+                    if not auth.verify_csrf(request, form):
+                        return webhttp.html_response("<h1>Forbidden</h1>", status="403 Forbidden")
                     email = _first(form, "email").lower()
                     password = _first(form, "password")
                     form_data = {"email": email}
@@ -412,6 +445,7 @@ def handle(request):
                             "Email is required.",
                             form_data=form_data,
                             current_user=current_user,
+                            csrf_token=csrf_token,
                         )
                     if email != target_user["email"]:
                         existing_email = db.get_user_by_email(conn, email)
@@ -421,6 +455,7 @@ def handle(request):
                                 "Email already in use.",
                                 form_data=form_data,
                                 current_user=current_user,
+                                csrf_token=csrf_token,
                             )
                     db.update_user_email(conn, target_user["id"], email)
                     if password:
@@ -438,6 +473,7 @@ def handle(request):
                     current_user=current_user,
                     root_admin_name=admin_username,
                     admin_levels=admin_levels,
+                    csrf_token=csrf_token,
                 )
             if request.method == "POST":
                 return _handle_admin_edit(
@@ -450,6 +486,7 @@ def handle(request):
                     root_id,
                     is_root_admin,
                     redirect_url=f"/users/{urllib.parse.quote(target_user['username'], safe='')}",
+                    csrf_token=csrf_token,
                 )
             return webhttp.html_response("<h1>Method Not Allowed</h1>", status="405 Method Not Allowed")
         if path in ("/users", "/users/"):
@@ -461,12 +498,15 @@ def handle(request):
                 root_admin_name=admin_username,
                 admin_levels=admin_levels,
                 root_id=root_id,
+                csrf_token=csrf_token,
             )
 
         if path in ("/users/create", "/users/create/") and request.method == "POST":
             if not is_admin:
                 return webhttp.redirect("/users")
             form = request.form()
+            if not auth.verify_csrf(request, form):
+                return webhttp.html_response("<h1>Forbidden</h1>", status="403 Forbidden")
             username = _first(form, "username")
             email = _first(form, "email").lower()
             password = _first(form, "password")
@@ -485,6 +525,7 @@ def handle(request):
                     form_data=form_data,
                     show_admin_fields=True,
                     root_admin_name=admin_username,
+                    csrf_token=csrf_token,
                 )
             if " " in username:
                 users = db.list_users(conn)
@@ -495,6 +536,7 @@ def handle(request):
                     form_data=form_data,
                     show_admin_fields=True,
                     root_admin_name=admin_username,
+                    csrf_token=csrf_token,
                 )
             if _normalize_key(username) == _normalize_key(admin_username):
                 users = db.list_users(conn)
@@ -505,6 +547,7 @@ def handle(request):
                     form_data=form_data,
                     show_admin_fields=True,
                     root_admin_name=admin_username,
+                    csrf_token=csrf_token,
                 )
             if db.get_user_by_username(conn, username):
                 users = db.list_users(conn)
@@ -515,6 +558,7 @@ def handle(request):
                     form_data=form_data,
                     show_admin_fields=True,
                     root_admin_name=admin_username,
+                    csrf_token=csrf_token,
                 )
             if db.get_user_by_email(conn, email):
                 users = db.list_users(conn)
@@ -525,6 +569,7 @@ def handle(request):
                     form_data=form_data,
                     show_admin_fields=True,
                     root_admin_name=admin_username,
+                    csrf_token=csrf_token,
                 )
             digest, salt = auth.new_password(password)
             db.add_user(conn, username, email, digest, salt, is_admin=False, is_admin_manual=False)
@@ -541,6 +586,8 @@ def handle(request):
             if not is_admin:
                 return webhttp.redirect("/users")
             form = request.form()
+            if not auth.verify_csrf(request, form):
+                return webhttp.html_response("<h1>Forbidden</h1>", status="403 Forbidden")
             user_id = _first(form, "id")
             if not user_id.isdigit():
                 return webhttp.redirect("/users")
@@ -572,10 +619,13 @@ def handle(request):
                             current_user=current_user,
                             root_admin_name=admin_username,
                             admin_levels=admin_levels,
+                            csrf_token=csrf_token,
                         )
                 return webhttp.redirect("/users")
             if request.method == "POST":
                 form = request.form()
+                if not auth.verify_csrf(request, form):
+                    return webhttp.html_response("<h1>Forbidden</h1>", status="403 Forbidden")
                 user_id = _first(form, "id")
                 if not user_id.isdigit():
                     return webhttp.redirect("/users")
@@ -591,12 +641,15 @@ def handle(request):
                     admin_levels,
                     root_id,
                     is_root_admin,
+                    csrf_token=csrf_token,
                 )
 
         if path in ("/users/delete", "/users/delete/") and request.method == "POST":
             if not is_admin:
                 return webhttp.redirect("/users")
             form = request.form()
+            if not auth.verify_csrf(request, form):
+                return webhttp.html_response("<h1>Forbidden</h1>", status="403 Forbidden")
             user_id = _first(form, "id")
             if user_id.isdigit():
                 user = db.get_user_by_id(conn, int(user_id))
@@ -607,7 +660,26 @@ def handle(request):
                         return webhttp.redirect("/users")
                     if not _can_manage_user(current_user, user, admin_levels, root_id):
                         return webhttp.redirect("/users")
-                    db.delete_user(conn, int(user_id))
+                    db.set_user_deleted(conn, int(user_id), True)
+            return webhttp.redirect("/users")
+
+        if path in ("/users/reinstate", "/users/reinstate/") and request.method == "POST":
+            if not is_admin:
+                return webhttp.redirect("/users")
+            form = request.form()
+            if not auth.verify_csrf(request, form):
+                return webhttp.html_response("<h1>Forbidden</h1>", status="403 Forbidden")
+            user_id = _first(form, "id")
+            if user_id.isdigit():
+                user = db.get_user_by_id(conn, int(user_id))
+                if user:
+                    if _normalize_key(user["username"]) == _normalize_key(admin_username):
+                        return webhttp.redirect("/users")
+                    if not is_root_admin and user["is_admin"]:
+                        return webhttp.redirect("/users")
+                    if not _can_manage_user(current_user, user, admin_levels, root_id):
+                        return webhttp.redirect("/users")
+                    db.set_user_deleted(conn, int(user_id), False)
             return webhttp.redirect("/users")
     finally:
         conn.close()

@@ -280,30 +280,24 @@ def handle(request):
                     user = db.get_user_by_email(conn, identifier.lower())
                 else:
                     user = db.get_user_by_username(conn, identifier)
-                if user and (user["is_locked"] or user["deleted"]):
-                    return _render_login(
-                        "Login failed.",
-                        list_name=settings.get("community_name", "Server List"),
-                        form_data=form_data,
-                    )
                 if not user or not auth.verify_password(password, user["password_salt"], user["password_hash"]):
                     admin_user = settings.get("admin_user", "Admin")
                     if _normalize_key(identifier) == _normalize_key(admin_user) and admin_auth.verify_login(
                         identifier, password, settings
                     ):
                         user = auth.ensure_admin_user(settings, conn)
-                        if user and (user["is_locked"] or user["deleted"]):
-                            return _render_login(
-                                "Login failed.",
-                                list_name=settings.get("community_name", "Server List"),
-                                form_data=form_data,
-                            )
                     else:
                         return _render_login(
                             "Login failed.",
                             list_name=settings.get("community_name", "Server List"),
                             form_data=form_data,
                         )
+                if user and (user["is_locked"] or user["deleted"]):
+                    return _render_login(
+                        "Account locked.",
+                        list_name=settings.get("community_name", "Server List"),
+                        form_data=form_data,
+                    )
                 headers = []
                 if isinstance(user, dict) and user.get("id") is None:
                     token = auth.sign_admin_session(user["username"])

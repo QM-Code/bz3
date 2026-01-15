@@ -40,6 +40,19 @@ def render_page(title, body_html, message=None, header_links_html=None):
           event.preventDefault();
           pendingForm = form;
           message.textContent = text;
+          const label = form.getAttribute('data-confirm-label');
+          const style = form.getAttribute('data-confirm-style');
+          if (label) {
+            ok.textContent = label;
+          } else {
+            ok.textContent = 'Delete';
+          }
+          ok.classList.remove('danger', 'success');
+          if (style === 'success') {
+            ok.classList.add('success');
+          } else if (style === 'danger') {
+            ok.classList.add('danger');
+          }
           modal.hidden = false;
           cancel.focus();
         });
@@ -290,6 +303,11 @@ def render_page(title, body_html, message=None, header_links_html=None):
     return webhttp.html_response(html)
 
 
+def csrf_input(token):
+    safe_token = webhttp.html_escape(token or "")
+    return f'<input type="hidden" name="csrf_token" value="{safe_token}">'
+
+
 def header(
     list_name,
     current_path,
@@ -401,15 +419,10 @@ def render_server_cards(
         description = webhttp.html_escape(entry.get("description", ""))
         num_players = entry.get("num_players")
         max_players = entry.get("max_players")
-        flags = entry.get("flags", [])
         active = entry.get("active", False)
         owner_name = entry["owner"]
         owner = webhttp.html_escape(owner_name)
         owner_url = f"/users/{urllib.parse.quote(owner_name, safe='')}"
-        approval_note = entry.get("approval_note")
-        approval_html = ""
-        if approval_note:
-            approval_html = f"<div class=\"approval-note\">{webhttp.html_escape(approval_note)}</div>"
         screenshot_id = entry.get("screenshot_id")
         screenshot = None
         full_image = None
@@ -419,13 +432,6 @@ def render_server_cards(
             full_image = urls.get("full") or screenshot
         actions_html = entry.get("actions_html") or ""
         actions_block = f"<div class=\"card-actions\">{actions_html}</div>" if actions_html else ""
-        flags_html = ""
-        if flags:
-            tags = "".join(f"<span class=\"tag\">{webhttp.html_escape(flag)}</span>" for flag in flags)
-            flags_html = f"<div class=\"tags\">{tags}</div>"
-
-        meta_html = ""
-
         description_html = f"<p>{description}</p>" if description else "<p class=\"muted\">No description provided.</p>"
         screenshot_html = ""
         card_class = "card-top"
@@ -463,7 +469,6 @@ def render_server_cards(
     <div class="title-block">
       <h3>{name_link}</h3>
       <div class="owner-line">by <a class="owner-link" href="{owner_url}">{owner}</a></div>
-      {approval_html}
     </div>
     <div class="online-block">
       <div class="{online_class}">{online_label}</div>
@@ -475,7 +480,6 @@ def render_server_cards(
     {screenshot_html}
     <div class="card-details">
       {description_html}
-      {flags_html}
     </div>
   </div>
 </article>"""
@@ -562,13 +566,16 @@ def render_admins_section(
     form_prefix="/users",
     notice_html=None,
     header_title_html=None,
+    csrf_token="",
 ):
+    csrf_html = csrf_input(csrf_token)
     if show_controls:
         admin_rows = "".join(
             f"""<tr>
   <td><a class="admin-user-link" href="/users/{urllib.parse.quote(admin["username"], safe='')}">{webhttp.html_escape(admin["username"])}</a></td>
   <td class="center-cell">
     <form method="post" action="{form_prefix}/admins/trust" class="js-toggle-form admin-toggle">
+      {csrf_html}
       <input type="hidden" name="username" value="{webhttp.html_escape(admin["username"])}">
       <label class="switch">
         <input type="checkbox" name="trust_admins" value="1" {"checked" if admin["trust_admins"] else ""}>
@@ -578,6 +585,7 @@ def render_admins_section(
   </td>
   <td class="center-cell">
     <form method="post" action="{form_prefix}/admins/remove" class="admin-action">
+      {csrf_html}
       <input type="hidden" name="username" value="{webhttp.html_escape(admin["username"])}">
       <button type="submit" class="secondary small">Remove</button>
     </form>
@@ -611,6 +619,7 @@ def render_admins_section(
     if show_add_form:
         safe_input = webhttp.html_escape(admin_input)
         add_form_html = f"""<form method="post" action="{form_prefix}/admins/add">
+  {csrf_html}
   <div class="row">
     <div>
       <label for="admin_username">Add admin by username</label>

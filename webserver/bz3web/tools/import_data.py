@@ -171,17 +171,13 @@ def import_data(path, allow_merge=False, overwrite=False):
             if db.get_server_by_name(conn, name):
                 skipped_servers += 1
                 continue
-            heartbeat_value = None
             record = {
                 "name": name,
                 "description": entry.get("description") or None,
                 "host": host,
                 "port": port,
-                "max_players": None,
-                "num_players": None,
                 "owner_user_id": owner_id,
                 "screenshot_id": entry.get("screenshot_id"),
-                "last_heartbeat": heartbeat_value,
             }
             db.add_server(conn, record)
             inserted_servers += 1

@@ -20,7 +20,17 @@
 ## Account state management
 
 - Add UI and workflows for managing locked and deleted accounts (unlock, restore, and audit visibility).
+- Add CSRF protection for unauthenticated forms (/login, /register, /forgot, /reset).
 
+## Architecture improvements
+
+- Introduce a routing layer with path templates and method dispatch to replace manual if/else routing.
+- Separate handler logic into service-layer/domain functions (validation + business rules).
+- Centralize response/error helpers to standardize HTML/JSON error handling.
+- Normalize DB access patterns and group ownership checks to reduce ad-hoc SQL in handlers.
+- Add a lightweight schema migration system to handle database upgrades safely.
+- Add config validation with clear error messages and defaulting.
+- Add a minimal test harness for auth/CSRF and DB integrity.
 ## Tags
 
 - Implement a tagging system managed under `/tags` (tags + descriptions), and allow users to tag worlds (#team, #ctf, #ffa, etc).

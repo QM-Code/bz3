@@ -59,6 +59,21 @@ def init_db(db_path):
         )
         """
     )
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS servers_host_port_unique ON servers(host, port)")
+    duplicates = conn.execute(
+        """
+        SELECT host, port, COUNT(*) AS total
+          FROM servers
+         GROUP BY host, port
+        HAVING total > 1
+        LIMIT 1
+        """
+    ).fetchone()
+    if duplicates:
+        conn.close()
+        raise ValueError(
+            f"[bz3web] Error: duplicate server host+port found in database ({duplicates[0]}:{duplicates[1]})."
+        )
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS user_admins (
@@ -189,6 +204,7 @@ def list_servers(conn):
                users.username AS owner_username
           FROM servers
           JOIN users ON users.id = servers.owner_user_id
+         WHERE users.deleted = 0
          ORDER BY servers.created_at DESC
         """
     ).fetchall()
@@ -215,6 +231,7 @@ def get_server_by_name(conn, name):
           FROM servers
           JOIN users ON users.id = servers.owner_user_id
          WHERE servers.name = ?
+           AND users.deleted = 0
         """,
         (name,),
     ).fetchone()
@@ -247,6 +264,7 @@ def list_user_servers(conn, user_id):
           FROM servers
           JOIN users ON users.id = servers.owner_user_id
          WHERE servers.owner_user_id = ?
+           AND users.deleted = 0
          ORDER BY servers.created_at DESC
         """,
         (user_id,),
@@ -449,6 +467,8 @@ def list_user_admins(conn, owner_user_id):
         FROM user_admins
         JOIN users ON users.id = user_admins.admin_user_id
         WHERE user_admins.owner_user_id = ?
+          AND users.deleted = 0
+          AND users.is_locked = 0
         ORDER BY users.username
         """,
         (owner_user_id,),

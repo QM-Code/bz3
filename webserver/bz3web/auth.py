@@ -20,6 +20,27 @@ def verify_password(password, salt, digest):
     return hmac.compare_digest(supplied, digest)
 
 
+def csrf_token(request):
+    cookies = webhttp.parse_cookies(request.environ)
+    session = cookies.get("user_session", "")
+    if not session:
+        return ""
+    secret = config.get_config().get("session_secret", "")
+    return hmac.new(secret.encode("utf-8"), session.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def verify_csrf(request, form):
+    expected = csrf_token(request)
+    if not expected:
+        return True
+    supplied = form.get("csrf_token", "")
+    if isinstance(supplied, list):
+        supplied = supplied[0] if supplied else ""
+    if not supplied:
+        return False
+    return hmac.compare_digest(supplied, expected)
+
+
 def sign_user_session(user_id):
     secret = config.get_config().get("session_secret", "")
     return webhttp.sign_session(str(user_id), secret, expires_in=8 * 3600)

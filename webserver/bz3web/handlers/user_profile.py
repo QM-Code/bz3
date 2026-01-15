@@ -28,6 +28,7 @@ def _render_profile(
     can_manage,
     message=None,
     admin_notice="",
+    csrf_token="",
 ):
     settings = config.get_config()
     timeout = int(settings.get("heartbeat_timeout_seconds", 120))
@@ -48,11 +49,13 @@ def _render_profile(
         }
         if can_manage:
             server_id = entry.get("id")
+            csrf_html = views.csrf_input(csrf_token)
             entry["actions_html"] = f"""<form method="get" action="/server/edit">
   <input type="hidden" name="id" value="{server_id}">
   <button type="submit" class="secondary small">Edit</button>
 </form>
 <form method="post" action="/server/delete" data-confirm="Delete this server permanently?">
+  {csrf_html}
   <input type="hidden" name="id" value="{server_id}">
   <button type="submit" class="secondary small">Delete</button>
 </form>"""
@@ -88,6 +91,7 @@ def _render_profile(
         form_prefix=f"/users/{encoded_user}",
         notice_html=admin_notice,
         header_title_html=admins_header_html,
+        csrf_token=csrf_token,
     )
 
     submit_html = ""
@@ -131,10 +135,13 @@ def handle(request):
     conn = db.connect(db.default_db_path())
     try:
         target_user = db.get_user_by_username(conn, username)
-        if not target_user or target_user["deleted"]:
+        if not target_user:
             return webhttp.html_response("<h1>User not found</h1>", status="404 Not Found")
 
         current_user = auth.get_user_from_request(request)
+        is_admin = auth.is_admin(current_user)
+        if target_user["deleted"] and not is_admin:
+            return webhttp.html_response("<h1>User not found</h1>", status="404 Not Found")
         if current_user:
             account._sync_root_admin_privileges(conn, settings)
         can_manage = _can_manage_profile(current_user, target_user, conn, settings)
@@ -145,6 +152,8 @@ def handle(request):
             if not can_manage:
                 return webhttp.html_response("<h1>Forbidden</h1>", status="403 Forbidden")
             form = request.form()
+            if not auth.verify_csrf(request, form):
+                return webhttp.html_response("<h1>Forbidden</h1>", status="403 Forbidden")
             remainder = path[len("/users/") :]
             parts = remainder.split("/", 2)
             action = parts[2] if len(parts) == 3 and parts[1] == "admins" else ""
@@ -183,7 +192,9 @@ def handle(request):
                         db.remove_user_admin(conn, target_user["id"], admin_user["id"])
                         account._recompute_root_admins(conn, target_user, settings)
                         return webhttp.redirect(_profile_url(target_user["username"]))
-            servers = db.list_user_servers(conn, target_user["id"])
+            servers = []
+            if not target_user["deleted"]:
+                servers = db.list_user_servers(conn, target_user["id"])
             admins = db.list_user_admins(conn, target_user["id"])
             notice_html = ""
             if current_user and current_user["id"] == target_user["id"]:
@@ -197,9 +208,12 @@ def handle(request):
                 can_manage,
                 message=message,
                 admin_notice=notice_html,
+                csrf_token=auth.csrf_token(request),
             )
 
-        servers = db.list_user_servers(conn, target_user["id"])
+        servers = []
+        if not target_user["deleted"]:
+            servers = db.list_user_servers(conn, target_user["id"])
         admins = db.list_user_admins(conn, target_user["id"])
         notice_html = ""
         if current_user and current_user["id"] == target_user["id"]:
@@ -212,6 +226,7 @@ def handle(request):
             show_inactive,
             can_manage,
             admin_notice=notice_html,
+            csrf_token=auth.csrf_token(request),
         )
     finally:
         conn.close()

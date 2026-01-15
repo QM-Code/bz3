@@ -18,6 +18,7 @@ def handle(request):
     timeout = int(settings.get("heartbeat_timeout_seconds", 120))
     user = auth.get_user_from_request(request)
     is_admin = auth.is_admin(user)
+    csrf_token = auth.csrf_token(request)
     profile_url = None
     if user:
         profile_url = f"/users/{quote(user['username'], safe='')}"
@@ -43,11 +44,13 @@ def handle(request):
         entry["screenshot_id"] = row["screenshot_id"]
         if is_admin:
             server_id = entry.get("id")
+            csrf_html = views.csrf_input(csrf_token)
             entry["actions_html"] = f"""<form method="get" action="/server/edit">
   <input type="hidden" name="id" value="{server_id}">
   <button type="submit" class="secondary small">Edit</button>
 </form>
 <form method="post" action="/server/delete" data-confirm="Delete this server permanently?">
+  {csrf_html}
   <input type="hidden" name="id" value="{server_id}">
   <button type="submit" class="secondary small">Delete</button>
 </form>"""

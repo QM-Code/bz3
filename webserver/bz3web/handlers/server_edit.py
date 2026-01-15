@@ -34,7 +34,7 @@ def _can_manage_owner(user, owner_user, conn, settings):
     return users_handler._can_manage_user(user, owner_user, levels, root_id)
 
 
-def _render_form(server, user, message=None, form_data=None, usernames=None, is_admin=False):
+def _render_form(server, user, message=None, form_data=None, usernames=None, is_admin=False, csrf_token=""):
     form_data = form_data or {}
     usernames = usernames or []
 
@@ -58,7 +58,9 @@ def _render_form(server, user, message=None, form_data=None, usernames=None, is_
   </div>
 """
     cancel_href = _profile_url(server["owner_username"])
+    csrf_html = views.csrf_input(csrf_token)
     body = f"""<form method=\"post\" action=\"/server/edit\" enctype=\"multipart/form-data\">
+  {csrf_html}
   <input type=\"hidden\" name=\"id\" value=\"{server['id']}\">
   <div class=\"row\">
     <div>
@@ -118,6 +120,8 @@ def handle(request):
     try:
         if request.path.rstrip("/") == "/server/delete" and request.method == "POST":
             form = request.form()
+            if not auth.verify_csrf(request, form):
+                return webhttp.html_response("<h1>Forbidden</h1>", status="403 Forbidden")
             server_id = _first(form, "id")
             if not server_id.isdigit():
                 return webhttp.redirect(_profile_url(user["username"]))
@@ -141,11 +145,19 @@ def handle(request):
             if not _can_manage_owner(user, owner_user, conn, settings):
                 return webhttp.redirect(_profile_url(user["username"]))
             usernames = [row["username"] for row in db.list_users(conn) if not row["deleted"]] if is_admin else []
-            return _render_form(server, user, usernames=usernames, is_admin=is_admin)
+            return _render_form(
+                server,
+                user,
+                usernames=usernames,
+                is_admin=is_admin,
+                csrf_token=auth.csrf_token(request),
+            )
 
         content_length = int(request.environ.get("CONTENT_LENGTH") or 0)
         max_bytes = int(settings.get("upload_max_bytes", 3 * 1024 * 1024))
         form, files = request.multipart()
+        if not auth.verify_csrf(request, form):
+            return webhttp.html_response("<h1>Forbidden</h1>", status="403 Forbidden")
         server_id = _first(form, "id")
         if not server_id.isdigit():
             return webhttp.redirect(_profile_url(user["username"]))
@@ -168,6 +180,7 @@ def handle(request):
                 form_data=form_data,
                 usernames=usernames,
                 is_admin=is_admin,
+                csrf_token=auth.csrf_token(request),
             )
         host = _first(form, "host")
         port_text = _first(form, "port")
@@ -180,6 +193,7 @@ def handle(request):
                 form_data=form_data,
                 usernames=usernames,
                 is_admin=is_admin,
+                csrf_token=auth.csrf_token(request),
             )
         try:
             port = int(port_text)
@@ -191,6 +205,7 @@ def handle(request):
                 form_data=form_data,
                 usernames=usernames,
                 is_admin=is_admin,
+                csrf_token=auth.csrf_token(request),
             )
 
         owner_user_id = server["owner_user_id"]
@@ -206,6 +221,7 @@ def handle(request):
                         form_data=form_data,
                         usernames=usernames,
                         is_admin=is_admin,
+                        csrf_token=auth.csrf_token(request),
                     )
                 owner_user_id = owner_user["id"]
 
@@ -218,6 +234,7 @@ def handle(request):
                 form_data=form_data,
                 usernames=usernames,
                 is_admin=is_admin,
+                csrf_token=auth.csrf_token(request),
             )
         record = {
             "name": name,

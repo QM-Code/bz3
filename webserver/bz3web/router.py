@@ -75,7 +75,7 @@ def dispatch(request):
         if username:
             request.query.setdefault("name", [username])
             return user_profile.handle(request)
-    if path in ("/users", "/users/create", "/users/edit", "/users/delete", "/users/lock"):
+    if path in ("/users", "/users/create", "/users/edit", "/users/delete", "/users/reinstate", "/users/lock"):
         user = auth.get_user_from_request(request)
         if not user:
             return webhttp.redirect("/login")
