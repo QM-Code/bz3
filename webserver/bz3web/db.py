@@ -20,27 +20,7 @@ def _resolve_data_dir():
 def init_db(db_path):
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     conn = sqlite3.connect(db_path)
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS servers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT,
-            description TEXT,
-            host TEXT NOT NULL,
-            port INTEGER NOT NULL,
-            plugins TEXT,
-            max_players INTEGER,
-            num_players INTEGER,
-            game_mode TEXT,
-            user_id INTEGER,
-            owner_username TEXT COLLATE NOCASE,
-            last_heartbeat INTEGER,
-            screenshot_id TEXT,
-            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
+    conn.execute("PRAGMA foreign_keys = ON")
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS users (
@@ -49,14 +29,51 @@ def init_db(db_path):
             email TEXT NOT NULL COLLATE NOCASE UNIQUE,
             password_hash TEXT NOT NULL,
             password_salt TEXT NOT NULL,
-            auto_approve INTEGER NOT NULL DEFAULT 0,
             is_admin INTEGER NOT NULL DEFAULT 0,
-            admin_list_public INTEGER NOT NULL DEFAULT 0,
+            is_admin_manual INTEGER NOT NULL DEFAULT 0,
+            is_locked INTEGER NOT NULL DEFAULT 0,
+            locked_at TEXT,
+            deleted INTEGER NOT NULL DEFAULT 0,
+            deleted_at TEXT,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
         """
     )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS servers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+            description TEXT,
+            host TEXT NOT NULL,
+            port INTEGER NOT NULL,
+            max_players INTEGER,
+            num_players INTEGER,
+            owner_user_id INTEGER NOT NULL,
+            last_heartbeat INTEGER,
+            screenshot_id TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(owner_user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+        """
+    )
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS servers_host_port_unique ON servers(host, port)")
+    duplicates = conn.execute(
+        """
+        SELECT host, port, COUNT(*) AS total
+          FROM servers
+         GROUP BY host, port
+        HAVING total > 1
+        LIMIT 1
+        """
+    ).fetchone()
+    if duplicates:
+        conn.close()
+        raise ValueError(
+            f"[bz3web] Error: duplicate server host+port found in database ({duplicates[0]}:{duplicates[1]})."
+        )
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS user_admins (
@@ -65,7 +82,9 @@ def init_db(db_path):
             admin_user_id INTEGER NOT NULL,
             trust_admins INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(owner_user_id, admin_user_id)
+            UNIQUE(owner_user_id, admin_user_id),
+            FOREIGN KEY(owner_user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY(admin_user_id) REFERENCES users(id) ON DELETE CASCADE
         )
         """
     )
@@ -75,7 +94,8 @@ def init_db(db_path):
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
             token TEXT NOT NULL,
-            expires_at INTEGER NOT NULL
+            expires_at INTEGER NOT NULL,
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
         )
         """
     )
@@ -85,6 +105,7 @@ def init_db(db_path):
 def connect(db_path):
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
 
@@ -92,22 +113,19 @@ def add_server(conn, record):
     conn.execute(
         """
         INSERT INTO servers
-            (name, description, host, port, plugins, max_players, num_players, game_mode, user_id, owner_username,
+            (name, description, host, port, max_players, num_players, owner_user_id,
              screenshot_id, last_heartbeat)
         VALUES
-            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             record.get("name"),
             record.get("description"),
             record["host"],
             record["port"],
-            record.get("plugins"),
             record.get("max_players"),
             record.get("num_players"),
-            record.get("game_mode"),
-            record.get("user_id"),
-            record.get("owner_username"),
+            record.get("owner_user_id"),
             record.get("screenshot_id"),
             record.get("last_heartbeat"),
         ),
@@ -123,11 +141,9 @@ def update_server(conn, server_id, record):
             description = ?,
             host = ?,
             port = ?,
-            plugins = ?,
             max_players = ?,
             num_players = ?,
-            game_mode = ?,
-            owner_username = ?,
+            owner_user_id = ?,
             screenshot_id = ?,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
@@ -137,26 +153,14 @@ def update_server(conn, server_id, record):
             record.get("description"),
             record["host"],
             record["port"],
-            record.get("plugins"),
             record.get("max_players"),
             record.get("num_players"),
-            record.get("game_mode"),
-            record.get("owner_username"),
+            record.get("owner_user_id"),
             record.get("screenshot_id"),
             server_id,
         ),
     )
     conn.commit()
-
-
-def set_owner_username(conn, server_id, owner_username):
-    conn.execute(
-        "UPDATE servers SET owner_username = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-        (owner_username, server_id),
-    )
-    conn.commit()
-
-
 
 
 def update_heartbeat(conn, server_id, timestamp, num_players=None, max_players=None):
@@ -194,16 +198,55 @@ def delete_server(conn, server_id):
 
 
 def list_servers(conn):
-    return conn.execute("SELECT * FROM servers ORDER BY created_at DESC").fetchall()
+    return conn.execute(
+        """
+        SELECT servers.*,
+               users.username AS owner_username
+          FROM servers
+          JOIN users ON users.id = servers.owner_user_id
+         WHERE users.deleted = 0
+         ORDER BY servers.created_at DESC
+        """
+    ).fetchall()
 
 
 def get_server(conn, server_id):
-    return conn.execute("SELECT * FROM servers WHERE id = ?", (server_id,)).fetchone()
+    return conn.execute(
+        """
+        SELECT servers.*,
+               users.username AS owner_username
+          FROM servers
+          JOIN users ON users.id = servers.owner_user_id
+         WHERE servers.id = ?
+        """,
+        (server_id,),
+    ).fetchone()
+
+
+def get_server_by_name(conn, name):
+    return conn.execute(
+        """
+        SELECT servers.*,
+               users.username AS owner_username
+          FROM servers
+          JOIN users ON users.id = servers.owner_user_id
+         WHERE servers.name = ?
+           AND users.deleted = 0
+        """,
+        (name,),
+    ).fetchone()
 
 
 def get_server_by_host_port(conn, host, port):
     return conn.execute(
-        "SELECT * FROM servers WHERE host = ? AND port = ?",
+        """
+        SELECT servers.*,
+               users.username AS owner_username
+          FROM servers
+          JOIN users ON users.id = servers.owner_user_id
+         WHERE servers.host = ?
+           AND servers.port = ?
+        """,
         (host, port),
     ).fetchone()
 
@@ -213,25 +256,35 @@ def list_ports_by_host(conn, host):
     return [row["port"] for row in rows]
 
 
-def list_user_servers(conn, user_id, username):
+def list_user_servers(conn, user_id):
     return conn.execute(
         """
-        SELECT * FROM servers
-        WHERE owner_username = ? COLLATE NOCASE
-           OR (owner_username IS NULL AND user_id = ?)
-        ORDER BY created_at DESC
+        SELECT servers.*,
+               users.username AS owner_username
+          FROM servers
+          JOIN users ON users.id = servers.owner_user_id
+         WHERE servers.owner_user_id = ?
+           AND users.deleted = 0
+         ORDER BY servers.created_at DESC
         """,
-        (username, user_id),
+        (user_id,),
     ).fetchall()
 
 
-def add_user(conn, username, email, password_hash, password_salt, is_admin=False):
+def add_user(conn, username, email, password_hash, password_salt, is_admin=False, is_admin_manual=False):
     conn.execute(
         """
-        INSERT INTO users (username, email, password_hash, password_salt, is_admin)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO users (username, email, password_hash, password_salt, is_admin, is_admin_manual)
+        VALUES (?, ?, ?, ?, ?, ?)
         """,
-        (username, email, password_hash, password_salt, 1 if is_admin else 0),
+        (
+            username,
+            email,
+            password_hash,
+            password_salt,
+            1 if is_admin else 0,
+            1 if is_admin_manual else 0,
+        ),
     )
     conn.commit()
 
@@ -252,35 +305,50 @@ def update_user_username(conn, user_id, username):
     conn.commit()
 
 
-def update_owner_username(conn, old_username, new_username):
-    conn.execute(
-        "UPDATE servers SET owner_username = ?, updated_at = CURRENT_TIMESTAMP WHERE owner_username = ?",
-        (new_username, old_username),
-    )
-    conn.commit()
-
-
-def set_user_auto_approve(conn, user_id, enabled):
-    conn.execute(
-        "UPDATE users SET auto_approve = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-        (1 if enabled else 0, user_id),
-    )
-    conn.commit()
-
-
-def set_user_admin_list_public(conn, user_id, enabled):
-    conn.execute(
-        "UPDATE users SET admin_list_public = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-        (1 if enabled else 0, user_id),
-    )
-    conn.commit()
-
-
 def set_user_admin(conn, user_id, enabled):
     conn.execute(
-        "UPDATE users SET is_admin = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        "UPDATE users SET is_admin = ?, is_admin_manual = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        (1 if enabled else 0, 1 if enabled else 0, user_id),
+    )
+    conn.commit()
+
+
+def set_user_admin_manual(conn, user_id, enabled):
+    conn.execute(
+        "UPDATE users SET is_admin_manual = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
         (1 if enabled else 0, user_id),
     )
+    conn.commit()
+
+
+def recompute_admin_flags(conn, root_admin_id):
+    users = conn.execute(
+        "SELECT id, deleted FROM users"
+    ).fetchall()
+    admin_ids = set()
+    if root_admin_id:
+        admin_ids.add(root_admin_id)
+        direct_admins = conn.execute(
+            "SELECT admin_user_id, trust_admins FROM user_admins WHERE owner_user_id = ?",
+            (root_admin_id,),
+        ).fetchall()
+        direct_ids = [row["admin_user_id"] for row in direct_admins]
+        admin_ids.update(direct_ids)
+        trusted_ids = [row["admin_user_id"] for row in direct_admins if row["trust_admins"]]
+        for trusted_id in trusted_ids:
+            rows = conn.execute(
+                "SELECT admin_user_id FROM user_admins WHERE owner_user_id = ?",
+                (trusted_id,),
+            ).fetchall()
+            admin_ids.update(row["admin_user_id"] for row in rows)
+    for row in users:
+        if row["deleted"]:
+            conn.execute("UPDATE users SET is_admin = 0 WHERE id = ?", (row["id"],))
+        else:
+            conn.execute(
+                "UPDATE users SET is_admin = ? WHERE id = ?",
+                (1 if row["id"] in admin_ids else 0, row["id"]),
+            )
     conn.commit()
 
 
@@ -289,6 +357,82 @@ def set_user_password(conn, user_id, password_hash, password_salt):
         "UPDATE users SET password_hash = ?, password_salt = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
         (password_hash, password_salt, user_id),
     )
+    conn.commit()
+
+
+def set_user_locked(conn, user_id, locked, locked_at=None):
+    if locked:
+        if locked_at:
+            conn.execute(
+                """
+                UPDATE users
+                SET is_locked = 1,
+                    locked_at = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (locked_at, user_id),
+            )
+        else:
+            conn.execute(
+                """
+                UPDATE users
+                SET is_locked = 1,
+                    locked_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (user_id,),
+            )
+    else:
+        conn.execute(
+            """
+            UPDATE users
+            SET is_locked = 0,
+                locked_at = NULL,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (user_id,),
+        )
+    conn.commit()
+
+
+def set_user_deleted(conn, user_id, deleted, deleted_at=None):
+    if deleted:
+        if deleted_at:
+            conn.execute(
+                """
+                UPDATE users
+                SET deleted = 1,
+                    deleted_at = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (deleted_at, user_id),
+            )
+        else:
+            conn.execute(
+                """
+                UPDATE users
+                SET deleted = 1,
+                    deleted_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (user_id,),
+            )
+    else:
+        conn.execute(
+            """
+            UPDATE users
+            SET deleted = 0,
+                deleted_at = NULL,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (user_id,),
+        )
     conn.commit()
 
 
@@ -323,6 +467,8 @@ def list_user_admins(conn, owner_user_id):
         FROM user_admins
         JOIN users ON users.id = user_admins.admin_user_id
         WHERE user_admins.owner_user_id = ?
+          AND users.deleted = 0
+          AND users.is_locked = 0
         ORDER BY users.username
         """,
         (owner_user_id,),

@@ -28,11 +28,11 @@ def render_lightbox_script():
       lightbox.hidden = true;
       image.src = "";
     }
-    document.querySelectorAll(".thumb[data-full]").forEach((thumb) => {
-      thumb.addEventListener("click", () => {
-        const src = thumb.getAttribute("data-full") || thumb.src;
-        openLightbox(src);
-      });
+    document.addEventListener("click", (event) => {
+      const thumb = event.target.closest(".thumb[data-full]");
+      if (!thumb) return;
+      const src = thumb.getAttribute("data-full") || thumb.src;
+      openLightbox(src);
     });
     closeBtn.addEventListener("click", closeLightbox);
     lightbox.addEventListener("click", (event) => {

@@ -65,6 +65,7 @@ def import_data(path, allow_merge=False, overwrite=False):
     skipped_servers = 0
     try:
         admin_username = config.get_config().get("admin_user", "Admin")
+        admin_names = set()
         for entry in users:
             if not isinstance(entry, dict):
                 skipped_users += 1
@@ -74,9 +75,11 @@ def import_data(path, allow_merge=False, overwrite=False):
             password = _normalize(entry.get("password"))
             password_hash = _normalize(entry.get("password_hash"))
             password_salt = _normalize(entry.get("password_salt"))
-            is_admin = bool(entry.get("is_admin"))
-            admin_list_public = bool(entry.get("admin_list_public"))
-            auto_approve = bool(entry.get("auto_approve"))
+            is_admin = bool(entry.get("is_admin_manual") or entry.get("is_admin"))
+            is_locked = bool(entry.get("is_locked"))
+            is_deleted = bool(entry.get("deleted"))
+            locked_at = _normalize(entry.get("locked_at")) or None
+            deleted_at = _normalize(entry.get("deleted_at")) or None
             if not username or not email:
                 skipped_users += 1
                 continue
@@ -94,9 +97,10 @@ def import_data(path, allow_merge=False, overwrite=False):
                 elif password:
                     digest, salt = auth.new_password(password)
                     db.set_user_password(conn, user_id, digest, salt)
-                db.set_user_admin(conn, user_id, is_admin)
-                db.set_user_auto_approve(conn, user_id, auto_approve)
-                db.set_user_admin_list_public(conn, user_id, admin_list_public)
+                db.set_user_locked(conn, user_id, is_locked, locked_at=locked_at)
+                db.set_user_deleted(conn, user_id, is_deleted, deleted_at=deleted_at)
+                if is_admin and username.lower() != admin_username.lower():
+                    admin_names.add(username.lower())
                 inserted_users += 1
                 continue
             if db.get_user_by_username(conn, username) or db.get_user_by_email(conn, email):
@@ -107,16 +111,21 @@ def import_data(path, allow_merge=False, overwrite=False):
                 salt = password_salt
             else:
                 digest, salt = auth.new_password(password)
-            db.add_user(conn, username, email, digest, salt, is_admin=is_admin)
+            db.add_user(conn, username, email, digest, salt, is_admin=False, is_admin_manual=False)
             user_row = db.get_user_by_username(conn, username)
             if user_row:
-                db.set_user_admin_list_public(conn, user_row["id"], admin_list_public)
-                db.set_user_auto_approve(conn, user_row["id"], auto_approve)
+                db.set_user_locked(conn, user_row["id"], is_locked, locked_at=locked_at)
+                db.set_user_deleted(conn, user_row["id"], is_deleted, deleted_at=deleted_at)
+            if is_admin and username.lower() != admin_username.lower():
+                admin_names.add(username.lower())
             inserted_users += 1
 
-        user_rows = conn.execute("SELECT id, username FROM users").fetchall()
-        user_ids = {row["username"].lower(): row["id"] for row in user_rows}
-        user_names = {row["username"].lower(): row["username"] for row in user_rows}
+        user_rows = conn.execute("SELECT id, username, deleted FROM users").fetchall()
+        user_ids = {
+            row["username"].lower(): row["id"]
+            for row in user_rows
+            if not row["deleted"]
+        }
 
         for entry in users:
             if not isinstance(entry, dict):
@@ -134,35 +143,46 @@ def import_data(path, allow_merge=False, overwrite=False):
                     continue
                 db.add_user_admin(conn, owner_id, admin_id, trust_admins=trust_admins)
 
+        root_user = db.get_user_by_username(conn, admin_username)
+        if root_user:
+            for admin_name in sorted(admin_names):
+                admin_id = user_ids.get(admin_name)
+                if admin_id:
+                    db.add_user_admin(conn, root_user["id"], admin_id)
+
         for entry in servers:
             if not isinstance(entry, dict):
                 skipped_servers += 1
                 continue
+            name = _normalize(entry.get("name"))
             host = _normalize(entry.get("host"))
             port = _parse_int(entry.get("port"))
-            if not host or port is None:
+            if not name or not host or port is None:
                 skipped_servers += 1
                 continue
             owner = _normalize(entry.get("owner"))
             owner_key = owner.lower() if owner else ""
             owner_id = user_ids.get(owner_key) if owner else None
-            heartbeat_value = None
+            if owner_id is None:
+                owner_id = user_ids.get(admin_username.lower())
+            if owner_id is None:
+                skipped_servers += 1
+                continue
+            if db.get_server_by_name(conn, name):
+                skipped_servers += 1
+                continue
             record = {
-                "name": entry.get("name") or None,
+                "name": name,
                 "description": entry.get("description") or None,
                 "host": host,
                 "port": port,
-                "plugins": entry.get("plugins"),
-                "max_players": None,
-                "num_players": None,
-                "game_mode": entry.get("game_mode"),
-                "user_id": owner_id,
-                "owner_username": user_names.get(owner_key) if owner_id else None,
+                "owner_user_id": owner_id,
                 "screenshot_id": entry.get("screenshot_id"),
-                "last_heartbeat": heartbeat_value,
             }
             db.add_server(conn, record)
             inserted_servers += 1
+        if root_user:
+            db.recompute_admin_flags(conn, root_user["id"])
     finally:
         conn.close()
 

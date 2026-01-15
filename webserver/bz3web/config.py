@@ -24,8 +24,12 @@ def _find_config_path():
 def _load_config():
     global _CONFIG_PATH
     config_path = _find_config_path()
-    with open(config_path, "r", encoding="utf-8") as handle:
-        data = json.load(handle)
+    try:
+        with open(config_path, "r", encoding="utf-8") as handle:
+            data = json.load(handle)
+    except json.JSONDecodeError as exc:
+        location = f"line {exc.lineno} column {exc.colno}" if exc.lineno and exc.colno else "unknown location"
+        raise ValueError(f"[bz3web] Error: corrupt config.json file ({location}).") from exc
     _CONFIG_PATH = config_path
     return data
 

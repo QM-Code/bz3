@@ -6,13 +6,24 @@ from bz3web import auth, config, db, webhttp
 
 
 def _handle_auth(request):
-    if request.method != "POST":
+    settings = config.get_config()
+    debug_auth = bool(settings.get("debug_auth", False))
+    if request.method == "GET":
+        if not debug_auth:
+            return webhttp.json_response({"ok": False, "error": "method_not_allowed"}, status="405 Method Not Allowed")
+        username = request.query.get("username", [""])[0].strip()
+        email = request.query.get("email", [""])[0].strip().lower()
+        password = request.query.get("password", [""])[0]
+        passhash = request.query.get("passhash", [""])[0].strip()
+    elif request.method == "POST":
+        form = request.form()
+        username = form.get("username", [""])[0].strip()
+        email = form.get("email", [""])[0].strip().lower()
+        password = ""
+        passhash = form.get("passhash", [""])[0].strip()
+    else:
         return webhttp.json_response({"ok": False, "error": "method_not_allowed"}, status="405 Method Not Allowed")
-    form = request.form()
-    username = form.get("username", [""])[0].strip()
-    email = form.get("email", [""])[0].strip().lower()
-    password = form.get("password", [""])[0]
-    if not password or (not email and not username):
+    if not (password or passhash) or (not email and not username):
         return webhttp.json_response({"ok": False, "error": "missing_credentials"}, status="400 Bad Request")
     conn = db.connect(db.default_db_path())
     try:
@@ -22,11 +33,15 @@ def _handle_auth(request):
             user = db.get_user_by_email(conn, email)
         if not user:
             return webhttp.json_response({"ok": False, "error": "invalid_credentials"}, status="401 Unauthorized")
-        if not auth.verify_password(password, user["password_salt"], user["password_hash"]):
+        if user["is_locked"] or user["deleted"]:
             return webhttp.json_response({"ok": False, "error": "invalid_credentials"}, status="401 Unauthorized")
-        return webhttp.json_response(
-            {"ok": True, "user_id": user["id"], "email": user["email"], "username": user["username"]}
-        )
+        if passhash:
+            if not hmac.compare_digest(passhash, user["password_hash"]):
+                return webhttp.json_response({"ok": False, "error": "invalid_credentials"}, status="401 Unauthorized")
+        else:
+            if not auth.verify_password(password, user["password_salt"], user["password_hash"]):
+                return webhttp.json_response({"ok": False, "error": "invalid_credentials"}, status="401 Unauthorized")
+        return webhttp.json_response({"ok": True})
     finally:
         conn.close()
 
@@ -191,86 +206,92 @@ def _handle_heartbeat(request):
 def _handle_admins(request):
     if request.method not in ("GET", "POST"):
         return webhttp.json_response({"ok": False, "error": "method_not_allowed"}, status="405 Method Not Allowed")
-    settings = config.get_config()
-    debug_auth = bool(settings.get("debug_auth", False))
     if request.method == "GET":
-        if not debug_auth:
-            return webhttp.json_response(
-                {
-                    "ok": False,
-                    "error": "method_not_allowed",
-                    "message": "GET is disabled unless debug_auth is enabled.",
-                },
-                status="405 Method Not Allowed",
-            )
-        username = request.query.get("user", [""])[0].strip()
-        password_hash = request.query.get("passhash", [""])[0].strip()
-        password_text = request.query.get("password", [""])[0]
+        host = request.query.get("host", [""])[0].strip()
+        port_text = request.query.get("port", [""])[0].strip()
     else:
         form = request.form()
-        username = form.get("user", [""])[0].strip()
-        password_hash = form.get("password", [""])[0].strip() or form.get("passhash", [""])[0].strip()
-        password_text = ""
-    if not username:
+        host = form.get("host", [""])[0].strip()
+        port_text = form.get("port", [""])[0].strip()
+    if not host:
         return webhttp.json_response(
-            {"ok": False, "error": "missing_user", "message": "user is required"},
+            {"ok": False, "error": "missing_host", "message": "host is required"},
+            status="400 Bad Request",
+        )
+    if not port_text:
+        return webhttp.json_response(
+            {"ok": False, "error": "missing_port", "message": "port is required"},
+            status="400 Bad Request",
+        )
+    try:
+        port = int(port_text)
+        if port < 1 or port > 65535:
+            raise ValueError
+    except ValueError:
+        return webhttp.json_response(
+            {
+                "ok": False,
+                "error": "invalid_port",
+                "message": "port must be an integer in the range 1-65535",
+            },
             status="400 Bad Request",
         )
     conn = db.connect(db.default_db_path())
     try:
-        user = db.get_user_by_username(conn, username)
-        if not user:
+        servers = conn.execute(
+            "SELECT owner_user_id FROM servers WHERE host = ? ORDER BY id",
+            (host,),
+        ).fetchall()
+        if not servers:
             return webhttp.json_response(
-                {"ok": False, "error": "user_not_found", "message": f"User {username} was not found"},
+                {
+                    "ok": False,
+                    "error": "host_not_found",
+                    "message": f"host not found: {host}",
+                },
                 status="404 Not Found",
             )
-        if not user["admin_list_public"]:
-            if password_text:
-                if not auth.verify_password(password_text, user["password_salt"], user["password_hash"]):
-                    return webhttp.json_response(
-                        {
-                            "ok": False,
-                            "error": "invalid_password",
-                            "message": "password did not match",
-                        },
-                        status="401 Unauthorized",
-                    )
-            elif not password_hash:
-                return webhttp.json_response(
-                    {
-                        "ok": False,
-                        "error": "missing_password",
-                        "message": "password hash is required for this user",
-                    },
-                    status="401 Unauthorized",
-                )
-            elif not hmac.compare_digest(password_hash, user["password_hash"]):
-                return webhttp.json_response(
-                    {
-                        "ok": False,
-                        "error": "invalid_password",
-                        "message": "password hash did not match",
-                    },
-                    status="401 Unauthorized",
-                )
-        direct_admins = db.list_user_admins(conn, user["id"])
+        server = db.get_server_by_host_port(conn, host, port)
+        if not server:
+            return webhttp.json_response(
+                {
+                    "ok": False,
+                    "error": "port_not_found",
+                    "message": f"port not found for host {host}: {port}",
+                },
+                status="404 Not Found",
+            )
+        owner_id = server["owner_user_id"]
+        owner_user = db.get_user_by_id(conn, owner_id)
+        if not owner_user or owner_user["deleted"]:
+            return webhttp.json_response(
+                {
+                    "ok": False,
+                    "error": "owner_not_found",
+                    "message": f"owner not found for host {host}:{port}",
+                },
+                status="404 Not Found",
+            )
+        direct_admins = db.list_user_admins(conn, owner_id)
         admin_names = {admin["username"] for admin in direct_admins}
         for admin in direct_admins:
             if not admin["trust_admins"]:
                 continue
             for trusted in db.list_user_admins(conn, admin["admin_user_id"]):
                 admin_names.add(trusted["username"])
-        return webhttp.json_response({"ok": True, "user": username, "admins": sorted(admin_names)})
+        return webhttp.json_response(
+            {"ok": True, "host": host, "port": port, "owner": owner_user["username"], "admins": sorted(admin_names)}
+        )
     finally:
         conn.close()
 
 
 def handle(request):
     path = request.path.rstrip("/")
-    if path == "/auth":
+    if path == "/api/auth":
         return _handle_auth(request)
-    if path == "/heartbeat":
+    if path == "/api/heartbeat":
         return _handle_heartbeat(request)
-    if path == "/admins":
+    if path == "/api/admins":
         return _handle_admins(request)
     return webhttp.json_response({"ok": False, "error": "not_found"}, status="404 Not Found")
