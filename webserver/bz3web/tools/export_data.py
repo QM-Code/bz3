@@ -15,9 +15,11 @@ def export_data():
                    email,
                    password_hash,
                    password_salt,
-                   auto_approve,
                    is_admin,
-                   admin_list_public
+                   is_locked,
+                   locked_at,
+                   deleted,
+                   deleted_at
               FROM users
              ORDER BY LOWER(username)
             """
@@ -49,9 +51,11 @@ def export_data():
                 "email": user["email"],
                 "password_hash": user["password_hash"],
                 "password_salt": user["password_salt"],
-                "auto_approve": bool(user["auto_approve"]),
                 "is_admin": bool(user["is_admin"]),
-                "admin_list_public": bool(user["admin_list_public"]),
+                "is_locked": bool(user["is_locked"]),
+                "locked_at": user["locked_at"],
+                "deleted": bool(user["deleted"]),
+                "deleted_at": user["deleted_at"],
             }
             admins = admin_lookup.get(user["id"])
             if admins:
@@ -60,16 +64,15 @@ def export_data():
 
         servers = conn.execute(
             """
-            SELECT name,
-                   description,
-                   host,
-                   port,
-                   plugins,
-                   game_mode,
-                   owner_username,
-                   screenshot_id
+            SELECT servers.name,
+                   servers.description,
+                   servers.host,
+                   servers.port,
+                   users.username AS owner_username,
+                   servers.screenshot_id
               FROM servers
-             ORDER BY LOWER(name)
+              JOIN users ON users.id = servers.owner_user_id
+             ORDER BY LOWER(servers.name)
             """
         ).fetchall()
         server_payload = []
@@ -82,10 +85,6 @@ def export_data():
                 "owner": server["owner_username"],
                 "screenshot_id": server["screenshot_id"],
             }
-            if server["plugins"] is not None:
-                entry["plugins"] = server["plugins"]
-            if server["game_mode"] is not None:
-                entry["game_mode"] = server["game_mode"]
             server_payload.append(entry)
 
         return {"users": user_payload, "servers": server_payload}

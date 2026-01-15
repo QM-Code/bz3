@@ -1,10 +1,10 @@
+try:
+    from waitress import serve as serve_app
+except ImportError:
+    serve_app = None
 from wsgiref.simple_server import make_server
 
 from bz3web import config, db, router, webhttp
-
-
-DB_PATH = db.default_db_path()
-db.init_db(DB_PATH)
 
 
 def application(environ, start_response):
@@ -19,15 +19,24 @@ def application(environ, start_response):
 
 
 def main():
-    settings = config.get_config()
+    try:
+        settings = config.get_config()
+        db.init_db(db.default_db_path())
+    except ValueError as exc:
+        print(str(exc))
+        return
     host = settings.get("host", "127.0.0.1")
     port = int(settings.get("port", 8080))
-    with make_server(host, port, application) as server:
-        print(f"Server list server listening on http://{host}:{port}")
-        try:
+    print(f"Server list server listening on http://{host}:{port}")
+    try:
+        if serve_app is not None:
+            threads = int(settings.get("waitress_threads", 8))
+            serve_app(application, host=host, port=port, threads=threads)
+            return
+        with make_server(host, port, application) as server:
             server.serve_forever()
-        except KeyboardInterrupt:
-            print("\nServer stopped.")
+    except KeyboardInterrupt:
+        print("\nServer stopped.")
 
 
 if __name__ == "__main__":

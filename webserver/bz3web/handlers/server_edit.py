@@ -1,4 +1,7 @@
+from urllib.parse import quote
+
 from bz3web import auth, config, db, uploads, views, webhttp
+from bz3web.handlers import users as users_handler
 
 
 def _first(form, key):
@@ -14,10 +17,21 @@ def _normalize_key(value):
     return value.strip().lower()
 
 
-def _owns_server(user, server):
-    if server["owner_username"]:
-        return _normalize_key(server["owner_username"]) == _normalize_key(user["username"])
-    return server["user_id"] == user["id"]
+def _profile_url(username):
+    return f"/users/{quote(username, safe='')}"
+
+
+def _can_manage_owner(user, owner_user, conn, settings):
+    if not user:
+        return False
+    if owner_user is None:
+        return False
+    if owner_user and user["id"] == owner_user["id"]:
+        return True
+    if not auth.is_admin(user):
+        return False
+    levels, root_id = users_handler._admin_levels(conn, settings)
+    return users_handler._can_manage_user(user, owner_user, levels, root_id)
 
 
 def _render_form(server, user, message=None, form_data=None, usernames=None, is_admin=False):
@@ -30,7 +44,7 @@ def _render_form(server, user, message=None, form_data=None, usernames=None, is_
         value = server[key]
         return webhttp.html_escape("" if value is None else str(value))
 
-    owner_value = webhttp.html_escape(form_data.get("owner_username") or (server["owner_username"] or ""))
+    owner_value = webhttp.html_escape(form_data.get("owner_username") or server["owner_username"])
     owner_field = ""
     if is_admin:
         options = "".join(f"<option value=\"{webhttp.html_escape(name)}\"></option>" for name in usernames)
@@ -43,7 +57,7 @@ def _render_form(server, user, message=None, form_data=None, usernames=None, is_
     </datalist>
   </div>
 """
-    cancel_href = "/users" if is_admin else "/account"
+    cancel_href = _profile_url(server["owner_username"])
     body = f"""<form method=\"post\" action=\"/server/edit\" enctype=\"multipart/form-data\">
   <input type=\"hidden\" name=\"id\" value=\"{server['id']}\">
   <div class=\"row\">
@@ -58,7 +72,7 @@ def _render_form(server, user, message=None, form_data=None, usernames=None, is_
   </div>
   <div>
     <label for=\"name\">Server Name</label>
-    <input id=\"name\" name=\"name\" value=\"{val('name')}\">
+    <input id=\"name\" name=\"name\" required value=\"{val('name')}\">
   </div>
   <div>
     <label for=\"description\">Description</label>
@@ -74,6 +88,7 @@ def _render_form(server, user, message=None, form_data=None, usernames=None, is_
   </div>
 </form>
 """
+    profile_url = _profile_url(user["username"])
     header_html = views.header_with_title(
         config.get_config().get("community_name", "Server List"),
         "/server/edit",
@@ -81,6 +96,8 @@ def _render_form(server, user, message=None, form_data=None, usernames=None, is_
         title="Edit server",
         error=message,
         user_name=auth.display_username(user),
+        is_admin=auth.is_admin(user),
+        profile_url=profile_url,
     )
     body = f"""{header_html}
 {body}"""
@@ -103,25 +120,27 @@ def handle(request):
             form = request.form()
             server_id = _first(form, "id")
             if not server_id.isdigit():
-                return webhttp.redirect("/account")
+                return webhttp.redirect(_profile_url(user["username"]))
             server = db.get_server(conn, int(server_id))
             if not server:
-                return webhttp.redirect("/account")
-            if not is_admin and not _owns_server(user, server):
-                return webhttp.redirect("/account")
+                return webhttp.redirect(_profile_url(user["username"]))
+            owner_user = db.get_user_by_id(conn, server["owner_user_id"])
+            if not _can_manage_owner(user, owner_user, conn, settings):
+                return webhttp.redirect(_profile_url(user["username"]))
             db.delete_server(conn, int(server_id))
-            return webhttp.redirect("/users" if is_admin else "/account")
+            return webhttp.redirect(_profile_url(server["owner_username"]))
 
         if request.method == "GET":
             server_id = request.query.get("id", [""])[0]
             if not server_id.isdigit():
-                return webhttp.redirect("/users" if is_admin else "/account")
+                return webhttp.redirect(_profile_url(user["username"]))
             server = db.get_server(conn, int(server_id))
             if not server:
-                return webhttp.redirect("/users" if is_admin else "/account")
-            if not is_admin and not _owns_server(user, server):
-                return webhttp.redirect("/account")
-            usernames = [row["username"] for row in db.list_users(conn)] if is_admin else []
+                return webhttp.redirect(_profile_url(user["username"]))
+            owner_user = db.get_user_by_id(conn, server["owner_user_id"])
+            if not _can_manage_owner(user, owner_user, conn, settings):
+                return webhttp.redirect(_profile_url(user["username"]))
+            usernames = [row["username"] for row in db.list_users(conn) if not row["deleted"]] if is_admin else []
             return _render_form(server, user, usernames=usernames, is_admin=is_admin)
 
         content_length = int(request.environ.get("CONTENT_LENGTH") or 0)
@@ -129,17 +148,18 @@ def handle(request):
         form, files = request.multipart()
         server_id = _first(form, "id")
         if not server_id.isdigit():
-            return webhttp.redirect("/users" if is_admin else "/account")
+            return webhttp.redirect(_profile_url(user["username"]))
         server = db.get_server(conn, int(server_id))
         if not server:
-            return webhttp.redirect("/users" if is_admin else "/account")
-        if not is_admin and not _owns_server(user, server):
-            return webhttp.redirect("/account")
+            return webhttp.redirect(_profile_url(user["username"]))
+        owner_user = db.get_user_by_id(conn, server["owner_user_id"])
+        if not _can_manage_owner(user, owner_user, conn, settings):
+            return webhttp.redirect(_profile_url(user["username"]))
         form_data = _form_values(
             form,
             ["host", "port", "name", "description", "owner_username"],
         )
-        usernames = [row["username"] for row in db.list_users(conn)] if is_admin else []
+        usernames = [row["username"] for row in db.list_users(conn) if not row["deleted"]] if is_admin else []
         if content_length > max_bytes + 1024 * 1024:
             return _render_form(
                 server,
@@ -151,11 +171,12 @@ def handle(request):
             )
         host = _first(form, "host")
         port_text = _first(form, "port")
-        if not host or not port_text:
+        name = _first(form, "name")
+        if not host or not port_text or not name:
             return _render_form(
                 server,
                 user,
-                message="Host and port are required.",
+                message="Host, port, and server name are required.",
                 form_data=form_data,
                 usernames=usernames,
                 is_admin=is_admin,
@@ -172,12 +193,12 @@ def handle(request):
                 is_admin=is_admin,
             )
 
-        owner_username = server["owner_username"] or user["username"]
+        owner_user_id = server["owner_user_id"]
         if is_admin:
             owner_input = _first(form, "owner_username")
             if owner_input:
                 owner_user = db.get_user_by_username(conn, owner_input)
-                if not owner_user:
+                if not owner_user or owner_user["deleted"]:
                     return _render_form(
                         server,
                         user,
@@ -186,20 +207,26 @@ def handle(request):
                         usernames=usernames,
                         is_admin=is_admin,
                     )
-                owner_username = owner_user["username"]
-            else:
-                owner_username = None
+                owner_user_id = owner_user["id"]
 
+        existing = db.get_server_by_name(conn, name)
+        if existing and existing["id"] != server["id"]:
+            return _render_form(
+                server,
+                user,
+                message="Server name is already taken.",
+                form_data=form_data,
+                usernames=usernames,
+                is_admin=is_admin,
+            )
         record = {
-            "name": _first(form, "name") or None,
+            "name": name,
             "description": _first(form, "description") or None,
             "host": host,
             "port": port,
-            "plugins": server["plugins"],
             "max_players": server["max_players"],
             "num_players": server["num_players"],
-            "game_mode": server["game_mode"],
-            "owner_username": owner_username,
+            "owner_user_id": owner_user_id,
             "screenshot_id": server["screenshot_id"],
         }
 
@@ -218,6 +245,6 @@ def handle(request):
             record["screenshot_id"] = upload_info["id"]
 
         db.update_server(conn, int(server_id), record)
-        return webhttp.redirect("/users" if is_admin else "/account")
+        return webhttp.redirect(_profile_url(server["owner_username"]))
     finally:
         conn.close()

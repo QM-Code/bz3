@@ -1,8 +1,8 @@
 import secrets
 import time
+from urllib.parse import quote
 
-from bz3web import admin_auth, auth, config, db, lightbox, views, webhttp
-from bz3web.server_status import is_active
+from bz3web import admin_auth, auth, config, db, views, webhttp
 
 
 def _first(form, key):
@@ -47,6 +47,7 @@ def _render_register(message=None, form_data=None):
         logged_in=False,
         title="Create account",
         error=message,
+        is_admin=False,
     )
     body = f"""{header_html}
 {body}"""
@@ -83,6 +84,7 @@ def _render_login(message=None, list_name=None, logged_in=False, form_data=None)
             title="Login",
             show_login=False,
             error=message,
+            is_admin=False,
         )
     body = f"""{header_html}
 {body}"""
@@ -117,6 +119,7 @@ def _render_forgot(message=None, reset_link=None, level="info", form_data=None):
         logged_in=False,
         title="Reset password",
         **notice_kwargs,
+        is_admin=False,
     )
     body = f"""{header_html}
 {body}"""
@@ -144,141 +147,11 @@ def _render_reset(token, message=None):
         logged_in=False,
         title="Set a new password",
         error=message,
+        is_admin=False,
     )
     body = f"""{header_html}
 {body}"""
     return views.render_page("Reset password", body)
-
-
-def _render_account(user, servers, admins, admin_list_public=False, show_inactive=False, message=None, form_data=None):
-    entries = []
-    settings = config.get_config()
-    timeout = int(settings.get("heartbeat_timeout_seconds", 120))
-    active_count = 0
-    inactive_count = 0
-    for server in servers:
-        active = is_active(server, timeout)
-        if active:
-            active_count += 1
-        else:
-            inactive_count += 1
-        if show_inactive:
-            if active:
-                continue
-        else:
-            if not active:
-                continue
-        actions_html = f"""<form method="get" action="/server/edit">
-  <input type="hidden" name="id" value="{server["id"]}">
-  <button type="submit" class="secondary small">Edit</button>
-</form>
-<form method="post" action="/server/delete" data-confirm="Delete this server permanently?">
-  <input type="hidden" name="id" value="{server["id"]}">
-  <button type="submit" class="secondary small">Delete</button>
-</form>"""
-        entries.append(
-            {
-                "host": server["host"],
-                "port": str(server["port"]),
-                "name": server["name"],
-                "description": server["description"],
-                "max_players": server["max_players"],
-                "num_players": server["num_players"],
-                "active": active,
-                "owner": server["owner_username"] or user["username"],
-                "screenshot_id": server["screenshot_id"],
-                "actions_html": actions_html,
-            }
-        )
-    toggle_url = "/account?show_inactive=1" if not show_inactive else "/account"
-    toggle_label = "Show offline servers" if not show_inactive else "Show online servers"
-    summary_text = f"<strong>{active_count} online</strong> / {inactive_count} offline"
-    cards_html = views.render_server_cards(
-        entries,
-        header_title="Servers",
-        summary_text=summary_text,
-        toggle_url=toggle_url,
-        toggle_label=toggle_label,
-    )
-    submit_html = """<div class="actions section-actions">
-  <a class="admin-link" href="/submit">Add server</a>
-</div>"""
-    form_data = form_data or {}
-    admin_input = webhttp.html_escape(form_data.get("admin_username", ""))
-    admin_rows = "".join(
-        f"""<tr>
-  <td><a class="admin-user-link" href="/user?name={webhttp.html_escape(admin["username"])}">{webhttp.html_escape(admin["username"])}</a></td>
-  <td>
-    <form method="post" action="/account/admins/trust">
-      <input type="hidden" name="username" value="{webhttp.html_escape(admin["username"])}">
-      <label class="switch">
-        <input type="checkbox" name="trust_admins" value="1" {"checked" if admin["trust_admins"] else ""} onchange="this.form.submit()">
-        <span class="slider"></span>
-      </label>
-    </form>
-  </td>
-  <td>
-    <form method="post" action="/account/admins/remove">
-      <input type="hidden" name="username" value="{webhttp.html_escape(admin["username"])}">
-      <button type="submit" class="secondary">Remove</button>
-    </form>
-  </td>
-</tr>"""
-        for admin in admins
-    ) or "<tr><td colspan=\"3\">No admins assigned.</td></tr>"
-
-    public_checked = "checked" if admin_list_public else ""
-    body = f"""{cards_html}
-{submit_html}
-<h2>Admins</h2>
-<p class="muted">Admins can manage your game worlds in the client/server binaries. Add trusted users here.</p>
-<form method="post" action="/account/admins/public">
-  <div class="row">
-    <div>
-      <label for="admins_public">Make Public</label>
-      <label class="switch">
-        <input id="admins_public" name="admins_public" type="checkbox" value="1" {public_checked} onchange="this.form.submit()">
-        <span class="slider"></span>
-      </label>
-    </div>
-  </div>
-</form>
-<table>
-  <thead>
-    <tr>
-      <th>Username</th>
-      <th>Trust user's admins</th>
-      <th>Actions</th>
-    </tr>
-  </thead>
-  <tbody>
-    {admin_rows}
-  </tbody>
-</table>
-<form method="post" action="/account/admins/add">
-  <div class="row">
-    <div>
-      <label for="admin_username">Add admin by username</label>
-      <input id="admin_username" name="username" required value="{admin_input}">
-    </div>
-  </div>
-  <div class="actions">
-    <button type="submit">Add admin</button>
-  </div>
-</form>
-{lightbox.render_lightbox()}
-{lightbox.render_lightbox_script()}
-"""
-    header_html = views.header(
-        config.get_config().get("community_name", "Server List"),
-        "/account",
-        logged_in=True,
-        error=message,
-        user_name=auth.display_username(user),
-    )
-    body = f"""{header_html}
-{body}"""
-    return views.render_page("Servers", body)
 
 
 def _normalize_key(value):
@@ -286,9 +159,7 @@ def _normalize_key(value):
 
 
 def _owns_server(user, server):
-    if server["owner_username"]:
-        return _normalize_key(server["owner_username"]) == _normalize_key(user["username"])
-    return server["user_id"] == user["id"]
+    return server["owner_user_id"] == user["id"]
 
 
 def _is_root_admin(user, settings):
@@ -301,13 +172,62 @@ def _sync_root_admin_privileges(conn, settings):
     root_user = db.get_user_by_username(conn, admin_username)
     if not root_user:
         return
-    if not root_user["is_admin"]:
-        db.set_user_admin(conn, root_user["id"], True)
-    admin_rows = db.list_user_admins(conn, root_user["id"])
-    for admin in admin_rows:
-        target = db.get_user_by_username(conn, admin["username"])
-        if target and not target["is_admin"]:
-            db.set_user_admin(conn, target["id"], True)
+    db.recompute_admin_flags(conn, root_user["id"])
+
+
+def _recompute_root_admins(conn, user, settings):
+    if not _is_root_admin(user, settings):
+        admin_username = settings.get("admin_user", "Admin")
+        root_user = db.get_user_by_username(conn, admin_username)
+        if not root_user:
+            return
+        admins = db.list_user_admins(conn, root_user["id"])
+        trusted_admin_ids = {
+            admin["admin_user_id"] for admin in admins if admin["trust_admins"]
+        }
+        if user["id"] not in trusted_admin_ids:
+            return
+    else:
+        admin_username = settings.get("admin_user", "Admin")
+        root_user = db.get_user_by_username(conn, admin_username)
+        if not root_user:
+            return
+    if root_user:
+        db.recompute_admin_flags(conn, root_user["id"])
+
+
+def _trusted_primary_notice(conn, target_user, settings):
+    admin_username = settings.get("admin_user", "Admin")
+    root_user = db.get_user_by_username(conn, admin_username)
+    if not root_user:
+        return ""
+    admins = db.list_user_admins(conn, root_user["id"])
+    trusted_ids = {
+        admin["admin_user_id"] for admin in admins if admin["trust_admins"]
+    }
+    if target_user["id"] == root_user["id"]:
+        return (
+            '<div class="admin-notice">'
+            '<div>You are logged in as the <span class="admin-notice-strong">Root Admin</span>.</div>'
+            '<ul>'
+            '<li>Any admins you create will also be granted Community Admin status.</li>'
+            '<li class="admin-notice-warning">If you enable "Trust User\'s Admins", all of that user\'s admins will also '
+            'become Community Admins.</li>'
+            '<li>Please read the <a href="/admin-docs">Admin Documentation</a> and proceed with caution.</li>'
+            '</ul>'
+            '</div>'
+        )
+    if target_user["id"] not in trusted_ids:
+        return ""
+    return (
+        '<div class="admin-notice">'
+        '<div>You are a <span class="admin-notice-strong">Trusted Primary Community Admin</span>.</div>'
+        '<ul>'
+        '<li>Any admins you create will also be granted Community Admin status.</li>'
+        '<li>Please read the <a href="/admin-docs">Admin Documentation</a> and proceed with caution.</li>'
+        '</ul>'
+        '</div>'
+    )
 
 
 def handle(request):
@@ -341,7 +261,10 @@ def handle(request):
                 headers = []
                 token = auth.sign_user_session(user["id"])
                 webhttp.set_cookie(headers, "user_session", token, max_age=8 * 3600)
-                status, redirect_headers, body = webhttp.redirect("/account")
+                profile_url = "/servers"
+                if user and "username" in user:
+                    profile_url = f"/users/{quote(user['username'], safe='')}"
+                status, redirect_headers, body = webhttp.redirect(profile_url)
                 return status, headers + redirect_headers, body
             return webhttp.html_response("<h1>Method Not Allowed</h1>", status="405 Method Not Allowed")
 
@@ -357,12 +280,24 @@ def handle(request):
                     user = db.get_user_by_email(conn, identifier.lower())
                 else:
                     user = db.get_user_by_username(conn, identifier)
+                if user and (user["is_locked"] or user["deleted"]):
+                    return _render_login(
+                        "Login failed.",
+                        list_name=settings.get("community_name", "Server List"),
+                        form_data=form_data,
+                    )
                 if not user or not auth.verify_password(password, user["password_salt"], user["password_hash"]):
                     admin_user = settings.get("admin_user", "Admin")
                     if _normalize_key(identifier) == _normalize_key(admin_user) and admin_auth.verify_login(
                         identifier, password, settings
                     ):
                         user = auth.ensure_admin_user(settings, conn)
+                        if user and (user["is_locked"] or user["deleted"]):
+                            return _render_login(
+                                "Login failed.",
+                                list_name=settings.get("community_name", "Server List"),
+                                form_data=form_data,
+                            )
                     else:
                         return _render_login(
                             "Login failed.",
@@ -375,7 +310,10 @@ def handle(request):
                 else:
                     token = auth.sign_user_session(user["id"])
                 webhttp.set_cookie(headers, "user_session", token, max_age=8 * 3600)
-                status, redirect_headers, body = webhttp.redirect("/account")
+                profile_url = "/servers"
+                if user and "username" in user:
+                    profile_url = f"/users/{quote(user['username'], safe='')}"
+                status, redirect_headers, body = webhttp.redirect(profile_url)
                 return status, headers + redirect_headers, body
             return webhttp.html_response("<h1>Method Not Allowed</h1>", status="405 Method Not Allowed")
 
@@ -384,7 +322,7 @@ def handle(request):
                 return webhttp.html_response("<h1>Method Not Allowed</h1>", status="405 Method Not Allowed")
             headers = []
             webhttp.set_cookie(headers, "user_session", "expired", max_age=0)
-            status, redirect_headers, body = webhttp.redirect("/")
+            status, redirect_headers, body = webhttp.redirect("/servers")
             return status, headers + redirect_headers, body
 
         if path == "/forgot":
@@ -431,85 +369,6 @@ def handle(request):
                 return _render_login("Password updated. Please sign in.", list_name=settings.get("community_name", "Server List"))
             return webhttp.html_response("<h1>Method Not Allowed</h1>", status="405 Method Not Allowed")
 
-        if path == "/account":
-            user = auth.get_user_from_request(request)
-            if not user:
-                return webhttp.redirect("/login")
-            _sync_root_admin_privileges(conn, settings)
-            servers = db.list_user_servers(conn, user["id"], user["username"])
-            admins = db.list_user_admins(conn, user["id"])
-            admin_list_public = bool(user["admin_list_public"])
-            show_inactive = request.query.get("show_inactive", [""])[0] == "1"
-            return _render_account(
-                user,
-                servers,
-                admins,
-                admin_list_public=admin_list_public,
-                show_inactive=show_inactive,
-            )
-
-        if path == "/account/admins/add" and request.method == "POST":
-            user = auth.get_user_from_request(request)
-            if not user:
-                return webhttp.redirect("/login")
-            form = request.form()
-            username = _first(form, "username")
-            form_data = {"admin_username": username}
-            if not username:
-                servers = db.list_user_servers(conn, user["id"], user["username"])
-                admins = db.list_user_admins(conn, user["id"])
-                return _render_account(user, servers, admins, message="Username is required.", form_data=form_data)
-            if _normalize_key(username) == _normalize_key(user["username"]):
-                servers = db.list_user_servers(conn, user["id"], user["username"])
-                admins = db.list_user_admins(conn, user["id"])
-                return _render_account(user, servers, admins, message="You cannot add yourself.", form_data=form_data)
-            admin_user = db.get_user_by_username(conn, username)
-            if not admin_user:
-                servers = db.list_user_servers(conn, user["id"], user["username"])
-                admins = db.list_user_admins(conn, user["id"])
-                return _render_account(user, servers, admins, message="User not found.", form_data=form_data)
-            db.add_user_admin(conn, user["id"], admin_user["id"])
-            if _is_root_admin(user, settings):
-                db.set_user_admin(conn, admin_user["id"], True)
-            return webhttp.redirect("/account")
-
-        if path == "/account/admins/public" and request.method == "POST":
-            user = auth.get_user_from_request(request)
-            if not user:
-                return webhttp.redirect("/login")
-            form = request.form()
-            admin_list_public = form.get("admins_public", [""])[0] == "1"
-            db.set_user_admin_list_public(conn, user["id"], admin_list_public)
-            return webhttp.redirect("/account")
-
-        if path == "/account/admins/trust" and request.method == "POST":
-            user = auth.get_user_from_request(request)
-            if not user:
-                return webhttp.redirect("/login")
-            form = request.form()
-            username = _first(form, "username")
-            trust = form.get("trust_admins", [""])[0] == "1"
-            admin_user = db.get_user_by_username(conn, username)
-            if not admin_user:
-                servers = db.list_user_servers(conn, user["id"], user["username"])
-                admins = db.list_user_admins(conn, user["id"])
-                return _render_account(user, servers, admins, message="User not found.")
-            db.set_user_admin_trust(conn, user["id"], admin_user["id"], trust)
-            return webhttp.redirect("/account")
-
-        if path == "/account/admins/remove" and request.method == "POST":
-            user = auth.get_user_from_request(request)
-            if not user:
-                return webhttp.redirect("/login")
-            form = request.form()
-            username = _first(form, "username")
-            if username:
-                admin_user = db.get_user_by_username(conn, username)
-                if admin_user:
-                    db.remove_user_admin(conn, user["id"], admin_user["id"])
-                    if _is_root_admin(user, settings):
-                        db.set_user_admin(conn, admin_user["id"], False)
-            return webhttp.redirect("/account")
     finally:
         conn.close()
 

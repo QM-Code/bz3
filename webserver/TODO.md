@@ -16,3 +16,19 @@
 ## Streams
 
 - Look into having a link for a Twitch stream of a game in progress.
+
+## Account state management
+
+- Add UI and workflows for managing locked and deleted accounts (unlock, restore, and audit visibility).
+
+## Tags
+
+- Implement a tagging system managed under `/tags` (tags + descriptions), and allow users to tag worlds (#team, #ctf, #ffa, etc).
+
+## Ratings
+
+- Implement a rating system for worlds and users.
+
+## API namespace
+
+- Consolidate additional JSON endpoints under `/api` (users, worlds, tags, ratings, uploads metadata, etc).

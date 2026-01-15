@@ -39,7 +39,7 @@ while true; do
     max_players="$(awk '{print $3}' <<< "${entry}")"
     players="$((RANDOM % max_players))"
     echo "heartbeat ${host}:${port} players=${players} max=${max_players}"
-    response="$(curl -s -w "\n%{http_code}" "http://127.0.0.1:8080/heartbeat?host=${host}&port=${port}&players=${players}&max=${max_players}")"
+    response="$(curl -s -w "\n%{http_code}" "http://127.0.0.1:8080/api/heartbeat?host=${host}&port=${port}&players=${players}&max=${max_players}")"
     body="$(printf "%s" "${response}" | head -n 1)"
     status="$(printf "%s" "${response}" | tail -n 1)"
     if [[ "${status}" != "200" ]] || grep -q '"ok": false' <<< "${body}"; then

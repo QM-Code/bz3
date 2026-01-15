@@ -22,6 +22,8 @@ def _handle_auth(request):
             user = db.get_user_by_email(conn, email)
         if not user:
             return webhttp.json_response({"ok": False, "error": "invalid_credentials"}, status="401 Unauthorized")
+        if user["is_locked"] or user["deleted"]:
+            return webhttp.json_response({"ok": False, "error": "invalid_credentials"}, status="401 Unauthorized")
         if not auth.verify_password(password, user["password_salt"], user["password_hash"]):
             return webhttp.json_response({"ok": False, "error": "invalid_credentials"}, status="401 Unauthorized")
         return webhttp.json_response(
@@ -219,40 +221,11 @@ def _handle_admins(request):
     conn = db.connect(db.default_db_path())
     try:
         user = db.get_user_by_username(conn, username)
-        if not user:
+        if not user or user["deleted"]:
             return webhttp.json_response(
                 {"ok": False, "error": "user_not_found", "message": f"User {username} was not found"},
                 status="404 Not Found",
             )
-        if not user["admin_list_public"]:
-            if password_text:
-                if not auth.verify_password(password_text, user["password_salt"], user["password_hash"]):
-                    return webhttp.json_response(
-                        {
-                            "ok": False,
-                            "error": "invalid_password",
-                            "message": "password did not match",
-                        },
-                        status="401 Unauthorized",
-                    )
-            elif not password_hash:
-                return webhttp.json_response(
-                    {
-                        "ok": False,
-                        "error": "missing_password",
-                        "message": "password hash is required for this user",
-                    },
-                    status="401 Unauthorized",
-                )
-            elif not hmac.compare_digest(password_hash, user["password_hash"]):
-                return webhttp.json_response(
-                    {
-                        "ok": False,
-                        "error": "invalid_password",
-                        "message": "password hash did not match",
-                    },
-                    status="401 Unauthorized",
-                )
         direct_admins = db.list_user_admins(conn, user["id"])
         admin_names = {admin["username"] for admin in direct_admins}
         for admin in direct_admins:
@@ -267,10 +240,10 @@ def _handle_admins(request):
 
 def handle(request):
     path = request.path.rstrip("/")
-    if path == "/auth":
+    if path == "/api/auth":
         return _handle_auth(request)
-    if path == "/heartbeat":
+    if path == "/api/heartbeat":
         return _handle_heartbeat(request)
-    if path == "/admins":
+    if path == "/api/admins":
         return _handle_admins(request)
     return webhttp.json_response({"ok": False, "error": "not_found"}, status="404 Not Found")

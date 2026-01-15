@@ -1,3 +1,5 @@
+import urllib.parse
+
 from bz3web import auth, config, db, views, webhttp
 
 
@@ -19,31 +21,81 @@ def _is_root_admin(user, settings):
     return _normalize_key(user["username"]) == _normalize_key(admin_username)
 
 
-def _render_users_list(users, current_user, message=None, form_data=None, show_admin_fields=False, root_admin_name="Admin"):
+def _admin_levels(conn, settings):
+    admin_username = settings.get("admin_user", "Admin")
+    root_user = db.get_user_by_username(conn, admin_username)
+    if not root_user:
+        return {}, None
+    levels = {root_user["id"]: 0}
+    primary_admins = db.list_user_admins(conn, root_user["id"])
+    for admin in primary_admins:
+        levels[admin["admin_user_id"]] = 1
+    for admin in primary_admins:
+        if not admin["trust_admins"]:
+            continue
+        for sub_admin in db.list_user_admins(conn, admin["admin_user_id"]):
+            levels.setdefault(sub_admin["admin_user_id"], 2)
+    return levels, root_user["id"]
+
+
+def _can_manage_user(current_user, target_user, levels, root_id):
+    if root_id and current_user["id"] == root_id:
+        return True
+    current_level = levels.get(current_user["id"])
+    target_level = levels.get(target_user["id"])
+    if current_level is None:
+        return False
+    if target_level is None:
+        return True
+    return target_level >= current_level
+
+
+def _render_users_list(
+    users,
+    current_user,
+    message=None,
+    form_data=None,
+    show_admin_fields=False,
+    root_admin_name="Admin",
+    admin_levels=None,
+    root_id=None,
+):
     list_name = config.get_config().get("community_name", "Server List")
     form_data = form_data or {}
 
     if show_admin_fields:
         rows = []
         for user in users:
-            auto = "Yes" if user["auto_approve"] else "No"
             admin_flag = "Yes" if user["is_admin"] else "No"
+            locked = "Yes" if user["is_locked"] else "No"
+            deleted = "Yes" if user["deleted"] else "No"
+            is_root_target = _normalize_key(user["username"]) == _normalize_key(root_admin_name)
+            can_lock = not is_root_target and (not user["is_admin"] or _is_root_admin(current_user, config.get_config()))
+            can_edit = _can_manage_user(current_user, user, admin_levels or {}, root_id)
+            lock_checked = "checked" if user["is_locked"] else ""
+            lock_html = ""
+            if can_lock:
+                lock_html = f"""<form method="post" action="/users/lock" class="js-toggle-form">
+      <input type="hidden" name="id" value="{user["id"]}">
+      <input type="checkbox" name="locked" value="1" {lock_checked}>
+    </form>"""
+            edit_html = ""
+            if can_edit:
+                edit_html = f"""<a class="admin-link secondary" href="/users/{urllib.parse.quote(user["username"], safe='')}/edit">Edit</a>"""
             rows.append(
                 f"""<tr>
-  <td>{webhttp.html_escape(user["username"])}</td>
-  <td>{webhttp.html_escape(user["email"])}</td>
-  <td>{auto}</td>
-  <td>{admin_flag}</td>
-  <td>
-    <form method="get" action="/users/edit">
-      <input type="hidden" name="id" value="{user["id"]}">
-      <button type="submit" class="secondary">Edit</button>
-    </form>
+  <td><a class="plain-link bold-link" href="/users/{urllib.parse.quote(user["username"], safe='')}">{webhttp.html_escape(user["username"])}</a></td>
+  <td class="center-cell"><span class="status-{admin_flag.lower()}">{admin_flag}</span></td>
+  <td class="center-cell">
+    {lock_html or f'<span class="status-{locked.lower()}">{locked}</span>'}
+  </td>
+  <td class="center-cell"><span class="status-{deleted.lower()}">{deleted}</span></td>
+  <td class="center-cell">
+    {edit_html}
   </td>
 </tr>"""
             )
         rows_html = "".join(rows) or "<tr><td colspan=\"5\">No users yet.</td></tr>"
-        new_auto_checked = "checked" if form_data.get("auto_approve") else ""
         new_admin_checked = "checked" if form_data.get("is_admin") else ""
         show_admin_toggle = _is_root_admin(current_user, config.get_config())
         admin_toggle_html = ""
@@ -55,14 +107,14 @@ def _render_users_list(users, current_user, message=None, form_data=None, show_a
     </div>
   </div>
 """
-        body = f"""<table>
+        body = f"""<table class="users-table">
   <thead>
     <tr>
-      <th>Username</th>
-      <th>Email</th>
-      <th>Auto-Approve</th>
-      <th>Admin</th>
-      <th>Actions</th>
+      <th class="center-cell">Username</th>
+      <th class="center-cell">Admin</th>
+      <th class="center-cell">Lock</th>
+      <th class="center-cell">Deleted</th>
+      <th class="center-cell">Actions</th>
     </tr>
   </thead>
   <tbody>
@@ -86,10 +138,6 @@ def _render_users_list(users, current_user, message=None, form_data=None, show_a
       <label for="new_password">Password</label>
       <input id="new_password" name="password" type="password" required>
     </div>
-    <div>
-      <label for="new_auto_approve">Auto-Approve</label>
-      <input id="new_auto_approve" name="auto_approve" type="checkbox" {new_auto_checked}>
-    </div>
   </div>
 {admin_toggle_html}  <div class="actions">
     <button type="submit">Create User</button>
@@ -99,7 +147,7 @@ def _render_users_list(users, current_user, message=None, form_data=None, show_a
     else:
         rows = "".join(
             f"""<tr>
-  <td><a class="admin-link" href="/user?name={webhttp.html_escape(user["username"])}">{webhttp.html_escape(user["username"])}</a></td>
+  <td><a class="plain-link bold-link" href="/users/{urllib.parse.quote(user["username"], safe='')}">{webhttp.html_escape(user["username"])}</a></td>
 </tr>"""
             for user in users
         )
@@ -116,6 +164,7 @@ def _render_users_list(users, current_user, message=None, form_data=None, show_a
 </table>
 """
 
+    profile_url = f"/users/{urllib.parse.quote(current_user['username'], safe='')}"
     header_html = views.header_with_title(
         list_name,
         "/users",
@@ -123,68 +172,56 @@ def _render_users_list(users, current_user, message=None, form_data=None, show_a
         title="Users",
         error=message,
         user_name=auth.display_username(current_user),
+        is_admin=auth.is_admin(current_user),
+        profile_url=profile_url,
     )
     body = f"""{header_html}
 {body}"""
     return views.render_page("Users", body)
 
 
-def _render_user_edit(user, message=None, form_data=None, current_user=None, root_admin_name="Admin"):
+def _render_user_edit(
+    user,
+    message=None,
+    form_data=None,
+    current_user=None,
+    root_admin_name="Admin",
+    admin_levels=None,
+):
     form_data = form_data or {}
     username_value = form_data.get("username", user["username"])
     email_value = form_data.get("email", user["email"])
-    if "auto_approve" in form_data:
-        checked = "checked" if form_data.get("auto_approve") else ""
-    else:
-        checked = "checked" if user["auto_approve"] else ""
-    if "is_admin" in form_data:
-        admin_checked = "checked" if form_data.get("is_admin") else ""
-    else:
-        admin_checked = "checked" if user["is_admin"] else ""
-    is_root_target = _normalize_key(user["username"]) == _normalize_key(root_admin_name)
-    show_admin_toggle = _is_root_admin(current_user, config.get_config())
-    admin_field = ""
-    if show_admin_toggle:
-        disabled = "disabled" if is_root_target else ""
-        admin_field = f"""  <div class="row">
-    <div>
-      <label for="is_admin">Admin</label>
-      <input id="is_admin" name="is_admin" type="checkbox" {admin_checked} {disabled}>
-    </div>
-  </div>
-"""
-    body = f"""<form method="post" action="/users/edit">
+    action_url = f"/users/{urllib.parse.quote(user['username'], safe='')}/edit"
+    cancel_url = f"/users/{urllib.parse.quote(user['username'], safe='')}"
+    body = f"""<form method="post" action="{action_url}">
   <input type="hidden" name="id" value="{user["id"]}">
-  <div class="row">
-    <div>
-      <label for="username">Username</label>
-      <input id="username" name="username" required value="{webhttp.html_escape(username_value)}">
-    </div>
-    <div>
-      <label for="email">Email</label>
-      <input id="email" name="email" type="email" required value="{webhttp.html_escape(email_value)}">
-    </div>
+  <div>
+    <label for="username">Username</label>
+    <input id="username" name="username" required value="{webhttp.html_escape(username_value)}">
   </div>
-  <div class="row">
-    <div>
-      <label for="auto_approve">Auto-Approve</label>
-      <input id="auto_approve" name="auto_approve" type="checkbox" {checked}>
-    </div>
+  <div>
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" required value="{webhttp.html_escape(email_value)}">
   </div>
-{admin_field}  <div>
+  <div>
     <label for="password">Reset password (optional)</label>
     <input id="password" name="password" type="password" placeholder="Leave blank to keep current password">
   </div>
   <div class="actions">
     <button type="submit">Save changes</button>
-    <a class="admin-link align-right" href="/users">Cancel</a>
+    <a class="admin-link align-right" href="{cancel_url}">Cancel</a>
   </div>
 </form>
-<form method="post" action="/users/delete">
+"""
+    if auth.is_admin(current_user):
+        body += f"""<form method="post" action="/users/delete">
   <input type="hidden" name="id" value="{user["id"]}">
-  <button type="submit" class="secondary">Delete user</button>
+  <div class="actions center">
+    <button type="submit" class="danger">Delete user</button>
+  </div>
 </form>
 """
+    profile_url = f"/users/{urllib.parse.quote(current_user['username'], safe='')}"
     header_html = views.header_with_title(
         config.get_config().get("community_name", "Server List"),
         "/users/edit",
@@ -192,10 +229,148 @@ def _render_user_edit(user, message=None, form_data=None, current_user=None, roo
         title="Edit user",
         error=message,
         user_name=auth.display_username(current_user),
+        is_admin=auth.is_admin(current_user),
+        profile_url=profile_url,
     )
     body = f"""{header_html}
 {body}"""
     return views.render_page("Edit User", body)
+
+
+def _render_user_settings(user, message=None, form_data=None, current_user=None):
+    form_data = form_data or {}
+    email_value = form_data.get("email", user["email"])
+    body = f"""<form method="post" action="/users/{urllib.parse.quote(user["username"], safe='')}/edit">
+  <div class="row">
+    <div>
+      <label for="email">Email</label>
+      <input id="email" name="email" type="email" required value="{webhttp.html_escape(email_value)}">
+    </div>
+  </div>
+  <div>
+    <label for="password">New password (optional)</label>
+    <input id="password" name="password" type="password" placeholder="Leave blank to keep current password">
+  </div>
+  <div class="actions">
+    <button type="submit">Save changes</button>
+    <a class="admin-link align-right" href="/users/{urllib.parse.quote(user["username"], safe='')}">Cancel</a>
+  </div>
+</form>
+"""
+    profile_url = f"/users/{urllib.parse.quote(current_user['username'], safe='')}"
+    header_html = views.header_with_title(
+        config.get_config().get("community_name", "Server List"),
+        f"/users/{urllib.parse.quote(user['username'], safe='')}/edit",
+        logged_in=True,
+        title="Personal settings",
+        error=message,
+        user_name=auth.display_username(current_user),
+        is_admin=auth.is_admin(current_user),
+        profile_url=profile_url,
+    )
+    body = f"""{header_html}
+{body}"""
+    return views.render_page("Personal settings", body)
+
+
+def _handle_admin_edit(
+    conn,
+    current_user,
+    target_user,
+    form,
+    admin_username,
+    admin_levels,
+    root_id,
+    is_root_admin,
+    redirect_url="/users",
+):
+    is_root_target = _normalize_key(target_user["username"]) == _normalize_key(admin_username)
+    if not is_root_admin and is_root_target:
+        return webhttp.redirect(redirect_url)
+    if not _can_manage_user(current_user, target_user, admin_levels, root_id):
+        return webhttp.redirect(redirect_url)
+    username = _first(form, "username")
+    email = _first(form, "email").lower()
+    password = _first(form, "password")
+    is_admin_value = _first(form, "is_admin") == "on"
+    form_data = {"username": username, "email": email, "is_admin": is_admin_value}
+    if not username or not email:
+        return _render_user_edit(
+            target_user,
+            "Username and email are required.",
+            form_data=form_data,
+            current_user=current_user,
+            root_admin_name=admin_username,
+            admin_levels=admin_levels,
+        )
+    if " " in username:
+        return _render_user_edit(
+            target_user,
+            "Username cannot contain spaces.",
+            form_data=form_data,
+            current_user=current_user,
+            root_admin_name=admin_username,
+            admin_levels=admin_levels,
+        )
+    if _normalize_key(username) == _normalize_key(admin_username):
+        return _render_user_edit(
+            target_user,
+            "Username is reserved.",
+            form_data=form_data,
+            current_user=current_user,
+            root_admin_name=admin_username,
+            admin_levels=admin_levels,
+        )
+    if is_root_target and _normalize_key(username) != _normalize_key(admin_username):
+        return _render_user_edit(
+            target_user,
+            "Root admin username cannot be changed.",
+            form_data=form_data,
+            current_user=current_user,
+            root_admin_name=admin_username,
+            admin_levels=admin_levels,
+        )
+    existing = db.get_user_by_username(conn, username)
+    if existing and existing["id"] != target_user["id"]:
+        return _render_user_edit(
+            target_user,
+            "Username already taken.",
+            form_data=form_data,
+            current_user=current_user,
+            root_admin_name=admin_username,
+            admin_levels=admin_levels,
+        )
+    if email != target_user["email"]:
+        existing_email = db.get_user_by_email(conn, email)
+        if existing_email and existing_email["id"] != target_user["id"]:
+            return _render_user_edit(
+                target_user,
+                "Email already in use.",
+                form_data=form_data,
+                current_user=current_user,
+                root_admin_name=admin_username,
+                admin_levels=admin_levels,
+            )
+    db.update_user_email(conn, target_user["id"], email)
+    if username != target_user["username"]:
+        db.update_user_username(conn, target_user["id"], username)
+    if is_root_admin:
+        if is_root_target:
+            root_user = db.get_user_by_username(conn, admin_username)
+            if root_user:
+                db.recompute_admin_flags(conn, root_user["id"])
+        else:
+            root_user = db.get_user_by_username(conn, admin_username)
+            if root_user:
+                if is_admin_value:
+                    db.add_user_admin(conn, root_user["id"], target_user["id"])
+                else:
+                    db.remove_user_admin(conn, root_user["id"], target_user["id"])
+                db.recompute_admin_flags(conn, root_user["id"])
+    if password:
+        digest, salt = auth.new_password(password)
+        db.set_user_password(conn, target_user["id"], digest, salt)
+    return webhttp.redirect(redirect_url)
 
 
 def handle(request):
@@ -210,6 +385,73 @@ def handle(request):
     path = request.path.rstrip("/") or "/users"
     conn = db.connect(db.default_db_path())
     try:
+        admin_levels, root_id = _admin_levels(conn, settings)
+        if path.startswith("/users/") and path.endswith("/edit"):
+            username = request.query.get("name", [""])[0].strip()
+            if not username:
+                return webhttp.html_response("<h1>Missing user</h1>", status="400 Bad Request")
+            target_user = db.get_user_by_username(conn, username)
+            if request.method == "POST" and not target_user:
+                form = request.form()
+                user_id = _first(form, "id")
+                if user_id.isdigit():
+                    target_user = db.get_user_by_id(conn, int(user_id))
+            if not target_user or target_user["deleted"]:
+                return webhttp.html_response("<h1>User not found</h1>", status="404 Not Found")
+            if current_user["id"] == target_user["id"]:
+                if request.method == "GET":
+                    return _render_user_settings(target_user, current_user=current_user)
+                if request.method == "POST":
+                    form = request.form()
+                    email = _first(form, "email").lower()
+                    password = _first(form, "password")
+                    form_data = {"email": email}
+                    if not email:
+                        return _render_user_settings(
+                            target_user,
+                            "Email is required.",
+                            form_data=form_data,
+                            current_user=current_user,
+                        )
+                    if email != target_user["email"]:
+                        existing_email = db.get_user_by_email(conn, email)
+                        if existing_email and existing_email["id"] != target_user["id"]:
+                            return _render_user_settings(
+                                target_user,
+                                "Email already in use.",
+                                form_data=form_data,
+                                current_user=current_user,
+                            )
+                    db.update_user_email(conn, target_user["id"], email)
+                    if password:
+                        digest, salt = auth.new_password(password)
+                        db.set_user_password(conn, target_user["id"], digest, salt)
+                    return webhttp.redirect(f"/users/{urllib.parse.quote(target_user['username'], safe='')}")
+                return webhttp.html_response("<h1>Method Not Allowed</h1>", status="405 Method Not Allowed")
+            if not is_admin:
+                return webhttp.html_response("<h1>Forbidden</h1>", status="403 Forbidden")
+            if not _can_manage_user(current_user, target_user, admin_levels, root_id):
+                return webhttp.html_response("<h1>Forbidden</h1>", status="403 Forbidden")
+            if request.method == "GET":
+                return _render_user_edit(
+                    target_user,
+                    current_user=current_user,
+                    root_admin_name=admin_username,
+                    admin_levels=admin_levels,
+                )
+            if request.method == "POST":
+                return _handle_admin_edit(
+                    conn,
+                    current_user,
+                    target_user,
+                    request.form(),
+                    admin_username,
+                    admin_levels,
+                    root_id,
+                    is_root_admin,
+                    redirect_url=f"/users/{urllib.parse.quote(target_user['username'], safe='')}",
+                )
+            return webhttp.html_response("<h1>Method Not Allowed</h1>", status="405 Method Not Allowed")
         if path in ("/users", "/users/"):
             users = db.list_users(conn)
             return _render_users_list(
@@ -217,6 +459,8 @@ def handle(request):
                 current_user,
                 show_admin_fields=is_admin,
                 root_admin_name=admin_username,
+                admin_levels=admin_levels,
+                root_id=root_id,
             )
 
         if path in ("/users/create", "/users/create/") and request.method == "POST":
@@ -226,12 +470,10 @@ def handle(request):
             username = _first(form, "username")
             email = _first(form, "email").lower()
             password = _first(form, "password")
-            auto_approve = _first(form, "auto_approve") == "on"
             is_admin_value = _first(form, "is_admin") == "on"
             form_data = {
                 "username": username,
                 "email": email,
-                "auto_approve": auto_approve,
                 "is_admin": is_admin_value,
             }
             if not username or not email or not password:
@@ -285,11 +527,32 @@ def handle(request):
                     root_admin_name=admin_username,
                 )
             digest, salt = auth.new_password(password)
-            db.add_user(conn, username, email, digest, salt, is_admin=is_admin_value if is_root_admin else False)
-            if auto_approve:
-                user = db.get_user_by_email(conn, email)
-                if user:
-                    db.set_user_auto_approve(conn, user["id"], True)
+            db.add_user(conn, username, email, digest, salt, is_admin=False, is_admin_manual=False)
+            root_user = db.get_user_by_username(conn, admin_username)
+            if root_user:
+                if is_root_admin and is_admin_value:
+                    new_user = db.get_user_by_username(conn, username)
+                    if new_user:
+                        db.add_user_admin(conn, root_user["id"], new_user["id"])
+                db.recompute_admin_flags(conn, root_user["id"])
+            return webhttp.redirect("/users")
+
+        if path in ("/users/lock", "/users/lock/") and request.method == "POST":
+            if not is_admin:
+                return webhttp.redirect("/users")
+            form = request.form()
+            user_id = _first(form, "id")
+            if not user_id.isdigit():
+                return webhttp.redirect("/users")
+            user = db.get_user_by_id(conn, int(user_id))
+            if not user:
+                return webhttp.redirect("/users")
+            if _normalize_key(user["username"]) == _normalize_key(admin_username):
+                return webhttp.redirect("/users")
+            if user["is_admin"] and not is_root_admin:
+                return webhttp.redirect("/users")
+            locked = _first(form, "locked") == "1"
+            db.set_user_locked(conn, int(user_id), locked)
             return webhttp.redirect("/users")
 
         if path in ("/users/edit", "/users/edit/"):
@@ -302,10 +565,13 @@ def handle(request):
                     if user:
                         if not is_root_admin and _normalize_key(user["username"]) == _normalize_key(admin_username):
                             return webhttp.redirect("/users")
+                        if not _can_manage_user(current_user, user, admin_levels, root_id):
+                            return webhttp.redirect("/users")
                         return _render_user_edit(
                             user,
                             current_user=current_user,
                             root_admin_name=admin_username,
+                            admin_levels=admin_levels,
                         )
                 return webhttp.redirect("/users")
             if request.method == "POST":
@@ -316,80 +582,16 @@ def handle(request):
                 user = db.get_user_by_id(conn, int(user_id))
                 if not user:
                     return webhttp.redirect("/users")
-                is_root_target = _normalize_key(user["username"]) == _normalize_key(admin_username)
-                if not is_root_admin and is_root_target:
-                    return webhttp.redirect("/users")
-                username = _first(form, "username")
-                email = _first(form, "email").lower()
-                auto_approve = _first(form, "auto_approve") == "on"
-                password = _first(form, "password")
-                is_admin_value = _first(form, "is_admin") == "on"
-                form_data = {"username": username, "email": email, "auto_approve": auto_approve, "is_admin": is_admin_value}
-                if not username or not email:
-                    return _render_user_edit(
-                        user,
-                        "Username and email are required.",
-                        form_data=form_data,
-                        current_user=current_user,
-                        root_admin_name=admin_username,
-                    )
-                if " " in username:
-                    return _render_user_edit(
-                        user,
-                        "Username cannot contain spaces.",
-                        form_data=form_data,
-                        current_user=current_user,
-                        root_admin_name=admin_username,
-                    )
-                if _normalize_key(username) == _normalize_key(admin_username):
-                    return _render_user_edit(
-                        user,
-                        "Username is reserved.",
-                        form_data=form_data,
-                        current_user=current_user,
-                        root_admin_name=admin_username,
-                    )
-                if is_root_target and _normalize_key(username) != _normalize_key(admin_username):
-                    return _render_user_edit(
-                        user,
-                        "Root admin username cannot be changed.",
-                        form_data=form_data,
-                        current_user=current_user,
-                        root_admin_name=admin_username,
-                    )
-                existing = db.get_user_by_username(conn, username)
-                if existing and existing["id"] != user["id"]:
-                    return _render_user_edit(
-                        user,
-                        "Username already taken.",
-                        form_data=form_data,
-                        current_user=current_user,
-                        root_admin_name=admin_username,
-                    )
-                if email != user["email"]:
-                    existing_email = db.get_user_by_email(conn, email)
-                    if existing_email and existing_email["id"] != user["id"]:
-                        return _render_user_edit(
-                            user,
-                            "Email already in use.",
-                            form_data=form_data,
-                            current_user=current_user,
-                            root_admin_name=admin_username,
-                        )
-                db.update_user_email(conn, int(user_id), email)
-                if username != user["username"]:
-                    db.update_user_username(conn, int(user_id), username)
-                    db.update_owner_username(conn, user["username"], username)
-                db.set_user_auto_approve(conn, int(user_id), auto_approve)
-                if is_root_admin:
-                    if is_root_target:
-                        db.set_user_admin(conn, int(user_id), True)
-                    else:
-                        db.set_user_admin(conn, int(user_id), is_admin_value)
-                if password:
-                    digest, salt = auth.new_password(password)
-                    db.set_user_password(conn, int(user_id), digest, salt)
-                return webhttp.redirect("/users")
+                return _handle_admin_edit(
+                    conn,
+                    current_user,
+                    user,
+                    form,
+                    admin_username,
+                    admin_levels,
+                    root_id,
+                    is_root_admin,
+                )
 
         if path in ("/users/delete", "/users/delete/") and request.method == "POST":
             if not is_admin:
@@ -402,6 +604,8 @@ def handle(request):
                     if _normalize_key(user["username"]) == _normalize_key(admin_username):
                         return webhttp.redirect("/users")
                     if not is_root_admin and user["is_admin"]:
+                        return webhttp.redirect("/users")
+                    if not _can_manage_user(current_user, user, admin_levels, root_id):
                         return webhttp.redirect("/users")
                     db.delete_user(conn, int(user_id))
             return webhttp.redirect("/users")

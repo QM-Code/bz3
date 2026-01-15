@@ -71,13 +71,10 @@ admin_row = db.get_user_by_username(conn, admin_user)
 if admin_row:
     db.set_user_password(conn, admin_row["id"], password_hash, salt)
     db.set_user_admin(conn, admin_row["id"], True)
-    db.set_user_auto_approve(conn, admin_row["id"], True)
 else:
     admin_email = f"{admin_user.lower()}@local"
     db.add_user(conn, admin_user, admin_email, password_hash, salt, is_admin=True)
     admin_row = db.get_user_by_username(conn, admin_user)
-    if admin_row:
-        db.set_user_auto_approve(conn, admin_row["id"], True)
 conn.close()
 PY
 

@@ -43,13 +43,17 @@ def get_user_from_request(request):
                 "id": None,
                 "username": username,
                 "email": "",
-                "auto_approve": 1,
                 "is_admin": 1,
             }
         return None
     conn = db.connect(db.default_db_path())
     try:
-        return db.get_user_by_id(conn, int(payload))
+        user = db.get_user_by_id(conn, int(payload))
+        if not user:
+            return None
+        if user["is_locked"] or user["deleted"]:
+            return None
+        return user
     finally:
         conn.close()
 
@@ -62,7 +66,7 @@ def ensure_admin_user(settings, conn):
     password_hash = settings.get("admin_password_hash", "")
     password_salt = settings.get("admin_password_salt", "")
     email = f"{admin_user.lower()}@local"
-    db.add_user(conn, admin_user, email, password_hash, password_salt, is_admin=True)
+    db.add_user(conn, admin_user, email, password_hash, password_salt, is_admin=True, is_admin_manual=True)
     admin_row = db.get_user_by_username(conn, admin_user)
     if admin_row:
         return dict(admin_row)
@@ -70,7 +74,6 @@ def ensure_admin_user(settings, conn):
         "id": None,
         "username": admin_user,
         "email": "",
-        "auto_approve": 1,
         "is_admin": 1,
     }
 

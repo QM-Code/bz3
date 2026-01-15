@@ -19,5 +19,8 @@
   "fullsize_height": 900,
   "debug_heartbeat": false,
   "debug_auth": false,
-  "heartbeat_timeout_seconds": 120
+  "servers_auto_refresh": 10,
+  "servers_auto_refresh_animate": true,
+  "heartbeat_timeout_seconds": 120,
+  "waitress_threads": 8
 }

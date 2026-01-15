@@ -13,19 +13,19 @@
 		},
 		{
 			"username" : "Whammo",
-			"inheritAdminList" : false
+			"inheritAdminList" : false,
 			"inheritBanList" : false
 		},
 		{
 			"username" : "allejo",
-			"inheritAdminList" : true
+			"inheritAdminList" : true,
 			"inheritBanList" : false
 		},
 		{
 			"username" : "annoying_cat",
 			"inheritAdminList" : true
 		}
-	]
+	],
     "maxPlayers": 20,
     "defaultPlayerParameters": {
         "speed": 5.0,
