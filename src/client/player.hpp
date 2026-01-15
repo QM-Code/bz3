@@ -45,6 +45,8 @@ public:
     glm::vec3 getVelocity() const { return state.velocity; }
     glm::quat getRotation() const { return state.rotation; }
     glm::vec3 getForwardVector() const;
+    int getScore() const { return state.score; }
+    void setScore(int score) { state.score = score; }
 
     void setExtents(const glm::vec3& extents);
 

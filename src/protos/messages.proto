@@ -34,6 +34,7 @@ message PlayerState {
   Vec3 velocity = 4;
   bool alive = 5;
   PlayerParameters params = 6;
+  int32 score = 7;
 }
 
 // =====================
@@ -77,6 +78,11 @@ message ServerMsg_PlayerDeath {
   uint32 client_id = 1;
 }
 
+message ServerMsg_SetScore {
+  uint32 client_id = 1;
+  int32 score = 2;
+}
+
 message ServerMsg_CreateShot {
   uint32 global_shot_id = 1;
   Vec3 position = 2;
@@ -115,10 +121,11 @@ message ServerMsg {
     PLAYER_LOCATION = 5;
     PLAYER_SPAWN = 6;
     PLAYER_DEATH = 7;
-    CREATE_SHOT = 8;
-    REMOVE_SHOT = 9;
-    INIT = 10;
-    CHAT = 11;
+    SET_SCORE = 8;
+    CREATE_SHOT = 9;
+    REMOVE_SHOT = 10;
+    INIT = 11;
+    CHAT = 12;
   }
 
   // Optional: keep a type field if you want quick switching/logging.
@@ -132,10 +139,11 @@ message ServerMsg {
     ServerMsg_PlayerLocation player_location = 6;
     ServerMsg_PlayerSpawn player_spawn = 7;
     ServerMsg_PlayerDeath player_death = 8;
-    ServerMsg_CreateShot create_shot = 9;
-    ServerMsg_RemoveShot remove_shot = 10;
-    ServerMsg_Init init = 11;
-    ServerMsg_Chat chat = 12;
+    ServerMsg_SetScore set_score = 9;
+    ServerMsg_CreateShot create_shot = 10;
+    ServerMsg_RemoveShot remove_shot = 11;
+    ServerMsg_Init init = 12;
+    ServerMsg_Chat chat = 13;
   }
 }
 

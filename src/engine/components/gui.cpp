@@ -69,9 +69,9 @@ void GUI::update() {
             ImGuiWindowFlags_NoSavedSettings
         );
 
-        std::string players = "";
-        for (const auto& name : scoreboardPlayerNames) {
-            players += name + "\n";
+        std::string players;
+        for (const auto& entry : scoreboardEntries) {
+            players += entry.name + "  (" + std::to_string(entry.score) + ")\n";
         }
 
         ImGui::Text("%s", players.c_str());
@@ -160,8 +160,8 @@ void GUI::drawDeathScreen() {
     ImGui::End();
 }
 
-void GUI::setScoreboardPlayerNames(const std::vector<std::string> &names) {
-    scoreboardPlayerNames = names;
+void GUI::setScoreboardEntries(const std::vector<ScoreboardEntry> &entries) {
+    scoreboardEntries = entries;
 }
 
 void GUI::drawConsolePanel() {

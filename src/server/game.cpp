@@ -115,6 +115,18 @@ void Game::update(TimeUtils::duration deltaTime) {
         if (!expired) {
             for (const auto &client : clients) {
                 if (shot->hits(client.get())) {
+                    client_id victimId = client->getId();
+                    client_id killerId = shot->getOwnerId();
+
+                    // Apply authoritative score changes
+                    if (Client* killer = getClient(killerId)) {
+                        if (killerId != victimId) {
+                            killer->setScore(killer->getScore() + 1);
+                        }
+                    }
+
+                    client->setScore(client->getScore() - 1);
+
                     client->die();
                     hit = true;
                     break;

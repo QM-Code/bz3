@@ -60,6 +60,10 @@ void Client::handleSpawn(const ServerMsg_PlayerSpawn &msg) {
     spdlog::trace("Client::update: Client id {} has spawned", id);
 }
 
+    void Client::applySetScore(int score) {
+        state.score = score;
+    }
+
 bool Client::isEqual(client_id otherId) {
     return this->id == otherId;
 }
