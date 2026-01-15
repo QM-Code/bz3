@@ -103,6 +103,12 @@ Other
 
 ## TODO
 * Switch to Jolt physics controller instead of bullet
+* Shooting self multiple times
+* Refactor game to create on join
+* Refactor Player & Client to both inherit from a base class
+* Shots are shooting inside buildings
+* Muzzle flash
+* Fizzle out effect
 
 ## License
 
