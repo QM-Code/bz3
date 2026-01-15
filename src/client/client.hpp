@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include "engine/types.hpp"
+#include <glm/vec3.hpp>
 
 class Game;
 
@@ -11,6 +12,8 @@ private:
     render_id renderId;
 
     PlayerState state;
+    bool justSpawned = false;
+    glm::vec3 lastSpawnPosition{0.0f};
 
 public:
     Client(Game &game, client_id id, const PlayerState &initialState);
