@@ -44,6 +44,7 @@ void decodePlayerState(const bz::PlayerState &input, PlayerState &output) {
     decodeQuat(input.rotation(), output.rotation);
     decodeVec3(input.velocity(), output.velocity);
     output.alive = input.alive();
+    output.score = input.score();
     output.params.clear();
     for (const auto &[key, val] : input.params().params()) {
         output.params[key] = val;
@@ -56,6 +57,7 @@ void encodePlayerState(const PlayerState &input, bz::PlayerState *output) {
     encodeQuat(input.rotation, output->mutable_rotation());
     encodeVec3(input.velocity, output->mutable_velocity());
     output->set_alive(input.alive);
+    output->set_score(input.score);
     auto *params = output->mutable_params();
     for (const auto &[key, val] : input.params) {
         (*params->mutable_params())[key] = val;
@@ -126,6 +128,13 @@ std::unique_ptr<ServerMsg> decodeServerMsg(const std::byte *data, std::size_t si
     case bz::ServerMsg::kPlayerDeath: {
         auto out = std::make_unique<ServerMsg_PlayerDeath>();
         out->clientId = msg.player_death().client_id();
+        return out;
+    }
+
+    case bz::ServerMsg::kSetScore: {
+        auto out = std::make_unique<ServerMsg_SetScore>();
+        out->clientId = msg.set_score().client_id();
+        out->score = msg.set_score().score();
         return out;
     }
 
@@ -366,6 +375,14 @@ std::optional<std::vector<std::byte>> encodeServerMsg(const ServerMsg &input) {
         msg.set_type(bz::ServerMsg::PLAYER_DEATH);
         const auto &typed = static_cast<const ServerMsg_PlayerDeath&>(input);
         msg.mutable_player_death()->set_client_id(typed.clientId);
+        break;
+    }
+    case ServerMsg_Type_SET_SCORE: {
+        msg.set_type(bz::ServerMsg::SET_SCORE);
+        const auto &typed = static_cast<const ServerMsg_SetScore&>(input);
+        auto* setScore = msg.mutable_set_score();
+        setScore->set_client_id(typed.clientId);
+        setScore->set_score(typed.score);
         break;
     }
     case ServerMsg_Type_CREATE_SHOT: {

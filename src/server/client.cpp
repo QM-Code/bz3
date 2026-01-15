@@ -10,6 +10,7 @@ Client::Client(Game &game, client_id id, std::string ip) : game(game), id(id), i
     state.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
     state.velocity = glm::vec3(0.0f, 0.0f, 0.0f);
     state.alive = false;
+    state.score = 0;
 
     state.params = game.world->getDefaultPlayerParameters();
 }
@@ -102,6 +103,15 @@ void Client::die() {
         deathMsg.clientId = id;
         game.engine.network->sendAll<ServerMsg_PlayerDeath>(&deathMsg);
     }
+}
+
+void Client::setScore(int newScore) {
+    state.score = newScore;
+
+    ServerMsg_SetScore msg;
+    msg.clientId = id;
+    msg.score = newScore;
+    game.engine.network->sendAll<ServerMsg_SetScore>(&msg);
 }
 
 bool Client::setParameter(const std::string &param, float value) {

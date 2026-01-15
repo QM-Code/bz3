@@ -11,6 +11,11 @@
 
 #include "engine/components/gui/server_browser.hpp"
 
+struct ScoreboardEntry {
+    std::string name;
+    int score;
+};
+
 class GUI {
     friend class ClientEngine;
 
@@ -25,7 +30,7 @@ private:
     bool showFPS = false;
 
     void update();
-    std::vector<std::string> scoreboardPlayerNames;
+    std::vector<ScoreboardEntry> scoreboardEntries;
     std::vector<std::string> consoleLines;
 
     std::array<char, 256> chatInputBuffer{};
@@ -41,7 +46,7 @@ private:
     ~GUI();
 
 public:
-    void setScoreboardPlayerNames(const std::vector<std::string> &names);
+    void setScoreboardEntries(const std::vector<ScoreboardEntry> &entries);
     void addConsoleLine(const std::string &playerName, const std::string &line);
     std::string getChatInputBuffer() const;
     void clearChatInputBuffer();

@@ -101,6 +101,15 @@ Other
 - Some libraries are fetched via CMake FetchContent (notably `threepp`, `enet`, `pybind11`).
 - Python plugin bytecode is redirected to a writable cache: set `BZ3_PY_CACHE_DIR` to choose the location (defaults to `/tmp/bz3-pycache`). If the directory cannot be created, bytecode writing is disabled. Current behavior is acceptable for now; we may revisit a dedicated cache path later.
 
+## TODO
+* Switch to Jolt physics controller instead of bullet
+* Shooting self multiple times
+* Refactor game to create on join
+* Refactor Player & Client to both inherit from a base class
+* Shots are shooting inside buildings
+* Muzzle flash
+* Fizzle out effect
+
 ## License
 
 MIT
