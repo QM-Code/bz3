@@ -9,6 +9,10 @@ GUI::GUI(GLFWwindow *window) {
     // Initialize ImGui context
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
+
+    // Disable ImGui ini persistence to avoid restoring stray debug/demo windows.
+    ImGuiIO& io = ImGui::GetIO();
+    io.IniFilename = nullptr;
     
     // Set ImGui style
     ImGui::StyleColorsDark();
@@ -18,7 +22,6 @@ GUI::GUI(GLFWwindow *window) {
     ImGui_ImplOpenGL3_Init("#version 330");
 
     // Load fonts
-    ImGuiIO& io = ImGui::GetIO();
     io.Fonts->AddFontDefault();
 
     const auto bigFontPath = bz::data::ResolveConfiguredAsset("guiBigFont");
@@ -129,39 +132,40 @@ void GUI::drawDeathScreen() {
     ImGuiIO& io = ImGui::GetIO();
     ImVec2 screenCenter = ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f);
 
-    ImGui::PushFont(bigFont);
+    const char* text = spawnHint.c_str();
 
-    const char* text = "Press U to spawn";
+    const float fontScale = 0.55f; // smaller so long hints stay on one line
+    ImFont* font = bigFont ? bigFont : ImGui::GetFont();
+    const float drawSize = font ? font->FontSize * fontScale : ImGui::GetFontSize() * fontScale;
+    ImVec2 textSize;
+    if (font) {
+        textSize = font->CalcTextSizeA(drawSize, FLT_MAX, 0.0f, text);
+    } else {
+        const ImVec2 raw = ImGui::CalcTextSize(text);
+        textSize = ImVec2(raw.x * fontScale, raw.y * fontScale);
+    }
 
-    // Calculate text size
-    ImVec2 textSize = ImGui::CalcTextSize(text);
-
-    // Position cursor so text is centered
-    ImGui::SetNextWindowPos(
-        ImVec2(screenCenter.x - textSize.x * 0.5f,
-            screenCenter.y - textSize.y * 0.5f),
-        ImGuiCond_Always
+    const ImVec2 textPos(
+        screenCenter.x - textSize.x * 0.5f,
+        screenCenter.y - textSize.y * 0.5f
     );
 
-    // Invisible window
-    ImGui::Begin(
-        "##SpawnHint",
-        nullptr,
-        ImGuiWindowFlags_NoDecoration |
-        ImGuiWindowFlags_NoInputs |
-        ImGuiWindowFlags_NoBackground |
-        ImGuiWindowFlags_AlwaysAutoResize
-    );
+    auto* drawList = ImGui::GetForegroundDrawList();
+    const ImU32 shadowColor = IM_COL32(0, 0, 0, 180);
+    const ImU32 textColor = IM_COL32(255, 255, 255, 255);
+    const ImVec2 shadowOffset(2.0f, 2.0f);
 
-    ImGui::TextUnformatted(text);
-
-    ImGui::PopFont();
-
-    ImGui::End();
+    const ImVec2 shadowPos(textPos.x + shadowOffset.x, textPos.y + shadowOffset.y);
+    drawList->AddText(font, drawSize, shadowPos, shadowColor, text);
+    drawList->AddText(font, drawSize, textPos, textColor, text);
 }
 
 void GUI::setScoreboardEntries(const std::vector<ScoreboardEntry> &entries) {
     scoreboardEntries = entries;
+}
+
+void GUI::setSpawnHint(const std::string &hint) {
+    spawnHint = hint;
 }
 
 void GUI::drawConsolePanel() {

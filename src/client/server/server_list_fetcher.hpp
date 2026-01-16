@@ -12,7 +12,7 @@ class ServerListFetcher {
 public:
     struct ServerRecord {
         std::string sourceName;
-        std::string sourceUrl;
+        std::string sourceHost;
         std::string name;
         std::string host;
         uint16_t port = 0;
@@ -21,6 +21,7 @@ public:
         std::string gameMode;
         std::string description;
         std::vector<std::string> flags;
+        std::string screenshotId;
     };
 
     explicit ServerListFetcher(std::vector<ClientServerListSource> sources);

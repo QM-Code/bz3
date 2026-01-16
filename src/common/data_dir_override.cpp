@@ -11,6 +11,7 @@
 #include <optional>
 #include <string>
 #include <system_error>
+#include <stdexcept>
 
 namespace {
 
@@ -127,17 +128,28 @@ std::filesystem::path EnsureConfigFileAtPath(const std::filesystem::path &path, 
 }
 
 std::optional<std::filesystem::path> ExtractDataDirFromConfig(const std::filesystem::path &configPath) {
-    if (auto configJson = bz::data::LoadJsonFile(configPath, "user config", spdlog::level::debug)) {
-        if (!configJson->is_object()) {
+    std::ifstream stream(configPath);
+    if (!stream) {
+        // If the file cannot be opened, fall back to other mechanisms.
+        return std::nullopt;
+    }
+
+    try {
+        nlohmann::json configJson;
+        stream >> configJson;
+
+        if (!configJson.is_object()) {
             return std::nullopt;
         }
 
-        if (auto dataDirIt = configJson->find("DataDir"); dataDirIt != configJson->end() && dataDirIt->is_string()) {
+        if (auto dataDirIt = configJson.find("DataDir"); dataDirIt != configJson.end() && dataDirIt->is_string()) {
             const auto value = dataDirIt->get<std::string>();
             if (!value.empty()) {
                 return std::filesystem::path(value);
             }
         }
+    } catch (const std::exception &ex) {
+        throw std::runtime_error("Failed to parse user config at " + configPath.string() + ": " + ex.what());
     }
 
     return std::nullopt;

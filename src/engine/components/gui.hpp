@@ -28,6 +28,7 @@ private:
     ImFont* bigFont;
     gui::ServerBrowserView serverBrowserView;
     bool showFPS = false;
+    std::string spawnHint = "Press U to spawn";
 
     void update();
     std::vector<ScoreboardEntry> scoreboardEntries;
@@ -47,6 +48,7 @@ private:
 
 public:
     void setScoreboardEntries(const std::vector<ScoreboardEntry> &entries);
+    void setSpawnHint(const std::string &hint);
     void addConsoleLine(const std::string &playerName, const std::string &line);
     std::string getChatInputBuffer() const;
     void clearChatInputBuffer();
