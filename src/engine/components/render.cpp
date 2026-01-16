@@ -3,8 +3,8 @@
 #include "spdlog/spdlog.h"
 #include "engine/user_pointer.hpp"
 #include <threepp/materials/ShaderMaterial.hpp>
-#include <threepp/geometries/PlaneGeometry.hpp>
-#include <threepp/objects/Mesh.hpp>
+#include <threepp/materials/MeshBasicMaterial.hpp>
+#include <threepp/geometries/CircleGeometry.hpp>
 #include <fstream>
 #include <iterator>
 #include <filesystem>
@@ -26,66 +26,6 @@ std::string readFileToString(const std::filesystem::path& path) {
 }
 } // namespace
 
-void Render::setAssetPathResolver(std::function<std::filesystem::path(const std::string&)> resolver) {
-    assetPathResolver = std::move(resolver);
-    radarMaterial.reset();
-    postProcessMaterial.reset();
-}
-
-void Render::ensureRadarMaterialLoaded() {
-    if (radarMaterial) return;
-    if (!assetPathResolver) return;
-
-    const auto vertPath = assetPathResolver("shaders.radar.vertex");
-    const auto fragPath = assetPathResolver("shaders.radar.fragment");
-
-    const auto vertSrc = readFileToString(vertPath);
-    const auto fragSrc = readFileToString(fragPath);
-
-    if (vertSrc.empty() || fragSrc.empty()) {
-        spdlog::error("Render: Radar shader source empty (vert='{}', frag='{}')", vertPath.string(), fragPath.string());
-        return;
-    }
-
-    radarMaterial = threepp::ShaderMaterial::create();
-    radarMaterial->vertexShader = vertSrc;
-    radarMaterial->fragmentShader = fragSrc;
-
-    radarMaterial->transparent = true;
-    radarMaterial->depthWrite = false;
-    radarMaterial->wireframe = false;
-
-    radarMaterial->uniforms.insert_or_assign("playerY", threepp::Uniform(threepp::UniformValue{0.0f}));
-    radarMaterial->uniforms.insert_or_assign("jumpHeight", threepp::Uniform(threepp::UniformValue{5.0f}));
-}
-
-void Render::ensurePostProcessMaterialLoaded() {
-    if (postProcessMaterial) return;
-    if (!assetPathResolver) return;
-
-    const auto vertPath = assetPathResolver("shaders.vintage.vertex");
-    const auto fragPath = assetPathResolver("shaders.vintage.fragment");
-
-    const auto vertSrc = readFileToString(vertPath);
-    const auto fragSrc = readFileToString(fragPath);
-
-    if (vertSrc.empty() || fragSrc.empty()) {
-        spdlog::error("Render: Postprocess shader source empty (vert='{}', frag='{}')", vertPath.string(), fragPath.string());
-        return;
-    }
-
-    postProcessMaterial = threepp::ShaderMaterial::create();
-    postProcessMaterial->vertexShader = vertSrc;
-    postProcessMaterial->fragmentShader = fragSrc;
-    postProcessMaterial->depthTest = false;
-    postProcessMaterial->depthWrite = false;
-    postProcessMaterial->transparent = false;
-
-    postProcessMaterial->uniforms.insert_or_assign("tColor", threepp::Uniform(threepp::UniformValue{static_cast<threepp::Texture*>(nullptr)}));
-    postProcessMaterial->uniforms.insert_or_assign("resolution", threepp::Uniform(threepp::UniformValue{threepp::Vector2(1.f, 1.f)}));
-    postProcessMaterial->uniforms.insert_or_assign("time", threepp::Uniform(threepp::UniformValue{0.0f}));
-}
-
 Render::Render(GLFWwindow *window) :
     window(window),
     renderer({1, 1}) {
@@ -105,21 +45,6 @@ Render::Render(GLFWwindow *window) :
         1000.f
     );
     camera->updateProjectionMatrix();
-
-    // Postprocess render target and camera
-    {
-        threepp::GLRenderTarget::Options opts;
-        opts.format = threepp::Format::RGBA;
-        opts.depthBuffer = true;
-        opts.stencilBuffer = false;
-        mainRenderTarget = std::make_unique<threepp::GLRenderTarget>(fbWidth, fbHeight, opts);
-
-        postProcessScene = threepp::Scene::create();
-        postProcessCamera = threepp::OrthographicCamera::create(-1.0f, 1.0f, 1.0f, -1.0f, 0.0f, 10.0f);
-        postProcessCamera->position.set(0, 0, 1);
-        postProcessCamera->lookAt(threepp::Vector3(0, 0, 0));
-        postProcessCamera->updateProjectionMatrix();
-    }
 
     // Radar camera + offscreen render target
     {
@@ -175,6 +100,13 @@ Render::Render(GLFWwindow *window) :
     shadowCam->bottom = -50;
     shadowCam->updateProjectionMatrix();
     scene->add(dir);
+
+    radarMaterial = threepp::ShaderMaterial::create();
+    radarMaterial->transparent = true;
+    radarMaterial->depthWrite = false;
+    radarMaterial->wireframe = false;
+    radarMaterial->uniforms.insert_or_assign("playerY", threepp::Uniform(threepp::UniformValue{0.0f}));
+    radarMaterial->uniforms.insert_or_assign("jumpHeight", threepp::Uniform(threepp::UniformValue{5.0f}));
 }
 
 Render::~Render() {
@@ -187,28 +119,12 @@ void Render::resizeCallback(int width, int height) {
     renderer.setSize({width, height});
     camera->aspect = static_cast<float>(width) / static_cast<float>(height);
     camera->updateProjectionMatrix();
-
-    if (height == 0) height = 1;
-    if (mainRenderTarget) {
-        mainRenderTarget->setSize(width, height);
-    }
 }
 
 void Render::update() {
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
-    if (height == 0) height = 1;
     renderer.setSize({width, height});
-
-    if (!mainRenderTarget) {
-        threepp::GLRenderTarget::Options opts;
-        opts.format = threepp::Format::RGBA;
-        opts.depthBuffer = true;
-        opts.stencilBuffer = false;
-        mainRenderTarget = std::make_unique<threepp::GLRenderTarget>(width, height, opts);
-    } else if (mainRenderTarget->width != static_cast<unsigned int>(width) || mainRenderTarget->height != static_cast<unsigned int>(height)) {
-        mainRenderTarget->setSize(width, height);
-    }
 
     // Radar render (offscreen)
     if (radarCamera && radarRenderTarget) {
@@ -231,7 +147,6 @@ void Render::update() {
         radarCamera->up.set(forward.x, forward.y, forward.z);
         radarCamera->lookAt(threepp::Vector3(p.x, p.y, p.z));
 
-        ensureRadarMaterialLoaded();
         if (radarMaterial) {
             radarMaterial->uniforms["playerY"].setValue(threepp::UniformValue{p.y});
         }
@@ -250,52 +165,14 @@ void Render::update() {
             radarTextureId = 0;
         }
     }
-    ensurePostProcessMaterialLoaded();
 
-    if (postProcessEnabled && postProcessMaterial && mainRenderTarget && postProcessScene && postProcessCamera) {
-        if (!postProcessQuad) {
-            auto quadGeometry = threepp::PlaneGeometry::create(2.0f, 2.0f);
-            postProcessQuad = threepp::Mesh::create(quadGeometry, postProcessMaterial);
-            postProcessQuad->frustumCulled = false;
-            postProcessScene->add(postProcessQuad);
-        } else if (postProcessQuad->material() != postProcessMaterial) {
-            postProcessQuad->setMaterial(postProcessMaterial);
-        }
-
-        renderer.setRenderTarget(mainRenderTarget.get());
-        renderer.setViewport(0, 0, width, height);
-        renderer.setClearColor(threepp::Color::skyblue);
-        renderer.clear(true, true, true);
-        renderer.render(*scene, *camera);
-
-        if (!mainRenderTarget->texture) {
-            // No color attachment; fall back to direct render.
-            renderer.setRenderTarget(nullptr);
-            renderer.setViewport(0, 0, width, height);
-            renderer.setClearColor(threepp::Color::skyblue);
-            renderer.render(*scene, *camera);
-            return;
-        }
-
-        postProcessMaterial->uniforms["tColor"].setValue(mainRenderTarget->texture.get());
-        postProcessMaterial->uniforms["resolution"].setValue(threepp::UniformValue{threepp::Vector2(static_cast<float>(width), static_cast<float>(height))});
-        postProcessMaterial->uniforms["time"].setValue(threepp::UniformValue{static_cast<float>(glfwGetTime())});
-        postProcessMaterial->uniformsNeedUpdate = true;
-
-        renderer.setRenderTarget(nullptr);
-        renderer.setViewport(0, 0, width, height);
-        renderer.setClearColor(threepp::Color(0x000000));
-        renderer.clear(true, false, false);
-        renderer.render(*postProcessScene, *postProcessCamera);
-    } else {
-        renderer.setRenderTarget(nullptr);
-        renderer.setViewport(0, 0, width, height);
-        renderer.setClearColor(threepp::Color::skyblue);
-        renderer.render(*scene, *camera);
-    }
+    renderer.setRenderTarget(nullptr);
+    renderer.setViewport(0, 0, width, height);
+    renderer.setClearColor(threepp::Color::skyblue);
+    renderer.render(*scene, *camera);
 }
 
-render_id Render::create(std::string modelPath) {
+render_id Render::create(std::string modelPath, float radius) {
     spdlog::trace("Render::create: Loading model from path {}", modelPath);
 
     // Load model and add to scene
@@ -315,18 +192,35 @@ render_id Render::create(std::string modelPath) {
         spdlog::trace("Render::create: Model added to scene from path {}", modelPath);
         objects[id] = model;
 
-        // Also add a clone of this model to the radar scene.
-        // (A threepp Object3D can only have one parent.)
-        if (radarScene) {
+        if (radius > 0.0f) {
+            // Only add a circle overlay to the radar (no model clone).
+            auto circleGeom = threepp::CircleGeometry::create(radius, 64);
+            auto circleMat = threepp::MeshBasicMaterial::create();
+            circleMat->color = threepp::Color(0xffffff);
+            circleMat->wireframe = true;
+            circleMat->transparent = true;
+            circleMat->opacity = 1.0f;
+            circleMat->depthTest = false;
+            circleMat->depthWrite = false;
+
+            auto circleMesh = threepp::Mesh::create(circleGeom, circleMat);
+            circleMesh->rotation.x = -1.57079632679f; // -90deg to lay flat in XZ
+            circleMesh->renderOrder = 10000; // ensure on top
+
+            auto circleGroup = threepp::Group::create();
+            circleGroup->add(circleMesh);
+
+            radarScene->add(circleGroup);
+            radarObjects[id] = circleGroup;
+        } else {
+            // Also add a clone of this model to the radar scene.
+            // (A threepp Object3D can only have one parent.)
             auto radarModel = model->clone<threepp::Group>(true);
 
             // Apply radar shader to every mesh in the radar scene.
             radarModel->traverseType<threepp::Mesh>([&](threepp::Mesh& mesh) {
                 mesh.castShadow = false;
                 mesh.receiveShadow = false;
-
-                ensureRadarMaterialLoaded();
-                if (!radarMaterial) return;
 
                 const auto& oldMaterials = mesh.materials();
                 if (oldMaterials.size() <= 1) {
@@ -358,9 +252,7 @@ void Render::destroy(render_id id) {
 
         auto rit = radarObjects.find(id);
         if (rit != radarObjects.end()) {
-            if (radarScene) {
-                radarScene->remove(*(rit->second));
-            }
+            radarScene->remove(*(rit->second));
             radarObjects.erase(rit);
         }
     } else {
@@ -457,6 +349,16 @@ void Render::setCameraPosition(const glm::vec3 &position) {
 void Render::setCameraRotation(const glm::quat &rotation) {
     camera->quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
     radarAnchorRotation = rotation;
+}
+
+void Render::setRadarShaderPath(const std::filesystem::path& vertPath,
+                                 const std::filesystem::path& fragPath) {
+    const auto vertSrc = readFileToString(vertPath);
+    const auto fragSrc = readFileToString(fragPath);
+
+    radarMaterial->vertexShader = vertSrc;
+    radarMaterial->fragmentShader = fragSrc;
+    radarMaterial->needsUpdate();
 }
 
 namespace {

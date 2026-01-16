@@ -20,7 +20,6 @@
 
 namespace threepp {
 class ShaderMaterial;
-class Mesh;
 }
 
 class Render {
@@ -35,11 +34,9 @@ private:
     std::shared_ptr<threepp::PerspectiveCamera> camera;
 
     std::shared_ptr<threepp::ShaderMaterial> radarMaterial;
-    std::shared_ptr<threepp::ShaderMaterial> postProcessMaterial;
     std::function<std::filesystem::path(const std::string&)> assetPathResolver;
 
     void ensureRadarMaterialLoaded();
-    void ensurePostProcessMaterialLoaded();
 
     // Radar camera rendering
     std::shared_ptr<threepp::OrthographicCamera> radarCamera;
@@ -47,13 +44,6 @@ private:
     unsigned int radarTextureId = 0;
     glm::vec3 radarAnchorPosition{0.0f};
     glm::quat radarAnchorRotation{1.0f, 0.0f, 0.0f, 0.0f};
-
-    // Postprocess pipeline
-    std::unique_ptr<threepp::GLRenderTarget> mainRenderTarget;
-    std::shared_ptr<threepp::Scene> postProcessScene;
-    std::shared_ptr<threepp::OrthographicCamera> postProcessCamera;
-    std::shared_ptr<threepp::Mesh> postProcessQuad;
-    bool postProcessEnabled{true};
 
     std::map<render_id, std::shared_ptr<threepp::Group>> objects;
     std::map<render_id, std::shared_ptr<threepp::Group>> radarObjects;
@@ -65,7 +55,7 @@ private:
     void resizeCallback(int width, int height);
 
 public:
-    render_id create(std::string modelPath);
+    render_id create(std::string modelPath, float radius = 0.0f);
     void destroy(render_id id);
     void setPosition(render_id id, const glm::vec3 &position);
     void setRotation(render_id id, const glm::quat &rotation);
@@ -75,10 +65,9 @@ public:
     void setCameraPosition(const glm::vec3 &position);
     void setCameraRotation(const glm::quat &rotation);
 
-    // Client-side hook: lets Game/World provide an asset path resolver.
-    void setAssetPathResolver(std::function<std::filesystem::path(const std::string&)> resolver);
-
     unsigned int getRadarTextureId() const { return radarTextureId; }
+    void setRadarShaderPath(const std::filesystem::path& vertPath,
+                            const std::filesystem::path& fragPath);
 
     // Camera state for downstream systems (e.g., particle renderer).
     glm::mat4 getViewProjectionMatrix() const;

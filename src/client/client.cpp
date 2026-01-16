@@ -11,7 +11,7 @@ void Client::syncRenderFromState() {
 }
 
 Client::Client(Game &game, client_id id, const PlayerState &initialState) : Actor(game, id) {
-    renderId = game.engine.render->create(game.world->getAssetPath("playerModel").string());
+    renderId = game.engine.render->create(game.world->getAssetPath("playerModel").string(), 1.5f);
 
     setState(initialState);
     justSpawned = state.alive;

@@ -50,11 +50,11 @@ void Player::setExtents(const glm::vec3& extents) {
 }
 
 void Player::earlyUpdate() {
+    bool wasGrounded = grounded;
+    grounded = physics->isGrounded();
+
     if (state.alive) {
         game.engine.gui->displayDeathScreen(false);
-
-        bool wasGrounded = grounded;
-        grounded = physics->isGrounded();
         
         if (grounded) {
             glm::vec2 movement(0.0f);
@@ -99,6 +99,11 @@ void Player::earlyUpdate() {
         }
 
     } else {
+        if (grounded) {
+            physics->setVelocity(glm::vec3(0.0f));
+            physics->setAngularVelocity(glm::vec3(0.0f));
+        }
+
         game.engine.gui->displayDeathScreen(true);
 
         if (game.engine.input->getInputState().spawn) {
@@ -149,6 +154,8 @@ void Player::die() {
     }
     dieAudio.play(state.position);
     state.alive = false;
+    auto vel = physics->getVelocity();
+    physics->setVelocity(glm::vec3(vel.x, getParameter("jumpSpeed"), vel.z));
 }
 
 void Player::spawn(glm::vec3 position, glm::quat rotation, glm::vec3 velocity) {
