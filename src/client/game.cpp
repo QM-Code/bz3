@@ -6,6 +6,11 @@
 Game::Game(ClientEngine &engine, std::string playerName, std::string worldDir) : playerName(playerName), engine(engine) {
     world = std::make_unique<World>(*this, worldDir);
     spdlog::trace("Game: World created successfully");
+
+    engine.render->setAssetPathResolver([this](const std::string& assetName) {
+        return this->world ? this->world->getAssetPath(assetName) : std::filesystem::path{};
+    });
+
     console = std::make_unique<Console>(*this);
     spdlog::trace("Game: Console created successfully");
 
@@ -13,6 +18,10 @@ Game::Game(ClientEngine &engine, std::string playerName, std::string worldDir) :
 };
 
 Game::~Game() {
+    if (engine.render) {
+        engine.render->setAssetPathResolver({});
+    }
+
     world.reset();
     spdlog::trace("Game: World destroyed successfully");
     console.reset();
