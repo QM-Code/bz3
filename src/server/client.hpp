@@ -7,15 +7,13 @@ class Game;
 class Client {
 private:
     Game &game;
-    
-    bool initialized;
     std::string ip;
     client_id id;
 
     PlayerState state;
 
 public:
-    Client(Game &game, client_id id, std::string ip);
+    Client(Game &game, client_id id, std::string ip, std::string name);
     ~Client();
 
     bool isEqual(client_id cid) const;
@@ -23,7 +21,6 @@ public:
     std::string getName() const;
     std::string getIP() const { return ip; }
     client_id getId() const { return id; }
-    bool isInitialized() const { return initialized; }
     const PlayerState &getState() const { return state; }
     int getScore() const { return state.score; }
     void update();

@@ -12,9 +12,8 @@ Player::Player(Game &game,
                client_id id,
                PlayerParameters params,
                const std::string name)
-    : game(game),
-      clientId(id),
-      grounded(false),
+        : Actor(game, id),
+            grounded(false),
             physics(&game.engine.physics->createPlayer()),
       audioEngine(*game.engine.audio),
     jumpAudio(audioEngine.loadClip(game.world->getAssetPath("audio.player.Jump"), 5)),
@@ -23,17 +22,13 @@ Player::Player(Game &game,
     landAudio(audioEngine.loadClip(game.world->getAssetPath("audio.player.Land"), 1)),
       lastJumpTime(TimeUtils::GetCurrentTime()),
       jumpCooldown(TimeUtils::getDuration(0.1f)) {
-    state.params = std::move(params);
+        setParameters(std::move(params));
     state.name = name;
     state.alive = false;
     state.score = 0;
     lastPosition = glm::vec3(0.0f);
     lastRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
-    ClientMsg_Init initMsg;
-    initMsg.name = name;
-    initMsg.protocolVersion = NET_PROTOCOL_VERSION;
-    game.engine.network->send<ClientMsg_Init>(initMsg);
 
     // Initialize controller extents from parameters once params are set
     setExtents(glm::vec3(
@@ -43,16 +38,6 @@ Player::Player(Game &game,
 }
 
 Player::~Player() = default;
-
-float Player::getParameter(const std::string &paramName) const {
-    auto it = state.params.find(paramName);
-    if (it != state.params.end()) {
-        return it->second;
-    } else {
-        spdlog::warn("Player::getParameter: Parameter '{}' not found, returning 0.0", paramName);
-        return 0.0f;
-    }
-}
 
 glm::vec3 Player::getForwardVector() const {
     return physics->getForwardVector();
@@ -124,9 +109,7 @@ void Player::earlyUpdate() {
 }
 
 void Player::lateUpdate() {
-    state.position = physics->getPosition();
-    state.rotation = physics->getRotation();
-    state.velocity = physics->getVelocity();
+    setLocation(physics->getPosition(), physics->getRotation(), physics->getVelocity());
     game.engine.render->setCameraPosition(state.position);
     game.engine.render->setCameraRotation(state.rotation);
 
@@ -144,14 +127,21 @@ void Player::lateUpdate() {
     audioEngine.setListenerRotation(state.rotation);
 }
 
-void Player::handleParameters(const ServerMsg_PlayerParameters &msg) {
-    for (const auto &pair : msg.params) {
-        state.params[pair.first] = pair.second;
-    }
-    game.engine.physics->setGravity(getParameter("gravity"));
+void Player::update(TimeUtils::duration /*deltaTime*/) {
+    earlyUpdate();
+    lateUpdate();
 }
 
-void Player::handleDeath() {
+void Player::setState(const PlayerState &newState) {
+    state = newState;
+    if (physics) {
+        physics->setPosition(state.position);
+        physics->setRotation(state.rotation);
+        physics->setVelocity(state.velocity);
+    }
+}
+
+void Player::die() {
     if (!state.alive) {
         return;
     }
@@ -159,11 +149,13 @@ void Player::handleDeath() {
     state.alive = false;
 }
 
-void Player::handleSpawn(const ServerMsg_PlayerSpawn &msg) {
-    spawnAudio.play(msg.position);
+void Player::spawn(glm::vec3 position, glm::quat rotation, glm::vec3 velocity) {
+    spawnAudio.play(position);
     state.alive = true;
-    physics->setPosition(msg.position);
-    physics->setRotation(msg.rotation);
-    physics->setVelocity(glm::vec3(0.0f));
+    setLocation(position, rotation, velocity);
+
+    physics->setPosition(position);
+    physics->setRotation(rotation);
+    physics->setVelocity(velocity);
     physics->setAngularVelocity(glm::vec3(0.0f));
 }

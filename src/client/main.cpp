@@ -126,8 +126,6 @@ int main(int argc, char *argv[]) {
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_SAMPLES, 4);
 
-    
-
     FullscreenState fullscreenState;
     fullscreenState.windowedWidth = configWidth;
     fullscreenState.windowedHeight = configHeight;
@@ -139,7 +137,6 @@ int main(int argc, char *argv[]) {
         glfwTerminate();
         exit(1);
     }
-
 
     spdlog::trace("GLFW window created successfully");
     glfwMakeContextCurrent(window);

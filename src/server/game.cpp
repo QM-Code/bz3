@@ -75,13 +75,28 @@ void Game::update(TimeUtils::duration deltaTime) {
     }
 
     for (const auto &connMsg : engine.network->consumeMessages<ClientMsg_PlayerJoin>()) {
-        world->sendInitToClient(connMsg.clientId);
-        auto newClient = std::make_unique<Client>(*this, connMsg.clientId, connMsg.ip);
+        spdlog::debug("Game::update: New client connection with id {} from IP {}",
+                      connMsg.clientId,
+                      connMsg.ip);
+        if (getClientByName(connMsg.name)) {
+            engine.network->disconnectClient(connMsg.clientId, "Client ID already in use.");
+            continue;
+        }
 
+        if (connMsg.protocolVersion != NET_PROTOCOL_VERSION) {
+            spdlog::warn("Game::update: Client id {} protocol mismatch (client {}, server {})",
+                         connMsg.clientId,
+                         connMsg.protocolVersion,
+                         NET_PROTOCOL_VERSION);
+            engine.network->disconnectClient(connMsg.clientId, "Protocol version mismatch.");
+            continue;
+        }
+
+        world->sendInitToClient(connMsg.clientId);
+        auto newClient = std::make_unique<Client>(*this, connMsg.clientId, connMsg.ip, connMsg.name);
+
+        // Send existing players to the newcomer
         for (const auto &client : clients) {
-            if (!client->isInitialized()) {
-                continue;
-            }
             ServerMsg_PlayerJoin existingMsg;
             existingMsg.clientId = client->getId();
             existingMsg.state = client->getState();
@@ -114,6 +129,10 @@ void Game::update(TimeUtils::duration deltaTime) {
         bool hit = false;
         if (!expired) {
             for (const auto &client : clients) {
+                if (client->getState().alive == false) {
+                    continue;
+                }
+
                 if (shot->hits(client.get())) {
                     client_id victimId = client->getId();
                     client_id killerId = shot->getOwnerId();

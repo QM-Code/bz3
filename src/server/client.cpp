@@ -2,10 +2,8 @@
 #include "spdlog/spdlog.h"
 #include "game.hpp"
 
-Client::Client(Game &game, client_id id, std::string ip) : game(game), id(id), ip(ip) { 
-    initialized = false;
-
-    state.name = "empty";
+Client::Client(Game &game, client_id id, std::string ip, std::string name) : game(game), id(id), ip(std::move(ip)) {
+    state.name = std::move(name);
     state.position = glm::vec3(0.0f, 0.0f, 0.0f);
     state.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
     state.velocity = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -13,6 +11,12 @@ Client::Client(Game &game, client_id id, std::string ip) : game(game), id(id), i
     state.score = 0;
 
     state.params = game.world->getDefaultPlayerParameters();
+
+    // Announce this player to all other clients
+    ServerMsg_PlayerJoin announceMsg;
+    announceMsg.clientId = id;
+    announceMsg.state = state;
+    game.engine.network->sendExcept<ServerMsg_PlayerJoin>(id, &announceMsg);
 }
 
 Client::~Client() {
@@ -30,46 +34,17 @@ std::string Client::getName() const {
 }
 
 void Client::update() {
-    for (const auto &initMsg : game.engine.network->consumeMessages<ClientMsg_Init>([this](const ClientMsg_Init &msg) {
+    for (const auto &locMsg : game.engine.network->consumeMessages<ClientMsg_PlayerLocation>([this](const ClientMsg_PlayerLocation &msg) {
         return msg.clientId == id;
     })) {
-        if (initialized) {
-            spdlog::warn("Client::update: Client id {} sent duplicate initialization message", id);
-            continue;
-        }
+        state.position = locMsg.position;
+        state.rotation = locMsg.rotation;
 
-        if (initMsg.protocolVersion != NET_PROTOCOL_VERSION) {
-            spdlog::warn("Client::update: Client id {} protocol mismatch (client {}, server {})",
-                         id,
-                         initMsg.protocolVersion,
-                         NET_PROTOCOL_VERSION);
-            game.engine.network->disconnectClient(id, "Protocol version mismatch.");
-            return;
-        }
-
-        spdlog::info("Client::update: Client id {} initialized with name {}", id, initMsg.name);
-        state.name = initMsg.name;
-        initialized = true;
-
-        ServerMsg_PlayerJoin connMsg;
-        connMsg.clientId = id;
-        connMsg.state = state;
-        game.engine.network->sendExcept<ServerMsg_PlayerJoin>(id, &connMsg);
-    }
-
-    if (initialized) {
-        for (const auto &locMsg : game.engine.network->consumeMessages<ClientMsg_PlayerLocation>([this](const ClientMsg_PlayerLocation &msg) {
-            return msg.clientId == id;
-        })) {
-            state.position = locMsg.position;
-            state.rotation = locMsg.rotation;
-
-            ServerMsg_PlayerLocation updateMsg;
-            updateMsg.clientId = id;
-            updateMsg.position = state.position;
-            updateMsg.rotation = state.rotation;
-            game.engine.network->sendExcept<ServerMsg_PlayerLocation>(id, &updateMsg);
-        }
+        ServerMsg_PlayerLocation updateMsg;
+        updateMsg.clientId = id;
+        updateMsg.position = state.position;
+        updateMsg.rotation = state.rotation;
+        game.engine.network->sendExcept<ServerMsg_PlayerLocation>(id, &updateMsg);
     }
 
     for (const auto &spawnMsg : game.engine.network->consumeMessages<ClientMsg_RequestPlayerSpawn>([this](const ClientMsg_RequestPlayerSpawn &msg) {
@@ -83,11 +58,13 @@ void Client::update() {
         Location spawnLocation = game.world->getSpawnLocation();
         state.position = spawnLocation.position;
         state.rotation = spawnLocation.rotation;
+        state.velocity = glm::vec3(0.0f);
 
         ServerMsg_PlayerSpawn spawnRespMsg;
         spawnRespMsg.clientId = id;
         spawnRespMsg.position = state.position;
         spawnRespMsg.rotation = state.rotation;
+        spawnRespMsg.velocity = state.velocity;
         game.engine.network->sendAll<ServerMsg_PlayerSpawn>(&spawnRespMsg);
 
         state.alive = true;

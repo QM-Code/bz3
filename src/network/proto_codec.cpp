@@ -195,14 +195,6 @@ std::unique_ptr<ClientMsg> decodeClientMsg(const std::byte *data, std::size_t si
 
     switch (msg.payload_case()) {
 
-    case bz::ClientMsg::kInit: {
-        auto out = std::make_unique<ClientMsg_Init>();
-        out->clientId = msg.client_id();
-        out->name = msg.init().name();
-        out->protocolVersion = msg.init().protocol_version();
-        return out;
-    }
-
     case bz::ClientMsg::kChat: {
         auto out = std::make_unique<ClientMsg_Chat>();
         out->clientId = msg.client_id();
@@ -238,6 +230,8 @@ std::unique_ptr<ClientMsg> decodeClientMsg(const std::byte *data, std::size_t si
         auto out = std::make_unique<ClientMsg_PlayerJoin>();
         out->clientId = msg.client_id();
         out->ip = msg.player_join().ip();
+        out->name = msg.player_join().name();
+        out->protocolVersion = msg.player_join().protocol_version();
         return out;
     }
 
@@ -257,11 +251,13 @@ std::optional<std::vector<std::byte>> encodeClientMsg(const ClientMsg &input) {
     msg.set_client_id(input.clientId);
 
     switch (input.type) {
-    case ClientMsg_Type_INIT: {
-        msg.set_type(bz::ClientMsg::INIT);
-        const auto &typed = static_cast<const ClientMsg_Init&>(input);
-        msg.mutable_init()->set_name(typed.name);
-        msg.mutable_init()->set_protocol_version(typed.protocolVersion);
+    case ClientMsg_Type_PLAYER_JOIN: {
+        msg.set_type(bz::ClientMsg::PLAYER_JOIN);
+        const auto &typed = static_cast<const ClientMsg_PlayerJoin&>(input);
+        auto *join = msg.mutable_player_join();
+        join->set_ip(typed.ip);
+        join->set_name(typed.name);
+        join->set_protocol_version(typed.protocolVersion);
         break;
     }
     case ClientMsg_Type_CHAT: {
@@ -292,12 +288,6 @@ std::optional<std::vector<std::byte>> encodeClientMsg(const ClientMsg &input) {
         shot->set_local_shot_id(typed.localShotId);
         encodeVec3(typed.position, shot->mutable_position());
         encodeVec3(typed.velocity, shot->mutable_velocity());
-        break;
-    }
-    case ClientMsg_Type_PLAYER_JOIN: {
-        msg.set_type(bz::ClientMsg::PLAYER_JOIN);
-        const auto &typed = static_cast<const ClientMsg_PlayerJoin&>(input);
-        msg.mutable_player_join()->set_ip(typed.ip);
         break;
     }
     case ClientMsg_Type_PLAYER_LEAVE: {
