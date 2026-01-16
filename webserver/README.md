@@ -1,4 +1,4 @@
-# BZ3 Server List Web
+# BZ3 Community Web Server
 
 This folder contains a small Python webserver that hosts a server list for BZ3 clients and provides account management, submissions, and admin tooling.
 
