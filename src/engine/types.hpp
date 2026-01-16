@@ -212,7 +212,6 @@ typedef struct ServerMsg_Init : ServerMsg {
 enum ClientMsg_Type {
     ClientMsg_Type_PLAYER_JOIN,
     ClientMsg_Type_PLAYER_LEAVE,
-    ClientMsg_Type_INIT,
     ClientMsg_Type_REQUEST_PLAYER_SPAWN,
     ClientMsg_Type_PLAYER_LOCATION,
     ClientMsg_Type_CREATE_SHOT,
@@ -228,19 +227,14 @@ typedef struct ClientMsg_PlayerJoin : ClientMsg {
     static constexpr ClientMsg_Type Type = ClientMsg_Type_PLAYER_JOIN;
     ClientMsg_PlayerJoin() { type = Type; }
     std::string ip;
+    std::string name;
+    uint32_t protocolVersion = NET_PROTOCOL_VERSION;
 } ClientMsg_PlayerJoin;
 
 typedef struct ClientMsg_PlayerLeave : ClientMsg {
     static constexpr ClientMsg_Type Type = ClientMsg_Type_PLAYER_LEAVE;
     ClientMsg_PlayerLeave() { type = Type; }
 } ClientMsg_PlayerLeave;
-
-typedef struct ClientMsg_Init: ClientMsg {
-    static constexpr ClientMsg_Type Type = ClientMsg_Type_INIT;
-    ClientMsg_Init() { type = Type; }
-    std::string name;
-    uint32_t protocolVersion = NET_PROTOCOL_VERSION;
-} ClientMsg_Init;
 
 typedef struct ClientMsg_RequestPlayerSpawn : ClientMsg {
     static constexpr ClientMsg_Type Type = ClientMsg_Type_REQUEST_PLAYER_SPAWN;

@@ -153,14 +153,11 @@ message ServerMsg {
 
 message ClientMsg_PlayerJoin {
   string ip = 1;
+  string name = 2;
+  uint32 protocol_version = 3;
 }
 
 message ClientMsg_PlayerLeave {
-}
-
-message ClientMsg_Init {
-  string name = 1;
-  uint32 protocol_version = 2;
 }
 
 message ClientMsg_RequestPlayerSpawn {
@@ -188,11 +185,10 @@ message ClientMsg {
     TYPE_UNSPECIFIED = 0;
     PLAYER_JOIN = 1;
     PLAYER_LEAVE = 2;
-    INIT = 3;
-    REQUEST_PLAYER_SPAWN = 4;
-    PLAYER_LOCATION = 5;
-    CREATE_SHOT = 6;
-    CHAT = 7;
+    REQUEST_PLAYER_SPAWN = 3;
+    PLAYER_LOCATION = 4;
+    CREATE_SHOT = 5;
+    CHAT = 6;
   }
 
   Type type = 1;
@@ -201,10 +197,9 @@ message ClientMsg {
   oneof payload {
     ClientMsg_PlayerJoin player_join = 3;
     ClientMsg_PlayerLeave player_leave = 4;
-    ClientMsg_Init init = 5;
-    ClientMsg_RequestPlayerSpawn request_player_spawn = 6;
-    ClientMsg_PlayerLocation player_location = 7;
-    ClientMsg_CreateShot create_shot = 8;
-    ClientMsg_Chat chat = 9;
+    ClientMsg_RequestPlayerSpawn request_player_spawn = 5;
+    ClientMsg_PlayerLocation player_location = 6;
+    ClientMsg_CreateShot create_shot = 7;
+    ClientMsg_Chat chat = 8;
   }
 }

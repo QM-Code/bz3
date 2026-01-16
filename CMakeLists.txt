@@ -90,6 +90,7 @@ target_include_directories(proto_lib PUBLIC ${CMAKE_BINARY_DIR})
 # Gather sources
 file(GLOB_RECURSE CLIENT_SOURCES "${PROJECT_SOURCE_DIR}/src/client/*.cpp")
 list(APPEND CLIENT_SOURCES
+    ${PROJECT_SOURCE_DIR}/src/client/actor.cpp
     ${PROJECT_SOURCE_DIR}/src/client/server/server_browser_controller.cpp
     ${PROJECT_SOURCE_DIR}/src/common/config_helpers.cpp
     ${PROJECT_SOURCE_DIR}/src/common/data_path_resolver.cpp

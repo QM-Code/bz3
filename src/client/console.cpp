@@ -31,7 +31,7 @@ void Console::update() {
                 }
             }
 
-            game.engine.gui->addConsoleLine(includePlayerName ? game.player->getName() : std::string(), consoleMessage);
+            game.engine.gui->addConsoleLine((includePlayerName && game.player) ? game.player->getName() : std::string(), consoleMessage);
 
             ClientMsg_Chat chatMsg;
             chatMsg.toId = BROADCAST_CLIENT_ID;
@@ -47,17 +47,15 @@ void Console::update() {
 
     for (const auto &msg : game.engine.network->consumeMessages<ServerMsg_Chat>()) {
         std::string name;
-        if (auto *client = game.getClientById(msg.fromId)) {
-            name = client->getName();
-        } else if (msg.fromId == game.player->getClientId()) {
-            name = "YOU";
+        if (auto *actor = game.getActorById(msg.fromId)) {
+            name = (game.player && actor == game.player) ? "YOU" : actor->getState().name;
         } else if (msg.fromId == SERVER_CLIENT_ID) {
             name = "SERVER";
         } else {
             name = "UNKNOWN";
         }
 
-        if (msg.toId == game.player->getClientId()) {
+        if (game.player && msg.toId == game.player->getClientId()) {
             name = "[" + name + " ->]";
         }
 

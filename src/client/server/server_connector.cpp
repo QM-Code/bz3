@@ -27,6 +27,14 @@ bool ServerConnector::connect(const std::string &targetHost, uint16_t targetPort
         spdlog::info("Connected to server at {}:{}", targetHost, targetPort);
         game = std::make_unique<Game>(engine, playerName, worldDir);
         spdlog::trace("Game initialized successfully");
+
+        ClientMsg_PlayerJoin joinMsg{};
+        joinMsg.clientId = 0; // server will overwrite based on connection
+        joinMsg.name = playerName;
+        joinMsg.protocolVersion = NET_PROTOCOL_VERSION;
+        joinMsg.ip = ""; // client does not know its external IP
+        engine.network->send<ClientMsg_PlayerJoin>(joinMsg);
+
         browser.hide();
         return true;
     }

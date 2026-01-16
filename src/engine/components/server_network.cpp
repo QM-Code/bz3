@@ -81,17 +81,24 @@ void ServerNetwork::update() {
                 break;
             }
 
-            if (decoded->type == ClientMsg_Type_PLAYER_JOIN || decoded->type == ClientMsg_Type_PLAYER_LEAVE) {
-                spdlog::warn("ServerNetwork::update: Ignoring client-sent join/leave message");
-                break;
-            }
-
             const client_id cid = getClient(evt.connection);
             if (cid == 0) {
                 break;
             }
 
             decoded->clientId = cid;
+
+            if (decoded->type == ClientMsg_Type_PLAYER_JOIN) {
+                auto *join = static_cast<ClientMsg_PlayerJoin*>(decoded.get());
+                // Prefer transport-reported IP if client left it blank
+                if (join->ip.empty()) {
+                    auto itIp = ipByConnection.find(evt.connection);
+                    if (itIp != ipByConnection.end()) {
+                        join->ip = itIp->second;
+                    }
+                }
+            }
+
             receivedMessages.push_back({ decoded.release() });
             
             break;
@@ -100,10 +107,7 @@ void ServerNetwork::update() {
             client_id newClientId = getNextClientId();
             clients[newClientId] = evt.connection;
             clientByConnection[evt.connection] = newClientId;
-            ClientMsg_PlayerJoin* connMsg = new ClientMsg_PlayerJoin();
-            connMsg->clientId = newClientId;
-            connMsg->ip = evt.peerIp;
-            receivedMessages.push_back({ connMsg });
+            ipByConnection[evt.connection] = evt.peerIp;
             break;
         }
         case net::Event::Type::Disconnect:
@@ -115,6 +119,7 @@ void ServerNetwork::update() {
             client_id discClientId = it->second;
             clientByConnection.erase(it);
             clients.erase(discClientId);
+            ipByConnection.erase(evt.connection);
             ClientMsg_PlayerLeave* discMsg = new ClientMsg_PlayerLeave();
             discMsg->clientId = discClientId;
             receivedMessages.push_back({ discMsg });

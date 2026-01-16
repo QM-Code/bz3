@@ -3,10 +3,12 @@
 #include <vector>
 #include "engine/types.hpp"
 #include "engine/client_engine.hpp"
-#include "player.hpp"
 #include "world.hpp"
 #include "shot.hpp"
 #include "console.hpp"
+
+#include "actor.hpp"
+#include "player.hpp"
 #include "client.hpp"
 
 enum FOCUS_STATE {
@@ -19,14 +21,14 @@ private:
     FOCUS_STATE focusState;
     std::string playerName;
 
+    std::vector<std::unique_ptr<Actor>> actors;
+
 public:
     ClientEngine &engine;
 
-    std::unique_ptr<Player> player;
+    Player *player = nullptr;
     std::unique_ptr<World> world;
     std::unique_ptr<Console> console;
-
-    std::vector<std::unique_ptr<Client>> clients;
     std::vector<std::unique_ptr<Shot>> shots;
 
     FOCUS_STATE getFocusState() const { return focusState; }
@@ -39,5 +41,6 @@ public:
 
     void addShot(std::unique_ptr<Shot> shot) { shots.push_back(std::move(shot)); }
 
-    Client *getClientById(client_id id);
+    const std::vector<std::unique_ptr<Actor>> &getActors() const { return actors; }
+    Actor *getActorById(client_id id);
 };
