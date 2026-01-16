@@ -2,7 +2,7 @@
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-config_path="${script_dir}/config.json"
+config_path="$(cd "${script_dir}/.." && pwd)/config.json"
 
 if ! command -v python3 >/dev/null 2>&1; then
   echo "python3 is required but was not found in PATH."
