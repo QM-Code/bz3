@@ -14,29 +14,32 @@ Chat::~Chat() {
     messages.clear();
 }
 
-void Chat::update() {
-    // Listen for incoming chat
-    for (const auto &chatMsg : game.engine.network->consumeMessages<ClientMsg_Chat>()) {
-        auto mutableMsg = chatMsg;
-        // Info out the chat message
-        spdlog::info("Client: {}, Message: {}", game.getClient(mutableMsg.clientId)->getName(), mutableMsg.text);
-        
-        std::string message = std::string(mutableMsg.text);
-        messages.push_back(message);
+void Chat::handleMessage(const ClientMsg_Chat &chatMsg) {
+    auto mutableMsg = chatMsg;
 
-        bool handled = g_runPluginCallbacks<ClientMsg_Chat>(mutableMsg);
+    const Client *fromClient = game.getClient(mutableMsg.clientId);
+    if (!fromClient) {
+        spdlog::warn("Chat::handleMessage: Received chat from unknown client id {}", mutableMsg.clientId);
+        return;
+    }
 
-        if (!handled) {
-            ServerMsg_Chat serverChatMsg;
-            serverChatMsg.fromId = mutableMsg.clientId;
-            serverChatMsg.toId = mutableMsg.toId;
-            serverChatMsg.text = mutableMsg.text;
+    spdlog::info("Client: {}, Message: {}", fromClient->getName(), mutableMsg.text);
 
-            if (mutableMsg.toId == BROADCAST_CLIENT_ID) {
-                game.engine.network->sendExcept<ServerMsg_Chat>(mutableMsg.clientId, &serverChatMsg);
-            } else {
-                game.engine.network->send<ServerMsg_Chat>(mutableMsg.toId, &serverChatMsg);
-            }
-        }
+    messages.push_back(std::string(mutableMsg.text));
+
+    bool handled = g_runPluginCallbacks<ClientMsg_Chat>(mutableMsg);
+    if (handled) {
+        return;
+    }
+
+    ServerMsg_Chat serverChatMsg;
+    serverChatMsg.fromId = mutableMsg.clientId;
+    serverChatMsg.toId = mutableMsg.toId;
+    serverChatMsg.text = mutableMsg.text;
+
+    if (mutableMsg.toId == BROADCAST_CLIENT_ID) {
+        game.engine.network->sendExcept<ServerMsg_Chat>(mutableMsg.clientId, &serverChatMsg);
+    } else {
+        game.engine.network->send<ServerMsg_Chat>(mutableMsg.toId, &serverChatMsg);
     }
 }

@@ -23,8 +23,11 @@ public:
     client_id getId() const { return id; }
     const PlayerState &getState() const { return state; }
     int getScore() const { return state.score; }
-    void update();
     glm::vec3 getPosition() const { return state.position; }
+
+    void applyLocation(const glm::vec3 &position, const glm::quat &rotation);
+    void trySpawn(const Location &spawnLocation);
+
     void die();
     void setScore(int newScore);
     bool setParameter(const std::string &param, float value);
