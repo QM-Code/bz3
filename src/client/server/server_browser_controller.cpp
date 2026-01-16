@@ -77,15 +77,27 @@ ServerBrowserController::ServerBrowserController(ClientEngine &engine,
             connector(connector),
             defaultHost(defaultHost.empty() ? "localhost" : defaultHost),
             defaultPort(applyPortFallback(defaultPort)) {
+    auto toInterval = [](int seconds) {
+        return seconds > 0 ? std::chrono::seconds(seconds) : std::chrono::seconds{0};
+    };
+
+    communityAutoRefreshInterval = toInterval(clientConfig.communityAutoRefreshSeconds);
+    lanAutoRefreshInterval = toInterval(clientConfig.lanAutoRefreshSeconds);
+
     refreshGuiServerListOptions();
     rebuildServerListFetcher();
 
                 browser.show({}, this->defaultHost, this->defaultPort);
     triggerFullRefresh();
-    nextAutoScanTime = SteadyClock::now() + autoScanInterval;
+    if (lanAutoRefreshInterval.count() > 0) {
+        nextAutoScanTime = SteadyClock::now() + lanAutoRefreshInterval;
+    } else {
+        nextAutoScanTime = SteadyClock::time_point{};
+    }
 }
 
 void ServerBrowserController::triggerFullRefresh() {
+    const auto nowSteady = SteadyClock::now();
     bool lanActive = isLanSelected();
     bool issuedRequest = false;
 
@@ -97,6 +109,13 @@ void ServerBrowserController::triggerFullRefresh() {
     if (serverListFetcher) {
         serverListFetcher->requestRefresh();
         issuedRequest = true;
+        if (communityAutoRefreshInterval.count() > 0) {
+            nextRemoteRefreshTime = nowSteady + communityAutoRefreshInterval;
+        } else {
+            nextRemoteRefreshTime = SteadyClock::time_point{};
+        }
+    } else {
+        nextRemoteRefreshTime = SteadyClock::time_point{};
     }
 
     if (!issuedRequest) {
@@ -211,6 +230,8 @@ void ServerBrowserController::rebuildEntries() {
         entry.activePlayers = record.activePlayers;
         entry.maxPlayers = record.maxPlayers;
         entry.gameMode = record.gameMode;
+        entry.screenshotId = record.screenshotId;
+        entry.sourceHost = record.sourceHost;
         entries.push_back(std::move(entry));
     }
 
@@ -231,17 +252,37 @@ void ServerBrowserController::update() {
     }
 
     auto nowSteady = SteadyClock::now();
+    const bool remoteListActive = static_cast<bool>(serverListFetcher);
 
     if (browser.consumeRefreshRequest()) {
         triggerFullRefresh();
-        nextAutoScanTime = nowSteady + autoScanInterval;
-    } else if (lanAutoRefreshEnabled && !discovery.isScanning() && nowSteady >= nextAutoScanTime) {
+        if (lanAutoRefreshInterval.count() > 0) {
+            nextAutoScanTime = nowSteady + lanAutoRefreshInterval;
+        } else {
+            nextAutoScanTime = SteadyClock::time_point{};
+        }
+    } else if (lanAutoRefreshInterval.count() > 0 && !discovery.isScanning() && nowSteady >= nextAutoScanTime) {
         triggerFullRefresh();
-        nextAutoScanTime = nowSteady + autoScanInterval;
+        nextAutoScanTime = nowSteady + lanAutoRefreshInterval;
+    }
+
+    if (!remoteListActive) {
+        nextRemoteRefreshTime = SteadyClock::time_point{};
+    } else {
+        if (communityAutoRefreshInterval.count() == 0) {
+            nextRemoteRefreshTime = SteadyClock::time_point{};
+        } else if (nextRemoteRefreshTime == SteadyClock::time_point{}) {
+            nextRemoteRefreshTime = nowSteady + communityAutoRefreshInterval;
+        }
+
+        if (communityAutoRefreshInterval.count() > 0 && !serverListFetcher->isFetching() && nowSteady >= nextRemoteRefreshTime) {
+            serverListFetcher->requestRefresh();
+            nextRemoteRefreshTime = nowSteady + communityAutoRefreshInterval;
+        }
     }
 
     discovery.update();
-    bool remoteFetchingActive = serverListFetcher && serverListFetcher->isFetching();
+    bool remoteFetchingActive = remoteListActive && serverListFetcher->isFetching();
     browser.setScanning(discovery.isScanning() || remoteFetchingActive);
 
     bool entriesDirty = false;
@@ -299,7 +340,11 @@ void ServerBrowserController::handleDisconnected(const std::string &reason) {
     browser.show(lastGuiEntries, defaultHost, defaultPort);
     browser.setStatus(status, true);
     triggerFullRefresh();
-    nextAutoScanTime = SteadyClock::now() + autoScanInterval;
+    if (lanAutoRefreshInterval.count() > 0) {
+        nextAutoScanTime = SteadyClock::now() + lanAutoRefreshInterval;
+    } else {
+        nextAutoScanTime = SteadyClock::time_point{};
+    }
 }
 
 void ServerBrowserController::refreshGuiServerListOptions() {
@@ -314,7 +359,7 @@ void ServerBrowserController::refreshGuiServerListOptions() {
     for (const auto &source : clientConfig.serverLists) {
         gui::ServerListOption option;
         option.name = resolveDisplayNameForSource(source);
-        option.url = source.url;
+        option.host = source.host;
         options.push_back(std::move(option));
     }
 
@@ -346,6 +391,7 @@ void ServerBrowserController::rebuildServerListFetcher() {
         serverListFetcher.reset();
         cachedRemoteServers.clear();
         lastServerListGeneration = 0;
+        nextRemoteRefreshTime = SteadyClock::time_point{};
         return;
     }
 
@@ -353,6 +399,11 @@ void ServerBrowserController::rebuildServerListFetcher() {
     cachedRemoteServers.clear();
     lastServerListGeneration = 0;
     serverListFetcher->requestRefresh();
+    if (communityAutoRefreshInterval.count() > 0) {
+        nextRemoteRefreshTime = SteadyClock::now() + communityAutoRefreshInterval;
+    } else {
+        nextRemoteRefreshTime = SteadyClock::time_point{};
+    }
 }
 
 void ServerBrowserController::handleServerListSelection(int selectedIndex) {
@@ -385,24 +436,24 @@ void ServerBrowserController::handleServerListSelection(int selectedIndex) {
 }
 
 void ServerBrowserController::handleServerListAddition(const gui::ServerListOption &option) {
-    std::string trimmedUrl = trimCopy(option.url);
+    std::string trimmedHost = trimCopy(option.host);
 
-    if (trimmedUrl.empty()) {
-        browser.setListStatus("Enter a URL before saving.", true);
+    if (trimmedHost.empty()) {
+        browser.setListStatus("Enter a host before saving.", true);
         return;
     }
 
     auto existing = std::find_if(clientConfig.serverLists.begin(), clientConfig.serverLists.end(),
         [&](const ClientServerListSource &source) {
-            return source.url == trimmedUrl;
+            return source.host == trimmedHost;
         });
     if (existing != clientConfig.serverLists.end()) {
-        browser.setListStatus("A server list with that URL already exists.", true);
+        browser.setListStatus("A server list with that host already exists.", true);
         return;
     }
 
     ClientServerListSource source;
-    source.url = trimmedUrl;
+    source.host = trimmedHost;
     clientConfig.serverLists.push_back(source);
 
     if (!clientConfig.Save(clientConfigPath)) {
@@ -426,19 +477,19 @@ void ServerBrowserController::updateServerListDisplayNamesFromCache() {
     std::vector<std::pair<std::size_t, std::string>> previousNames;
 
     for (const auto &record : cachedRemoteServers) {
-        if (record.sourceUrl.empty() || record.sourceName.empty()) {
+        if (record.sourceHost.empty() || record.sourceName.empty()) {
             continue;
         }
 
-        auto mapIt = serverListDisplayNames.find(record.sourceUrl);
+        auto mapIt = serverListDisplayNames.find(record.sourceHost);
         if (mapIt == serverListDisplayNames.end() || mapIt->second != record.sourceName) {
-            serverListDisplayNames[record.sourceUrl] = record.sourceName;
+            serverListDisplayNames[record.sourceHost] = record.sourceName;
             displayNamesChanged = true;
         }
 
         for (std::size_t i = 0; i < clientConfig.serverLists.size(); ++i) {
             auto &source = clientConfig.serverLists[i];
-            if (source.url != record.sourceUrl) {
+            if (source.host != record.sourceHost) {
                 continue;
             }
 
@@ -468,7 +519,7 @@ void ServerBrowserController::updateServerListDisplayNamesFromCache() {
 }
 
 std::string ServerBrowserController::resolveDisplayNameForSource(const ClientServerListSource &source) const {
-    auto it = serverListDisplayNames.find(source.url);
+    auto it = serverListDisplayNames.find(source.host);
     if (it != serverListDisplayNames.end() && !it->second.empty()) {
         return it->second;
     }
@@ -477,7 +528,7 @@ std::string ServerBrowserController::resolveDisplayNameForSource(const ClientSer
         return source.name;
     }
 
-    return source.url;
+    return source.host;
 }
 
 int ServerBrowserController::getLanOffset() const {
@@ -528,7 +579,7 @@ int ServerBrowserController::computeDefaultSelectionIndex(int optionCount) const
 
     if (!trimmedDefault.empty()) {
         for (std::size_t i = 0; i < clientConfig.serverLists.size(); ++i) {
-            if (clientConfig.serverLists[i].url == trimmedDefault) {
+            if (clientConfig.serverLists[i].host == trimmedDefault) {
                 return getLanOffset() + static_cast<int>(i);
             }
         }

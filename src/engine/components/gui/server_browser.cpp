@@ -7,6 +7,19 @@
 #include <imgui_internal.h>
 #include <spdlog/spdlog.h>
 #include <string>
+#include <unordered_map>
+#include <vector>
+#include <curl/curl.h>
+#include <imgui_impl_opengl3_loader.h>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
+namespace {
+using stbi_uc = Effekseer::stbi_uc;
+using Effekseer::stbi_load_from_memory;
+using Effekseer::stbi_image_free;
+}
 
 #include "common/data_path_resolver.hpp"
 
@@ -45,6 +58,24 @@ std::string trimCopy(const std::string &value) {
             return candidate;
         }
         return configuredServerPort();
+    }
+
+    size_t CurlWriteToVector(char *ptr, size_t size, size_t nmemb, void *userdata) {
+        auto *buffer = static_cast<std::vector<unsigned char> *>(userdata);
+        const size_t total = size * nmemb;
+        buffer->insert(buffer->end(), reinterpret_cast<unsigned char *>(ptr), reinterpret_cast<unsigned char *>(ptr) + total);
+        return total;
+    }
+
+    std::string normalizedHost(const std::string &host) {
+        if (host.empty()) {
+            return {};
+        }
+        std::string trimmed = host;
+        while (!trimmed.empty() && trimmed.back() == '/') {
+            trimmed.pop_back();
+        }
+        return trimmed;
     }
 }
 
@@ -136,8 +167,8 @@ void ServerBrowserView::draw(ImGuiIO &io) {
         if (!option.name.empty()) {
             return option.name;
         }
-        if (!option.url.empty()) {
-            return option.url;
+        if (!option.host.empty()) {
+            return option.host;
         }
         return std::string("Unnamed list");
     };
@@ -187,42 +218,17 @@ void ServerBrowserView::draw(ImGuiIO &io) {
         ImGuiTableFlags_ScrollY;
 
     const float tableHeight = 260.0f;
+    const float playerColumnWidth = 120.0f;
 
-    if (ImGui::BeginTable("##ServerBrowserPresets", 1, tableFlags, ImVec2(-1.0f, tableHeight))) {
-        ImGui::TableSetupColumn("##ServerListColumn", ImGuiTableColumnFlags_None, 1.0f);
+    if (ImGui::BeginTable("##ServerBrowserPresets", 2, tableFlags, ImVec2(-1.0f, tableHeight))) {
+        ImGui::TableSetupColumn("##ServerListColumn", ImGuiTableColumnFlags_WidthStretch, 1.0f);
+        ImGui::TableSetupColumn("##PlayerCountColumn", ImGuiTableColumnFlags_WidthFixed, playerColumnWidth);
 
         ImGui::TableNextRow(ImGuiTableRowFlags_Headers);
-        ImGui::TableSetColumnIndex(0);
 
         const char *serversHeadingLabel = "Servers";
-        ImVec2 headingTextSize;
-        if (hasHeadingFont) {
-            ImGui::PushFont(headingFont);
-            headingTextSize = ImGui::CalcTextSize(serversHeadingLabel);
-            ImGui::PopFont();
-        } else {
-            headingTextSize = ImGui::CalcTextSize(serversHeadingLabel);
-        }
 
-        const float headerStartX = ImGui::GetCursorPosX();
-        const float headerStartY = ImGui::GetCursorPosY();
-        const float headerWidth = ImGui::GetContentRegionAvail().x;
-        float buttonX = headerStartX + headerWidth - refreshButtonWidth;
-        float statusX = buttonX - style.ItemSpacing.x - statusTextWidth;
-        const float minStatusX = headerStartX + headingTextSize.x + style.ItemSpacing.x;
-        if (statusX < minStatusX) {
-            statusX = minStatusX;
-            buttonX = statusX + style.ItemSpacing.x + refreshButtonWidth;
-        }
-
-        const float maxButtonX = headerStartX + headerWidth - refreshButtonWidth;
-        if (buttonX > maxButtonX) {
-            buttonX = maxButtonX;
-            statusX = std::max(headerStartX + headingTextSize.x + style.ItemSpacing.x,
-                buttonX - style.ItemSpacing.x - statusTextWidth);
-        }
-
-        ImGui::SetCursorPos(ImVec2(headerStartX, headerStartY));
+        ImGui::TableSetColumnIndex(0);
         if (hasHeadingFont) {
             ImGui::PushFont(headingFont);
         }
@@ -230,11 +236,21 @@ void ServerBrowserView::draw(ImGuiIO &io) {
         if (hasHeadingFont) {
             ImGui::PopFont();
         }
-        float lineBottom = ImGui::GetCursorPosY();
+
+        ImGui::TableSetColumnIndex(1);
+        const float headerStartX = ImGui::GetCursorPosX();
+        const float headerStartY = ImGui::GetCursorPosY();
+        const float headerColumnWidth = ImGui::GetColumnWidth();
+        float buttonX = headerStartX + headerColumnWidth - refreshButtonWidth;
+        float statusX = buttonX - style.ItemSpacing.x - statusTextWidth;
+        if (statusX < headerStartX) {
+            statusX = headerStartX;
+            buttonX = std::max(buttonX, statusX + statusTextWidth + style.ItemSpacing.x);
+        }
 
         ImGui::SetCursorPos(ImVec2(statusX, headerStartY));
         ImGui::TextColored(scanColor, "%s", scanLabel);
-        lineBottom = std::max(lineBottom, ImGui::GetCursorPosY());
+        float lineBottom = ImGui::GetCursorPosY();
 
         ImGui::SetCursorPos(ImVec2(buttonX, headerStartY));
         if (hasButtonFont) {
@@ -259,6 +275,7 @@ void ServerBrowserView::draw(ImGuiIO &io) {
                 ImGui::TableNextRow();
 
                 ImGui::TableSetColumnIndex(0);
+                ImGui::PushID(i);
                 bool selected = (selectedIndex == i);
                 std::string selectableLabel = entry.label + "##server_row_" + std::to_string(i);
                 if (ImGui::Selectable(selectableLabel.c_str(), selected,
@@ -270,6 +287,44 @@ void ServerBrowserView::draw(ImGuiIO &io) {
                         statusIsError = false;
                     }
                 }
+
+                ImGui::TableSetColumnIndex(1);
+                const bool hasActive = entry.activePlayers >= 0;
+                const bool hasMax = entry.maxPlayers >= 0;
+                if (hasActive || hasMax) {
+                    std::string activeText = hasActive ? std::to_string(entry.activePlayers) : std::string("?");
+                    std::string maxText = hasMax ? std::to_string(entry.maxPlayers) : std::string("?");
+
+                    const float columnCursorX = ImGui::GetCursorPosX();
+                    const float columnWidth = ImGui::GetColumnWidth();
+                    float textWidth = ImGui::CalcTextSize((activeText + " / " + maxText).c_str()).x;
+                    float targetX = columnCursorX + columnWidth - style.CellPadding.x - textWidth;
+                    if (targetX < columnCursorX) {
+                        targetX = columnCursorX;
+                    }
+                    float targetY = ImGui::GetCursorPosY();
+                    ImGui::SetCursorPos(ImVec2(targetX, targetY));
+
+                    ImFont *countFont = regularFont ? regularFont : ImGui::GetFont();
+                    if (countFont) {
+                        ImGui::PushFont(countFont);
+                    }
+
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.60f, 0.80f, 0.40f, 1.0f));
+                    ImGui::TextUnformatted(activeText.c_str());
+                    ImGui::PopStyleColor();
+
+                    ImGui::SameLine(0.0f, 0.0f);
+                    ImGui::TextUnformatted(" / ");
+                    ImGui::SameLine(0.0f, 0.0f);
+                    ImGui::TextUnformatted(maxText.c_str());
+
+                    if (countFont) {
+                        ImGui::PopFont();
+                    }
+                }
+
+                ImGui::PopID();
             }
         }
 
@@ -351,7 +406,7 @@ void ServerBrowserView::draw(ImGuiIO &io) {
     ImGui::Spacing();
 
     ImGui::Text("Add server list");
-    ImGui::InputText("List URL", listUrlBuffer.data(), listUrlBuffer.size());
+    ImGui::InputText("Community host", listUrlBuffer.data(), listUrlBuffer.size());
 
     bool saveListClicked = false;
     if (hasButtonFont) {
@@ -366,7 +421,7 @@ void ServerBrowserView::draw(ImGuiIO &io) {
     if (saveListClicked) {
         std::string urlValue(listUrlBuffer.data());
         if (urlValue.empty()) {
-            listStatusText = "Enter a URL before saving.";
+            listStatusText = "Enter a host before saving.";
             listStatusIsError = true;
         } else {
             listStatusText.clear();
@@ -460,6 +515,38 @@ void ServerBrowserView::draw(ImGuiIO &io) {
             ImGui::TextDisabled("No description provided.");
         }
 
+        if (!selectedEntry->screenshotId.empty() && !selectedEntry->sourceHost.empty()) {
+            std::string hostBase = normalizedHost(selectedEntry->sourceHost);
+            std::string thumbnailUrl = hostBase + "/uploads/" + selectedEntry->screenshotId + "_thumb.jpg";
+
+            if (auto *thumb = getOrLoadThumbnail(thumbnailUrl)) {
+                if (thumb->textureId != 0 && thumb->width > 0 && thumb->height > 0) {
+                    ImGui::Spacing();
+                    ImGui::Separator();
+                    ImGui::TextUnformatted("Screenshot");
+
+                    const float maxWidth = ImGui::GetContentRegionAvail().x;
+                    const float maxHeight = 220.0f;
+                    float scale = 1.0f;
+                    scale = std::min(scale, maxWidth / static_cast<float>(thumb->width));
+                    scale = std::min(scale, maxHeight / static_cast<float>(thumb->height));
+                    if (scale <= 0.0f) {
+                        scale = 1.0f;
+                    }
+
+                    ImVec2 imageSize(
+                        static_cast<float>(thumb->width) * scale,
+                        static_cast<float>(thumb->height) * scale);
+
+                    ImGui::Image(static_cast<ImTextureID>(static_cast<intptr_t>(thumb->textureId)), imageSize);
+                } else if (thumb->failed) {
+                    ImGui::Spacing();
+                    ImGui::Separator();
+                    ImGui::TextDisabled("Screenshot unavailable.");
+                }
+            }
+        }
+
         ImGui::Spacing();
         ImGui::Separator();
         ImGui::TextUnformatted("Plugins");
@@ -494,6 +581,10 @@ void ServerBrowserView::show(const std::vector<ServerBrowserEntry> &newEntries,
     listStatusText.clear();
     listStatusIsError = false;
     resetBuffers(defaultHost, defaultPort);
+}
+
+ServerBrowserView::~ServerBrowserView() {
+    clearThumbnails();
 }
 
 void ServerBrowserView::setEntries(const std::vector<ServerBrowserEntry> &newEntries) {
@@ -535,6 +626,7 @@ void ServerBrowserView::hide() {
     scanning = false;
     listStatusText.clear();
     listStatusIsError = false;
+    clearThumbnails();
 }
 
 bool ServerBrowserView::isVisible() const {
@@ -608,6 +700,89 @@ void ServerBrowserView::resetBuffers(const std::string &defaultHost, uint16_t de
         "%s:%u",
         hostValue.c_str(),
         portValue);
+}
+
+ThumbnailTexture *ServerBrowserView::getOrLoadThumbnail(const std::string &url) {
+    if (url.empty()) {
+        return nullptr;
+    }
+
+    auto &entry = thumbnailCache[url];
+    if (entry.textureId != 0 || entry.failed) {
+        return &entry;
+    }
+
+    static bool curlInitialized = false;
+    if (!curlInitialized) {
+        if (curl_global_init(CURL_GLOBAL_DEFAULT) != 0) {
+            entry.failed = true;
+            return &entry;
+        }
+        curlInitialized = true;
+    }
+
+    CURL *curlHandle = curl_easy_init();
+    if (!curlHandle) {
+        entry.failed = true;
+        return &entry;
+    }
+
+    std::vector<unsigned char> body;
+    curl_easy_setopt(curlHandle, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curlHandle, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curlHandle, CURLOPT_TIMEOUT, 5L);
+    curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, CurlWriteToVector);
+    curl_easy_setopt(curlHandle, CURLOPT_WRITEDATA, &body);
+
+    CURLcode result = curl_easy_perform(curlHandle);
+    long status = 0;
+    if (result == CURLE_OK) {
+        curl_easy_getinfo(curlHandle, CURLINFO_RESPONSE_CODE, &status);
+    }
+    curl_easy_cleanup(curlHandle);
+
+    if (result != CURLE_OK || status < 200 || status >= 300 || body.empty()) {
+        entry.failed = true;
+        return &entry;
+    }
+
+    int width = 0;
+    int height = 0;
+    int channels = 0;
+    stbi_uc *pixels = stbi_load_from_memory(body.data(), static_cast<int>(body.size()), &width, &height, &channels, 4);
+    if (!pixels || width <= 0 || height <= 0) {
+        entry.failed = true;
+        if (pixels) {
+            stbi_image_free(pixels);
+        }
+        return &entry;
+    }
+
+    GLuint textureId = 0;
+    glGenTextures(1, &textureId);
+    glBindTexture(GL_TEXTURE_2D, textureId);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    stbi_image_free(pixels);
+
+    entry.textureId = textureId;
+    entry.width = width;
+    entry.height = height;
+    return &entry;
+}
+
+void ServerBrowserView::clearThumbnails() {
+    for (auto &[url, thumb] : thumbnailCache) {
+        if (thumb.textureId != 0) {
+            glDeleteTextures(1, &thumb.textureId);
+        }
+    }
+    thumbnailCache.clear();
 }
 
 } // namespace gui

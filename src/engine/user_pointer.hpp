@@ -5,4 +5,5 @@
 struct GLFWUserPointer {
     std::function<void(int, int)> resizeCallback;
     std::function<void(GLFWwindow*, int, int, int, int)> keyCallback;
+    std::function<void(GLFWwindow*, int, int, int)> mouseButtonCallback;
 };

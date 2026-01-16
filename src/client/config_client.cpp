@@ -10,8 +10,40 @@ namespace {
 ClientConfig ParseClientConfig(const nlohmann::json &root) {
     ClientConfig config;
 
+    auto parsePositiveInt = [](const nlohmann::json &object, const char *key) {
+        int value = 0;
+        auto it = object.find(key);
+        if (it == object.end()) {
+            return value;
+        }
+
+        try {
+            if (it->is_number_integer()) {
+                value = it->get<int>();
+            } else if (it->is_string()) {
+                value = std::stoi(it->get<std::string>());
+            }
+        } catch (...) {
+            value = 0;
+        }
+
+        if (value <= 0) {
+            return 0;
+        }
+        return value;
+    };
+
     if (auto it = root.find("tankPath"); it != root.end() && it->is_string()) {
         config.tankPath = it->get<std::string>();
+    }
+
+    if (auto guiIt = root.find("gui"); guiIt != root.end() && guiIt->is_object()) {
+        const auto &guiObject = *guiIt;
+        if (auto serverListIt = guiObject.find("serverList"); serverListIt != guiObject.end() && serverListIt->is_object()) {
+            const auto &serverListObject = *serverListIt;
+            config.communityAutoRefreshSeconds = parsePositiveInt(serverListObject, "communityAutoRefresh");
+            config.lanAutoRefreshSeconds = parsePositiveInt(serverListObject, "lanAutoRefresh");
+        }
     }
 
     if (auto serverListsIt = root.find("serverLists"); serverListsIt != root.end()) {
@@ -28,7 +60,37 @@ ClientConfig ParseClientConfig(const nlohmann::json &root) {
                 config.defaultServerList = defaultIt->get<std::string>();
             }
 
-            if (auto sourcesIt = serverListsObject.find("sources"); sourcesIt != serverListsObject.end()) {
+            auto parseCommunities = [&](const nlohmann::json &array) {
+                for (const auto &entry : array) {
+                    if (!entry.is_object()) {
+                        continue;
+                    }
+
+                    ClientServerListSource source;
+                    if (auto nameIt = entry.find("name"); nameIt != entry.end() && nameIt->is_string()) {
+                        source.name = nameIt->get<std::string>();
+                    }
+
+                    if (auto hostIt = entry.find("host"); hostIt != entry.end() && hostIt->is_string()) {
+                        source.host = hostIt->get<std::string>();
+                    }
+
+                    if (!source.host.empty()) {
+                        config.serverLists.push_back(source);
+                    } else {
+                        spdlog::warn("ClientConfig::Load: Skipping server list entry without host");
+                    }
+                }
+            };
+
+            if (auto communitiesIt = serverListsObject.find("communities"); communitiesIt != serverListsObject.end()) {
+                if (!communitiesIt->is_array()) {
+                    spdlog::warn("ClientConfig::Load: 'communities' must be an array");
+                } else {
+                    parseCommunities(*communitiesIt);
+                }
+            } else if (auto sourcesIt = serverListsObject.find("sources"); sourcesIt != serverListsObject.end()) {
+                // Backward compatibility: treat legacy 'sources' array as communities with 'url' fields.
                 if (!sourcesIt->is_array()) {
                     spdlog::warn("ClientConfig::Load: 'sources' must be an array");
                 } else {
@@ -43,13 +105,13 @@ ClientConfig ParseClientConfig(const nlohmann::json &root) {
                         }
 
                         if (auto urlIt = entry.find("url"); urlIt != entry.end() && urlIt->is_string()) {
-                            source.url = urlIt->get<std::string>();
+                            source.host = urlIt->get<std::string>();
                         }
 
-                        if (!source.url.empty()) {
+                        if (!source.host.empty()) {
                             config.serverLists.push_back(source);
                         } else {
-                            spdlog::warn("ClientConfig::Load: Skipping server list entry without URL");
+                            spdlog::warn("ClientConfig::Load: Skipping server list entry without host");
                         }
                     }
                 }
@@ -143,22 +205,37 @@ bool ClientConfig::Save(const std::string &path) const {
         serverListsObject.erase("default");
     }
 
-    nlohmann::json sourcesArray = nlohmann::json::array();
+    nlohmann::json communitiesArray = nlohmann::json::array();
     for (const auto &source : serverLists) {
-        if (source.url.empty()) {
+        if (source.host.empty()) {
             continue;
         }
 
         nlohmann::json entry;
-        entry["url"] = source.url;
+        entry["host"] = source.host;
         if (!source.name.empty()) {
             entry["name"] = source.name;
         }
-        sourcesArray.push_back(std::move(entry));
+        communitiesArray.push_back(std::move(entry));
     }
 
-    serverListsObject["sources"] = std::move(sourcesArray);
+    serverListsObject["communities"] = std::move(communitiesArray);
     userConfig["serverLists"] = std::move(serverListsObject);
+
+    nlohmann::json guiObject = nlohmann::json::object();
+    if (auto guiIt = userConfig.find("gui"); guiIt != userConfig.end() && guiIt->is_object()) {
+        guiObject = *guiIt;
+    }
+
+    nlohmann::json guiServerList = nlohmann::json::object();
+    if (auto serverListIt = guiObject.find("serverList"); serverListIt != guiObject.end() && serverListIt->is_object()) {
+        guiServerList = *serverListIt;
+    }
+
+    guiServerList["communityAutoRefresh"] = communityAutoRefreshSeconds;
+    guiServerList["lanAutoRefresh"] = lanAutoRefreshSeconds;
+    guiObject["serverList"] = std::move(guiServerList);
+    userConfig["gui"] = std::move(guiObject);
 
     std::error_code ec;
     const auto parentDir = filePath.parent_path();

@@ -7,14 +7,31 @@
     "serverLists": {
         "default": "http://192.168.1.6/servers.json",
         "showLAN": true,
-        "sources": [
-            {
-                "name": "Official BZ32 Server List",
-                "url": "http://192.168.1.6/servers.json",
-                "username" : "r55man",
-                "password" : "bzopen2024"
-            }
+        "communities": [
         ]
+    },
+    "gui": {
+        "serverList": {
+            "communityAutoRefresh": 0,
+            "lanAutoRefresh": 0
+        }
+    },
+    "keybindings": {
+        "fire": ["ENTER", "LEFT_MOUSE"],
+        "dropFlag": ["SPACE", "MIDDLE_MOUSE"],
+        "spawn": ["I", "RIGHT_MOUSE"],
+        "jump": ["TAB"],
+        "quickQuit": ["F12"],
+        "toggleFullscreen": ["F1"],
+        "chat": ["N"],
+        "chatTeam": ["M"],
+        "chatReply": ["."],
+        "chatAdmins": ["Z"],
+        "escape": ["ESCAPE"],
+        "moveLeft": ["LEFT"],
+        "moveRight": ["RIGHT"],
+        "moveForward": ["UP"],
+        "moveBackward": ["DOWN"]
     },
     "assets" : {
         "fonts" : {

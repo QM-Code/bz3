@@ -59,10 +59,12 @@ private:
     uint16_t defaultPort = 0;
     int activeServerListIndex = -1;
     std::unordered_map<std::string, std::string> serverListDisplayNames;
-    bool lanAutoRefreshEnabled = false;
+    std::chrono::seconds communityAutoRefreshInterval{0};
+    std::chrono::seconds lanAutoRefreshInterval{0};
+
+    SteadyClock::time_point nextRemoteRefreshTime{};
 
     SteadyClock::time_point nextAutoScanTime;
-    const std::chrono::seconds autoScanInterval{5};
     std::size_t lastDiscoveryVersion = 0;
     std::size_t lastServerListGeneration = 0;
 };

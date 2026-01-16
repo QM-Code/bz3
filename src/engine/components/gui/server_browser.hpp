@@ -5,6 +5,7 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include <unordered_map>
 
 struct ImGuiIO;
 struct ImFont;
@@ -22,6 +23,15 @@ struct ServerBrowserEntry {
     int activePlayers = -1;
     int maxPlayers = -1;
     std::string gameMode;
+    std::string screenshotId;
+    std::string sourceHost;
+};
+
+struct ThumbnailTexture {
+    unsigned int textureId = 0;
+    int width = 0;
+    int height = 0;
+    bool failed = false;
 };
 
 struct ServerBrowserSelection {
@@ -32,11 +42,12 @@ struct ServerBrowserSelection {
 
 struct ServerListOption {
     std::string name;
-    std::string url;
+    std::string host;
 };
 
 class ServerBrowserView {
 public:
+    ~ServerBrowserView();
     void initializeFonts(ImGuiIO &io);
     void draw(ImGuiIO &io);
 
@@ -58,6 +69,8 @@ public:
 
 private:
     void resetBuffers(const std::string &defaultHost, uint16_t defaultPort);
+    ThumbnailTexture *getOrLoadThumbnail(const std::string &url);
+    void clearThumbnails();
 
     bool visible = false;
     ImFont *regularFont = nullptr;
@@ -80,6 +93,8 @@ private:
     std::array<char, 512> listUrlBuffer{};
     std::string listStatusText;
     bool listStatusIsError = false;
+
+    std::unordered_map<std::string, ThumbnailTexture> thumbnailCache;
 };
 
 } // namespace gui

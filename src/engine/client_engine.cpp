@@ -19,6 +19,7 @@ ClientEngine::ClientEngine(GLFWwindow *window) {
     spdlog::trace("ClientEngine: Input initialized successfully");
     gui = new GUI(window);
     spdlog::trace("ClientEngine: GUI initialized successfully");
+    gui->setSpawnHint(input->spawnHintText());
     audio = new Audio();
     spdlog::trace("ClientEngine: Audio initialized successfully");
     particles = new ParticleEngine();

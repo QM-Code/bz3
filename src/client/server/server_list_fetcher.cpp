@@ -58,6 +58,20 @@ uint16_t configuredServerPortValue() {
     }
     return 0;
 }
+
+std::string buildServersUrl(const std::string &baseHost) {
+    if (baseHost.empty()) {
+        return {};
+    }
+
+    std::string normalized = baseHost;
+    // Trim trailing slashes so we can append predictable paths.
+    while (!normalized.empty() && normalized.back() == '/') {
+        normalized.pop_back();
+    }
+
+    return normalized + "/api/servers";
+}
 }
 
 ServerListFetcher::ServerListFetcher(std::vector<ClientServerListSource> sources)
@@ -126,8 +140,14 @@ std::vector<ServerListFetcher::ServerRecord> ServerListFetcher::fetchOnce() cons
     combined.reserve(16);
 
     for (const auto &source : sources) {
+        const std::string listUrl = buildServersUrl(source.host);
+        if (listUrl.empty()) {
+            spdlog::warn("ServerListFetcher: Skipping source with empty host");
+            continue;
+        }
+
         std::string responseBody;
-        if (!fetchUrl(source.url, responseBody)) {
+        if (!fetchUrl(listUrl, responseBody)) {
             continue;
         }
 
@@ -182,13 +202,20 @@ std::vector<ServerListFetcher::ServerRecord> ServerListFetcher::parseResponse(
             listName = nameIt->get<std::string>();
         }
 
+        std::string communityName;
+        if (auto commIt = jsonData.find("community_name"); commIt != jsonData.end() && commIt->is_string()) {
+            communityName = commIt->get<std::string>();
+        }
+
         if (!jsonData.contains("servers") || !jsonData["servers"].is_array()) {
-            spdlog::warn("ServerListFetcher: Server list from {} missing 'servers' array", source.url);
+            spdlog::warn("ServerListFetcher: Server list from {} missing 'servers' array", source.host);
             return records;
         }
 
-        std::string sourceDisplayName = source.name.empty() ? source.url : source.name;
-        if (!listName.empty()) {
+        std::string sourceDisplayName = source.name.empty() ? source.host : source.name;
+        if (!communityName.empty()) {
+            sourceDisplayName = communityName;
+        } else if (!listName.empty()) {
             sourceDisplayName = listName;
         }
 
@@ -203,7 +230,7 @@ std::vector<ServerListFetcher::ServerRecord> ServerListFetcher::parseResponse(
 
             ServerRecord record;
             record.sourceName = sourceDisplayName;
-            record.sourceUrl = source.url;
+            record.sourceHost = source.host;
             record.host = server.value("host", "");
             std::string portString = server.value("port", configuredServerPortString());
 
@@ -219,6 +246,9 @@ std::vector<ServerListFetcher::ServerRecord> ServerListFetcher::parseResponse(
             record.activePlayers = parseIntegerField(server, "active_players");
             if (record.activePlayers < 0) {
                 record.activePlayers = parseIntegerField(server, "num_players");
+            }
+            if (server.contains("screenshot_id") && server["screenshot_id"].is_string()) {
+                record.screenshotId = server["screenshot_id"].get<std::string>();
             }
             record.description = server.value("description", server.value("descrpition", std::string{}));
             record.flags.clear();
@@ -237,7 +267,7 @@ std::vector<ServerListFetcher::ServerRecord> ServerListFetcher::parseResponse(
             records.push_back(record);
         }
     } catch (const std::exception &ex) {
-        spdlog::warn("ServerListFetcher: Failed to parse response from {}: {}", source.url, ex.what());
+        spdlog::warn("ServerListFetcher: Failed to parse response from {}: {}", source.host, ex.what());
     }
 
     return records;
