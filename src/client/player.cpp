@@ -113,14 +113,16 @@ void Player::lateUpdate() {
     game.engine.render->setCameraPosition(state.position);
     game.engine.render->setCameraRotation(state.rotation);
 
-    if (glm::distance(lastPosition, state.position) > POSITION_UPDATE_THRESHOLD ||
-        angleBetween(lastRotation, state.rotation) > ROTATION_UPDATE_THRESHOLD) {
-        ClientMsg_PlayerLocation locMsg;
-        locMsg.position = state.position;
-        locMsg.rotation = state.rotation;
-        game.engine.network->send<ClientMsg_PlayerLocation>(locMsg);
-        lastPosition = state.position;
-        lastRotation = state.rotation;
+    if (state.alive) {
+        if (glm::distance(lastPosition, state.position) > POSITION_UPDATE_THRESHOLD ||
+            angleBetween(lastRotation, state.rotation) > ROTATION_UPDATE_THRESHOLD) {
+            ClientMsg_PlayerLocation locMsg;
+            locMsg.position = state.position;
+            locMsg.rotation = state.rotation;
+            game.engine.network->send<ClientMsg_PlayerLocation>(locMsg);
+            lastPosition = state.position;
+            lastRotation = state.rotation;
+        }
     }
 
     audioEngine.setListenerPosition(state.position);

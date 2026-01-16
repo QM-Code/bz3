@@ -33,42 +33,36 @@ std::string Client::getName() const {
     return state.name;
 }
 
-void Client::update() {
-    for (const auto &locMsg : game.engine.network->consumeMessages<ClientMsg_PlayerLocation>([this](const ClientMsg_PlayerLocation &msg) {
-        return msg.clientId == id;
-    })) {
-        state.position = locMsg.position;
-        state.rotation = locMsg.rotation;
+void Client::applyLocation(const glm::vec3 &position, const glm::quat &rotation) {
+    state.position = position;
+    state.rotation = rotation;
 
-        ServerMsg_PlayerLocation updateMsg;
-        updateMsg.clientId = id;
-        updateMsg.position = state.position;
-        updateMsg.rotation = state.rotation;
-        game.engine.network->sendExcept<ServerMsg_PlayerLocation>(id, &updateMsg);
+    ServerMsg_PlayerLocation updateMsg;
+    updateMsg.clientId = id;
+    updateMsg.position = state.position;
+    updateMsg.rotation = state.rotation;
+    updateMsg.velocity = state.velocity;
+    game.engine.network->sendExcept<ServerMsg_PlayerLocation>(id, &updateMsg);
+}
+
+void Client::trySpawn(const Location &spawnLocation) {
+    if (state.alive) {
+        spdlog::warn("Client::trySpawn: Client id {} requested spawn while already alive", id);
+        return;
     }
 
-    for (const auto &spawnMsg : game.engine.network->consumeMessages<ClientMsg_RequestPlayerSpawn>([this](const ClientMsg_RequestPlayerSpawn &msg) {
-        return msg.clientId == id;
-    })) {
-        if (state.alive) {
-            spdlog::warn("Client::update: Client id {} requested spawn while already alive", id);
-            continue;
-        }
+    state.position = spawnLocation.position;
+    state.rotation = spawnLocation.rotation;
+    state.velocity = glm::vec3(0.0f);
 
-        Location spawnLocation = game.world->getSpawnLocation();
-        state.position = spawnLocation.position;
-        state.rotation = spawnLocation.rotation;
-        state.velocity = glm::vec3(0.0f);
+    ServerMsg_PlayerSpawn spawnRespMsg;
+    spawnRespMsg.clientId = id;
+    spawnRespMsg.position = state.position;
+    spawnRespMsg.rotation = state.rotation;
+    spawnRespMsg.velocity = state.velocity;
+    game.engine.network->sendAll<ServerMsg_PlayerSpawn>(&spawnRespMsg);
 
-        ServerMsg_PlayerSpawn spawnRespMsg;
-        spawnRespMsg.clientId = id;
-        spawnRespMsg.position = state.position;
-        spawnRespMsg.rotation = state.rotation;
-        spawnRespMsg.velocity = state.velocity;
-        game.engine.network->sendAll<ServerMsg_PlayerSpawn>(&spawnRespMsg);
-
-        state.alive = true;
-    }
+    state.alive = true;
 }
 
 void Client::die() {
