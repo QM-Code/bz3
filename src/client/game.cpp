@@ -13,13 +13,11 @@ Game::Game(ClientEngine &engine, std::string playerName, std::string worldDir) :
 };
 
 Game::~Game() {
-    player.reset();
-    spdlog::trace("Game: Player destroyed successfully");
     world.reset();
     spdlog::trace("Game: World destroyed successfully");
     console.reset();
     spdlog::trace("Game: Console destroyed successfully");
-    clients.clear();
+    actors.clear();
     shots.clear();
 }
 
@@ -32,7 +30,9 @@ void Game::earlyUpdate(TimeUtils::duration deltaTime) {
 
     if (!player) {
         spdlog::trace("Game: Creating player with name '{}'", playerName);
-        player = std::make_unique<Player>(*this, world->playerId, world->getDefaultPlayerParameters(), playerName);
+        auto playerActor = std::make_unique<Player>(*this, world->playerId, world->getDefaultPlayerParameters(), playerName);
+        player = playerActor.get();
+        actors.push_back(std::move(playerActor));
         spdlog::trace("Game: Player created successfully");
     }
 
@@ -50,68 +50,58 @@ void Game::earlyUpdate(TimeUtils::duration deltaTime) {
     }
 
     for (const auto &msg : engine.network->consumeMessages<ServerMsg_PlayerJoin>()) {
-        clients.push_back(std::make_unique<Client>(*this, msg.clientId, msg.state));
+        if (getActorById(msg.clientId)) {
+            continue;
+        }
+        actors.push_back(std::make_unique<Client>(*this, msg.clientId, msg.state));
         spdlog::trace("Game: New client connected with ID {}", msg.clientId);
     }
 
     for (const auto &msg : engine.network->consumeMessages<ServerMsg_PlayerLeave>()) {
-        auto it = std::find_if(clients.begin(), clients.end(),
-            [&msg](const std::unique_ptr<Client> &client) {
-                return client->isEqual(msg.clientId);
-            }
-        );
+        auto it = std::remove_if(actors.begin(), actors.end(),
+            [&msg](const std::unique_ptr<Actor> &actor) {
+                return actor->isEqual(msg.clientId);
+            });
 
-        if (it != clients.end()) {
-            clients.erase(it);
+        if (it != actors.end()) {
+            actors.erase(it, actors.end());
             spdlog::trace("Game: Client disconnected with ID {}", msg.clientId);
         }
     }
 
     for (const auto &msg : engine.network->consumeMessages<ServerMsg_PlayerParameters>()) {
-        if (player && msg.clientId == world->playerId) {
-            player->handleParameters(msg);
+        if (auto *actor = getActorById(msg.clientId)) {
+            actor->setParameters(msg.params);
         }
     }
 
     for (const auto &msg : engine.network->consumeMessages<ServerMsg_PlayerState>()) {
-        if (auto *client = getClientById(msg.clientId)) {
-            client->applyState(msg.state);
+        if (auto *actor = getActorById(msg.clientId)) {
+            actor->setState(msg.state);
         }
     }
 
     for (const auto &msg : engine.network->consumeMessages<ServerMsg_PlayerLocation>()) {
-        if (auto *client = getClientById(msg.clientId)) {
-            client->applyLocation(msg);
+        if (auto *actor = getActorById(msg.clientId)) {
+            actor->setLocation(msg.position, msg.rotation, msg.velocity);
         }
     }
 
     for (const auto &msg : engine.network->consumeMessages<ServerMsg_PlayerDeath>()) {
-        if (player && msg.clientId == world->playerId) {
-            player->handleDeath();
-            continue;
-        }
-        if (auto *client = getClientById(msg.clientId)) {
-            client->handleDeath();
+        if (auto *actor = getActorById(msg.clientId)) {
+            actor->die();
         }
     }
 
     for (const auto &msg : engine.network->consumeMessages<ServerMsg_SetScore>()) {
-        if (player && msg.clientId == world->playerId) {
-            player->setScore(msg.score);
-            continue;
-        }
-        if (auto *client = getClientById(msg.clientId)) {
-            client->applySetScore(msg.score);
+        if (auto *actor = getActorById(msg.clientId)) {
+            actor->setScore(msg.score);
         }
     }
 
     for (const auto &msg : engine.network->consumeMessages<ServerMsg_PlayerSpawn>()) {
-        if (player && msg.clientId == world->playerId) {
-            player->handleSpawn(msg);
-            continue;
-        }
-        if (auto *client = getClientById(msg.clientId)) {
-            client->handleSpawn(msg);
+        if (auto *actor = getActorById(msg.clientId)) {
+            actor->spawn(msg.position, msg.rotation, msg.velocity);
         }
     }
 
@@ -134,7 +124,7 @@ void Game::earlyUpdate(TimeUtils::duration deltaTime) {
         }
     }
 
-    player->earlyUpdate();
+    (void)deltaTime;
 }
 
 void Game::lateUpdate(TimeUtils::duration deltaTime) {
@@ -142,10 +132,8 @@ void Game::lateUpdate(TimeUtils::duration deltaTime) {
         return;
     }
 
-    player->lateUpdate();
-
-    for (const auto &client : clients) {
-        client->update();
+    for (const auto &actor : actors) {
+        actor->update(deltaTime);
     }
 
     for (const auto &shot : shots) {
@@ -153,18 +141,18 @@ void Game::lateUpdate(TimeUtils::duration deltaTime) {
     }
 
     std::vector<ScoreboardEntry> scoreboard;
-    scoreboard.reserve(clients.size() + 1);
-    for (const auto &client : clients) {
-        scoreboard.push_back(ScoreboardEntry{client->getName(), client->getScore()});
+    scoreboard.reserve(actors.size());
+    for (const auto &actor : actors) {
+        const auto &s = actor->getState();
+        scoreboard.push_back(ScoreboardEntry{s.name, s.score});
     }
-    scoreboard.push_back(ScoreboardEntry{player->getName(), player->getScore()});
     engine.gui->setScoreboardEntries(scoreboard);
 }
 
-Client *Game::getClientById(client_id id) {
-    for (const auto &client : clients) {
-        if (client->isEqual(id)) {
-            return client.get();
+Actor *Game::getActorById(client_id id) {
+    for (auto &actor : actors) {
+        if (actor->isEqual(id)) {
+            return actor.get();
         }
     }
     return nullptr;

@@ -17,6 +17,7 @@ private:
     std::unique_ptr<net::IServerTransport> transport;
     std::map<client_id, net::ConnectionHandle> clients;
     std::map<net::ConnectionHandle, client_id> clientByConnection;
+    std::map<net::ConnectionHandle, std::string> ipByConnection;
 
     struct MsgData {
         ClientMsg* msg;
