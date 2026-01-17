@@ -5,6 +5,66 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root_dir="$(cd "${script_dir}/.." && pwd)"
 export PYTHONPATH="${root_dir}"
 
+script_name="$(basename "$0")"
+usage() {
+  echo "usage: ${script_name} -h host -p port" >&2
+}
+
+normalized_args=()
+for arg in "$@"; do
+  case "${arg}" in
+    --host)
+      normalized_args+=("-h")
+      ;;
+    --port)
+      normalized_args+=("-p")
+      ;;
+    --host=*)
+      normalized_args+=("-h" "${arg#*=}")
+      ;;
+    --port=*)
+      normalized_args+=("-p" "${arg#*=}")
+      ;;
+    --*)
+      echo "${script_name}: illegal option -- ${arg#--}" >&2
+      usage
+      exit 2
+      ;;
+    *)
+      normalized_args+=("${arg}")
+      ;;
+  esac
+done
+set -- "${normalized_args[@]}"
+
+api_host=""
+api_port=""
+while getopts ":h:p:" opt; do
+  case "${opt}" in
+    h)
+      api_host="${OPTARG}"
+      ;;
+    p)
+      api_port="${OPTARG}"
+      ;;
+    \?)
+      echo "${script_name}: illegal option -- ${OPTARG}" >&2
+      usage
+      exit 2
+      ;;
+    :)
+      echo "${script_name}: option requires an argument -- ${OPTARG}" >&2
+      usage
+      exit 2
+      ;;
+  esac
+done
+
+if [[ -z "${api_host}" || -z "${api_port}" ]]; then
+  usage
+  exit 2
+fi
+
 readarray -t servers < <(python3 - <<'PY'
 import random
 import sqlite3
@@ -39,7 +99,7 @@ while true; do
     max_players="$(awk '{print $3}' <<< "${entry}")"
     players="$((RANDOM % max_players))"
     echo "heartbeat ${host}:${port} players=${players} max=${max_players}"
-    response="$(curl -s -w "\n%{http_code}" "http://127.0.0.1:8080/api/heartbeat?host=${host}&port=${port}&players=${players}&max=${max_players}")"
+    response="$(curl -s -w "\n%{http_code}" "http://${api_host}:${api_port}/api/heartbeat?host=${host}&port=${port}&players=${players}&max=${max_players}")"
     body="$(printf "%s" "${response}" | head -n 1)"
     status="$(printf "%s" "${response}" | tail -n 1)"
     if [[ "${status}" != "200" ]] || grep -q '"ok": false' <<< "${body}"; then

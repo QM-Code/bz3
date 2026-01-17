@@ -5,6 +5,7 @@
 #include "server/server_discovery.hpp"
 #include "server/terminal_commands.hpp"
 #include "server/server_cli_options.hpp"
+#include "server/community_heartbeat.hpp"
 #include "common/data_dir_override.hpp"
 #include "common/data_path_resolver.hpp"
 #include "common/config_helpers.hpp"
@@ -117,7 +118,6 @@ int main(int argc, char *argv[]) {
 
     std::string serverName = bz::data::ReadStringConfig("serverName", "BZ OpenGL Server");
     std::string worldName = bz::data::ReadStringConfig("worldName", worldDirPath.filename().string());
-
     ServerEngine engine(port);
     g_engine = &engine;
     spdlog::trace("ServerEngine initialized successfully");
@@ -129,6 +129,9 @@ int main(int argc, char *argv[]) {
     spdlog::trace("Game initialized successfully");
 
     ServerDiscoveryBeacon discoveryBeacon(port, serverName, worldName);
+
+    CommunityHeartbeat communityHeartbeat;
+    communityHeartbeat.configureFromConfig(mergedConfig, port);
 
     spdlog::trace("Loading plugins...");
     py::scoped_interpreter guard{};
@@ -194,6 +197,8 @@ int main(int argc, char *argv[]) {
         engine.earlyUpdate(deltaTime);
         game.update(deltaTime);
         engine.lateUpdate(deltaTime);
+
+        communityHeartbeat.update(game);
     }
 
     spdlog::info("Server shutdown complete");

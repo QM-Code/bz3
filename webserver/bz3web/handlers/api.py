@@ -8,21 +8,23 @@ from bz3web import auth, config, db, webhttp
 def _handle_auth(request):
     settings = config.get_config()
     debug_auth = bool(settings.get("debug_auth", False))
-    if request.method == "GET":
-        if not debug_auth:
-            return webhttp.json_response({"ok": False, "error": "method_not_allowed"}, status="405 Method Not Allowed")
-        username = request.query.get("username", [""])[0].strip()
-        email = request.query.get("email", [""])[0].strip().lower()
-        password = request.query.get("password", [""])[0]
-        passhash = request.query.get("passhash", [""])[0].strip()
-    elif request.method == "POST":
-        form = request.form()
-        username = form.get("username", [""])[0].strip()
-        email = form.get("email", [""])[0].strip().lower()
-        password = ""
-        passhash = form.get("passhash", [""])[0].strip()
-    else:
+    if request.method not in ("GET", "POST"):
         return webhttp.json_response({"ok": False, "error": "method_not_allowed"}, status="405 Method Not Allowed")
+    if request.method == "GET" and not debug_auth:
+        return webhttp.json_response({"ok": False, "error": "method_not_allowed"}, status="405 Method Not Allowed")
+
+    if request.method == "GET":
+        source = request.query
+    else:
+        source = request.form()
+
+    username = source.get("username", [""])[0].strip()
+    email = source.get("email", [""])[0].strip().lower()
+    password = source.get("password", [""])[0]
+    passhash = source.get("passhash", [""])[0].strip()
+    world = source.get("world", [""])[0].strip()
+    if not debug_auth:
+        password = ""
     if not (password or passhash) or (not email and not username):
         return webhttp.json_response({"ok": False, "error": "missing_credentials"}, status="400 Bad Request")
     conn = db.connect(db.default_db_path())
@@ -41,7 +43,68 @@ def _handle_auth(request):
         else:
             if not auth.verify_password(password, user["password_salt"], user["password_hash"]):
                 return webhttp.json_response({"ok": False, "error": "invalid_credentials"}, status="401 Unauthorized")
-        return webhttp.json_response({"ok": True})
+        community_admin = bool(auth.is_admin(user))
+        resolved_username = user["username"]
+        local_admin = False
+        if world:
+            server = db.get_server_by_name(conn, world)
+            if server and (("deleted" not in server.keys()) or not server["deleted"]):
+                owner_name = server["owner_username"]
+                if owner_name and owner_name.lower() == resolved_username.lower():
+                    local_admin = True
+                else:
+                    owner_id = server["owner_user_id"]
+                    direct_admins = db.list_user_admins(conn, owner_id)
+                    admin_names = {admin["username"].lower() for admin in direct_admins}
+                    for admin in direct_admins:
+                        if not admin["trust_admins"]:
+                            continue
+                        for trusted in db.list_user_admins(conn, admin["admin_user_id"]):
+                            admin_names.add(trusted["username"].lower())
+                    local_admin = resolved_username.lower() in admin_names
+
+        return webhttp.json_response(
+            {"ok": True, "community_admin": community_admin, "local_admin": local_admin}
+        )
+    finally:
+        conn.close()
+
+
+def _handle_user_registered(request):
+    if request.method not in ("GET", "POST"):
+        return webhttp.json_response({"ok": False, "error": "method_not_allowed"}, status="405 Method Not Allowed")
+    if request.method == "GET":
+        username = request.query.get("username", [""])[0].strip()
+    else:
+        form = request.form()
+        username = form.get("username", [""])[0].strip()
+    if not username:
+        return webhttp.json_response({"ok": False, "error": "missing_username"}, status="400 Bad Request")
+
+    settings = config.get_config()
+    community_name = settings.get("community_name", "Server List")
+
+    conn = db.connect(db.default_db_path())
+    try:
+        user = db.get_user_by_username(conn, username)
+        if not user:
+            return webhttp.json_response(
+                {
+                    "ok": True,
+                    "registered": False,
+                    "community_name": community_name,
+                }
+            )
+        return webhttp.json_response(
+            {
+                "ok": True,
+                "registered": True,
+                "community_name": community_name,
+                "salt": user["password_salt"],
+                "locked": bool(user["is_locked"]),
+                "deleted": bool(user["deleted"]),
+            }
+        )
     finally:
         conn.close()
 
@@ -55,60 +118,57 @@ def _handle_heartbeat(request):
     max_players = None
     new_port = None
     if request.method == "GET":
-        host = request.query.get("host", [""])[0].strip()
-        port_text = request.query.get("port", [""])[0].strip()
-        port_missing = not port_text
-        players_text = request.query.get("players", [""])[0].strip()
-        max_text = request.query.get("max", [""])[0].strip()
-        newport_text = request.query.get("newport", [""])[0].strip()
-        try:
-            port = int(port_text)
-            if port < 1 or port > 65535:
-                raise ValueError
-        except ValueError:
-            port = None
+        source = request.query
     else:
-        form = request.form()
-        host = form.get("host", [""])[0].strip()
-        port_text = form.get("port", [""])[0].strip()
-        port_missing = not port_text
-        players_text = form.get("players", [""])[0].strip()
-        max_text = form.get("max", [""])[0].strip()
-        newport_text = form.get("newport", [""])[0].strip()
+        source = request.form()
+
+    server_text = source.get("server", [""])[0].strip()
+    players_text = source.get("players", [""])[0].strip()
+    max_text = source.get("max", [""])[0].strip()
+    newport_text = source.get("newport", [""])[0].strip()
+
+    if not server_text:
+        return webhttp.json_response(
+            {"ok": False, "error": "missing_server", "message": "server is required"},
+            status="400 Bad Request",
+        )
+
+    host = ""
+    port = None
+    if "://" in server_text:
+        parsed = urllib.parse.urlparse(server_text)
+        host = parsed.hostname or ""
+        port = parsed.port
+    else:
+        if ":" in server_text:
+            host, port_text = server_text.rsplit(":", 1)
+        else:
+            host = ""
+            port_text = server_text
         try:
             port = int(port_text)
-            if port < 1 or port > 65535:
-                raise ValueError
         except ValueError:
             port = None
 
     remote_addr = request.environ.get("REMOTE_ADDR", "")
     if not debug_heartbeat:
         host = remote_addr
-    if port is None:
-        error = "missing_port" if port_missing else "invalid_port"
-        message = (
-            "port is required and must be an integer in the range 1-65535"
-            if port_missing
-            else "port must be an integer in the range 1-65535"
-        )
+
+    if port is None or port < 1 or port > 65535:
         return webhttp.json_response(
             {
                 "ok": False,
-                "error": error,
-                "message": message,
+                "error": "invalid_port",
+                "message": "server must include a port in the range 1-65535",
             },
             status="400 Bad Request",
         )
-    if not host:
-        message = "host is required for heartbeat requests"
-        if debug_heartbeat:
-            message = "Heartbeat is running in debug mode. A host parameter must be specified in the query string."
+    if not host and debug_heartbeat:
         return webhttp.json_response(
             {
                 "ok": False,
-                "error": "missing_server",
-                "message": message,
+                "error": "missing_host",
+                "message": "server must include a host in debug_heartbeat mode",
             },
             status="400 Bad Request",
         )
@@ -290,6 +350,8 @@ def handle(request):
     path = request.path.rstrip("/")
     if path == "/api/auth":
         return _handle_auth(request)
+    if path == "/api/user_registered":
+        return _handle_user_registered(request)
     if path == "/api/heartbeat":
         return _handle_heartbeat(request)
     if path == "/api/admins":

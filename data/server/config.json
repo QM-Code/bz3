@@ -1,31 +1,13 @@
 {
     "defaultWorld" : "server/worlds/Default",
-	"admins" : [
-		{
-			"username" : "Grue",
-			"inheritAadminList" : true,
-			"inheritBanList" : true
-		},
-		{
-			"username" : "karmak",
-			"inheritAdminList" : true,
-			"inheritBanList" : false
-		},
-		{
-			"username" : "Whammo",
-			"inheritAdminList" : false,
-			"inheritBanList" : false
-		},
-		{
-			"username" : "allejo",
-			"inheritAdminList" : true,
-			"inheritBanList" : false
-		},
-		{
-			"username" : "annoying_cat",
-			"inheritAdminList" : true
-		}
-	],
+    "network" : {
+        "ServerAdvertiseHost": "192.168.1.6"
+    },
+    "community": {
+        "server" : "http://192.168.1.6:8080/",
+        "enabled" : true,
+        "heartbeatIntervalSeconds" : 10
+    },
     "maxPlayers": 20,
     "defaultPlayerParameters": {
         "speed": 5.0,

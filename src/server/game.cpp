@@ -87,7 +87,14 @@ void Game::update(TimeUtils::duration deltaTime) {
         }
 
         world->sendInitToClient(connMsg.clientId);
-        auto newClient = std::make_unique<Client>(*this, connMsg.clientId, connMsg.ip, connMsg.name);
+        auto newClient = std::make_unique<Client>(
+            *this,
+            connMsg.clientId,
+            connMsg.ip,
+            connMsg.name,
+            connMsg.registeredUser,
+            connMsg.communityAdmin,
+            connMsg.localAdmin);
 
         // Send existing players to the newcomer
         for (const auto &client : clients) {

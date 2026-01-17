@@ -175,7 +175,7 @@ int main(int argc, char *argv[]) {
         serverConnector);
 
     if (cliOptions.addrExplicit) {
-        serverConnector.connect(cliOptions.connectAddr, cliOptions.connectPort);
+        serverConnector.connect(cliOptions.connectAddr, cliOptions.connectPort, cliOptions.playerName, false, false, false);
     }
 
     lastFrameTime = TimeUtils::GetCurrentTime();
