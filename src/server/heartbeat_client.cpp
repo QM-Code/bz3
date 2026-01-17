@@ -1,15 +1,17 @@
 #include "server/heartbeat_client.hpp"
 
 #include <curl/curl.h>
+#include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
 #include "common/curl_global.hpp"
 
 namespace {
-size_t DiscardResponse(char *ptr, size_t size, size_t nmemb, void *userdata) {
-    (void)ptr;
-    (void)userdata;
-    return size * nmemb;
+size_t AppendResponse(char *ptr, size_t size, size_t nmemb, void *userdata) {
+    auto *buffer = static_cast<std::string *>(userdata);
+    const size_t total = size * nmemb;
+    buffer->append(ptr, total);
+    return total;
 }
 
 std::string trimTrailingSlash(std::string value) {
@@ -29,7 +31,7 @@ std::string urlEncode(CURL *curlHandle, const std::string &value) {
     return result;
 }
 
-bool performGet(const std::string &url, long &statusOut, std::string &errorOut) {
+bool performGet(const std::string &url, long &statusOut, std::string &errorOut, std::string &bodyOut) {
     if (!bz::net::EnsureCurlGlobalInit()) {
         return false;
     }
@@ -43,7 +45,8 @@ bool performGet(const std::string &url, long &statusOut, std::string &errorOut) 
     curl_easy_setopt(curlHandle, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(curlHandle, CURLOPT_TIMEOUT, 5L);
     curl_easy_setopt(curlHandle, CURLOPT_ERRORBUFFER, errorBuffer);
-    curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, DiscardResponse);
+    curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, AppendResponse);
+    curl_easy_setopt(curlHandle, CURLOPT_WRITEDATA, &bodyOut);
     CURLcode result = curl_easy_perform(curlHandle);
     long status = 0;
     if (result == CURLE_OK) {
@@ -61,6 +64,15 @@ bool performGet(const std::string &url, long &statusOut, std::string &errorOut) 
         return false;
     }
     if (status < 200 || status >= 300) {
+        if (!bodyOut.empty()) {
+            try {
+                auto jsonData = nlohmann::json::parse(bodyOut);
+                if (jsonData.contains("message") && jsonData["message"].is_string()) {
+                    errorOut = jsonData["message"].get<std::string>();
+                }
+            } catch (...) {
+            }
+        }
         return false;
     }
     return true;
@@ -157,7 +169,8 @@ void HeartbeatClient::workerProc() {
 
         long status = 0;
         std::string error;
-        if (!performGet(url, status, error)) {
+        std::string body;
+        if (!performGet(url, status, error, body)) {
             std::string reason;
             if (!error.empty()) {
                 reason = error;
