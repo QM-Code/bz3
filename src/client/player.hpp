@@ -30,6 +30,8 @@ private:
     glm::vec3 lastPosition;
     glm::quat lastRotation;
 
+    render_id renderId;
+
 public:
     Player(Game &game,
            client_id,
