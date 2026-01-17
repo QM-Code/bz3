@@ -35,8 +35,11 @@ public:
     bool isRegisteredUser() const { return registeredUser; }
     bool isCommunityAdmin() const { return communityAdmin; }
     bool isLocalAdmin() const { return localAdmin; }
-    void update();
     glm::vec3 getPosition() const { return state.position; }
+
+    void applyLocation(const glm::vec3 &position, const glm::quat &rotation);
+    void trySpawn(const Location &spawnLocation);
+
     void die();
     void setScore(int newScore);
     bool setParameter(const std::string &param, float value);

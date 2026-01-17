@@ -2,6 +2,8 @@
 #include <vector>
 #include <string>
 
+#include "engine/types.hpp"
+
 class Game;
 
 class Chat {
@@ -15,5 +17,5 @@ public:
     Chat(Game &game);
     ~Chat();
 
-    void update();
+    void handleMessage(const ClientMsg_Chat &chatMsg);
 };

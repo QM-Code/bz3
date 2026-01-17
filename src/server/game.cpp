@@ -68,12 +68,6 @@ Game::~Game() {
 }
 
 void Game::update(TimeUtils::duration deltaTime) {
-    chat->update();
-
-    for (const auto &client : clients) {
-        client->update();
-    }
-
     for (const auto &connMsg : engine.network->consumeMessages<ClientMsg_PlayerJoin>()) {
         spdlog::debug("Game::update: New client connection with id {} from IP {}",
                       connMsg.clientId,
@@ -116,6 +110,28 @@ void Game::update(TimeUtils::duration deltaTime) {
     for (const auto &disconnMsg : engine.network->consumeMessages<ClientMsg_PlayerLeave>()) {
         spdlog::info("Game::update: Client with id {} disconnected", disconnMsg.clientId);
         removeClient(disconnMsg.clientId);
+    }
+
+    for (const auto &chatMsg : engine.network->consumeMessages<ClientMsg_Chat>()) {
+        chat->handleMessage(chatMsg);
+    }
+
+    for (const auto &locMsg : engine.network->consumeMessages<ClientMsg_PlayerLocation>()) {
+        Client *client = getClient(locMsg.clientId);
+        if (!client) {
+            continue;
+        }
+
+        client->applyLocation(locMsg.position, locMsg.rotation);
+    }
+
+    for (const auto &spawnMsg : engine.network->consumeMessages<ClientMsg_RequestPlayerSpawn>()) {
+        Client *client = getClient(spawnMsg.clientId);
+        if (!client) {
+            continue;
+        }
+
+        client->trySpawn(world->getSpawnLocation());
     }
 
     for (const auto &shotMsg : engine.network->consumeMessages<ClientMsg_CreateShot>()) {
