@@ -3,7 +3,17 @@
 #include <algorithm>
 #include "engine/components/gui.hpp"
 
-Game::Game(ClientEngine &engine, std::string playerName, std::string worldDir) : playerName(playerName), engine(engine) {
+Game::Game(ClientEngine &engine,
+           std::string playerName,
+           std::string worldDir,
+           bool registeredUser,
+           bool communityAdmin,
+           bool localAdmin)
+    : playerName(std::move(playerName)),
+      registeredUser(registeredUser),
+      communityAdmin(communityAdmin),
+      localAdmin(localAdmin),
+      engine(engine) {
     world = std::make_unique<World>(*this, worldDir);
     spdlog::trace("Game: World created successfully");
     console = std::make_unique<Console>(*this);
@@ -30,7 +40,14 @@ void Game::earlyUpdate(TimeUtils::duration deltaTime) {
 
     if (!player) {
         spdlog::trace("Game: Creating player with name '{}'", playerName);
-        auto playerActor = std::make_unique<Player>(*this, world->playerId, world->getDefaultPlayerParameters(), playerName);
+        auto playerActor = std::make_unique<Player>(
+            *this,
+            world->playerId,
+            world->getDefaultPlayerParameters(),
+            playerName,
+            registeredUser,
+            communityAdmin,
+            localAdmin);
         player = playerActor.get();
         actors.push_back(std::move(playerActor));
         spdlog::trace("Game: Player created successfully");
@@ -144,7 +161,13 @@ void Game::lateUpdate(TimeUtils::duration deltaTime) {
     scoreboard.reserve(actors.size());
     for (const auto &actor : actors) {
         const auto &s = actor->getState();
-        scoreboard.push_back(ScoreboardEntry{s.name, s.score});
+        scoreboard.push_back(ScoreboardEntry{
+            s.name,
+            s.score,
+            s.registeredUser,
+            s.communityAdmin,
+            s.localAdmin
+        });
     }
     engine.gui->setScoreboardEntries(scoreboard);
 }

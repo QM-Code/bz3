@@ -11,7 +11,10 @@
 Player::Player(Game &game,
                client_id id,
                PlayerParameters params,
-               const std::string name)
+               const std::string name,
+               bool registeredUser,
+               bool communityAdmin,
+               bool localAdmin)
         : Actor(game, id),
             grounded(false),
             physics(&game.engine.physics->createPlayer()),
@@ -24,6 +27,9 @@ Player::Player(Game &game,
       jumpCooldown(TimeUtils::getDuration(0.1f)) {
         setParameters(std::move(params));
     state.name = name;
+    state.registeredUser = registeredUser;
+    state.communityAdmin = communityAdmin;
+    state.localAdmin = localAdmin;
     state.alive = false;
     state.score = 0;
     lastPosition = glm::vec3(0.0f);

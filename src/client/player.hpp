@@ -31,7 +31,13 @@ private:
     glm::quat lastRotation;
 
 public:
-    Player(Game &game, client_id, PlayerParameters params, const std::string name);
+    Player(Game &game,
+           client_id,
+           PlayerParameters params,
+           const std::string name,
+           bool registeredUser,
+           bool communityAdmin,
+           bool localAdmin);
     ~Player();
 
     std::string getName() const { return state.name; }

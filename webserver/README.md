@@ -88,8 +88,25 @@ The import/export format is modeled after `data/test-data.json` and includes all
 - `/api/admins` returns the admin list for the server identified by `host` + `port` (GET or POST).
 - `/api/heartbeat` updates server state from game servers (see `config.json` for debug/host rules).
 - `/api/auth` validates username/password for game server auth (POST only unless `debug_auth` is enabled).
+- `/api/user_registered` reports whether a username exists on the community server (GET or POST).
 
 ## API auth parameters
 
-- `POST /api/auth`: form fields `username` or `email`, plus `passhash` (pre-hashed).
-- `GET /api/auth` (only if `debug_auth` is true): query params `username` or `email`, plus `password` (plaintext) or `passhash` (pre-hashed).
+`/api/auth` accepts the same parameters via GET or POST (GET is only enabled when `debug_auth` is true).
+
+Parameters:
+- `username`: account username (use either `username` or `email`)
+- `email`: account email (use either `username` or `email`)
+- `passhash`: PBKDF2-SHA256 hash (required when `debug_auth` is false)
+- `password`: plaintext password (only accepted when `debug_auth` is true)
+- `world`: optional world/server name; includes `local_admin` in the response when supplied
+
+Example response:
+```json
+{
+  "ok": true,
+  "community_admin": false,
+  "local_admin": true
+}
+```
+- `GET /api/user_registered`: query param `username` (response includes `registered`, `community_name`, and `salt` when registered).

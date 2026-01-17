@@ -13,26 +13,37 @@ ServerConnector::ServerConnector(ClientEngine &engine,
                                  std::unique_ptr<Game> &game)
     : engine(engine),
       game(game),
-      playerName(std::move(playerName)),
+      defaultPlayerName(std::move(playerName)),
       worldDir(std::move(worldDir)) {}
 
-bool ServerConnector::connect(const std::string &targetHost, uint16_t targetPort) {
+bool ServerConnector::connect(const std::string &targetHost,
+                              uint16_t targetPort,
+                              const std::string &playerName,
+                              bool registeredUser,
+                              bool communityAdmin,
+                              bool localAdmin) {
     std::string status = "Connecting to " + targetHost + ":" + std::to_string(targetPort) + "...";
     auto &browser = engine.gui->serverBrowser();
     browser.setStatus(status, false);
     spdlog::info("Attempting to connect to {}:{}", targetHost, targetPort);
 
+    const std::string resolvedName = playerName.empty() ? defaultPlayerName : playerName;
     const uint16_t connectTimeoutMs = bz::data::ReadUInt16Config({"network.ConnectTimeoutMs"}, 2000);
     if (engine.network->connect(targetHost, targetPort, static_cast<int>(connectTimeoutMs))) {
         spdlog::info("Connected to server at {}:{}", targetHost, targetPort);
-        game = std::make_unique<Game>(engine, playerName, worldDir);
+        spdlog::info("Join mode: {} user", registeredUser ? "registered" : "anonymous");
+        spdlog::info("Join flags: community_admin={}, local_admin={}", communityAdmin, localAdmin);
+        game = std::make_unique<Game>(engine, resolvedName, worldDir, registeredUser, communityAdmin, localAdmin);
         spdlog::trace("Game initialized successfully");
 
         ClientMsg_PlayerJoin joinMsg{};
         joinMsg.clientId = 0; // server will overwrite based on connection
-        joinMsg.name = playerName;
+        joinMsg.name = resolvedName;
         joinMsg.protocolVersion = NET_PROTOCOL_VERSION;
         joinMsg.ip = ""; // client does not know its external IP
+        joinMsg.registeredUser = registeredUser;
+        joinMsg.communityAdmin = communityAdmin;
+        joinMsg.localAdmin = localAdmin;
         engine.network->send<ClientMsg_PlayerJoin>(joinMsg);
 
         browser.hide();

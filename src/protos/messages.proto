@@ -35,6 +35,9 @@ message PlayerState {
   bool alive = 5;
   PlayerParameters params = 6;
   int32 score = 7;
+  bool registered_user = 8;
+  bool community_admin = 9;
+  bool local_admin = 10;
 }
 
 // =====================
@@ -155,6 +158,9 @@ message ClientMsg_PlayerJoin {
   string ip = 1;
   string name = 2;
   uint32 protocol_version = 3;
+  bool registered_user = 4;
+  bool community_admin = 5;
+  bool local_admin = 6;
 }
 
 message ClientMsg_PlayerLeave {

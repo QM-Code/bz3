@@ -73,6 +73,7 @@ find_package(miniz REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(Protobuf REQUIRED)
 find_package(CURL REQUIRED)
+find_package(OpenSSL REQUIRED)
 
 # Compile protobuf files
 set(PROTO_FILES ${PROJECT_SOURCE_DIR}/src/protos/messages.proto)
@@ -88,18 +89,20 @@ target_link_libraries(proto_lib PUBLIC protobuf::libprotobuf)
 target_include_directories(proto_lib PUBLIC ${CMAKE_BINARY_DIR})
 
 # Gather sources
-file(GLOB_RECURSE CLIENT_SOURCES "${PROJECT_SOURCE_DIR}/src/client/*.cpp")
+file(GLOB_RECURSE CLIENT_SOURCES CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/src/client/*.cpp")
 list(APPEND CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/client/actor.cpp
     ${PROJECT_SOURCE_DIR}/src/client/server/server_browser_controller.cpp
+    ${PROJECT_SOURCE_DIR}/src/common/curl_global.cpp
     ${PROJECT_SOURCE_DIR}/src/common/config_helpers.cpp
     ${PROJECT_SOURCE_DIR}/src/common/data_path_resolver.cpp
     ${PROJECT_SOURCE_DIR}/src/common/data_dir_override.cpp
 )
-file(GLOB_RECURSE SERVER_SOURCES "${PROJECT_SOURCE_DIR}/src/server/*.cpp")
+file(GLOB_RECURSE SERVER_SOURCES CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/src/server/*.cpp")
 list(APPEND SERVER_SOURCES
     ${PROJECT_SOURCE_DIR}/src/server/terminal_commands.cpp
     ${PROJECT_SOURCE_DIR}/src/server/server_cli_options.cpp
+    ${PROJECT_SOURCE_DIR}/src/common/curl_global.cpp
     ${PROJECT_SOURCE_DIR}/src/common/config_helpers.cpp
     ${PROJECT_SOURCE_DIR}/src/common/data_path_resolver.cpp
     ${PROJECT_SOURCE_DIR}/src/common/data_dir_override.cpp
@@ -189,6 +192,7 @@ target_link_libraries(bz3 PRIVATE
     nlohmann_json::nlohmann_json
     proto_lib
     CURL::libcurl
+    OpenSSL::Crypto
     Effekseer
     EffekseerRendererGL
 )
@@ -204,6 +208,7 @@ target_link_libraries(bz3-server PRIVATE
     miniz::miniz
     nlohmann_json::nlohmann_json
     proto_lib
+    CURL::libcurl
 )
 
 # System libraries (platform-specific)

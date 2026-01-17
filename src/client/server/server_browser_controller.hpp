@@ -3,11 +3,13 @@
 #include <chrono>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 #include "client/config_client.hpp"
+#include "client/server/community_auth_client.hpp"
 #include "client/server/server_discovery.hpp"
 #include "client/server/server_list_fetcher.hpp"
 #include "engine/client_engine.hpp"
@@ -45,6 +47,10 @@ private:
     bool isLanSelected() const;
     const ClientServerListSource* getSelectedRemoteSource() const;
     int computeDefaultSelectionIndex(int optionCount) const;
+    void handleJoinSelection(const gui::ServerBrowserSelection &selection);
+    void handleAuthResponse(const CommunityAuthClient::Response &response);
+    std::string resolveCommunityHost(const gui::ServerBrowserSelection &selection) const;
+    std::string makeAuthCacheKey(const std::string &host, const std::string &username) const;
 
     ClientEngine &engine;
     gui::ServerBrowserView &browser;
@@ -54,17 +60,25 @@ private:
     ServerDiscovery discovery;
     std::unique_ptr<ServerListFetcher> serverListFetcher;
     std::vector<ServerListFetcher::ServerRecord> cachedRemoteServers;
+    std::vector<ServerListFetcher::SourceStatus> cachedSourceStatuses;
     std::vector<gui::ServerBrowserEntry> lastGuiEntries;
     std::string defaultHost;
     uint16_t defaultPort = 0;
     int activeServerListIndex = -1;
     std::unordered_map<std::string, std::string> serverListDisplayNames;
-    std::chrono::seconds communityAutoRefreshInterval{0};
-    std::chrono::seconds lanAutoRefreshInterval{0};
+    CommunityAuthClient authClient;
+    std::unordered_map<std::string, std::string> passwordSaltCache;
+    struct PendingJoin {
+        gui::ServerBrowserSelection selection;
+        std::string communityHost;
+        std::string username;
+        std::string password;
+        bool communityAdmin = false;
+        bool localAdmin = false;
+        bool awaitingAuth = false;
+    };
+    std::optional<PendingJoin> pendingJoin;
 
-    SteadyClock::time_point nextRemoteRefreshTime{};
-
-    SteadyClock::time_point nextAutoScanTime;
     std::size_t lastDiscoveryVersion = 0;
     std::size_t lastServerListGeneration = 0;
 };

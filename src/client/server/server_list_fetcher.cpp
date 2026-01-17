@@ -2,6 +2,7 @@
 
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
+#include "common/curl_global.hpp"
 #include "common/data_path_resolver.hpp"
 #include "spdlog/spdlog.h"
 
@@ -77,7 +78,7 @@ std::string buildServersUrl(const std::string &baseHost) {
 ServerListFetcher::ServerListFetcher(std::vector<ClientServerListSource> sources)
     : sources(std::move(sources)) {
     if (!this->sources.empty()) {
-        if (curl_global_init(CURL_GLOBAL_DEFAULT) == 0) {
+        if (bz::net::EnsureCurlGlobalInit()) {
             curlInitialized = true;
         } else {
             spdlog::warn("ServerListFetcher: Failed to initialize cURL");
@@ -88,10 +89,6 @@ ServerListFetcher::ServerListFetcher(std::vector<ClientServerListSource> sources
 ServerListFetcher::~ServerListFetcher() {
     if (worker.joinable()) {
         worker.join();
-    }
-
-    if (curlInitialized) {
-        curl_global_cleanup();
     }
 }
 
@@ -117,6 +114,11 @@ std::vector<ServerListFetcher::ServerRecord> ServerListFetcher::getServers() con
     return records;
 }
 
+std::vector<ServerListFetcher::SourceStatus> ServerListFetcher::getSourceStatuses() const {
+    std::lock_guard<std::mutex> lock(recordsMutex);
+    return sourceStatuses;
+}
+
 std::size_t ServerListFetcher::getGeneration() const {
     return generation.load();
 }
@@ -135,9 +137,11 @@ void ServerListFetcher::workerProc() {
     fetching.store(false);
 }
 
-std::vector<ServerListFetcher::ServerRecord> ServerListFetcher::fetchOnce() const {
+std::vector<ServerListFetcher::ServerRecord> ServerListFetcher::fetchOnce() {
     std::vector<ServerRecord> combined;
     combined.reserve(16);
+    std::vector<SourceStatus> statuses;
+    statuses.reserve(sources.size());
 
     for (const auto &source : sources) {
         const std::string listUrl = buildServersUrl(source.host);
@@ -146,13 +150,26 @@ std::vector<ServerListFetcher::ServerRecord> ServerListFetcher::fetchOnce() cons
             continue;
         }
 
+        SourceStatus status;
+        status.sourceHost = source.host;
+
         std::string responseBody;
         if (!fetchUrl(listUrl, responseBody)) {
+            status.ok = false;
+            status.hasData = false;
+            status.error = "request_failed";
+            statuses.push_back(std::move(status));
             continue;
         }
 
-        auto parsed = parseResponse(source, responseBody);
+        auto parsed = parseResponse(source, responseBody, &status);
         combined.insert(combined.end(), parsed.begin(), parsed.end());
+        statuses.push_back(std::move(status));
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(recordsMutex);
+        sourceStatuses = std::move(statuses);
     }
 
     return combined;
@@ -192,7 +209,8 @@ bool ServerListFetcher::fetchUrl(const std::string &url, std::string &outBody) {
 
 std::vector<ServerListFetcher::ServerRecord> ServerListFetcher::parseResponse(
     const ClientServerListSource &source,
-    const std::string &body) {
+    const std::string &body,
+    SourceStatus *statusOut) {
     std::vector<ServerRecord> records;
 
     try {
@@ -203,12 +221,25 @@ std::vector<ServerListFetcher::ServerRecord> ServerListFetcher::parseResponse(
         }
 
         std::string communityName;
+        int activeCount = -1;
+        int inactiveCount = -1;
         if (auto commIt = jsonData.find("community_name"); commIt != jsonData.end() && commIt->is_string()) {
             communityName = commIt->get<std::string>();
+        }
+        if (auto activeIt = jsonData.find("active_count"); activeIt != jsonData.end() && activeIt->is_number_integer()) {
+            activeCount = activeIt->get<int>();
+        }
+        if (auto inactiveIt = jsonData.find("inactive_count"); inactiveIt != jsonData.end() && inactiveIt->is_number_integer()) {
+            inactiveCount = inactiveIt->get<int>();
         }
 
         if (!jsonData.contains("servers") || !jsonData["servers"].is_array()) {
             spdlog::warn("ServerListFetcher: Server list from {} missing 'servers' array", source.host);
+            if (statusOut) {
+                statusOut->ok = false;
+                statusOut->hasData = true;
+                statusOut->error = "invalid_response";
+            }
             return records;
         }
 
@@ -217,6 +248,14 @@ std::vector<ServerListFetcher::ServerRecord> ServerListFetcher::parseResponse(
             sourceDisplayName = communityName;
         } else if (!listName.empty()) {
             sourceDisplayName = listName;
+        }
+
+        if (statusOut) {
+            statusOut->communityName = communityName.empty() ? sourceDisplayName : communityName;
+            statusOut->activeCount = activeCount;
+            statusOut->inactiveCount = inactiveCount;
+            statusOut->ok = true;
+            statusOut->hasData = true;
         }
 
         for (const auto &server : jsonData["servers"]) {
@@ -231,6 +270,9 @@ std::vector<ServerListFetcher::ServerRecord> ServerListFetcher::parseResponse(
             ServerRecord record;
             record.sourceName = sourceDisplayName;
             record.sourceHost = source.host;
+            record.communityName = communityName;
+            record.activeCount = activeCount;
+            record.inactiveCount = inactiveCount;
             record.host = server.value("host", "");
             std::string portString = server.value("port", configuredServerPortString());
 

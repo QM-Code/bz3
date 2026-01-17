@@ -6,6 +6,7 @@
 #include <unordered_set>
 #include <utility>
 
+#include "client/server/password_hash.hpp"
 #include "client/server/server_connector.hpp"
 #include "common/data_path_resolver.hpp"
 #include "spdlog/spdlog.h"
@@ -77,23 +78,11 @@ ServerBrowserController::ServerBrowserController(ClientEngine &engine,
             connector(connector),
             defaultHost(defaultHost.empty() ? "localhost" : defaultHost),
             defaultPort(applyPortFallback(defaultPort)) {
-    auto toInterval = [](int seconds) {
-        return seconds > 0 ? std::chrono::seconds(seconds) : std::chrono::seconds{0};
-    };
-
-    communityAutoRefreshInterval = toInterval(clientConfig.communityAutoRefreshSeconds);
-    lanAutoRefreshInterval = toInterval(clientConfig.lanAutoRefreshSeconds);
-
     refreshGuiServerListOptions();
     rebuildServerListFetcher();
 
                 browser.show({}, this->defaultHost, this->defaultPort);
     triggerFullRefresh();
-    if (lanAutoRefreshInterval.count() > 0) {
-        nextAutoScanTime = SteadyClock::now() + lanAutoRefreshInterval;
-    } else {
-        nextAutoScanTime = SteadyClock::time_point{};
-    }
 }
 
 void ServerBrowserController::triggerFullRefresh() {
@@ -109,13 +98,6 @@ void ServerBrowserController::triggerFullRefresh() {
     if (serverListFetcher) {
         serverListFetcher->requestRefresh();
         issuedRequest = true;
-        if (communityAutoRefreshInterval.count() > 0) {
-            nextRemoteRefreshTime = nowSteady + communityAutoRefreshInterval;
-        } else {
-            nextRemoteRefreshTime = SteadyClock::time_point{};
-        }
-    } else {
-        nextRemoteRefreshTime = SteadyClock::time_point{};
     }
 
     if (!issuedRequest) {
@@ -132,11 +114,14 @@ void ServerBrowserController::triggerFullRefresh() {
     }
 
     if (lanActive && serverListFetcher) {
-        browser.setStatus("Searching local network and fetching the selected server list...", false);
+        browser.setCommunityStatus("Searching local network and fetching the selected server list...",
+                                   gui::ServerBrowserView::MessageTone::Pending);
     } else if (lanActive) {
-        browser.setStatus("Searching local network for servers...", false);
+        browser.setCommunityStatus("Searching local network for servers...",
+                                   gui::ServerBrowserView::MessageTone::Pending);
     } else {
-        browser.setStatus("Fetching " + selectionLabel + "...", false);
+        browser.setCommunityStatus("Fetching " + selectionLabel + "...",
+                                   gui::ServerBrowserView::MessageTone::Pending);
     }
 
     browser.setScanning(issuedRequest);
@@ -232,6 +217,7 @@ void ServerBrowserController::rebuildEntries() {
         entry.gameMode = record.gameMode;
         entry.screenshotId = record.screenshotId;
         entry.sourceHost = record.sourceHost;
+        entry.worldName = record.name;
         entries.push_back(std::move(entry));
     }
 
@@ -243,6 +229,10 @@ void ServerBrowserController::rebuildEntries() {
 }
 
 void ServerBrowserController::update() {
+    while (auto response = authClient.consumeResponse()) {
+        handleAuthResponse(*response);
+    }
+
     if (auto listSelection = browser.consumeListSelection()) {
         handleServerListSelection(*listSelection);
     }
@@ -251,38 +241,12 @@ void ServerBrowserController::update() {
         handleServerListAddition(*newList);
     }
 
-    auto nowSteady = SteadyClock::now();
-    const bool remoteListActive = static_cast<bool>(serverListFetcher);
-
     if (browser.consumeRefreshRequest()) {
         triggerFullRefresh();
-        if (lanAutoRefreshInterval.count() > 0) {
-            nextAutoScanTime = nowSteady + lanAutoRefreshInterval;
-        } else {
-            nextAutoScanTime = SteadyClock::time_point{};
-        }
-    } else if (lanAutoRefreshInterval.count() > 0 && !discovery.isScanning() && nowSteady >= nextAutoScanTime) {
-        triggerFullRefresh();
-        nextAutoScanTime = nowSteady + lanAutoRefreshInterval;
-    }
-
-    if (!remoteListActive) {
-        nextRemoteRefreshTime = SteadyClock::time_point{};
-    } else {
-        if (communityAutoRefreshInterval.count() == 0) {
-            nextRemoteRefreshTime = SteadyClock::time_point{};
-        } else if (nextRemoteRefreshTime == SteadyClock::time_point{}) {
-            nextRemoteRefreshTime = nowSteady + communityAutoRefreshInterval;
-        }
-
-        if (communityAutoRefreshInterval.count() > 0 && !serverListFetcher->isFetching() && nowSteady >= nextRemoteRefreshTime) {
-            serverListFetcher->requestRefresh();
-            nextRemoteRefreshTime = nowSteady + communityAutoRefreshInterval;
-        }
     }
 
     discovery.update();
-    bool remoteFetchingActive = remoteListActive && serverListFetcher->isFetching();
+    bool remoteFetchingActive = serverListFetcher && serverListFetcher->isFetching();
     browser.setScanning(discovery.isScanning() || remoteFetchingActive);
 
     bool entriesDirty = false;
@@ -296,6 +260,7 @@ void ServerBrowserController::update() {
         std::size_t remoteGeneration = serverListFetcher->getGeneration();
         if (remoteGeneration != lastServerListGeneration) {
             cachedRemoteServers = serverListFetcher->getServers();
+            cachedSourceStatuses = serverListFetcher->getSourceStatuses();
             lastServerListGeneration = remoteGeneration;
             entriesDirty = true;
             updateServerListDisplayNamesFromCache();
@@ -306,12 +271,51 @@ void ServerBrowserController::update() {
         rebuildEntries();
     }
 
+    if (remoteFetchingActive && serverListFetcher && !isLanSelected()) {
+        std::string selectionLabel = "selected server list";
+        if (const auto *source = getSelectedRemoteSource()) {
+            selectionLabel = resolveDisplayNameForSource(*source);
+        }
+        browser.setCommunityStatus("Fetching " + selectionLabel + "...",
+                                   gui::ServerBrowserView::MessageTone::Pending);
+    } else if (serverListFetcher && !isLanSelected()) {
+        std::string statusText;
+        gui::ServerBrowserView::MessageTone tone = gui::ServerBrowserView::MessageTone::Notice;
+        const auto *source = getSelectedRemoteSource();
+        if (source && !source->host.empty()) {
+            for (const auto &status : cachedSourceStatuses) {
+                if (status.sourceHost != source->host) {
+                    continue;
+                }
+                if (!status.ok) {
+                    statusText = "Failed to reach community server";
+                    if (!source->host.empty()) {
+                        statusText += " (" + source->host + ")";
+                    }
+                    tone = gui::ServerBrowserView::MessageTone::Error;
+                } else if (status.activeCount == 0) {
+                    statusText = "Community currently has no active servers";
+                    if (status.inactiveCount >= 0) {
+                        statusText += " (" + std::to_string(status.inactiveCount) + " inactive)";
+                    }
+                }
+                break;
+            }
+        }
+        browser.setCommunityStatus(statusText, tone);
+    } else if (isLanSelected() && discovery.isScanning()) {
+        browser.setCommunityStatus("Searching local network for servers...",
+                                   gui::ServerBrowserView::MessageTone::Pending);
+    } else {
+        browser.setCommunityStatus(std::string{}, gui::ServerBrowserView::MessageTone::Notice);
+    }
+
     const auto &servers = discovery.getServers();
     bool lanEmpty = servers.empty();
     bool remoteEmpty = cachedRemoteServers.empty();
 
     if (auto selection = browser.consumeSelection()) {
-        connector.connect(selection->host, selection->port);
+        handleJoinSelection(*selection);
     }
 
     const ClientServerListSource *selectedRemoteSource = getSelectedRemoteSource();
@@ -319,13 +323,17 @@ void ServerBrowserController::update() {
 
     if (lanEmpty && remoteEmpty) {
         if (discovery.isScanning() && isLanSelected()) {
-            browser.setStatus("Searching local network for servers...", false);
+            browser.setStatus(std::string{}, false);
+            browser.setCommunityStatus("Searching local network for servers...",
+                                       gui::ServerBrowserView::MessageTone::Pending);
         } else if (remoteFetchingActive && serverListFetcher) {
-            browser.setStatus("Fetching " + remoteLabel + "...", false);
+            browser.setStatus(std::string{}, false);
         } else if (isLanSelected()) {
-            browser.setStatus("No LAN servers found. Start one locally or refresh.", true);
+            browser.setStatus(std::string{}, false);
+            browser.setCommunityStatus("No LAN servers found. Start one locally or refresh.",
+                                       gui::ServerBrowserView::MessageTone::Notice);
         } else if (serverListFetcher) {
-            browser.setStatus(remoteLabel + " returned no servers. Verify the list provider.", true);
+            browser.setStatus(std::string{}, false);
         } else {
             browser.setStatus("No server sources configured. Add a server list or enable Local Area Network.", true);
         }
@@ -340,11 +348,6 @@ void ServerBrowserController::handleDisconnected(const std::string &reason) {
     browser.show(lastGuiEntries, defaultHost, defaultPort);
     browser.setStatus(status, true);
     triggerFullRefresh();
-    if (lanAutoRefreshInterval.count() > 0) {
-        nextAutoScanTime = SteadyClock::now() + lanAutoRefreshInterval;
-    } else {
-        nextAutoScanTime = SteadyClock::time_point{};
-    }
 }
 
 void ServerBrowserController::refreshGuiServerListOptions() {
@@ -390,20 +393,16 @@ void ServerBrowserController::rebuildServerListFetcher() {
     if (sources.empty()) {
         serverListFetcher.reset();
         cachedRemoteServers.clear();
+        cachedSourceStatuses.clear();
         lastServerListGeneration = 0;
-        nextRemoteRefreshTime = SteadyClock::time_point{};
         return;
     }
 
     serverListFetcher = std::make_unique<ServerListFetcher>(std::move(sources));
     cachedRemoteServers.clear();
+    cachedSourceStatuses.clear();
     lastServerListGeneration = 0;
     serverListFetcher->requestRefresh();
-    if (communityAutoRefreshInterval.count() > 0) {
-        nextRemoteRefreshTime = SteadyClock::now() + communityAutoRefreshInterval;
-    } else {
-        nextRemoteRefreshTime = SteadyClock::time_point{};
-    }
 }
 
 void ServerBrowserController::handleServerListSelection(int selectedIndex) {
@@ -427,9 +426,9 @@ void ServerBrowserController::handleServerListSelection(int selectedIndex) {
     rebuildEntries();
 
     if (isLanSelected()) {
-        browser.setListStatus("Local Area Network selected.", false);
+        browser.setStatus("Local Area Network selected.", false);
     } else {
-        browser.setListStatus("Server list updated.", false);
+        browser.setStatus("Server list updated.", false);
     }
 
     triggerFullRefresh();
@@ -469,6 +468,181 @@ void ServerBrowserController::handleServerListAddition(const gui::ServerListOpti
     refreshGuiServerListOptions();
     rebuildServerListFetcher();
     triggerFullRefresh();
+}
+
+void ServerBrowserController::handleJoinSelection(const gui::ServerBrowserSelection &selection) {
+    std::string username = trimCopy(browser.getUsername());
+    if (username.empty()) {
+        browser.setStatus("Enter a username before joining.", true);
+        return;
+    }
+
+    std::string password = browser.getPassword();
+    std::string communityHost = resolveCommunityHost(selection);
+
+    pendingJoin.reset();
+
+    if (communityHost.empty()) {
+        connector.connect(selection.host, selection.port, username, false, false, false);
+        return;
+    }
+
+    if (password.empty()) {
+        spdlog::info("Checking username '{}' on community {}", username, communityHost);
+        browser.setStatus("Checking username availability...", false);
+        pendingJoin = PendingJoin{selection, communityHost, username, std::string{}, false, false, false};
+        authClient.requestUserRegistered(communityHost, username);
+        return;
+    }
+
+    std::string cacheKey = makeAuthCacheKey(communityHost, username);
+    auto saltIt = passwordSaltCache.find(cacheKey);
+    if (saltIt == passwordSaltCache.end()) {
+        spdlog::info("Fetching auth salt for '{}' on community {}", username, communityHost);
+        browser.setStatus("Fetching account info...", false);
+        pendingJoin = PendingJoin{selection, communityHost, username, password, false, false, false};
+        authClient.requestUserRegistered(communityHost, username);
+        return;
+    }
+
+    std::string passhash;
+    if (!client::auth::HashPasswordPBKDF2Sha256(password, saltIt->second, passhash)) {
+        browser.setStatus("Failed to hash password.", true);
+        return;
+    }
+
+    spdlog::info("Authenticating '{}' on community {}", username, communityHost);
+    browser.setStatus("Authenticating...", false);
+    pendingJoin = PendingJoin{selection, communityHost, username, std::string{}, false, false, true};
+    authClient.requestAuth(communityHost, username, passhash, selection.worldName);
+}
+
+void ServerBrowserController::handleAuthResponse(const CommunityAuthClient::Response &response) {
+    if (!pendingJoin) {
+        return;
+    }
+
+    const auto &pending = *pendingJoin;
+    if (pending.communityHost != response.host || pending.username != response.username) {
+        return;
+    }
+
+    if (response.type == CommunityAuthClient::RequestType::UserRegistered) {
+        if (!response.ok) {
+            spdlog::warn("Community auth: user_registered failed for '{}' on {}: {}",
+                         response.username,
+                         response.host,
+                         response.error.empty() ? "unknown_error" : response.error);
+            browser.setStatus("Failed to reach community server.", true);
+            pendingJoin.reset();
+            return;
+        }
+
+        std::string cacheKey = makeAuthCacheKey(response.host, response.username);
+        if (!response.salt.empty()) {
+            passwordSaltCache[cacheKey] = response.salt;
+        }
+
+        if (response.registered && (response.locked || response.deleted)) {
+            if (response.locked) {
+                browser.setStatus("This username is locked out. Please contact an admin.", true);
+            } else {
+                browser.setStatus("That username is unavailable on this community.", true);
+            }
+            pendingJoin.reset();
+            return;
+        }
+
+        if (pending.password.empty()) {
+            if (response.registered) {
+                std::string communityLabel = response.communityName.empty()
+                    ? response.host
+                    : response.communityName;
+                browser.setStatus(
+                    "Username is registered on " + communityLabel + ". Enter your password to join.",
+                    true);
+                pendingJoin.reset();
+            } else {
+                pendingJoin.reset();
+                spdlog::info("Connecting as anonymous user '{}' to {}:{}",
+                             pending.username,
+                             pending.selection.host,
+                             pending.selection.port);
+                connector.connect(pending.selection.host, pending.selection.port, pending.username, false, false, false);
+            }
+            return;
+        }
+
+        if (!response.registered) {
+            pendingJoin.reset();
+            spdlog::info("Connecting as anonymous user '{}' to {}:{}",
+                         pending.username,
+                         pending.selection.host,
+                         pending.selection.port);
+            connector.connect(pending.selection.host, pending.selection.port, pending.username, false, false, false);
+            return;
+        }
+
+        if (response.salt.empty()) {
+            browser.setStatus("Missing password salt from community.", true);
+            pendingJoin.reset();
+            return;
+        }
+
+        std::string passhash;
+        if (!client::auth::HashPasswordPBKDF2Sha256(pending.password, response.salt, passhash)) {
+            browser.setStatus("Failed to hash password.", true);
+            pendingJoin.reset();
+            return;
+        }
+
+        spdlog::info("Authenticating '{}' on community {}", response.username, response.host);
+        browser.setStatus("Authenticating...", false);
+        pendingJoin->password.clear();
+        pendingJoin->awaitingAuth = true;
+        authClient.requestAuth(response.host, response.username, passhash, pending.selection.worldName);
+        return;
+    }
+
+    if (!response.ok) {
+        spdlog::warn("Community auth: authentication failed for '{}' on {}: {}",
+                     response.username,
+                     response.host,
+                     response.error.empty() ? "unknown_error" : response.error);
+        browser.setStatus("Authentication failed.", true);
+        pendingJoin.reset();
+        return;
+    }
+
+    spdlog::info("Connecting as registered user '{}' to {}:{}",
+                 pending.username,
+                 pending.selection.host,
+                 pending.selection.port);
+    browser.clearPassword();
+    connector.connect(
+        pending.selection.host,
+        pending.selection.port,
+        pending.username,
+        true,
+        response.communityAdmin,
+        response.localAdmin);
+    pendingJoin.reset();
+}
+
+std::string ServerBrowserController::resolveCommunityHost(const gui::ServerBrowserSelection &selection) const {
+    if (!selection.sourceHost.empty()) {
+        return selection.sourceHost;
+    }
+    if (!selection.fromPreset) {
+        if (const auto *source = getSelectedRemoteSource()) {
+            return source->host;
+        }
+    }
+    return {};
+}
+
+std::string ServerBrowserController::makeAuthCacheKey(const std::string &host, const std::string &username) const {
+    return host + "\n" + username;
 }
 
 void ServerBrowserController::updateServerListDisplayNamesFromCache() {

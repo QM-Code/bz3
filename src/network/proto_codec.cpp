@@ -45,6 +45,9 @@ void decodePlayerState(const bz::PlayerState &input, PlayerState &output) {
     decodeVec3(input.velocity(), output.velocity);
     output.alive = input.alive();
     output.score = input.score();
+    output.registeredUser = input.registered_user();
+    output.communityAdmin = input.community_admin();
+    output.localAdmin = input.local_admin();
     output.params.clear();
     for (const auto &[key, val] : input.params().params()) {
         output.params[key] = val;
@@ -58,6 +61,9 @@ void encodePlayerState(const PlayerState &input, bz::PlayerState *output) {
     encodeVec3(input.velocity, output->mutable_velocity());
     output->set_alive(input.alive);
     output->set_score(input.score);
+    output->set_registered_user(input.registeredUser);
+    output->set_community_admin(input.communityAdmin);
+    output->set_local_admin(input.localAdmin);
     auto *params = output->mutable_params();
     for (const auto &[key, val] : input.params) {
         (*params->mutable_params())[key] = val;
@@ -232,6 +238,9 @@ std::unique_ptr<ClientMsg> decodeClientMsg(const std::byte *data, std::size_t si
         out->ip = msg.player_join().ip();
         out->name = msg.player_join().name();
         out->protocolVersion = msg.player_join().protocol_version();
+        out->registeredUser = msg.player_join().registered_user();
+        out->communityAdmin = msg.player_join().community_admin();
+        out->localAdmin = msg.player_join().local_admin();
         return out;
     }
 
@@ -258,6 +267,9 @@ std::optional<std::vector<std::byte>> encodeClientMsg(const ClientMsg &input) {
         join->set_ip(typed.ip);
         join->set_name(typed.name);
         join->set_protocol_version(typed.protocolVersion);
+        join->set_registered_user(typed.registeredUser);
+        join->set_community_admin(typed.communityAdmin);
+        join->set_local_admin(typed.localAdmin);
         break;
     }
     case ClientMsg_Type_CHAT: {
