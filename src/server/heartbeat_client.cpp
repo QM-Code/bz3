@@ -6,6 +6,12 @@
 #include "common/curl_global.hpp"
 
 namespace {
+size_t DiscardResponse(char *ptr, size_t size, size_t nmemb, void *userdata) {
+    (void)ptr;
+    (void)userdata;
+    return size * nmemb;
+}
+
 std::string trimTrailingSlash(std::string value) {
     while (!value.empty() && value.back() == '/') {
         value.pop_back();
@@ -23,7 +29,7 @@ std::string urlEncode(CURL *curlHandle, const std::string &value) {
     return result;
 }
 
-bool performGet(const std::string &url) {
+bool performGet(const std::string &url, long &statusOut, std::string &errorOut) {
     if (!bz::net::EnsureCurlGlobalInit()) {
         return false;
     }
@@ -31,9 +37,13 @@ bool performGet(const std::string &url) {
     if (!curlHandle) {
         return false;
     }
+    char errorBuffer[CURL_ERROR_SIZE];
+    errorBuffer[0] = '\0';
     curl_easy_setopt(curlHandle, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curlHandle, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(curlHandle, CURLOPT_TIMEOUT, 5L);
+    curl_easy_setopt(curlHandle, CURLOPT_ERRORBUFFER, errorBuffer);
+    curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, DiscardResponse);
     CURLcode result = curl_easy_perform(curlHandle);
     long status = 0;
     if (result == CURLE_OK) {
@@ -41,7 +51,16 @@ bool performGet(const std::string &url) {
     }
     curl_easy_cleanup(curlHandle);
 
-    if (result != CURLE_OK || status < 200 || status >= 300) {
+    statusOut = status;
+    if (result != CURLE_OK) {
+        if (errorBuffer[0] != '\0') {
+            errorOut = errorBuffer;
+        } else {
+            errorOut = curl_easy_strerror(result);
+        }
+        return false;
+    }
+    if (status < 200 || status >= 300) {
         return false;
     }
     return true;
@@ -136,8 +155,25 @@ void HeartbeatClient::workerProc() {
             "&players=" + encodedPlayers +
             "&max=" + encodedMax;
 
-        if (!performGet(url)) {
-            spdlog::warn("HeartbeatClient: Heartbeat request failed for {}", baseUrl);
+        long status = 0;
+        std::string error;
+        if (!performGet(url, status, error)) {
+            std::string reason;
+            if (!error.empty()) {
+                reason = error;
+            }
+            if (status > 0 && (status < 200 || status >= 300)) {
+                if (!reason.empty()) {
+                    reason += ", ";
+                }
+                reason += "http_status=" + std::to_string(status);
+            }
+            if (reason.empty()) {
+                reason = "request failed";
+            }
+            spdlog::warn("HeartbeatClient: Failed to send heartbeat to {}: {}", baseUrl, reason);
+        } else {
+            spdlog::debug("HeartbeatClient: Sent heartbeat to {}", baseUrl);
         }
     }
 }
