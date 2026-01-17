@@ -53,6 +53,8 @@ void ClientEngine::lateUpdate(TimeUtils::duration deltaTime) {
     
     render->update();
 
+    gui->setRadarTextureId(render->getRadarTextureId());
+
     const float deltaSeconds = std::chrono::duration<float>(deltaTime).count();
     particles->update(deltaSeconds);
     particles->render(render->getViewMatrix(), render->getProjectionMatrix(), render->getCameraPosition(), render->getCameraForward());

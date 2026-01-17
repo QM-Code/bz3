@@ -41,6 +41,8 @@ private:
     std::string submittedInputBuffer;
     bool chatFocus = false;
 
+    unsigned int radarTextureId = 0;
+
     void drawTexture(unsigned int textureId);
     void drawConsolePanel();
     void drawDeathScreen();
@@ -52,6 +54,7 @@ private:
 public:
     void setScoreboardEntries(const std::vector<ScoreboardEntry> &entries);
     void setSpawnHint(const std::string &hint);
+    void setRadarTextureId(unsigned int textureId) { radarTextureId = textureId; }
     void addConsoleLine(const std::string &playerName, const std::string &line);
     std::string getChatInputBuffer() const;
     void clearChatInputBuffer();

@@ -14,7 +14,7 @@ Shot::Shot(Game &game,
     position(position),
     prevPosition(position),
     velocity(velocity),
-    renderId(game.engine.render->create(game.world->getAssetPath("shotModel").string())),
+    renderId(game.engine.render->create(game.world->getAssetPath("shotModel").string(), 0.6f)),
     audioEngine(*game.engine.audio),
     fireAudio(audioEngine.loadClip(game.world->getAssetPath("audio.shot.Fire").string(), 20)),
     ricochetAudio(audioEngine.loadClip(game.world->getAssetPath("audio.shot.Ricochet").string(), 20)) {

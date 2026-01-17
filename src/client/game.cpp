@@ -19,10 +19,16 @@ Game::Game(ClientEngine &engine,
     console = std::make_unique<Console>(*this);
     spdlog::trace("Game: Console created successfully");
 
+    engine.render->setRadarShaderPath(
+        world->getAssetPath("shaders.radar.vertex"),
+        world->getAssetPath("shaders.radar.fragment")
+    );
+
     focusState = FOCUS_STATE_GAME;
 };
 
 Game::~Game() {
+
     world.reset();
     spdlog::trace("Game: World destroyed successfully");
     console.reset();

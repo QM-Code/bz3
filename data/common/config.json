@@ -16,6 +16,10 @@
             "radar" : {
                 "vertex": "shaders/radar.vert",
                 "fragment": "shaders/radar.frag"
+            },
+            "vintage" : {
+                "vertex": "shaders/vintage.vert",
+                "fragment": "shaders/vintage.frag"
             }
         }
     }

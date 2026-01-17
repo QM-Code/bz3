@@ -2,30 +2,37 @@ uniform float playerY;
 uniform float jumpHeight;   
 varying vec3 vWorldPos;
 const float MAX_DY = 10.0;
-const float MAX_DY_DOWN = 5.0;
-const float MAX_DOWN_ALPHA = 0.5;
+const float BELOW_SOLID_DY = 10.0;
+const float BLUE_SOLID_DY = 1.0;
 
 void main() {
     float dy = vWorldPos.y - playerY;
 
-    if (dy == 0.0) discard;
+    // Exactly at player height should contribute nothing.
+    // Use a small epsilon to avoid precision artifacts.
+    if (abs(dy) < 1e-4) discard;
 
-    float alpha = clamp(abs(dy) / MAX_DY, 0.0, 1.0);
-    vec3 color;
+    float alpha = 0.0;
+    vec3 color = vec3(0.0);
 
     if (dy > 0.0) {
-        if (dy < jumpHeight) {
-            float t = clamp(dy / jumpHeight, 0.0, 1.0);
-            color = vec3(1.0);
+        // 0..BLUE_SOLID_DY: fade-in blue (alpha 0->1)
+        if (dy < BLUE_SOLID_DY) {
+            float t = clamp(dy / BLUE_SOLID_DY, 0.0, 1.0);
+            color = vec3(0.0, 0.0, 1.0);
             alpha = t;
         } else {
-            float t = clamp((dy - jumpHeight) / (MAX_DY - jumpHeight), 0.0, 1.0);
-            color = mix(vec3(1.0), vec3(0.0, 0.0, 1.0), t);
+            // >= BLUE_SOLID_DY: solid (no transparency). At 5 units up: fully blue.
+            // Higher than that: shift towards red.
+            float t = clamp((dy - BLUE_SOLID_DY) / max(1e-3, (MAX_DY - BLUE_SOLID_DY)), 0.0, 1.0);
+            color = mix(vec3(0.0, 0.0, 1.0), vec3(1.0, 0.0, 0.0), t);
             alpha = 1.0;
         }
     } else {
-        color = vec3(0.0);
-        alpha = clamp(clamp((abs(dy) / MAX_DY_DOWN), 0, 1) * MAX_DOWN_ALPHA, 0.0, 1.0);
+        // 0..-BELOW_SOLID_DY: fade-in red (alpha 0->1), then stay fully opaque red.
+        float t = clamp((-dy) / BELOW_SOLID_DY, 0.0, 1.0);
+        color = vec3(1.0, 0.0, 0.0);
+        alpha = t;
     }
 
     gl_FragColor = vec4(color, alpha);
