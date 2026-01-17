@@ -22,6 +22,7 @@ using Effekseer::stbi_image_free;
 }
 
 #include "common/data_path_resolver.hpp"
+#include "common/curl_global.hpp"
 
 namespace {
 std::string trimCopy(const std::string &value) {
@@ -121,6 +122,8 @@ void ServerBrowserView::draw(ImGuiIO &io) {
         return;
     }
 
+    processThumbnailUploads();
+
     const bool pushedRegularFont = (regularFont != nullptr);
     if (pushedRegularFont) {
         ImGui::PushFont(regularFont);
@@ -162,6 +165,7 @@ void ServerBrowserView::draw(ImGuiIO &io) {
     listPanelWidth = std::clamp(listPanelWidth, minListWidth, maxListWidth);
 
     ImGui::BeginChild("ServerBrowserListPane", ImVec2(listPanelWidth, 0), false);
+    const MessageColors messageColors = getMessageColors();
 
     auto formatListLabel = [](const ServerListOption &option) {
         if (!option.name.empty()) {
@@ -204,12 +208,7 @@ void ServerBrowserView::draw(ImGuiIO &io) {
 
     ImGui::Spacing();
 
-    ImVec4 scanColor = scanning ?
-        ImVec4(0.60f, 0.80f, 0.40f, 1.0f) :
-        ImVec4(0.70f, 0.70f, 0.70f, 1.0f);
-    const char *scanLabel = scanning ? "Scanning..." : "Idle";
     const float refreshButtonWidth = ImGui::CalcTextSize("Refresh").x + style.FramePadding.x * 2.0f;
-    const float statusTextWidth = ImGui::CalcTextSize(scanLabel).x;
 
     const ImGuiTableFlags tableFlags =
         ImGuiTableFlags_Resizable |
@@ -242,14 +241,6 @@ void ServerBrowserView::draw(ImGuiIO &io) {
         const float headerStartY = ImGui::GetCursorPosY();
         const float headerColumnWidth = ImGui::GetColumnWidth();
         float buttonX = headerStartX + headerColumnWidth - refreshButtonWidth;
-        float statusX = buttonX - style.ItemSpacing.x - statusTextWidth;
-        if (statusX < headerStartX) {
-            statusX = headerStartX;
-            buttonX = std::max(buttonX, statusX + statusTextWidth + style.ItemSpacing.x);
-        }
-
-        ImGui::SetCursorPos(ImVec2(statusX, headerStartY));
-        ImGui::TextColored(scanColor, "%s", scanLabel);
         float lineBottom = ImGui::GetCursorPosY();
 
         ImGui::SetCursorPos(ImVec2(buttonX, headerStartY));
@@ -268,7 +259,17 @@ void ServerBrowserView::draw(ImGuiIO &io) {
         if (entries.empty()) {
             ImGui::TableNextRow();
             ImGui::TableSetColumnIndex(0);
-            ImGui::TextDisabled("No saved servers yet.");
+            if (!communityStatusText.empty()) {
+                ImVec4 statusColor = messageColors.notice;
+                if (communityStatusTone == MessageTone::Error) {
+                    statusColor = messageColors.error;
+                } else if (communityStatusTone == MessageTone::Pending) {
+                    statusColor = messageColors.pending;
+                }
+                ImGui::TextColored(statusColor, "%s", communityStatusText.c_str());
+            } else {
+                ImGui::TextDisabled("No saved servers yet.");
+            }
         } else {
             for (int i = 0; i < static_cast<int>(entries.size()); ++i) {
                 const auto &entry = entries[i];
@@ -282,7 +283,13 @@ void ServerBrowserView::draw(ImGuiIO &io) {
                         ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowDoubleClick)) {
                     selectedIndex = i;
                     if (ImGui::IsMouseDoubleClicked(0)) {
-                        pendingSelection = ServerBrowserSelection{ entry.host, entry.port, true };
+                        pendingSelection = ServerBrowserSelection{
+                            entry.host,
+                            entry.port,
+                            true,
+                            entry.sourceHost,
+                            entry.worldName
+                        };
                         statusText.clear();
                         statusIsError = false;
                     }
@@ -335,6 +342,22 @@ void ServerBrowserView::draw(ImGuiIO &io) {
     ImGui::Separator();
     ImGui::Spacing();
 
+    if (!statusText.empty()) {
+        ImVec4 color = statusIsError ? messageColors.error : messageColors.pending;
+        ImGui::TextColored(color, "%s", statusText.c_str());
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+    }
+
+    ImGui::Text("Player identity");
+    ImGui::InputText("Username", usernameBuffer.data(), usernameBuffer.size());
+    ImGui::InputText("Password", passwordBuffer.data(), passwordBuffer.size(), ImGuiInputTextFlags_Password);
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+
     ImGui::Text("Custom server");
     ImGui::InputText("Address (host:port)", addressBuffer.data(), addressBuffer.size());
 
@@ -351,54 +374,54 @@ void ServerBrowserView::draw(ImGuiIO &io) {
     if (joinCustomClicked) {
         std::string addressValue = trimCopy(addressBuffer.data());
         if (addressValue.empty()) {
-            statusText = "Enter a server address before joining.";
-            statusIsError = true;
+            customStatusText = "Enter a server address before joining.";
+            customStatusIsError = true;
         } else {
             auto colonPos = addressValue.find_last_of(':');
             if (colonPos == std::string::npos) {
                 const std::string exampleAddress = "localhost:" + configuredServerPortLabel();
-                statusText = "Use the format host:port (example: " + exampleAddress + ").";
-                statusIsError = true;
+                customStatusText = "Use the format host:port (example: " + exampleAddress + ").";
+                customStatusIsError = true;
             } else {
                 std::string hostPart = trimCopy(addressValue.substr(0, colonPos));
                 std::string portPart = trimCopy(addressValue.substr(colonPos + 1));
 
                 if (hostPart.empty()) {
-                    statusText = "Hostname cannot be empty.";
-                    statusIsError = true;
+                    customStatusText = "Hostname cannot be empty.";
+                    customStatusIsError = true;
                 } else if (portPart.empty()) {
-                    statusText = "Port cannot be empty.";
-                    statusIsError = true;
+                    customStatusText = "Port cannot be empty.";
+                    customStatusIsError = true;
                 } else {
                     try {
                         int portValue = std::stoi(portPart);
                         if (portValue < 1 || portValue > 65535) {
-                            statusText = "Ports must be between 1 and 65535.";
-                            statusIsError = true;
+                            customStatusText = "Ports must be between 1 and 65535.";
+                            customStatusIsError = true;
                         } else {
                             pendingSelection = ServerBrowserSelection{
                                 hostPart,
                                 static_cast<uint16_t>(portValue),
-                                false
+                                false,
+                                std::string{},
+                                std::string{}
                             };
-                            statusText.clear();
-                            statusIsError = false;
+                            customStatusText.clear();
+                            customStatusIsError = false;
                         }
                     } catch (...) {
-                        statusText = "Port must be a valid number.";
-                        statusIsError = true;
+                        customStatusText = "Port must be a valid number.";
+                        customStatusIsError = true;
                     }
                 }
             }
         }
     }
 
-    if (!statusText.empty()) {
+    if (!customStatusText.empty()) {
         ImGui::Spacing();
-        ImVec4 color = statusIsError ?
-            ImVec4(0.93f, 0.36f, 0.36f, 1.0f) :
-            ImVec4(0.60f, 0.80f, 0.40f, 1.0f);
-        ImGui::TextColored(color, "%s", statusText.c_str());
+        ImVec4 color = customStatusIsError ? messageColors.error : messageColors.action;
+        ImGui::TextColored(color, "%s", customStatusText.c_str());
     }
 
     ImGui::Spacing();
@@ -432,9 +455,7 @@ void ServerBrowserView::draw(ImGuiIO &io) {
 
     if (!listStatusText.empty()) {
         ImGui::Spacing();
-        ImVec4 listColor = listStatusIsError ?
-            ImVec4(0.93f, 0.36f, 0.36f, 1.0f) :
-            ImVec4(0.60f, 0.80f, 0.40f, 1.0f);
+        ImVec4 listColor = listStatusIsError ? messageColors.error : messageColors.action;
         ImGui::TextColored(listColor, "%s", listStatusText.c_str());
     }
 
@@ -467,7 +488,13 @@ void ServerBrowserView::draw(ImGuiIO &io) {
     if (joinSelectedClicked) {
         if (selectedIndex >= 0 && selectedIndex < static_cast<int>(entries.size())) {
             const auto &entry = entries[selectedIndex];
-            pendingSelection = ServerBrowserSelection{ entry.host, entry.port, true };
+            pendingSelection = ServerBrowserSelection{
+                entry.host,
+                entry.port,
+                true,
+                entry.sourceHost,
+                entry.worldName
+            };
             statusText.clear();
             statusIsError = false;
         } else {
@@ -543,6 +570,10 @@ void ServerBrowserView::draw(ImGuiIO &io) {
                     ImGui::Spacing();
                     ImGui::Separator();
                     ImGui::TextDisabled("Screenshot unavailable.");
+                } else if (thumb->loading) {
+                    ImGui::Spacing();
+                    ImGui::Separator();
+                    ImGui::TextDisabled("Loading screenshot...");
                 }
             }
         }
@@ -576,14 +607,20 @@ void ServerBrowserView::show(const std::vector<ServerBrowserEntry> &newEntries,
     pendingSelection.reset();
     statusText = "Select a server to connect or enter your own.";
     statusIsError = false;
+    customStatusText.clear();
+    customStatusIsError = false;
     pendingListSelection.reset();
     pendingNewList.reset();
     listStatusText.clear();
     listStatusIsError = false;
+    communityStatusText.clear();
+    communityStatusTone = MessageTone::Notice;
+    clearPassword();
     resetBuffers(defaultHost, defaultPort);
 }
 
 ServerBrowserView::~ServerBrowserView() {
+    stopThumbnailWorker();
     clearThumbnails();
 }
 
@@ -619,6 +656,8 @@ void ServerBrowserView::hide() {
     visible = false;
     statusText.clear();
     statusIsError = false;
+    customStatusText.clear();
+    customStatusIsError = false;
     pendingSelection.reset();
     pendingListSelection.reset();
     pendingNewList.reset();
@@ -626,6 +665,10 @@ void ServerBrowserView::hide() {
     scanning = false;
     listStatusText.clear();
     listStatusIsError = false;
+    communityStatusText.clear();
+    communityStatusTone = MessageTone::Notice;
+    clearPassword();
+    stopThumbnailWorker();
     clearThumbnails();
 }
 
@@ -636,6 +679,11 @@ bool ServerBrowserView::isVisible() const {
 void ServerBrowserView::setStatus(const std::string &text, bool isErrorMessage) {
     statusText = text;
     statusIsError = isErrorMessage;
+}
+
+void ServerBrowserView::setCustomStatus(const std::string &text, bool isErrorMessage) {
+    customStatusText = text;
+    customStatusIsError = isErrorMessage;
 }
 
 std::optional<ServerBrowserSelection> ServerBrowserView::consumeSelection() {
@@ -677,6 +725,23 @@ void ServerBrowserView::clearNewListInputs() {
     listUrlBuffer.fill(0);
 }
 
+void ServerBrowserView::setCommunityStatus(const std::string &text, MessageTone tone) {
+    communityStatusText = text;
+    communityStatusTone = tone;
+}
+
+std::string ServerBrowserView::getUsername() const {
+    return trimCopy(usernameBuffer.data());
+}
+
+std::string ServerBrowserView::getPassword() const {
+    return std::string(passwordBuffer.data());
+}
+
+void ServerBrowserView::clearPassword() {
+    passwordBuffer.fill(0);
+}
+
 bool ServerBrowserView::consumeRefreshRequest() {
     if (!refreshRequested) {
         return false;
@@ -707,72 +772,18 @@ ThumbnailTexture *ServerBrowserView::getOrLoadThumbnail(const std::string &url) 
         return nullptr;
     }
 
-    auto &entry = thumbnailCache[url];
-    if (entry.textureId != 0 || entry.failed) {
-        return &entry;
-    }
-
-    static bool curlInitialized = false;
-    if (!curlInitialized) {
-        if (curl_global_init(CURL_GLOBAL_DEFAULT) != 0) {
-            entry.failed = true;
-            return &entry;
+    auto it = thumbnailCache.find(url);
+    if (it != thumbnailCache.end()) {
+        if (it->second.textureId != 0 || it->second.failed || it->second.loading) {
+            return &it->second;
         }
-        curlInitialized = true;
     }
 
-    CURL *curlHandle = curl_easy_init();
-    if (!curlHandle) {
-        entry.failed = true;
-        return &entry;
+    ThumbnailTexture &entry = thumbnailCache[url];
+    if (!entry.loading && entry.textureId == 0 && !entry.failed) {
+        entry.loading = true;
+        queueThumbnailRequest(url);
     }
-
-    std::vector<unsigned char> body;
-    curl_easy_setopt(curlHandle, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curlHandle, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(curlHandle, CURLOPT_TIMEOUT, 5L);
-    curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, CurlWriteToVector);
-    curl_easy_setopt(curlHandle, CURLOPT_WRITEDATA, &body);
-
-    CURLcode result = curl_easy_perform(curlHandle);
-    long status = 0;
-    if (result == CURLE_OK) {
-        curl_easy_getinfo(curlHandle, CURLINFO_RESPONSE_CODE, &status);
-    }
-    curl_easy_cleanup(curlHandle);
-
-    if (result != CURLE_OK || status < 200 || status >= 300 || body.empty()) {
-        entry.failed = true;
-        return &entry;
-    }
-
-    int width = 0;
-    int height = 0;
-    int channels = 0;
-    stbi_uc *pixels = stbi_load_from_memory(body.data(), static_cast<int>(body.size()), &width, &height, &channels, 4);
-    if (!pixels || width <= 0 || height <= 0) {
-        entry.failed = true;
-        if (pixels) {
-            stbi_image_free(pixels);
-        }
-        return &entry;
-    }
-
-    GLuint textureId = 0;
-    glGenTextures(1, &textureId);
-    glBindTexture(GL_TEXTURE_2D, textureId);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-    glBindTexture(GL_TEXTURE_2D, 0);
-
-    stbi_image_free(pixels);
-
-    entry.textureId = textureId;
-    entry.width = width;
-    entry.height = height;
     return &entry;
 }
 
@@ -783,6 +794,157 @@ void ServerBrowserView::clearThumbnails() {
         }
     }
     thumbnailCache.clear();
+}
+
+ServerBrowserView::MessageColors ServerBrowserView::getMessageColors() const {
+    MessageColors colors;
+    colors.error = ImVec4(0.93f, 0.36f, 0.36f, 1.0f);
+    colors.notice = ImVec4(0.90f, 0.80f, 0.30f, 1.0f);
+    colors.action = ImVec4(0.60f, 0.80f, 0.40f, 1.0f);
+    colors.pending = ImVec4(0.35f, 0.70f, 0.95f, 1.0f);
+    return colors;
+}
+
+void ServerBrowserView::startThumbnailWorker() {
+    if (thumbnailWorker.joinable()) {
+        return;
+    }
+
+    thumbnailWorkerStop = false;
+    thumbnailWorker = std::thread(&ServerBrowserView::thumbnailWorkerProc, this);
+}
+
+void ServerBrowserView::stopThumbnailWorker() {
+    {
+        std::lock_guard<std::mutex> lock(thumbnailMutex);
+        thumbnailWorkerStop = true;
+        thumbnailRequests.clear();
+        thumbnailInFlight.clear();
+        thumbnailResults.clear();
+    }
+    thumbnailCv.notify_all();
+    if (thumbnailWorker.joinable()) {
+        thumbnailWorker.join();
+    }
+}
+
+void ServerBrowserView::queueThumbnailRequest(const std::string &url) {
+    startThumbnailWorker();
+    std::lock_guard<std::mutex> lock(thumbnailMutex);
+    if (!thumbnailInFlight.insert(url).second) {
+        return;
+    }
+    thumbnailRequests.push_back(url);
+    thumbnailCv.notify_one();
+}
+
+void ServerBrowserView::processThumbnailUploads() {
+    std::deque<ThumbnailPayload> results;
+    {
+        std::lock_guard<std::mutex> lock(thumbnailMutex);
+        results.swap(thumbnailResults);
+    }
+
+    for (auto &payload : results) {
+        {
+            std::lock_guard<std::mutex> lock(thumbnailMutex);
+            thumbnailInFlight.erase(payload.url);
+        }
+
+        auto &entry = thumbnailCache[payload.url];
+        entry.loading = false;
+
+        if (payload.failed || payload.pixels.empty() || payload.width <= 0 || payload.height <= 0) {
+            entry.failed = true;
+            continue;
+        }
+
+        GLuint textureId = 0;
+        glGenTextures(1, &textureId);
+        glBindTexture(GL_TEXTURE_2D, textureId);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, payload.width, payload.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, payload.pixels.data());
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        entry.textureId = textureId;
+        entry.width = payload.width;
+        entry.height = payload.height;
+        entry.failed = false;
+    }
+}
+
+void ServerBrowserView::thumbnailWorkerProc() {
+    auto fetchBytes = [](const std::string &url, std::vector<unsigned char> &body) {
+        if (!bz::net::EnsureCurlGlobalInit()) {
+            return false;
+        }
+
+        CURL *curlHandle = curl_easy_init();
+        if (!curlHandle) {
+            return false;
+        }
+
+        curl_easy_setopt(curlHandle, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curlHandle, CURLOPT_FOLLOWLOCATION, 1L);
+        curl_easy_setopt(curlHandle, CURLOPT_TIMEOUT, 5L);
+        curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, CurlWriteToVector);
+        curl_easy_setopt(curlHandle, CURLOPT_WRITEDATA, &body);
+
+        CURLcode result = curl_easy_perform(curlHandle);
+        long status = 0;
+        if (result == CURLE_OK) {
+            curl_easy_getinfo(curlHandle, CURLINFO_RESPONSE_CODE, &status);
+        }
+        curl_easy_cleanup(curlHandle);
+
+        if (result != CURLE_OK || status < 200 || status >= 300 || body.empty()) {
+            return false;
+        }
+
+        return true;
+    };
+
+    while (true) {
+        std::string url;
+        {
+            std::unique_lock<std::mutex> lock(thumbnailMutex);
+            thumbnailCv.wait(lock, [&]() { return thumbnailWorkerStop || !thumbnailRequests.empty(); });
+            if (thumbnailWorkerStop) {
+                return;
+            }
+            url = std::move(thumbnailRequests.front());
+            thumbnailRequests.pop_front();
+        }
+
+        ThumbnailPayload payload;
+        payload.url = url;
+        payload.failed = true;
+
+        std::vector<unsigned char> body;
+        if (fetchBytes(url, body)) {
+            int width = 0;
+            int height = 0;
+            int channels = 0;
+            stbi_uc *pixels = stbi_load_from_memory(body.data(), static_cast<int>(body.size()), &width, &height, &channels, 4);
+            if (pixels && width > 0 && height > 0) {
+                payload.width = width;
+                payload.height = height;
+                payload.failed = false;
+                payload.pixels.assign(pixels, pixels + (width * height * 4));
+            }
+            if (pixels) {
+                stbi_image_free(pixels);
+            }
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(thumbnailMutex);
+            thumbnailResults.push_back(std::move(payload));
+        }
+    }
 }
 
 } // namespace gui

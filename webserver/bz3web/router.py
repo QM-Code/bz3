@@ -103,6 +103,6 @@ def dispatch(request):
         return _serve_static(path)
     if path.startswith("/uploads/"):
         return _serve_upload(path)
-    if path in ("/api/auth", "/api/heartbeat", "/api/admins"):
+    if path in ("/api/auth", "/api/heartbeat", "/api/admins", "/api/user_registered"):
         return api.handle(request)
     return None

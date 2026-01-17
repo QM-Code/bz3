@@ -2,13 +2,28 @@
 #include "spdlog/spdlog.h"
 #include "game.hpp"
 
-Client::Client(Game &game, client_id id, std::string ip, std::string name) : game(game), id(id), ip(std::move(ip)) {
+Client::Client(Game &game,
+               client_id id,
+               std::string ip,
+               std::string name,
+               bool registeredUser,
+               bool communityAdmin,
+               bool localAdmin)
+    : game(game),
+      id(id),
+      ip(std::move(ip)),
+      registeredUser(registeredUser),
+      communityAdmin(communityAdmin),
+      localAdmin(localAdmin) {
     state.name = std::move(name);
     state.position = glm::vec3(0.0f, 0.0f, 0.0f);
     state.rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
     state.velocity = glm::vec3(0.0f, 0.0f, 0.0f);
     state.alive = false;
     state.score = 0;
+    state.registeredUser = registeredUser;
+    state.communityAdmin = communityAdmin;
+    state.localAdmin = localAdmin;
 
     state.params = game.world->getDefaultPlayerParameters();
 

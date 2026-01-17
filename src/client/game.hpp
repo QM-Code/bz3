@@ -20,6 +20,9 @@ class Game {
 private:
     FOCUS_STATE focusState;
     std::string playerName;
+    bool registeredUser = false;
+    bool communityAdmin = false;
+    bool localAdmin = false;
 
     std::vector<std::unique_ptr<Actor>> actors;
 
@@ -33,7 +36,12 @@ public:
 
     FOCUS_STATE getFocusState() const { return focusState; }
 
-    Game(ClientEngine &engine, std::string playerName, std::string worldDir);
+    Game(ClientEngine &engine,
+         std::string playerName,
+         std::string worldDir,
+         bool registeredUser,
+         bool communityAdmin,
+         bool localAdmin);
     ~Game();
 
     void earlyUpdate(TimeUtils::duration deltaTime);

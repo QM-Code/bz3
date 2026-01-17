@@ -39,11 +39,7 @@ ClientConfig ParseClientConfig(const nlohmann::json &root) {
 
     if (auto guiIt = root.find("gui"); guiIt != root.end() && guiIt->is_object()) {
         const auto &guiObject = *guiIt;
-        if (auto serverListIt = guiObject.find("serverList"); serverListIt != guiObject.end() && serverListIt->is_object()) {
-            const auto &serverListObject = *serverListIt;
-            config.communityAutoRefreshSeconds = parsePositiveInt(serverListObject, "communityAutoRefresh");
-            config.lanAutoRefreshSeconds = parsePositiveInt(serverListObject, "lanAutoRefresh");
-        }
+        (void)guiObject;
     }
 
     if (auto serverListsIt = root.find("serverLists"); serverListsIt != root.end()) {
@@ -222,20 +218,19 @@ bool ClientConfig::Save(const std::string &path) const {
     serverListsObject["communities"] = std::move(communitiesArray);
     userConfig["serverLists"] = std::move(serverListsObject);
 
-    nlohmann::json guiObject = nlohmann::json::object();
     if (auto guiIt = userConfig.find("gui"); guiIt != userConfig.end() && guiIt->is_object()) {
-        guiObject = *guiIt;
+        auto &guiObject = *guiIt;
+        if (auto serverListIt = guiObject.find("serverList"); serverListIt != guiObject.end() && serverListIt->is_object()) {
+            serverListIt->erase("communityAutoRefresh");
+            serverListIt->erase("lanAutoRefresh");
+            if (serverListIt->empty()) {
+                guiObject.erase("serverList");
+            }
+        }
+        if (guiObject.empty()) {
+            userConfig.erase("gui");
+        }
     }
-
-    nlohmann::json guiServerList = nlohmann::json::object();
-    if (auto serverListIt = guiObject.find("serverList"); serverListIt != guiObject.end() && serverListIt->is_object()) {
-        guiServerList = *serverListIt;
-    }
-
-    guiServerList["communityAutoRefresh"] = communityAutoRefreshSeconds;
-    guiServerList["lanAutoRefresh"] = lanAutoRefreshSeconds;
-    guiObject["serverList"] = std::move(guiServerList);
-    userConfig["gui"] = std::move(guiObject);
 
     std::error_code ec;
     const auto parentDir = filePath.parent_path();

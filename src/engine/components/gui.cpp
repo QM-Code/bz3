@@ -72,12 +72,17 @@ void GUI::update() {
             ImGuiWindowFlags_NoSavedSettings
         );
 
-        std::string players;
         for (const auto& entry : scoreboardEntries) {
-            players += entry.name + "  (" + std::to_string(entry.score) + ")\n";
+            const char *prefix = "  ";
+            if (entry.communityAdmin) {
+                prefix = "@ ";
+            } else if (entry.localAdmin) {
+                prefix = "* ";
+            } else if (entry.registeredUser) {
+                prefix = "+ ";
+            }
+            ImGui::Text("%s%s  (%d)", prefix, entry.name.c_str(), entry.score);
         }
-
-        ImGui::Text("%s", players.c_str());
         ImGui::End();
 
         drawConsolePanel();

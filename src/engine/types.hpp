@@ -76,7 +76,7 @@ using render_id = uint32_t;
 
 using PlayerParameters = std::map<std::string, float>;
 
-constexpr uint32_t NET_PROTOCOL_VERSION = 1;
+constexpr uint32_t NET_PROTOCOL_VERSION = 4;
 
 typedef struct PlayerState {
     std::string name;
@@ -85,6 +85,9 @@ typedef struct PlayerState {
     glm::vec3 velocity;
     bool alive;
     int score = 0;
+    bool registeredUser = false;
+    bool communityAdmin = false;
+    bool localAdmin = false;
     PlayerParameters params;
 } PlayerState;
 
@@ -229,6 +232,9 @@ typedef struct ClientMsg_PlayerJoin : ClientMsg {
     std::string ip;
     std::string name;
     uint32_t protocolVersion = NET_PROTOCOL_VERSION;
+    bool registeredUser = false;
+    bool communityAdmin = false;
+    bool localAdmin = false;
 } ClientMsg_PlayerJoin;
 
 typedef struct ClientMsg_PlayerLeave : ClientMsg {

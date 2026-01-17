@@ -10,12 +10,7 @@
         "communities": [
         ]
     },
-    "gui": {
-        "serverList": {
-            "communityAutoRefresh": 0,
-            "lanAutoRefresh": 0
-        }
-    },
+    "gui": {},
     "keybindings": {
         "fire": ["ENTER", "LEFT_MOUSE"],
         "dropFlag": ["SPACE", "MIDDLE_MOUSE"],
