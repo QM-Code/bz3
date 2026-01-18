@@ -165,6 +165,7 @@ void Player::die() {
     if (!state.alive) {
         return;
     }
+    Actor::die();
     dieAudio.play(state.position);
     state.alive = false;
     auto vel = physics->getVelocity();

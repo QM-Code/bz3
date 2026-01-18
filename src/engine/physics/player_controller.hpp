@@ -1,10 +1,10 @@
 #pragma once
 
+#include <Jolt/Jolt.h>
+#include <Jolt/Physics/Character/CharacterVirtual.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <memory>
-
-class btRigidBody;
 class PhysicsWorld;
 
 class PhysicsPlayerController {
@@ -21,9 +21,9 @@ public:
     glm::vec3 getVelocity() const;
     glm::vec3 getAngularVelocity() const;
     glm::vec3 getForwardVector() const;
-	void setHalfExtents(const glm::vec3& extents) { halfExtents = extents; }
+	void setHalfExtents(const glm::vec3& extents);
 
-    // Advance the controller by dt using its current velocity, handling collisions manually.
+    // Advance the controller by dt using Jolt's CharacterVirtual helper.
     void update(float dt);
 
     void setPosition(const glm::vec3& position);
@@ -37,17 +37,14 @@ public:
 
 private:
     PhysicsWorld* world = nullptr;
-    glm::vec3 position{0.0f};
+    JPH::Ref<JPH::CharacterVirtual> character_;
+    glm::vec3 halfExtents{0.5f, 1.0f, 0.5f};
     glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
     glm::vec3 velocity{0.0f};
     glm::vec3 angularVelocity{0.0f};
-
     float gravity = -9.8f; // downward acceleration (m/s^2)
+    float characterPadding = 0.05f; // padding Jolt adds around the shape
+    float groundSupportBand = 0.1f; // vertical band above the feet that counts as supporting ground
 
-    // Controller shape (half extents) for sweeps and separation.
-    glm::vec3 halfExtents{0.5f, 1.0f, 0.5f};
-
-    // Internal helpers
-    void resolvePenetrations();
-    bool findDeepestPenetration(glm::vec3& outNormal, float& outDepth) const;
+    glm::vec3 centerPosition() const;
 };

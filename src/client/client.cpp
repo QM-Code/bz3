@@ -10,7 +10,9 @@ void Client::syncRenderFromState() {
     game.engine.render->setVisible(renderId, state.alive);
 }
 
-Client::Client(Game &game, client_id id, const PlayerState &initialState) : Actor(game, id) {
+Client::Client(Game &game, client_id id, const PlayerState &initialState)
+    : Actor(game, id),
+      dieAudio(game.engine.audio->loadClip(game.world->getAssetPath("audio.player.Die"), 10)) {
     renderId = game.engine.render->create(game.world->getAssetPath("playerModel").string(), false);
     game.engine.render->setRadarCircleGraphic(renderId, 1.2f);
 
@@ -25,9 +27,6 @@ Client::~Client() {
 }
 
 void Client::update(TimeUtils::duration /*deltaTime*/) {
-    if (!state.alive) {
-        return;
-    }
     syncRenderFromState();
 }
 
@@ -39,7 +38,9 @@ void Client::die() {
     if (!state.alive) {
         return;
     }
+    Actor::die();
     state.alive = false;
+    dieAudio.play(state.position);
     game.engine.render->setVisible(renderId, false);
     spdlog::trace("Client::update: Client id {} has died", id);
 }

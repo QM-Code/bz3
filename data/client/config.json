@@ -55,7 +55,8 @@
             }
         },
         "effects": {
-            "shot": "effects/orb.efkefc"
+            "shot": "effects/orb/orb.efkefc",
+            "explosion": "effects/explosion/explosion.efkefc"
         }
     },
     "network": {

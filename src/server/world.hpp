@@ -1,6 +1,6 @@
 #pragma once
 #include "engine/types.hpp"
-#include "engine/physics/compound_body.hpp"
+#include "engine/physics/static_body.hpp"
 #include <filesystem>
 #include <map>
 #include <nlohmann/json.hpp>
@@ -22,7 +22,7 @@ private:
     nlohmann::json config;
 
     PlayerParameters defaultPlayerParams;
-    PhysicsCompoundBody physics;
+    PhysicsStaticBody physics;
     bool zipWorldOnStartup = true;
     bool worldDataCached = false;
     std::vector<std::byte> worldDataCache;

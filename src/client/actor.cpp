@@ -1,4 +1,5 @@
 #include "actor.hpp"
+#include "game.hpp"
 
 #include <utility>
 
@@ -33,6 +34,11 @@ void Actor::setParameters(const PlayerParameters &params) {
 
 void Actor::setParameters(PlayerParameters &&params) {
     state.params = std::move(params);
+}
+
+void Actor::die() {
+    auto fx = game.engine.particles->createEffect(game.world->getAssetPath("effects.explosion").string(), 1.0f);
+    fx.setPosition(state.position);
 }
 
 bool Actor::isEqual(client_id otherId) const {
