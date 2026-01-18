@@ -318,14 +318,12 @@ void Render::destroy(render_id id) {
     if (it != objects.end()) {
         scene->remove(*(it->second));
         objects.erase(it);
+    } 
 
-        auto rit = radarObjects.find(id);
-        if (rit != radarObjects.end()) {
-            radarScene->remove(*(rit->second));
-            radarObjects.erase(rit);
-        }
-    } else {
-        spdlog::error("Render::destroy: Invalid render_id {}", id);
+    auto rit = radarObjects.find(id);
+    if (rit != radarObjects.end()) {
+        radarScene->remove(*(rit->second));
+        radarObjects.erase(rit);
     }
 }
 

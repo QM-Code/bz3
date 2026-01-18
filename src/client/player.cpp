@@ -46,7 +46,9 @@ Player::Player(Game &game,
         getParameter("z_extent")));
 }
 
-Player::~Player() = default;
+Player::~Player() {
+    game.engine.render->destroy(renderId);
+}
 
 glm::vec3 Player::getForwardVector() const {
     return physics->getForwardVector();
@@ -101,8 +103,27 @@ void Player::earlyUpdate() {
 
         if (game.getFocusState() == FOCUS_STATE_GAME) {
             if (game.engine.input->getInputState().fire) {
-                glm::vec3 shotPosition = state.position + getForwardVector() * muzzleOffset.z +
-                                          glm::vec3(0.0f, muzzleOffset.y, 0.0f);
+                const glm::vec3 cameraPos = state.position + glm::vec3(0.0f, muzzleOffset.y, 0.0f);
+                const glm::vec3 muzzlePos = state.position + getForwardVector() * muzzleOffset.z +
+                                            glm::vec3(0.0f, muzzleOffset.y, 0.0f);
+
+                glm::vec3 shotPosition = muzzlePos;
+                if (game.engine.physics) {
+                    glm::vec3 hitPoint{};
+                    glm::vec3 hitNormal{};
+                    if (game.engine.physics->raycast(cameraPos, muzzlePos, hitPoint, hitNormal)) {
+                        const glm::vec3 dirVec = muzzlePos - cameraPos;
+                        const float dirLenSq = glm::dot(dirVec, dirVec);
+                        if (dirLenSq > 1e-6f) {
+                            const glm::vec3 dir = dirVec * (1.0f / std::sqrt(dirLenSq));
+                            constexpr float backOff = 0.05f;
+                            shotPosition = hitPoint - dir * backOff;
+                        } else {
+                            shotPosition = hitPoint;
+                        }
+                    }
+                }
+
                 glm::vec3 shotVelocity = getForwardVector() * getParameter("shotSpeed") + getVelocity();
 
                 auto shot = std::make_unique<Shot>(game, shotPosition, shotVelocity);

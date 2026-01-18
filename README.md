@@ -102,14 +102,11 @@ Other
 - Python plugin bytecode is redirected to a writable cache: set `BZ3_PY_CACHE_DIR` to choose the location (defaults to `/tmp/bz3-pycache`). If the directory cannot be created, bytecode writing is disabled. Current behavior is acceptable for now; we may revisit a dedicated cache path later.
 
 ## TODO
-* Switch to Jolt physics controller instead of bullet
+* Teams
 * Shots are shooting inside buildings (this is because of muzzle shot position)
 * Muzzle flash
 * Shot fizzle out effect
-* Explosion effect
-* Custom tank model
 * Make current player and FOV appear on radar
-* Load SVG as on-radar graphic
 * Tank treads when moving
 * Improve radar shader
 * API Event handler

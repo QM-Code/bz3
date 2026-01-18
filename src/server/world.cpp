@@ -2,8 +2,12 @@
 #include "game.hpp"
 #include "spdlog/spdlog.h"
 #include "common/data_path_resolver.hpp"
+#include <glm/glm.hpp>
+#include <glm/gtc/constants.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <fstream>
 #include <map>
+#include <random>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -205,14 +209,26 @@ std::string World::getAssetPath(const std::string &assetName) const {
 }
 
 Location World::getSpawnLocation() const {
-    // Make x random between -10 and 10 and make z random between -10 and 10
-    // and make z random between 10 and 15, and y rotation random between 0 and 2pi
-    float x = static_cast<float>(rand() % 2001 - 1000) / 100.0f;
-    float z = static_cast<float>(rand() % 2001 - 1000) / 100.0f;
-    float y = static_cast<float>(rand() % 501 + 1000) / 100.0f;
-    float rotY = static_cast<float>(rand() % 6283) / 1000.0f;
+    static thread_local std::mt19937 rng{std::random_device{}()};
+    std::uniform_real_distribution<float> distXZ(-20.0f, 20.0f);
+    std::uniform_real_distribution<float> distRot(0.0f, glm::two_pi<float>());
+
+    const float x = distXZ(rng);
+    const float z = distXZ(rng);
+
+    const glm::vec3 rayStart{x, 500.0f, z};
+    const glm::vec3 rayEnd{x, -100.0f, z};
+    glm::vec3 hitPoint{};
+    glm::vec3 hitNormal{};
+    float y = 5.0f; // fallback height if nothing is hit
+
+    if (game.engine.physics && game.engine.physics->raycast(rayStart, rayEnd, hitPoint, hitNormal)) {
+        y = hitPoint.y;
+    }
+
+    const float rotY = distRot(rng);
     return Location{
         .position = glm::vec3(x, y, z),
-        .rotation = glm::angleAxis(rotY, glm::vec3(0, 1, 0))
+        .rotation = glm::angleAxis(rotY, glm::vec3(0.0f, 1.0f, 0.0f))
     };
 }
