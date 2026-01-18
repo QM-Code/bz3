@@ -141,6 +141,7 @@ const char* toString(Effekseer::LogType type) {
 		return "Unknown";
 	}
 }
+
 } // namespace
 
 struct ParticleEffectData {
