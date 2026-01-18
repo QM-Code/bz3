@@ -15,6 +15,9 @@ struct ClientCLIOptions {
     bool dataDirExplicit = false;
     bool userConfigExplicit = false;
     bool verbose = false;
+    std::string logLevel;
+    bool logLevelExplicit = false;
+    bool timestampLogging = false;
 };
 
 ClientCLIOptions ParseClientCLIOptions(int argc, char *argv[]);

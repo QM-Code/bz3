@@ -72,8 +72,7 @@ void CommunityHeartbeat::update(const Game &game) {
 
     auto now = std::chrono::steady_clock::now();
     if (nextHeartbeatTime == std::chrono::steady_clock::time_point{}) {
-        nextHeartbeatTime = now + std::chrono::seconds(intervalSeconds);
-        return;
+        nextHeartbeatTime = now;
     }
 
     if (now < nextHeartbeatTime) {

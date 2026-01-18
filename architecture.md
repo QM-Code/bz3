@@ -21,7 +21,7 @@ src/
         shot.{hpp,cpp}                 # Local + replicated shots (visual + raycast ricochet)
         console.{hpp,cpp}              # Chat/console glue to GUI
         server/
-            server_browser_controller.*  # Orchestrates LAN scan + remote server lists + connect requests
+            community_browser_controller.*  # Orchestrates LAN scan + remote server lists + connect requests
             server_connector.*           # Connects, constructs Game on success
             server_discovery.*           # Client-side LAN discovery scanning (UDP broadcast)
             server_list_fetcher.*        # Remote server list fetch via HTTP (libcurl)
@@ -49,7 +49,7 @@ src/
             server_network.*             # ENet server + protobuf decode + send helpers
             render.*                     # threepp scene/camera/renderer; loads models via Assimp
             gui.*                        # Dear ImGui + HUD/console + server browser view integration
-            gui/server_browser.*         # Server browser UI
+            gui/main_menu.*              # Main menu UI wrapper
             input.*                      # GLFW key handling + per-frame InputState
             audio.*                      # miniaudio engine + pooled clip instances
 
@@ -228,7 +228,7 @@ Then world initialization builds:
 
 #### Connect → init → world
 
-1. Server browser selects a server and calls `ServerConnector::connect(...)`.
+1. Community browser selects a server and calls `ServerConnector::connect(...)`.
 2. `ClientNetwork::connect(...)` establishes ENet connection.
 3. Client constructs `Game`, which constructs `World`.
 4. Server sends `ServerMsg_Init` (client id + defaults + optional world zip).
@@ -267,7 +267,7 @@ Models are loaded via `threepp::AssimpLoader` (GLB/Assimp formats). Gameplay sto
 
 `src/engine/components/gui.*` owns Dear ImGui setup and two major views:
 
-- **Server browser** view (when not connected)
+- **Community browser** view (when not connected)
 - **HUD/console** view (when in game)
 
 Fonts are loaded via `ResolveConfiguredAsset(...)` using configured font keys.
@@ -315,7 +315,7 @@ Fonts are loaded via `ResolveConfiguredAsset(...)` using configured font keys.
 - `Chat` (`src/server/chat.*`): routes chat; offers plugin interception.
 - `World` (`src/server/world.*`): world config/assets + optional world zip distribution.
 
-## Server browser and discovery
+## Community browser and discovery
 
 There are two server discovery sources:
 
@@ -326,8 +326,8 @@ There are two server discovery sources:
 
 2. **Remote server lists (HTTP JSON)**
      - Fetch: `src/client/server/server_list_fetcher.*` (libcurl)
-     - Orchestration: `src/client/server/server_browser_controller.*`
-     - UI: `src/engine/components/gui/server_browser.*`
+     - Orchestration: `src/client/server/community_browser_controller.*`
+     - UI: `src/engine/components/gui/main_menu.*`
 
 The server browser controller merges results from LAN + remote lists into a single list of UI entries and delegates connection to `ServerConnector`.
 
@@ -355,7 +355,7 @@ Plugin callbacks are keyed by `ClientMsg_Type` and currently invoked from gamepl
 - **World loading / packaging**: `src/server/world.*` and `src/client/world.*`
 - **Physics issues**: `src/engine/physics/physics_world.*` (and GLB meshes used by world assets)
 - **UI/HUD**: `src/engine/components/gui.*`
-- **Server browser**: `src/client/server/*` (control) + `src/engine/components/gui/server_browser.*` (view)
+- **Community browser**: `src/client/server/*` (control) + `src/engine/components/gui/main_menu.*` (view)
 - **Plugins / moderation / commands**: `src/server/plugin.*` and `data/plugins/*`
 
 ## Common gotchas

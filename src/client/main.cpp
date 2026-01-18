@@ -7,7 +7,7 @@
 #include "game.hpp"
 #include "client/client_cli_options.hpp"
 #include "client/config_client.hpp"
-#include "client/server/server_browser_controller.hpp"
+#include "client/server/community_browser_controller.hpp"
 #include "client/server/server_connector.hpp"
 #include "common/data_dir_override.hpp"
 #include "common/data_path_resolver.hpp"
@@ -74,18 +74,42 @@ void ToggleFullscreen(GLFWwindow *window, FullscreenState &state, bool vsyncEnab
 
 #define MIN_DELTA_TIME (1.0f / 120.0f)
 
-void ConfigureLogging(bool verbose) {
-    if (verbose) {
-        spdlog::set_level(spdlog::level::trace);
+spdlog::level::level_enum ParseLogLevel(const std::string &level) {
+    if (level == "trace") {
+        return spdlog::level::trace;
+    }
+    if (level == "debug") {
+        return spdlog::level::debug;
+    }
+    if (level == "info") {
+        return spdlog::level::info;
+    }
+    if (level == "warn") {
+        return spdlog::level::warn;
+    }
+    if (level == "err") {
+        return spdlog::level::err;
+    }
+    if (level == "critical") {
+        return spdlog::level::critical;
+    }
+    if (level == "off") {
+        return spdlog::level::off;
+    }
+    return spdlog::level::info;
+}
+
+void ConfigureLogging(spdlog::level::level_enum level, bool includeTimestamp) {
+    if (includeTimestamp) {
         spdlog::set_pattern("%Y-%m-%d %H:%M:%S.%e [%^%l%$] %v");
     } else {
-        spdlog::set_level(spdlog::level::info);
-        spdlog::set_pattern("%v");
+        spdlog::set_pattern("[%^%l%$] %v");
     }
+    spdlog::set_level(level);
 }
 
 int main(int argc, char *argv[]) {
-    ConfigureLogging(false);
+    ConfigureLogging(spdlog::level::info, false);
 
     const bz::data::DataDirOverrideResult dataDirResult = bz::data::ApplyDataDirOverrideFromArgs(argc, argv);
 
@@ -108,9 +132,10 @@ int main(int argc, char *argv[]) {
     const bool vsyncEnabled = bz::data::ReadBoolConfig({"graphics.VSync"}, true);
 
     const ClientCLIOptions cliOptions = ParseClientCLIOptions(argc, argv);
-    if (cliOptions.verbose) {
-        ConfigureLogging(true);
-    }
+    const spdlog::level::level_enum logLevel = cliOptions.logLevelExplicit
+        ? ParseLogLevel(cliOptions.logLevel)
+        : (cliOptions.verbose ? spdlog::level::trace : spdlog::level::info);
+    ConfigureLogging(logLevel, cliOptions.timestampLogging);
 
     const std::string clientUserConfigPath = clientUserConfigPathFs.string();
     ClientConfig clientConfig = ClientConfig::Load("");
@@ -166,7 +191,7 @@ int main(int argc, char *argv[]) {
 
     std::unique_ptr<Game> game;
     ServerConnector serverConnector(engine, cliOptions.playerName, initialWorldDir, game);
-    ServerBrowserController serverBrowser(
+    CommunityBrowserController communityBrowser(
         engine,
         clientConfig,
         clientUserConfigPath,
@@ -203,11 +228,11 @@ int main(int argc, char *argv[]) {
             if (game) {
                 game.reset();
             }
-            serverBrowser.handleDisconnected(disconnectEvent->reason);
+            communityBrowser.handleDisconnected(disconnectEvent->reason);
         }
 
         if (!game) {
-            serverBrowser.update();
+            communityBrowser.update();
         }
 
         if (game) {
