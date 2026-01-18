@@ -72,6 +72,10 @@ The import/export format is modeled after `data/test-data.json` and includes all
 - `bin/clean-images.sh`: deletes unreferenced screenshot files in the uploads directory (use `--dry-run` to preview).
 - `bin/test-heartbeat.sh`: sends heartbeat pings for sample servers (dev helper).
 
+## Agent prompts
+
+Repo-level guidance lives in `AGENTS.md`. Task-specific prompts live under `docs/agent-prompts/` (see the Webserver prompt).
+
 ## URLs
 
 - `/` redirects to `/servers`.

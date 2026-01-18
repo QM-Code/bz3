@@ -363,3 +363,7 @@ Plugin callbacks are keyed by `ClientMsg_Type` and currently invoked from gamepl
 - `BZ3_DATA_DIR` must point at the repo’s `data/` directory (or an installed equivalent).
 - Config and assets are *layered*; if something “mysteriously” changes between worlds, check the world’s `config.json` and `manifest.json` merging.
 - Network messages are freed on `flushPeekedMessages()`; don’t hold pointers returned by `peekMessage<T>()` beyond the current frame.
+
+## Agent prompts
+
+Repo-level guidance lives in `AGENTS.md`. Task-specific prompts live under `docs/agent-prompts/`.
