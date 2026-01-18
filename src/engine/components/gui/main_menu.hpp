@@ -118,7 +118,7 @@ private:
     void resetBuffers(const std::string &defaultHost, uint16_t defaultPort);
     ThumbnailTexture *getOrLoadThumbnail(const std::string &url);
     MessageColors getMessageColors() const;
-    void drawSettingsPanel(const MessageColors &colors) const;
+    void drawSettingsPanel(const MessageColors &colors);
     void drawDocumentationPanel(const MessageColors &colors) const;
     void drawStartServerPanel(const MessageColors &colors);
     void drawPlaceholderPanel(const char *heading, const char *body, const MessageColors &colors) const;
@@ -203,6 +203,20 @@ private:
     std::string themeStatusText;
     bool themeStatusIsError = false;
     bool useThemeOverrides = false;
+    enum class BindingColumn {
+        Keyboard,
+        Mouse,
+        Controller
+    };
+    static constexpr std::size_t kKeybindingCount = 11;
+    std::array<std::array<char, 128>, kKeybindingCount> keybindingKeyboardBuffers{};
+    std::array<std::array<char, 128>, kKeybindingCount> keybindingMouseBuffers{};
+    std::array<std::array<char, 128>, kKeybindingCount> keybindingControllerBuffers{};
+    int selectedBindingIndex = -1;
+    BindingColumn selectedBindingColumn = BindingColumn::Keyboard;
+    bool settingsLoaded = false;
+    std::string settingsStatusText;
+    bool settingsStatusIsError = false;
 
     struct LocalServerProcess {
         int id = 0;

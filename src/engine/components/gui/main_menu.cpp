@@ -220,6 +220,7 @@ void MainMenuView::draw(ImGuiIO &io) {
 void MainMenuView::setUserConfigPath(const std::string &path) {
     userConfigPath = path;
     themesLoaded = false;
+    settingsLoaded = false;
 }
 
 bool MainMenuView::consumeFontReloadRequest() {
