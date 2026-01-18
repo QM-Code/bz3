@@ -10,7 +10,8 @@ CommunityHeartbeat::CommunityHeartbeat() : client(std::make_unique<HeartbeatClie
 CommunityHeartbeat::~CommunityHeartbeat() = default;
 
 void CommunityHeartbeat::configureFromConfig(const nlohmann::json &mergedConfig,
-                                             uint16_t listenPort) {
+                                             uint16_t listenPort,
+                                             const std::string &communityOverride) {
     std::string advertiseHost = bz::data::ReadStringConfig("network.ServerAdvertiseHost", "");
     std::string serverHost = bz::data::ReadStringConfig("network.ServerHost", "");
     if (advertiseHost.empty() || advertiseHost == "0.0.0.0") {
@@ -56,6 +57,15 @@ void CommunityHeartbeat::configureFromConfig(const nlohmann::json &mergedConfig,
                 }
             }
         }
+    }
+
+    if (!communityOverride.empty()) {
+        communityUrl = communityOverride;
+        enabled = true;
+    }
+
+    if (!communityUrl.empty() && communityUrl.rfind("http://", 0) != 0 && communityUrl.rfind("https://", 0) != 0) {
+        communityUrl = "http://" + communityUrl;
     }
 
     if (communityUrl.empty()) {

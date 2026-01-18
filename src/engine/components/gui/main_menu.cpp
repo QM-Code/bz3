@@ -290,6 +290,8 @@ void MainMenuView::setListOptions(const std::vector<ServerListOption> &options, 
     listOptions = options;
     if (listOptions.empty()) {
         listSelectedIndex = -1;
+        serverCommunityIndex = -1;
+        lastCredentialsListIndex = -1;
         pendingListSelection.reset();
         return;
     }
@@ -300,6 +302,140 @@ void MainMenuView::setListOptions(const std::vector<ServerListOption> &options, 
         listSelectedIndex = static_cast<int>(listOptions.size()) - 1;
     } else {
         listSelectedIndex = selectedIndexIn;
+    }
+
+    if (serverCommunityIndex < 0 || serverCommunityIndex >= static_cast<int>(listOptions.size())) {
+        serverCommunityIndex = listSelectedIndex;
+    }
+}
+
+std::string MainMenuView::communityKeyForIndex(int index) const {
+    if (index < 0 || index >= static_cast<int>(listOptions.size())) {
+        return {};
+    }
+    const auto &option = listOptions[index];
+    if (option.name == "Local Area Network") {
+        return "LAN";
+    }
+    std::string host = option.host;
+    while (!host.empty() && host.back() == '/') {
+        host.pop_back();
+    }
+    return host;
+}
+
+void MainMenuView::refreshCommunityCredentials() {
+    if (listSelectedIndex == lastCredentialsListIndex) {
+        return;
+    }
+    lastCredentialsListIndex = listSelectedIndex;
+    passwordIsHash = false;
+    usernameBuffer.fill(0);
+    passwordBuffer.fill(0);
+
+    const std::string key = communityKeyForIndex(listSelectedIndex);
+    if (key.empty()) {
+        return;
+    }
+
+    nlohmann::json config;
+    if (!loadUserConfig(config)) {
+        return;
+    }
+
+    const auto guiIt = config.find("gui");
+    if (guiIt == config.end() || !guiIt->is_object()) {
+        return;
+    }
+    const auto credsIt = guiIt->find("communityCredentials");
+    if (credsIt == guiIt->end() || !credsIt->is_object()) {
+        return;
+    }
+    const auto entryIt = credsIt->find(key);
+    if (entryIt == credsIt->end() || !entryIt->is_object()) {
+        return;
+    }
+    const auto &entry = *entryIt;
+    if (auto userIt = entry.find("username"); userIt != entry.end() && userIt->is_string()) {
+        std::snprintf(usernameBuffer.data(), usernameBuffer.size(), "%s", userIt->get<std::string>().c_str());
+    }
+    if (key != "LAN") {
+        if (auto passIt = entry.find("passwordHash"); passIt != entry.end() && passIt->is_string()) {
+            const std::string passhash = passIt->get<std::string>();
+            if (!passhash.empty()) {
+                std::snprintf(passwordBuffer.data(), passwordBuffer.size(), "%s", passhash.c_str());
+                passwordIsHash = true;
+            }
+        }
+    }
+}
+
+void MainMenuView::persistCommunityCredentials(bool passwordChanged) {
+    const std::string key = communityKeyForIndex(listSelectedIndex);
+    if (key.empty()) {
+        return;
+    }
+
+    nlohmann::json config;
+    if (!loadUserConfig(config)) {
+        return;
+    }
+
+    const std::string username = trimCopy(usernameBuffer.data());
+    if (username.empty()) {
+        eraseNestedConfig(config, {"gui", "communityCredentials", key.c_str()});
+    } else {
+        setNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "username"}, username);
+        if (key == "LAN") {
+            eraseNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "passwordHash"});
+            eraseNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "salt"});
+        } else if (passwordIsHash && !trimCopy(passwordBuffer.data()).empty()) {
+            setNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "passwordHash"}, trimCopy(passwordBuffer.data()));
+        } else if (passwordChanged) {
+            eraseNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "passwordHash"});
+        }
+    }
+
+    std::string error;
+    saveUserConfig(config, error);
+}
+
+void MainMenuView::storeCommunityAuth(const std::string &communityHost,
+                                      const std::string &username,
+                                      const std::string &passhash,
+                                      const std::string &salt) {
+    if (communityHost.empty() || username.empty()) {
+        return;
+    }
+
+    std::string key = communityHost;
+    while (!key.empty() && key.back() == '/') {
+        key.pop_back();
+    }
+
+    nlohmann::json config;
+    if (!loadUserConfig(config)) {
+        return;
+    }
+
+    setNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "username"}, username);
+    if (!passhash.empty()) {
+        setNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "passwordHash"}, passhash);
+    }
+    if (!salt.empty()) {
+        setNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "salt"}, salt);
+    }
+
+    std::string error;
+    saveUserConfig(config, error);
+
+    const std::string activeKey = communityKeyForIndex(listSelectedIndex);
+    if (activeKey == key) {
+        std::snprintf(usernameBuffer.data(), usernameBuffer.size(), "%s", username.c_str());
+        if (!passhash.empty()) {
+            std::snprintf(passwordBuffer.data(), passwordBuffer.size(), "%s", passhash.c_str());
+            passwordIsHash = true;
+        }
     }
 }
 
@@ -388,8 +524,13 @@ std::string MainMenuView::getPassword() const {
     return std::string(passwordBuffer.data());
 }
 
+bool MainMenuView::isPasswordHash() const {
+    return passwordIsHash;
+}
+
 void MainMenuView::clearPassword() {
     passwordBuffer.fill(0);
+    passwordIsHash = false;
 }
 
 bool MainMenuView::consumeRefreshRequest() {

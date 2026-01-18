@@ -54,6 +54,7 @@ namespace gui {
 void MainMenuView::drawCommunityPanel(const MessageColors &messageColors) {
     const bool hasHeadingFont = (headingFont != nullptr);
     const bool hasButtonFont = (buttonFont != nullptr);
+    bool joinFromIdentity = false;
 
     ImVec2 contentAvail = ImGui::GetContentRegionAvail();
     const ImGuiStyle &style = ImGui::GetStyle();
@@ -235,11 +236,76 @@ void MainMenuView::drawCommunityPanel(const MessageColors &messageColors) {
     ImGui::Separator();
     ImGui::Spacing();
 
-    ImGui::PushStyleColor(ImGuiCol_Text, headingColor);
-    ImGui::Text("Player identity");
+    refreshCommunityCredentials();
+
+    bool usernameChanged = false;
+    bool passwordChanged = false;
+
+    const bool isLanCommunity =
+        listSelectedIndex >= 0 &&
+        listSelectedIndex < static_cast<int>(listOptions.size()) &&
+        listOptions[listSelectedIndex].name == "Local Area Network";
+
+    const float joinInlineWidth = ImGui::CalcTextSize("Join").x + style.FramePadding.x * 2.0f;
+    const float labelSpacing = style.ItemSpacing.x * 2.0f;
+    const float inputWidth = 150.0f;
+    float rowWidth = ImGui::GetContentRegionAvail().x - joinInlineWidth - style.ItemSpacing.x;
+    float contentWidth = inputWidth + ImGui::CalcTextSize("Username").x + style.ItemInnerSpacing.x;
+    if (!isLanCommunity) {
+        contentWidth += labelSpacing;
+        contentWidth += ImGui::CalcTextSize("Password").x + style.ItemInnerSpacing.x + inputWidth;
+    }
+
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted("Username");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(inputWidth);
+    const bool usernameEdited = ImGui::InputText(
+        "##Username",
+        usernameBuffer.data(),
+        usernameBuffer.size(),
+        ImGuiInputTextFlags_EnterReturnsTrue);
+    joinFromIdentity |= usernameEdited;
+    usernameChanged |= usernameEdited;
+
+    if (!isLanCommunity) {
+        ImGui::SameLine(0.0f, labelSpacing);
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted("Password");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(inputWidth);
+        const bool passwordEdited = ImGui::InputText(
+            "##Password",
+            passwordBuffer.data(),
+            passwordBuffer.size(),
+            ImGuiInputTextFlags_Password | ImGuiInputTextFlags_EnterReturnsTrue);
+        joinFromIdentity |= passwordEdited;
+        if (passwordEdited) {
+            passwordIsHash = false;
+            passwordChanged = true;
+        }
+    }
+
+    if (rowWidth > contentWidth) {
+        ImGui::SameLine(0.0f, rowWidth - contentWidth);
+    } else {
+        ImGui::SameLine();
+    }
+    if (hasButtonFont) {
+        ImGui::PushFont(buttonFont);
+    }
+    ImGui::PushStyleColor(ImGuiCol_Text, buttonColor);
+    if (ImGui::Button("Join")) {
+        joinFromIdentity = true;
+    }
     ImGui::PopStyleColor();
-    ImGui::InputText("Username", usernameBuffer.data(), usernameBuffer.size());
-    ImGui::InputText("Password", passwordBuffer.data(), passwordBuffer.size(), ImGuiInputTextFlags_Password);
+    if (hasButtonFont) {
+        ImGui::PopFont();
+    }
+
+    if (usernameChanged || passwordChanged) {
+        persistCommunityCredentials(passwordChanged);
+    }
 
     if (!statusText.empty()) {
         ImGui::Spacing();
@@ -369,7 +435,7 @@ void MainMenuView::drawCommunityPanel(const MessageColors &messageColors) {
     const float joinButtonWidth = ImGui::CalcTextSize("Join").x + style.FramePadding.x * 2.0f;
     const float joinButtonOffset = std::max(0.0f, ImGui::GetContentRegionAvail().x - joinButtonWidth);
     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + joinButtonOffset);
-    bool joinSelectedClicked = false;
+    bool joinSelectedClicked = joinFromIdentity;
     if (hasButtonFont) {
         ImGui::PushFont(buttonFont);
     }

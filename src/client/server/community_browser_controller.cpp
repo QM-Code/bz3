@@ -479,6 +479,7 @@ void CommunityBrowserController::handleJoinSelection(const gui::CommunityBrowser
     }
 
     std::string password = browser.getPassword();
+    const bool passwordIsHash = browser.isPasswordHash();
     std::string communityHost = resolveCommunityHost(selection);
 
     pendingJoin.reset();
@@ -493,6 +494,15 @@ void CommunityBrowserController::handleJoinSelection(const gui::CommunityBrowser
         browser.setStatus("Checking username availability...", false);
         pendingJoin = PendingJoin{selection, communityHost, username, std::string{}, false, false, false};
         authClient.requestUserRegistered(communityHost, username);
+        return;
+    }
+
+    if (passwordIsHash) {
+        spdlog::info("Authenticating '{}' on community {} (stored hash)", username, communityHost);
+        browser.setStatus("Authenticating...", false);
+        browser.storeCommunityAuth(communityHost, username, password, std::string{});
+        pendingJoin = PendingJoin{selection, communityHost, username, std::string{}, false, false, true};
+        authClient.requestAuth(communityHost, username, password, selection.worldName);
         return;
     }
 
@@ -514,6 +524,7 @@ void CommunityBrowserController::handleJoinSelection(const gui::CommunityBrowser
 
     spdlog::info("Authenticating '{}' on community {}", username, communityHost);
     browser.setStatus("Authenticating...", false);
+    browser.storeCommunityAuth(communityHost, username, passhash, saltIt->second);
     pendingJoin = PendingJoin{selection, communityHost, username, std::string{}, false, false, true};
     authClient.requestAuth(communityHost, username, passhash, selection.worldName);
 }
@@ -599,6 +610,7 @@ void CommunityBrowserController::handleAuthResponse(const CommunityAuthClient::R
 
         spdlog::info("Authenticating '{}' on community {}", response.username, response.host);
         browser.setStatus("Authenticating...", false);
+        browser.storeCommunityAuth(response.host, response.username, passhash, response.salt);
         pendingJoin->password.clear();
         pendingJoin->awaitingAuth = true;
         authClient.requestAuth(response.host, response.username, passhash, pending.selection.worldName);

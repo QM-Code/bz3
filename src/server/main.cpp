@@ -156,7 +156,8 @@ int main(int argc, char *argv[]) {
     ServerDiscoveryBeacon discoveryBeacon(port, serverName, worldName);
 
     CommunityHeartbeat communityHeartbeat;
-    communityHeartbeat.configureFromConfig(mergedConfig, port);
+    const std::string communityOverride = cliOptions.communityExplicit ? cliOptions.community : std::string();
+    communityHeartbeat.configureFromConfig(mergedConfig, port, communityOverride);
 
     spdlog::trace("Loading plugins...");
     py::scoped_interpreter guard{};

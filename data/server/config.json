@@ -12,7 +12,7 @@
     "maxPlayers": 20,
     "defaultPlayerParameters": {
         "speed": 5.0,
-        "turnSpeed": 3.0,
+        "turnSpeed": 2.0,
         "jumpSpeed": 8.0,
         "shotSpeed": 20.0,
         "shotLifetime": 3.0,

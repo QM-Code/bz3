@@ -212,8 +212,9 @@ std::string MainMenuView::findServerBinary() {
 bool MainMenuView::startLocalServer(uint16_t port,
                                     const std::string &worldDir,
                                     bool useDefaultWorld,
-                                    const std::string &dataDir,
                                     const std::string &advertiseHost,
+                                    const std::string &communityUrl,
+                                    const std::string &communityLabel,
                                     const std::string &logLevel,
                                     std::string &error) {
     error.clear();
@@ -234,7 +235,14 @@ bool MainMenuView::startLocalServer(uint16_t port,
     server->useDefaultWorld = useDefaultWorld;
     server->logLevel = logLevel;
     server->advertiseHost = advertiseHost;
-    server->dataDir = dataDir;
+    if (communityLabel == "Local Area Network") {
+        server->communityUrl.clear();
+        server->communityLabel = communityLabel;
+    } else {
+        server->communityUrl = communityUrl;
+        server->communityLabel = communityLabel;
+    }
+    server->dataDir = bz::data::DataRoot().string();
 
     if (!launchLocalServer(*server, error)) {
         return false;
@@ -359,6 +367,10 @@ bool MainMenuView::launchLocalServer(LocalServerProcess &server, std::string &er
             args.push_back("-c");
             args.push_back(server.configPath);
         }
+        if (!server.communityUrl.empty()) {
+            args.push_back("-C");
+            args.push_back(server.communityUrl);
+        }
         if (!server.dataDir.empty()) {
             args.push_back("-d");
             args.push_back(server.dataDir);
@@ -446,13 +458,6 @@ void MainMenuView::drawStartServerPanel(const MessageColors &colors) {
     ImGui::Separator();
     ImGui::Spacing();
 
-    if (serverDataDirBuffer[0] == '\0') {
-        const std::string dataDir = bz::data::ReadStringConfig("DataDir", "");
-        if (!dataDir.empty()) {
-            std::snprintf(serverDataDirBuffer.data(), serverDataDirBuffer.size(), "%s", dataDir.c_str());
-        }
-    }
-
     if (serverAdvertiseHostBuffer[0] == '\0') {
         std::string advertiseHost = bz::data::ReadStringConfig("network.ServerAdvertiseHost", "");
         if (advertiseHost.empty()) {
@@ -463,16 +468,26 @@ void MainMenuView::drawStartServerPanel(const MessageColors &colors) {
         }
     }
 
+    auto formatCommunityLabel = [](const ServerListOption &option) {
+        if (!option.name.empty()) {
+            return option.name;
+        }
+        if (!option.host.empty()) {
+            return option.host;
+        }
+        return std::string("Unnamed community");
+    };
+
     const ImGuiStyle &style = ImGui::GetStyle();
     const float totalWidth = ImGui::GetContentRegionAvail().x;
-    const float portWidth = 135.0f;
+    const float ipWidth = std::max(90.0f, totalWidth * 0.12f);
+    const float portWidth = 120.0f;
+    const float communityWidth = std::max(260.0f, totalWidth * 0.32f);
     const float loggingWidth = 90.0f;
     const float actionWidth = 110.0f;
     const float spacing = style.ItemSpacing.x;
-    const float available = totalWidth - (portWidth + loggingWidth + actionWidth) - (spacing * 6.0f);
-    const float worldWidth = std::max(180.0f, available * 0.38f);
-    const float dataWidth = std::max(180.0f, available * 0.31f);
-    const float ipWidth = std::max(135.0f, available * 0.27f);
+    const float available = totalWidth - (ipWidth + portWidth + communityWidth + loggingWidth + actionWidth) - (spacing * 7.0f);
+    const float worldWidth = std::max(160.0f, available);
 
     static const char *kLogLevels[] = {"trace", "debug", "info", "warn", "err", "critical", "off"};
     constexpr int kLogLevelCount = static_cast<int>(sizeof(kLogLevels) / sizeof(kLogLevels[0]));
@@ -484,8 +499,8 @@ void MainMenuView::drawStartServerPanel(const MessageColors &colors) {
     if (ImGui::BeginTable("NewServerForm", 6, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_BordersOuter)) {
         ImGui::TableSetupColumn("IP Address", ImGuiTableColumnFlags_WidthFixed, ipWidth);
         ImGui::TableSetupColumn("Port", ImGuiTableColumnFlags_WidthFixed, portWidth);
+        ImGui::TableSetupColumn("Community", ImGuiTableColumnFlags_WidthFixed, communityWidth);
         ImGui::TableSetupColumn("World Directory", ImGuiTableColumnFlags_WidthFixed, worldWidth);
-        ImGui::TableSetupColumn("Data Directory", ImGuiTableColumnFlags_WidthFixed, dataWidth);
         ImGui::TableSetupColumn("Logging", ImGuiTableColumnFlags_WidthFixed, loggingWidth);
         ImGui::TableSetupColumn("Action", ImGuiTableColumnFlags_WidthFixed, actionWidth);
         ImGui::TableHeadersRow();
@@ -513,6 +528,31 @@ void MainMenuView::drawStartServerPanel(const MessageColors &colors) {
         }
 
         ImGui::TableSetColumnIndex(2);
+        if (listOptions.empty()) {
+            ImGui::TextDisabled("No communities");
+        } else {
+            if (serverCommunityIndex < 0 || serverCommunityIndex >= static_cast<int>(listOptions.size())) {
+                serverCommunityIndex = 0;
+            }
+            const auto &currentCommunity = listOptions[serverCommunityIndex];
+            const std::string communityLabel = formatCommunityLabel(currentCommunity);
+            if (ImGui::BeginCombo("##ServerCommunity", communityLabel.c_str())) {
+                for (int i = 0; i < static_cast<int>(listOptions.size()); ++i) {
+                    const auto &option = listOptions[i];
+                    const std::string optionLabel = formatCommunityLabel(option);
+                    const bool selected = (i == serverCommunityIndex);
+                    if (ImGui::Selectable(optionLabel.c_str(), selected)) {
+                        serverCommunityIndex = i;
+                    }
+                    if (selected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+        }
+
+        ImGui::TableSetColumnIndex(3);
         ImGui::SetNextItemWidth(-1.0f);
         ImGui::InputText("##WorldDir", serverWorldBuffer.data(), serverWorldBuffer.size());
         ImGui::SameLine();
@@ -556,10 +596,6 @@ void MainMenuView::drawStartServerPanel(const MessageColors &colors) {
             ImGui::EndPopup();
         }
 
-        ImGui::TableSetColumnIndex(3);
-        ImGui::SetNextItemWidth(-1.0f);
-        ImGui::InputText("##DataDir", serverDataDirBuffer.data(), serverDataDirBuffer.size());
-
         ImGui::TableSetColumnIndex(4);
         ImGui::SetNextItemWidth(-1.0f);
         ImGui::Combo("##ServerLogLevel", &serverLogLevelIndex, kLogLevels, kLogLevelCount);
@@ -567,16 +603,22 @@ void MainMenuView::drawStartServerPanel(const MessageColors &colors) {
         ImGui::TableSetColumnIndex(5);
         if (ImGui::Button("Start")) {
             const std::string worldDir = trimCopy(serverWorldBuffer.data());
-            const std::string dataDir = trimCopy(serverDataDirBuffer.data());
             const std::string advertiseHost = trimCopy(serverAdvertiseHostBuffer.data());
             const bool useDefaultWorld = worldDir.empty();
             const std::string logLevel = kLogLevels[serverLogLevelIndex];
+            const std::string communityUrl = (serverCommunityIndex >= 0 && serverCommunityIndex < static_cast<int>(listOptions.size()))
+                ? listOptions[serverCommunityIndex].host
+                : std::string();
+            const std::string communityLabel = (serverCommunityIndex >= 0 && serverCommunityIndex < static_cast<int>(listOptions.size()))
+                ? formatCommunityLabel(listOptions[serverCommunityIndex])
+                : std::string();
             std::string error;
             if (!startLocalServer(static_cast<uint16_t>(serverPortInput),
                                   worldDir,
                                   useDefaultWorld,
-                                  dataDir,
                                   advertiseHost,
+                                  communityUrl,
+                                  communityLabel,
                                   logLevel,
                                   error)) {
                 serverStatusIsError = true;
@@ -611,110 +653,116 @@ void MainMenuView::drawStartServerPanel(const MessageColors &colors) {
             ImGui::TextDisabled("No servers running.");
         } else {
             std::optional<std::size_t> removeIndex;
-        if (ImGui::BeginTable("LocalServerTable", 6, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable, ImVec2(0, -1.0f))) {
-            ImGui::TableSetupColumn("IP Address", ImGuiTableColumnFlags_WidthFixed, 130.0f);
-            ImGui::TableSetupColumn("Port", ImGuiTableColumnFlags_WidthFixed, 80.0f);
-            ImGui::TableSetupColumn("World", ImGuiTableColumnFlags_WidthStretch);
-            ImGui::TableSetupColumn("Logging", ImGuiTableColumnFlags_WidthFixed, 110.0f);
-            ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed, 120.0f);
-            ImGui::TableSetupColumn("Actions", ImGuiTableColumnFlags_WidthFixed, 160.0f);
-            ImGui::TableHeadersRow();
+            if (ImGui::BeginTable("LocalServerTable", 7, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable, ImVec2(0, -1.0f))) {
+                ImGui::TableSetupColumn("Community", ImGuiTableColumnFlags_WidthFixed, 150.0f);
+                ImGui::TableSetupColumn("IP Address", ImGuiTableColumnFlags_WidthFixed, 130.0f);
+                ImGui::TableSetupColumn("Port", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+                ImGui::TableSetupColumn("World", ImGuiTableColumnFlags_WidthStretch);
+                ImGui::TableSetupColumn("Logging", ImGuiTableColumnFlags_WidthFixed, 110.0f);
+                ImGui::TableSetupColumn("Status", ImGuiTableColumnFlags_WidthFixed, 120.0f);
+                ImGui::TableSetupColumn("Actions", ImGuiTableColumnFlags_WidthFixed, 160.0f);
+                ImGui::TableHeadersRow();
 
-            for (std::size_t index = 0; index < localServers.size(); ++index) {
-                auto &server = *localServers[index];
-                ImGui::TableNextRow();
-                const bool rowSelected = (selectedLogServerId == server.id);
-                ImGui::TableSetColumnIndex(0);
-                ImGui::PushID(server.id);
-                const std::string ipLabel = server.advertiseHost.empty() ? "-" : server.advertiseHost;
-                if (ImGui::Selectable(ipLabel.c_str(), rowSelected, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap)) {
-                    selectedLogServerId = server.id;
-                }
+                for (std::size_t index = 0; index < localServers.size(); ++index) {
+                    auto &server = *localServers[index];
+                    ImGui::TableNextRow();
+                    const bool rowSelected = (selectedLogServerId == server.id);
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::PushID(server.id);
+                    const std::string communityLabel = server.communityLabel.empty()
+                        ? (server.communityUrl.empty() ? "-" : server.communityUrl)
+                        : server.communityLabel;
+                    if (ImGui::Selectable(communityLabel.c_str(), rowSelected, ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap)) {
+                        selectedLogServerId = server.id;
+                    }
 
-                ImGui::TableSetColumnIndex(1);
-                ImGui::Text("%u", static_cast<unsigned int>(server.port));
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::TextUnformatted(server.advertiseHost.empty() ? "-" : server.advertiseHost.c_str());
 
-                ImGui::TableSetColumnIndex(2);
-                if (server.useDefaultWorld) {
-                    ImGui::TextUnformatted("Default World");
-                } else {
-                    ImGui::TextUnformatted(server.worldDir.empty() ? "(unset)" : server.worldDir.c_str());
-                }
+                    ImGui::TableSetColumnIndex(2);
+                    ImGui::Text("%u", static_cast<unsigned int>(server.port));
 
-                ImGui::TableSetColumnIndex(3);
-                if (server.running.load()) {
-                    const char *label = server.logLevel.empty() ? "info" : server.logLevel.c_str();
-                    ImGui::TextUnformatted(label);
-                } else {
-                    int logIndex = server.logLevel.empty() ? 2 : -1;
-                    if (!server.logLevel.empty()) {
-                        for (int i = 0; i < kLogLevelCount; ++i) {
-                            if (server.logLevel == kLogLevels[i]) {
-                                logIndex = i;
-                                break;
+                    ImGui::TableSetColumnIndex(3);
+                    if (server.useDefaultWorld) {
+                        ImGui::TextUnformatted("Default World");
+                    } else {
+                        ImGui::TextUnformatted(server.worldDir.empty() ? "(unset)" : server.worldDir.c_str());
+                    }
+
+                    ImGui::TableSetColumnIndex(4);
+                    if (server.running.load()) {
+                        const char *label = server.logLevel.empty() ? "info" : server.logLevel.c_str();
+                        ImGui::TextUnformatted(label);
+                    } else {
+                        int logIndex = server.logLevel.empty() ? 2 : -1;
+                        if (!server.logLevel.empty()) {
+                            for (int i = 0; i < kLogLevelCount; ++i) {
+                                if (server.logLevel == kLogLevels[i]) {
+                                    logIndex = i;
+                                    break;
+                                }
                             }
                         }
-                    }
-                    if (logIndex < 0) {
-                        logIndex = 2;
-                    }
-                    ImGui::SetNextItemWidth(-1.0f);
-                    if (ImGui::Combo("##ServerLogLevelRow", &logIndex, kLogLevels, kLogLevelCount)) {
-                        server.logLevel = kLogLevels[logIndex];
-                    }
-                }
-
-                ImGui::TableSetColumnIndex(4);
-                if (server.running.load()) {
-                    ImGui::TextColored(colors.action, "Running");
-                } else {
-                    std::string status = "Stopped";
-                    if (server.exitStatus != 0) {
-                        status += " (" + formatExitStatus(server.exitStatus) + ")";
-                    }
-                    ImGui::TextColored(colors.notice, "%s", status.c_str());
-                }
-
-                ImGui::TableSetColumnIndex(5);
-                if (server.running.load()) {
-                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.85f, 0.30f, 0.30f, 1.0f));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.90f, 0.38f, 0.38f, 1.0f));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.75f, 0.22f, 0.22f, 1.0f));
-                    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, 1.0f));
-                    if (ImGui::Button("Stop")) {
-                        selectedLogServerId = server.id;
-                        stopLocalServer(index);
-                    }
-                    ImGui::PopStyleVar();
-                    ImGui::PopStyleColor(3);
-                } else {
-                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.30f, 0.70f, 0.35f, 1.0f));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.35f, 0.78f, 0.40f, 1.0f));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.26f, 0.60f, 0.30f, 1.0f));
-                    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, 1.0f));
-                    if (ImGui::Button("Start")) {
-                        selectedLogServerId = server.id;
-                        std::string error;
-                        if (!launchLocalServer(server, error)) {
-                            serverStatusIsError = true;
-                            serverStatusText = error;
-                        } else {
-                            serverStatusIsError = false;
-                            serverStatusText.clear();
+                        if (logIndex < 0) {
+                            logIndex = 2;
+                        }
+                        ImGui::SetNextItemWidth(-1.0f);
+                        if (ImGui::Combo("##ServerLogLevelRow", &logIndex, kLogLevels, kLogLevelCount)) {
+                            server.logLevel = kLogLevels[logIndex];
                         }
                     }
-                    ImGui::PopStyleVar();
-                    ImGui::PopStyleColor(3);
-                    ImGui::SameLine();
-                    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, 1.0f));
-                    if (ImGui::Button("Remove")) {
-                        stopLocalServer(index);
-                        removeIndex = index;
+
+                    ImGui::TableSetColumnIndex(5);
+                    if (server.running.load()) {
+                        ImGui::TextColored(colors.action, "Running");
+                    } else {
+                        std::string status = "Stopped";
+                        if (server.exitStatus != 0) {
+                            status += " (" + formatExitStatus(server.exitStatus) + ")";
+                        }
+                        ImGui::TextColored(colors.notice, "%s", status.c_str());
                     }
-                    ImGui::PopStyleVar();
+
+                    ImGui::TableSetColumnIndex(6);
+                    if (server.running.load()) {
+                        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.85f, 0.30f, 0.30f, 1.0f));
+                        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.90f, 0.38f, 0.38f, 1.0f));
+                        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.75f, 0.22f, 0.22f, 1.0f));
+                        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, 1.0f));
+                        if (ImGui::Button("Stop")) {
+                            selectedLogServerId = server.id;
+                            stopLocalServer(index);
+                        }
+                        ImGui::PopStyleVar();
+                        ImGui::PopStyleColor(3);
+                    } else {
+                        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.30f, 0.70f, 0.35f, 1.0f));
+                        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.35f, 0.78f, 0.40f, 1.0f));
+                        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.26f, 0.60f, 0.30f, 1.0f));
+                        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, 1.0f));
+                        if (ImGui::Button("Start")) {
+                            selectedLogServerId = server.id;
+                            std::string error;
+                            if (!launchLocalServer(server, error)) {
+                                serverStatusIsError = true;
+                                serverStatusText = error;
+                            } else {
+                                serverStatusIsError = false;
+                                serverStatusText.clear();
+                            }
+                        }
+                        ImGui::PopStyleVar();
+                        ImGui::PopStyleColor(3);
+                        ImGui::SameLine();
+                        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, 1.0f));
+                        if (ImGui::Button("Remove")) {
+                            stopLocalServer(index);
+                            removeIndex = index;
+                        }
+                        ImGui::PopStyleVar();
+                    }
+                    ImGui::PopID();
                 }
-                ImGui::PopID();
-            }
 
                 ImGui::EndTable();
             }

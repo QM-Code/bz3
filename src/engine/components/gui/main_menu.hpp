@@ -93,7 +93,12 @@ public:
     void clearNewListInputs();
     std::string getUsername() const;
     std::string getPassword() const;
+    bool isPasswordHash() const;
     void clearPassword();
+    void storeCommunityAuth(const std::string &communityHost,
+                            const std::string &username,
+                            const std::string &passhash,
+                            const std::string &salt);
     void setCommunityStatus(const std::string &text, MessageTone tone);
     bool consumeRefreshRequest();
     void setScanning(bool scanning);
@@ -126,6 +131,9 @@ private:
     void setNestedConfig(nlohmann::json &root, std::initializer_list<const char*> path, nlohmann::json value) const;
     void setNestedConfig(nlohmann::json &root, const std::vector<std::string> &path, nlohmann::json value) const;
     void eraseNestedConfig(nlohmann::json &root, std::initializer_list<const char*> path) const;
+    std::string communityKeyForIndex(int index) const;
+    void refreshCommunityCredentials();
+    void persistCommunityCredentials(bool passwordChanged);
     nlohmann::json themeToJson(const ThemeConfig &theme) const;
     ThemeConfig themeFromJson(const nlohmann::json &themeJson, const ThemeConfig &fallback) const;
     void applyThemeSelection(const std::string &name);
@@ -136,8 +144,9 @@ private:
     bool startLocalServer(uint16_t port,
                           const std::string &worldDir,
                           bool useDefaultWorld,
-                          const std::string &dataDir,
                           const std::string &advertiseHost,
+                          const std::string &communityUrl,
+                          const std::string &communityLabel,
                           const std::string &logLevel,
                           std::string &error);
     bool launchLocalServer(LocalServerProcess &server, std::string &error);
@@ -176,6 +185,8 @@ private:
     bool listStatusIsError = false;
     std::string communityStatusText;
     MessageTone communityStatusTone = MessageTone::Notice;
+    int lastCredentialsListIndex = -1;
+    bool passwordIsHash = false;
 
     ThumbnailCache thumbnails;
 
@@ -200,6 +211,8 @@ private:
         bool useDefaultWorld = false;
         std::string logLevel;
         std::string advertiseHost;
+        std::string communityUrl;
+        std::string communityLabel;
         std::string dataDir;
         std::string configPath;
         int pid = -1;
@@ -220,9 +233,9 @@ private:
     bool serverStatusIsError = false;
     std::array<char, 64> serverAdvertiseHostBuffer{};
     std::array<char, 128> serverWorldBuffer{};
-    std::array<char, 256> serverDataDirBuffer{};
     int serverPortInput = 11899;
     int serverLogLevelIndex = 2;
+    int serverCommunityIndex = -1;
 };
 
 } // namespace gui
