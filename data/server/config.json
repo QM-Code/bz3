@@ -1,7 +1,7 @@
 {
     "defaultWorld" : "server/worlds/Default",
     "network" : {
-        "ServerAdvertiseHost": "192.168.1.6"
+        "ServerAdvertiseHost": "192.168.1.14"
     },
     "community": {
         "server" : "http://192.168.1.6:8080/",
@@ -21,9 +21,9 @@
         "backwardSpeedMultiplier": 0.8,
         "leftTurnSpeedMultiplier": 1,
         "rightTurnSpeedMultiplier": 1,
-        "x_extent": 1.3,
-        "y_extent": 2.0,
-        "z_extent": 2.0
+        "x_extent": 2,
+        "y_extent": 1.5,
+        "z_extent": 3.4
     },
     "plugins" : [
         {

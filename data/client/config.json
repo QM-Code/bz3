@@ -10,7 +10,13 @@
         "communities": [
         ]
     },
-    "gui": {},
+    "gui": {
+        "radar": {
+            "shotRadius": 0.6,
+            "playerRadius": 1,
+            "clientRadius": 1
+        }
+    },
     "keybindings": {
         "fire": ["ENTER", "LEFT_MOUSE"],
         "dropFlag": ["SPACE", "MIDDLE_MOUSE"],

@@ -30,6 +30,9 @@ private:
     glm::vec3 lastPosition;
     glm::quat lastRotation;
 
+    render_id renderId;
+    glm::vec3 muzzleOffset{0.0f, 1.18f, 2.22f};
+
 public:
     Player(Game &game,
            client_id,

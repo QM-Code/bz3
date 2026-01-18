@@ -5,23 +5,19 @@
 #include <glm/glm.hpp>
 
 void Client::syncRenderFromState() {
-    game.engine.render->setPosition(renderId, state.position + glm::vec3(0.0f, -0.8f, 0.0f));
-    game.engine.render->setRotation(renderId, state.rotation * glm::angleAxis(glm::pi<float>(), glm::vec3(0, 1, 0)));
+    game.engine.render->setPosition(renderId, state.position);
+    game.engine.render->setRotation(renderId, state.rotation);
     game.engine.render->setVisible(renderId, state.alive);
 }
 
 Client::Client(Game &game, client_id id, const PlayerState &initialState) : Actor(game, id) {
-    renderId = game.engine.render->create(game.world->getAssetPath("playerModel").string(), 1.5f);
+    renderId = game.engine.render->create(game.world->getAssetPath("playerModel").string(), false);
+    game.engine.render->setRadarCircleGraphic(renderId, 1.2f);
 
     setState(initialState);
     justSpawned = state.alive;
     lastSpawnPosition = state.position;
     spdlog::trace("Client::Client: Initialized location for client id {}", id);
-
-    game.engine.render->setPosition(renderId, state.position + glm::vec3(0.0f, -0.9f, 0.0f));
-    game.engine.render->setRotation(renderId, state.rotation * glm::angleAxis(glm::pi<float>(), glm::vec3(0, 1, 0)));
-    game.engine.render->setScale(renderId, glm::vec3(0.5f, 0.5f, 0.5f));
-    game.engine.render->setVisible(renderId, state.alive);
 }
 
 Client::~Client() {
@@ -37,7 +33,6 @@ void Client::update(TimeUtils::duration /*deltaTime*/) {
 
 void Client::setState(const PlayerState &newState) {
     state = newState;
-    syncRenderFromState();
 }
 
 void Client::die() {

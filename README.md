@@ -103,12 +103,30 @@ Other
 
 ## TODO
 * Switch to Jolt physics controller instead of bullet
-* Shooting self multiple times
-* Refactor game to create on join
-* Refactor Player & Client to both inherit from a base class
-* Shots are shooting inside buildings
+* Shots are shooting inside buildings (this is because of muzzle shot position)
 * Muzzle flash
-* Fizzle out effect
+* Shot fizzle out effect
+* Explosion effect
+* Custom tank model
+* Make current player and FOV appear on radar
+* Load SVG as on-radar graphic
+* Tank treads when moving
+* Improve radar shader
+* API Event handler
+* Better sounds
+* Switch to Ogre rendering engine
+
+## Events
+* Tick
+* Chat
+* PlayerJoin
+* PlayerLeave
+* PlayerSpawn
+* PlayerDie
+* PlayerCreateShot
+* RemoveShot
+* FlagGrab
+* FlagDrop
 
 ## License
 

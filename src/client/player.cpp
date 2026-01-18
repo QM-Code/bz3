@@ -35,6 +35,9 @@ Player::Player(Game &game,
     lastPosition = glm::vec3(0.0f);
     lastRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
+    renderId = game.engine.render->create();
+    game.engine.render->setRadarCircleGraphic(renderId, 1.2f);
+
 
     // Initialize controller extents from parameters once params are set
     setExtents(glm::vec3(
@@ -58,6 +61,8 @@ void Player::setExtents(const glm::vec3& extents) {
 void Player::earlyUpdate() {
     bool wasGrounded = grounded;
     grounded = physics->isGrounded();
+
+    game.engine.render->setPosition(renderId, state.position);
 
     if (state.alive) {
         game.engine.gui->displayDeathScreen(false);
@@ -96,7 +101,8 @@ void Player::earlyUpdate() {
 
         if (game.getFocusState() == FOCUS_STATE_GAME) {
             if (game.engine.input->getInputState().fire) {
-                glm::vec3 shotPosition = state.position + getForwardVector() * 2.0f;
+                glm::vec3 shotPosition = state.position + getForwardVector() * muzzleOffset.z +
+                                          glm::vec3(0.0f, muzzleOffset.y, 0.0f);
                 glm::vec3 shotVelocity = getForwardVector() * getParameter("shotSpeed") + getVelocity();
 
                 auto shot = std::make_unique<Shot>(game, shotPosition, shotVelocity);
@@ -119,10 +125,11 @@ void Player::earlyUpdate() {
     }
 }
 
-void Player::lateUpdate() {
+    void Player::lateUpdate() {
     setLocation(physics->getPosition(), physics->getRotation(), physics->getVelocity());
-    game.engine.render->setCameraPosition(state.position);
+    game.engine.render->setCameraPosition(state.position + glm::vec3(0.0f, muzzleOffset.y, 0.0f));
     game.engine.render->setCameraRotation(state.rotation);
+    game.engine.render->setRadarFOVLinesAngle(CAMERA_FOV);
 
     if (state.alive) {
         if (glm::distance(lastPosition, state.position) > POSITION_UPDATE_THRESHOLD ||

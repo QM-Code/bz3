@@ -4,12 +4,15 @@
 #include "engine/user_pointer.hpp"
 #include <threepp/materials/ShaderMaterial.hpp>
 #include <threepp/materials/MeshBasicMaterial.hpp>
+#include <threepp/materials/LineBasicMaterial.hpp>
 #include <threepp/geometries/CircleGeometry.hpp>
+#include <threepp/geometries/BoxGeometry.hpp>
 #include <fstream>
 #include <iterator>
 #include <filesystem>
 #include <array>
 #include <algorithm>
+#include <vector>
 #include <glm/gtc/quaternion.hpp>
 
 namespace {
@@ -48,7 +51,8 @@ Render::Render(GLFWwindow *window) :
 
     // Radar camera + offscreen render target
     {
-        constexpr unsigned int radarTexSize = 512;
+        // Supersample radar at 2x to smooth edges (no MSAA support in this threepp build)
+        constexpr unsigned int radarTexSize = 512 * 2;
         constexpr float radarOrthoHalfSize = 40.0f;
         constexpr float radarNear = 0.1f;
         constexpr float radarFar = 500.0f;
@@ -107,6 +111,26 @@ Render::Render(GLFWwindow *window) :
     radarMaterial->wireframe = false;
     radarMaterial->uniforms.insert_or_assign("playerY", threepp::Uniform(threepp::UniformValue{0.0f}));
     radarMaterial->uniforms.insert_or_assign("jumpHeight", threepp::Uniform(threepp::UniformValue{5.0f}));
+
+    // Radar FOV beams (always present)
+    {
+        auto geom = threepp::BoxGeometry::create(radarFOVBeamWidth, 0.2f, radarFOVBeamLength);
+        auto mat = threepp::MeshBasicMaterial::create();
+        mat->color = threepp::Color(0xffffff);
+        mat->depthTest = false;
+        mat->depthWrite = false;
+
+        radarFOVLeft = threepp::Mesh::create(geom, mat);
+        radarFOVRight = threepp::Mesh::create(geom, mat);
+
+        radarFOVLeft->renderOrder = 10000;
+        radarFOVRight->renderOrder = 10000;
+
+        radarScene->add(radarFOVLeft);
+        radarScene->add(radarFOVRight);
+
+        setRadarFOVLinesAngle(CAMERA_FOV);
+    }
 }
 
 Render::~Render() {
@@ -172,47 +196,36 @@ void Render::update() {
     renderer.render(*scene, *camera);
 }
 
-render_id Render::create(std::string modelPath, float radius) {
-    spdlog::trace("Render::create: Loading model from path {}", modelPath);
-
+render_id Render::create() {
     // Load model and add to scene
     static render_id nextId = 1;
     render_id id = nextId++;
+    return id;
+}
 
+render_id Render::create(std::string modelPath, bool addToRadar) {
+    render_id id = create();
+    setModel(id, modelPath, addToRadar);
+    spdlog::trace("Render::create: Created object with render_id {}", id);
+    return id;
+}
+
+void Render::setModel(render_id id, const std::filesystem::path& modelPath, bool addToRadar) {
     threepp::AssimpLoader loader;
+    const auto modelPathStr = modelPath.string();
 
     try {
         auto model = loader.load(modelPath);
-        spdlog::trace("Render::create: Model loaded successfully from path {}", modelPath);
+        spdlog::trace("Render::create: Model loaded successfully from path {}", modelPathStr);
         model->traverseType<threepp::Mesh>([&](threepp::Mesh& child) {
             child.castShadow = true;
             child.receiveShadow = true;
         });
         scene->add(model);
-        spdlog::trace("Render::create: Model added to scene from path {}", modelPath);
+        spdlog::trace("Render::create: Model added to scene from path {}", modelPathStr);
         objects[id] = model;
 
-        if (radius > 0.0f) {
-            // Only add a circle overlay to the radar (no model clone).
-            auto circleGeom = threepp::CircleGeometry::create(radius, 64);
-            auto circleMat = threepp::MeshBasicMaterial::create();
-            circleMat->color = threepp::Color(0xffffff);
-            circleMat->wireframe = true;
-            circleMat->transparent = true;
-            circleMat->opacity = 1.0f;
-            circleMat->depthTest = false;
-            circleMat->depthWrite = false;
-
-            auto circleMesh = threepp::Mesh::create(circleGeom, circleMat);
-            circleMesh->rotation.x = -1.57079632679f; // -90deg to lay flat in XZ
-            circleMesh->renderOrder = 10000; // ensure on top
-
-            auto circleGroup = threepp::Group::create();
-            circleGroup->add(circleMesh);
-
-            radarScene->add(circleGroup);
-            radarObjects[id] = circleGroup;
-        } else {
+        if (addToRadar) {
             // Also add a clone of this model to the radar scene.
             // (A threepp Object3D can only have one parent.)
             auto radarModel = model->clone<threepp::Group>(true);
@@ -236,12 +249,68 @@ render_id Render::create(std::string modelPath, float radius) {
             radarObjects[id] = radarModel;
         }
     } catch (...) {
-        spdlog::error("Render::create: Failed to load model at path {}", modelPath);
+        spdlog::error("Render::create: Failed to load model at path {}", modelPathStr);
+    }
+}
+
+void Render::setRadarCircleGraphic(render_id id, float radius) {
+    // Only add a circle overlay to the radar (no model clone).
+    auto circleGeom = threepp::CircleGeometry::create(radius, 64);
+    auto circleMat = threepp::MeshBasicMaterial::create();
+    circleMat->color = threepp::Color(0xffffff);
+    circleMat->wireframe = true;
+    circleMat->transparent = true;
+    circleMat->opacity = 1.0f;
+    circleMat->depthTest = false;
+    circleMat->depthWrite = false;
+
+    auto circleMesh = threepp::Mesh::create(circleGeom, circleMat);
+    circleMesh->rotation.x = -1.57079632679f; // -90deg to lay flat in XZ
+    circleMesh->renderOrder = 10000; // ensure on top
+
+    auto circleGroup = threepp::Group::create();
+    circleGroup->add(circleMesh);
+
+    radarScene->add(circleGroup);
+    radarObjects[id] = circleGroup;
+}
+
+void Render::setRadarFOVLinesAngle(float fovDegrees) {
+    // Use current framebuffer aspect so lines match the on-screen view
+    int fbWidth = 1, fbHeight = 1;
+    if (window) {
+        glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+        if (fbHeight == 0) fbHeight = 1;
+    }
+    const float aspect = static_cast<float>(fbWidth) / static_cast<float>(fbHeight);
+
+    const float length = 80.0f;
+    const float halfVertRad = glm::radians(fovDegrees * 0.5f);
+    const float halfHorizRad = std::atan(std::tan(halfVertRad) * aspect);
+
+    radarFOVBeamLength = length;
+
+    if (radarFOVLeft) {
+        const glm::quat yaw = glm::angleAxis(halfHorizRad, glm::vec3(0, 1, 0));
+        const glm::quat combined = radarAnchorRotation * yaw;
+        const glm::vec3 offset = combined * glm::vec3(0.0f, 0.0f, -radarFOVBeamLength * 0.5f);
+
+        radarFOVLeft->quaternion.set(combined.x, combined.y, combined.z, combined.w);
+        radarFOVLeft->position.set(radarAnchorPosition.x + offset.x,
+                                   radarAnchorPosition.y + offset.y,
+                                   radarAnchorPosition.z + offset.z);
     }
 
-    spdlog::trace("Render::create: Created object with render_id {}", id);
-    
-    return id;
+    if (radarFOVRight) {
+        const glm::quat yaw = glm::angleAxis(-halfHorizRad, glm::vec3(0, 1, 0));
+        const glm::quat combined = radarAnchorRotation * yaw;
+        const glm::vec3 offset = combined * glm::vec3(0.0f, 0.0f, -radarFOVBeamLength * 0.5f);
+
+        radarFOVRight->quaternion.set(combined.x, combined.y, combined.z, combined.w);
+        radarFOVRight->position.set(radarAnchorPosition.x + offset.x,
+                                    radarAnchorPosition.y + offset.y,
+                                    radarAnchorPosition.z + offset.z);
+    }
 }
 
 void Render::destroy(render_id id) {
@@ -261,83 +330,66 @@ void Render::destroy(render_id id) {
 }
 
 void Render::setPosition(render_id id, const glm::vec3 &position) {
+    auto rit = radarObjects.find(id);
+    if (rit != radarObjects.end()) {
+        rit->second->position.set(position.x, position.y, position.z);
+    }
+
     auto it = objects.find(id);
     if (it != objects.end()) {
         it->second->position.set(position.x, position.y, position.z);
-
-        auto rit = radarObjects.find(id);
-        if (rit != radarObjects.end()) {
-            rit->second->position.set(position.x, position.y, position.z);
-        }
-    } else {
-        spdlog::error("Render::setPosition: Invalid render_id {}", id);
     }
 }
 
 void Render::setRotation(render_id id, const glm::quat &rotation) {
+    auto rit = radarObjects.find(id);
+    if (rit != radarObjects.end()) {
+        rit->second->quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
+    }
+
     auto it = objects.find(id);
     if (it != objects.end()) {
         it->second->quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
-
-        auto rit = radarObjects.find(id);
-        if (rit != radarObjects.end()) {
-            rit->second->quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w);
-        }
-    } else {
-        spdlog::error("Render::setRotation: Invalid render_id {}", id);
     }
 }
 
 void Render::setScale(render_id id, const glm::vec3 &scale) {
+    auto rit = radarObjects.find(id);
+    if (rit != radarObjects.end()) {
+        rit->second->scale.set(scale.x, scale.y, scale.z);
+    }
+
     auto it = objects.find(id);
     if (it != objects.end()) {
         it->second->scale.set(scale.x, scale.y, scale.z);
-
-        auto rit = radarObjects.find(id);
-        if (rit != radarObjects.end()) {
-            rit->second->scale.set(scale.x, scale.y, scale.z);
-        }
-    } else {
-        spdlog::error("Render::setScale: Invalid render_id {}", id);
     }
 }
 
 void Render::setVisible(render_id id, bool visible) {
+    auto rit = radarObjects.find(id);
+    if (rit != radarObjects.end()) {
+        rit->second->visible = visible;
+    }
+
     auto it = objects.find(id);
     if (it != objects.end()) {
         it->second->visible = visible;
-
-        auto rit = radarObjects.find(id);
-        if (rit != radarObjects.end()) {
-            rit->second->visible = visible;
-        }
-    } else {
-        spdlog::error("Render::setVisible: Invalid render_id {}", id);
     }
 }
 
 void Render::setTransparency(render_id id, bool transparency) {
     auto it = objects.find(id);
     if (it != objects.end()) {
-        // First get the Object3D
         auto *object = it->second.get();
         object->traverse([](threepp::Object3D& obj) {
-            // Then traverse to find all Meshes and set their material transparencymodel->traverse([](threepp::Object3D& obj) {
             if (auto mesh = obj.as<threepp::Mesh>()) {
                 for (auto& mat : mesh->materials()) {
                     mat->transparent = true;
-                    if (true) {
-                        mat->alphaTest = 0.01f; // important
-                        mat->depthWrite = false; // prevents sorting artifacts
-                    } else {
-                        mat->alphaTest = 0.0f;
-                        mat->depthWrite = true;
-                    }
+                    mat->alphaTest = 0.01f;
+                    mat->depthWrite = false;
                 }
             }
         });
-    } else {
-        spdlog::error("Render::setTransparency: Invalid render_id {}", id);
     }
 }
 

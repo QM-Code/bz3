@@ -43,7 +43,7 @@ void Shot::update(TimeUtils::duration deltaTime) {
 }
 
 bool Shot::hits(Client *client) {
-    if (glm::distance(position, client->getPosition()) < 0.5f) {
+    if (glm::distance(position, client->getPosition() + glm::vec3(0.0f, 1.0f, 0.0f)) < 1.0f) {
         return true;
     } else {
         return false;

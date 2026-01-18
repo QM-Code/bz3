@@ -2,6 +2,8 @@
 #include <threepp/threepp.hpp>
 #include <threepp/cameras/OrthographicCamera.hpp>
 #include <threepp/renderers/GLRenderTarget.hpp>
+#include <threepp/objects/Line.hpp>
+#include <threepp/objects/Mesh.hpp>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -36,6 +38,12 @@ private:
     std::shared_ptr<threepp::ShaderMaterial> radarMaterial;
     std::function<std::filesystem::path(const std::string&)> assetPathResolver;
 
+    // Optional radar-only helper visuals
+    std::shared_ptr<threepp::Mesh> radarFOVLeft;
+    std::shared_ptr<threepp::Mesh> radarFOVRight;
+    float radarFOVBeamLength = 80.0f;
+    float radarFOVBeamWidth = 0.3f;
+
     void ensureRadarMaterialLoaded();
 
     // Radar camera rendering
@@ -55,7 +63,12 @@ private:
     void resizeCallback(int width, int height);
 
 public:
-    render_id create(std::string modelPath, float radius = 0.0f);
+    render_id create();
+    render_id create(std::string modelPath, bool addToRadar = true);
+    void setModel(render_id id, const std::filesystem::path& modelPath, bool addToRadar = true);
+    void setRadarCircleGraphic(render_id id, float radius = 1.0f);
+    void setRadarFOVLinesAngle(float fovDegrees);
+
     void destroy(render_id id);
     void setPosition(render_id id, const glm::vec3 &position);
     void setRotation(render_id id, const glm::quat &rotation);
