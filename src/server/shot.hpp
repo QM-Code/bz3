@@ -27,4 +27,5 @@ public:
     bool hits(Client *client);
     bool isExpired() const;
     client_id getOwnerId() const { return ownerId; }
+    shot_id getGlobalId() const { return globalId; }
 };

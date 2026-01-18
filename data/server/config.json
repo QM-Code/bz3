@@ -32,6 +32,10 @@
                 "enableAdminCommands" : true
             },
             "enabled" : true
+        },
+        {
+            "name" : "cheat",
+            "enabled" : true
         }
     ]
 

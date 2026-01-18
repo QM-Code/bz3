@@ -2,6 +2,7 @@
 #include "spdlog/spdlog.h"
 #include <algorithm>
 #include <utility>
+#include "plugin.hpp"
 
 void Game::addClient(std::unique_ptr<Client> client) {
     clients.push_back(std::move(client));
@@ -110,10 +111,34 @@ void Game::update(TimeUtils::duration deltaTime) {
     for (const auto &disconnMsg : engine.network->consumeMessages<ClientMsg_PlayerLeave>()) {
         spdlog::info("Game::update: Client with id {} disconnected", disconnMsg.clientId);
         removeClient(disconnMsg.clientId);
+
+        Event_PlayerLeave event;
+        event.playerId = disconnMsg.clientId;
+        g_triggerPluginEvent<Event_PlayerLeave>(EventType_PlayerLeave, event);
     }
 
     for (const auto &chatMsg : engine.network->consumeMessages<ClientMsg_Chat>()) {
         chat->handleMessage(chatMsg);
+
+        Event_Chat event;
+        event.fromId = chatMsg.clientId;
+        event.toId = chatMsg.toId;
+        event.message = chatMsg.text;
+        bool handled = g_triggerPluginEvent<Event_Chat>(EventType_Chat, event);
+        if (handled) {
+            return;
+        }
+
+        ServerMsg_Chat serverChatMsg;
+        serverChatMsg.fromId = chatMsg.clientId;
+        serverChatMsg.toId = chatMsg.toId;
+        serverChatMsg.text = chatMsg.text;
+
+        if (chatMsg.toId == BROADCAST_CLIENT_ID) {
+            engine.network->sendExcept<ServerMsg_Chat>(chatMsg.clientId, &serverChatMsg);
+        } else {
+            engine.network->send<ServerMsg_Chat>(chatMsg.toId, &serverChatMsg);
+        }
     }
 
     for (const auto &locMsg : engine.network->consumeMessages<ClientMsg_PlayerLocation>()) {
@@ -131,17 +156,33 @@ void Game::update(TimeUtils::duration deltaTime) {
             continue;
         }
 
+        Event_PlayerSpawn event;
+        event.playerId = spawnMsg.clientId;
+        bool handled = g_triggerPluginEvent<Event_PlayerSpawn>(EventType_PlayerSpawn, event);
+        if (handled) {
+            continue;
+        }
+
         client->trySpawn(world->getSpawnLocation());
     }
 
     for (const auto &shotMsg : engine.network->consumeMessages<ClientMsg_CreateShot>()) {
-        shots.push_back(std::make_unique<Shot>(
+        shot_id globalShotId = 0;
+
+        // Make the shot here before pushing it (using unique pointer)
+        auto shot = std::make_unique<Shot>(
             *this,
             shotMsg.clientId,
             shotMsg.localShotId,
             shotMsg.position,
             shotMsg.velocity
-        ));
+        );
+        globalShotId = shot->getGlobalId();
+        shots.push_back(std::move(shot));
+
+        Event_CreateShot event;
+        event.shotId = globalShotId;
+        g_triggerPluginEvent<Event_CreateShot>(EventType_CreateShot, event);
     }
 
     for (auto it = shots.begin(); it != shots.end(); ) {
@@ -167,8 +208,16 @@ void Game::update(TimeUtils::duration deltaTime) {
                         }
                     }
 
-                    client->setScore(client->getScore() - 1);
+                    Event_PlayerDie event;
+                    event.victimPlayerId = victimId;
+                    event.shotId = shot->getGlobalId();
+                    bool handled = g_triggerPluginEvent<Event_PlayerDie>(EventType_PlayerDie, event);
 
+                    if (handled) {
+                        break;
+                    }
+
+                    client->setScore(client->getScore() - 1);
                     client->die();
                     hit = true;
                     break;

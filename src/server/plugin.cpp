@@ -7,9 +7,11 @@
 #include <pybind11/embed.h>
 #include <filesystem>
 
+
+
 extern Game* g_game;
 extern ServerEngine* g_engine;
-std::map<ClientMsg_Type, std::vector<pybind11::function>> g_pluginCallbacks;
+std::map<EventType, std::vector<pybind11::function>> g_pluginCallbacks;
 namespace {
 std::vector<std::string> g_loadedPlugins;
 }
@@ -105,7 +107,7 @@ const std::vector<std::string> &PluginAPI::getLoadedPluginScripts() {
     return g_loadedPlugins;
 }
 
-void PluginAPI::registerCallback(ClientMsg_Type type, pybind11::function func) {
+void PluginAPI::registerCallback(EventType type, pybind11::function func) {
     if (g_pluginCallbacks.find(type) == g_pluginCallbacks.end()) {
         g_pluginCallbacks[type] = std::vector<pybind11::function>();
     }
@@ -187,10 +189,14 @@ std::optional<std::string> PluginAPI::getPlayerIP(client_id id) {
 PYBIND11_EMBEDDED_MODULE(bzapi, m) {
     m.doc() = "Plugin API for BZ OpenGL server plugins";
 
-    pybind11::enum_<ClientMsg_Type>(m, "event_type")
-        .value("CHAT", ClientMsg_Type::ClientMsg_Type_CHAT)
-        .value("PLAYER_JOIN", ClientMsg_Type::ClientMsg_Type_PLAYER_JOIN)
-        .value("PLAYER_LEAVE", ClientMsg_Type::ClientMsg_Type_PLAYER_LEAVE)
+    // Register the enum
+    pybind11::enum_<EventType>(m, "EventType")
+        .value("PLAYER_JOIN", EventType_PlayerJoin)
+        .value("PLAYER_LEAVE", EventType_PlayerLeave)
+        .value("PLAYER_SPAWN", EventType_PlayerSpawn)
+        .value("PLAYER_DIE", EventType_PlayerDie)
+        .value("CREATE_SHOT", EventType_CreateShot)
+        .value("CHAT", EventType_Chat)
         .export_values();
 
     // Callback registration function
