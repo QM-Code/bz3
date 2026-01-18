@@ -3,13 +3,15 @@
 from enum import IntEnum
 from typing import Callable
 
-class event_type(IntEnum):
-    CHAT = 0
-    CONNECTION = 1
-    DISCONNECTION = 2
-    DEATH = 3
+class EventType(IntEnum):
+    PLAYER_JOIN = 1
+    PLAYER_LEAVE = 2
+    PLAYER_SPAWN = 3
+    PLAYER_DIE = 4
+    CREATE_SHOT = 5
+    CHAT = 6
 
-def register_callback(type: event_type, callback: Callable) -> None:
+def register_callback(type: EventType, callback: Callable) -> None:
     """Register a callback for a specific event type"""
     ...
 
