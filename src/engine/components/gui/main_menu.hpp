@@ -93,7 +93,7 @@ public:
     void clearNewListInputs();
     std::string getUsername() const;
     std::string getPassword() const;
-    bool isPasswordHash() const;
+    std::string getStoredPasswordHash() const;
     void clearPassword();
     void storeCommunityAuth(const std::string &communityHost,
                             const std::string &username,
@@ -186,7 +186,7 @@ private:
     std::string communityStatusText;
     MessageTone communityStatusTone = MessageTone::Notice;
     int lastCredentialsListIndex = -1;
-    bool passwordIsHash = false;
+    std::string storedPasswordHash;
 
     ThumbnailCache thumbnails;
 

@@ -1,0 +1,37 @@
+We are going to work on the GUI/HUD part of the code; in particular, the MainMenu and its associated panels. This file exists to help you find the relevant files and see the big picture of the code you will be working with. Please read it and prepare yourself accordingly.
+
+Where to start
+- Main wrapper: `src/engine/components/gui/main_menu.hpp` and `main_menu.cpp`.
+- Panels live in `src/engine/components/gui/panels/`:
+  - `community_browser_panel.cpp`
+  - `start_server_panel.cpp`
+  - `themes_panel.cpp`
+  - `settings_panel.cpp`, `documentation_panel.cpp` (placeholders)
+- The MainMenu wrapper renders the top header and tabs, then delegates each panel’s draw.
+
+Big picture flow
+- `GUI::update()` calls `mainMenuView.draw(...)` and handles font reload requests.
+- MainMenu is the entry UI screen; it orchestrates state shared across panels (e.g., list options, auth inputs, log output).
+- Community panel handles server list selection, join flow, and user identity input.
+- Start Server panel manages local `bz3-server` processes and log streaming.
+- Themes panel persists user theme overrides to the user config.
+
+Key integration points
+- Community panel and Start Server panel share the community list (`listOptions`) so the server launcher can pick a community to send heartbeats to.
+- Community auth flow is in `client/server/community_browser_controller.cpp` and uses the UI state from `MainMenuView`.
+- Thumbnail loading is in `src/engine/components/gui/thumbnail_cache.hpp/.cpp`.
+- Server heartbeat override uses `-C/--community` (see `server/community_heartbeat.cpp`).
+
+If you need to change behavior, check these first
+- `engine/components/gui/main_menu.hpp/.cpp` for shared state and helper methods.
+- `engine/components/gui/panels/community_browser_panel.cpp` for UI/UX flow and join triggers.
+- `engine/components/gui/panels/start_server_panel.cpp` for local server management and logs.
+- `client/server/community_browser_controller.cpp` for auth, join, and server-list logic.
+
+Guardrails
+- Do not store plaintext passwords. Password hashes are used for auth when needed.
+- LAN mode should never use passwords.
+- Keep UI responsive; background work stays off the UI thread.
+
+Goal for the next session
+- Use this map to quickly locate and modify the relevant panel or shared logic, without re-deriving the UI structure.

@@ -329,9 +329,9 @@ void MainMenuView::refreshCommunityCredentials() {
         return;
     }
     lastCredentialsListIndex = listSelectedIndex;
-    passwordIsHash = false;
     usernameBuffer.fill(0);
     passwordBuffer.fill(0);
+    storedPasswordHash.clear();
 
     const std::string key = communityKeyForIndex(listSelectedIndex);
     if (key.empty()) {
@@ -363,8 +363,7 @@ void MainMenuView::refreshCommunityCredentials() {
         if (auto passIt = entry.find("passwordHash"); passIt != entry.end() && passIt->is_string()) {
             const std::string passhash = passIt->get<std::string>();
             if (!passhash.empty()) {
-                std::snprintf(passwordBuffer.data(), passwordBuffer.size(), "%s", passhash.c_str());
-                passwordIsHash = true;
+                storedPasswordHash = passhash;
             }
         }
     }
@@ -389,8 +388,8 @@ void MainMenuView::persistCommunityCredentials(bool passwordChanged) {
         if (key == "LAN") {
             eraseNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "passwordHash"});
             eraseNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "salt"});
-        } else if (passwordIsHash && !trimCopy(passwordBuffer.data()).empty()) {
-            setNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "passwordHash"}, trimCopy(passwordBuffer.data()));
+        } else if (!storedPasswordHash.empty()) {
+            setNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "passwordHash"}, storedPasswordHash);
         } else if (passwordChanged) {
             eraseNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "passwordHash"});
         }
@@ -433,8 +432,7 @@ void MainMenuView::storeCommunityAuth(const std::string &communityHost,
     if (activeKey == key) {
         std::snprintf(usernameBuffer.data(), usernameBuffer.size(), "%s", username.c_str());
         if (!passhash.empty()) {
-            std::snprintf(passwordBuffer.data(), passwordBuffer.size(), "%s", passhash.c_str());
-            passwordIsHash = true;
+            storedPasswordHash = passhash;
         }
     }
 }
@@ -524,13 +522,12 @@ std::string MainMenuView::getPassword() const {
     return std::string(passwordBuffer.data());
 }
 
-bool MainMenuView::isPasswordHash() const {
-    return passwordIsHash;
+std::string MainMenuView::getStoredPasswordHash() const {
+    return storedPasswordHash;
 }
 
 void MainMenuView::clearPassword() {
     passwordBuffer.fill(0);
-    passwordIsHash = false;
 }
 
 bool MainMenuView::consumeRefreshRequest() {

@@ -267,6 +267,10 @@ void MainMenuView::drawCommunityPanel(const MessageColors &messageColors) {
         ImGuiInputTextFlags_EnterReturnsTrue);
     joinFromIdentity |= usernameEdited;
     usernameChanged |= usernameEdited;
+    if (usernameEdited) {
+        storedPasswordHash.clear();
+        passwordChanged = true;
+    }
 
     if (!isLanCommunity) {
         ImGui::SameLine(0.0f, labelSpacing);
@@ -274,14 +278,16 @@ void MainMenuView::drawCommunityPanel(const MessageColors &messageColors) {
         ImGui::TextUnformatted("Password");
         ImGui::SameLine();
         ImGui::SetNextItemWidth(inputWidth);
-        const bool passwordEdited = ImGui::InputText(
+        const char *passwordHint = storedPasswordHash.empty() ? "" : "stored";
+        const bool passwordEdited = ImGui::InputTextWithHint(
             "##Password",
+            passwordHint,
             passwordBuffer.data(),
             passwordBuffer.size(),
             ImGuiInputTextFlags_Password | ImGuiInputTextFlags_EnterReturnsTrue);
         joinFromIdentity |= passwordEdited;
         if (passwordEdited) {
-            passwordIsHash = false;
+            storedPasswordHash.clear();
             passwordChanged = true;
         }
     }

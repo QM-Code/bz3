@@ -479,7 +479,7 @@ void CommunityBrowserController::handleJoinSelection(const gui::CommunityBrowser
     }
 
     std::string password = browser.getPassword();
-    const bool passwordIsHash = browser.isPasswordHash();
+    const std::string storedHash = browser.getStoredPasswordHash();
     std::string communityHost = resolveCommunityHost(selection);
 
     pendingJoin.reset();
@@ -489,20 +489,20 @@ void CommunityBrowserController::handleJoinSelection(const gui::CommunityBrowser
         return;
     }
 
+    if (password.empty() && !storedHash.empty()) {
+        spdlog::info("Authenticating '{}' on community {} (stored hash)", username, communityHost);
+        browser.setStatus("Authenticating...", false);
+        browser.storeCommunityAuth(communityHost, username, storedHash, std::string{});
+        pendingJoin = PendingJoin{selection, communityHost, username, std::string{}, false, false, true};
+        authClient.requestAuth(communityHost, username, storedHash, selection.worldName);
+        return;
+    }
+
     if (password.empty()) {
         spdlog::info("Checking username '{}' on community {}", username, communityHost);
         browser.setStatus("Checking username availability...", false);
         pendingJoin = PendingJoin{selection, communityHost, username, std::string{}, false, false, false};
         authClient.requestUserRegistered(communityHost, username);
-        return;
-    }
-
-    if (passwordIsHash) {
-        spdlog::info("Authenticating '{}' on community {} (stored hash)", username, communityHost);
-        browser.setStatus("Authenticating...", false);
-        browser.storeCommunityAuth(communityHost, username, password, std::string{});
-        pendingJoin = PendingJoin{selection, communityHost, username, std::string{}, false, false, true};
-        authClient.requestAuth(communityHost, username, password, selection.worldName);
         return;
     }
 
