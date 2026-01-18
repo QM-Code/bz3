@@ -22,14 +22,38 @@
 
 #define MIN_FRAME_HZ (1.0f / 120.0f)
 
-void ConfigureLogging(bool verbose) {
-    if (verbose) {
-        spdlog::set_level(spdlog::level::trace);
+spdlog::level::level_enum ParseLogLevel(const std::string &level) {
+    if (level == "trace") {
+        return spdlog::level::trace;
+    }
+    if (level == "debug") {
+        return spdlog::level::debug;
+    }
+    if (level == "info") {
+        return spdlog::level::info;
+    }
+    if (level == "warn") {
+        return spdlog::level::warn;
+    }
+    if (level == "err") {
+        return spdlog::level::err;
+    }
+    if (level == "critical") {
+        return spdlog::level::critical;
+    }
+    if (level == "off") {
+        return spdlog::level::off;
+    }
+    return spdlog::level::info;
+}
+
+void ConfigureLogging(spdlog::level::level_enum level, bool includeTimestamp) {
+    if (includeTimestamp) {
         spdlog::set_pattern("%Y-%m-%d %H:%M:%S.%e [%^%l%$] %v");
     } else {
-        spdlog::set_level(spdlog::level::info);
-        spdlog::set_pattern("%v");
+        spdlog::set_pattern("[%^%l%$] %v");
     }
+    spdlog::set_level(level);
 }
 
 Game *g_game = nullptr;
@@ -49,7 +73,7 @@ void signalHandler(int signum) {
 }
 
 int main(int argc, char *argv[]) {
-    ConfigureLogging(false);
+    ConfigureLogging(spdlog::level::info, false);
 
     // Register signal handler
     signal(SIGINT, signalHandler);
@@ -71,9 +95,10 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    if (cliOptions.verbose) {
-        ConfigureLogging(true);
-    }
+    const spdlog::level::level_enum logLevel = cliOptions.logLevelExplicit
+        ? ParseLogLevel(cliOptions.logLevel)
+        : (cliOptions.verbose ? spdlog::level::trace : spdlog::level::info);
+    ConfigureLogging(logLevel, cliOptions.timestampLogging);
 
     if (!cliOptions.worldSpecified) {
         spdlog::error("No world directory specified. Use -w <directory> or -D to load the bundled default world.");

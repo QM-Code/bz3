@@ -63,6 +63,29 @@ uint16_t ReadUInt16Config(std::initializer_list<const char*> paths, uint16_t def
     return defaultValue;
 }
 
+float ReadFloatConfig(std::initializer_list<const char*> paths, float defaultValue) {
+    for (const char* path : paths) {
+        if (const auto* value = ConfigValue(path)) {
+            if (value->is_number_float()) {
+                return static_cast<float>(value->get<double>());
+            }
+            if (value->is_number_integer()) {
+                return static_cast<float>(value->get<long long>());
+            }
+            if (value->is_string()) {
+                try {
+                    return std::stof(value->get<std::string>());
+                } catch (...) {
+                    spdlog::warn("Config '{}' string value is not a valid float", path);
+                }
+            } else {
+                spdlog::warn("Config '{}' cannot be interpreted as float", path);
+            }
+        }
+    }
+    return defaultValue;
+}
+
 std::string ReadStringConfig(const char *path, const std::string &defaultValue) {
     if (const auto* value = ConfigValue(path)) {
         if (value->is_string()) {

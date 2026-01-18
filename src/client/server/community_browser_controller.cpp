@@ -1,4 +1,4 @@
-#include "client/server/server_browser_controller.hpp"
+#include "client/server/community_browser_controller.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -65,27 +65,28 @@ uint16_t applyPortFallback(uint16_t candidate) {
 }
 }
 
-ServerBrowserController::ServerBrowserController(ClientEngine &engine,
-                                                 ClientConfig &clientConfig,
-                                                 const std::string &configPath,
-                                                 const std::string &defaultHost,
-                                                 uint16_t defaultPort,
-                                                 ServerConnector &connector)
+CommunityBrowserController::CommunityBrowserController(ClientEngine &engine,
+                                                       ClientConfig &clientConfig,
+                                                       const std::string &configPath,
+                                                       const std::string &defaultHost,
+                                                       uint16_t defaultPort,
+                                                       ServerConnector &connector)
     : engine(engine),
-            browser(engine.gui->serverBrowser()),
+      browser(engine.gui->mainMenu()),
       clientConfig(clientConfig),
       clientConfigPath(configPath),
-            connector(connector),
-            defaultHost(defaultHost.empty() ? "localhost" : defaultHost),
-            defaultPort(applyPortFallback(defaultPort)) {
+      connector(connector),
+      defaultHost(defaultHost.empty() ? "localhost" : defaultHost),
+      defaultPort(applyPortFallback(defaultPort)) {
     refreshGuiServerListOptions();
     rebuildServerListFetcher();
 
-                browser.show({}, this->defaultHost, this->defaultPort);
+    browser.show({}, this->defaultHost, this->defaultPort);
+    browser.setUserConfigPath(clientConfigPath);
     triggerFullRefresh();
 }
 
-void ServerBrowserController::triggerFullRefresh() {
+void CommunityBrowserController::triggerFullRefresh() {
     const auto nowSteady = SteadyClock::now();
     bool lanActive = isLanSelected();
     bool issuedRequest = false;
@@ -115,19 +116,19 @@ void ServerBrowserController::triggerFullRefresh() {
 
     if (lanActive && serverListFetcher) {
         browser.setCommunityStatus("Searching local network and fetching the selected server list...",
-                                   gui::ServerBrowserView::MessageTone::Pending);
+                                   gui::MainMenuView::MessageTone::Pending);
     } else if (lanActive) {
         browser.setCommunityStatus("Searching local network for servers...",
-                                   gui::ServerBrowserView::MessageTone::Pending);
+                                   gui::MainMenuView::MessageTone::Pending);
     } else {
         browser.setCommunityStatus("Fetching " + selectionLabel + "...",
-                                   gui::ServerBrowserView::MessageTone::Pending);
+                                   gui::MainMenuView::MessageTone::Pending);
     }
 
     browser.setScanning(issuedRequest);
 }
 
-void ServerBrowserController::rebuildEntries() {
+void CommunityBrowserController::rebuildEntries() {
     const auto &servers = discovery.getServers();
     const bool lanViewActive = isLanSelected();
 
@@ -160,7 +161,7 @@ void ServerBrowserController::rebuildEntries() {
         return description;
     };
 
-    std::vector<gui::ServerBrowserEntry> entries;
+    std::vector<gui::CommunityBrowserEntry> entries;
     entries.reserve(servers.size() + cachedRemoteServers.size());
     std::unordered_set<std::string> seen;
     seen.reserve(entries.capacity() > 0 ? entries.capacity() : 1);
@@ -174,7 +175,7 @@ void ServerBrowserController::rebuildEntries() {
             if (!seen.insert(key).second) {
                 continue;
             }
-            gui::ServerBrowserEntry entry;
+            gui::CommunityBrowserEntry entry;
             const std::string addressLabel = serverInfo.host + ":" + std::to_string(serverInfo.port);
             entry.label = addressLabel;
             entry.host = serverInfo.host;
@@ -204,7 +205,7 @@ void ServerBrowserController::rebuildEntries() {
         if (!seen.insert(key).second) {
             continue;
         }
-        gui::ServerBrowserEntry entry;
+        gui::CommunityBrowserEntry entry;
         entry.label = record.name.empty() ? record.host : record.name;
         entry.host = record.host;
         entry.port = recordPort;
@@ -228,7 +229,7 @@ void ServerBrowserController::rebuildEntries() {
     }
 }
 
-void ServerBrowserController::update() {
+void CommunityBrowserController::update() {
     while (auto response = authClient.consumeResponse()) {
         handleAuthResponse(*response);
     }
@@ -277,10 +278,10 @@ void ServerBrowserController::update() {
             selectionLabel = resolveDisplayNameForSource(*source);
         }
         browser.setCommunityStatus("Fetching " + selectionLabel + "...",
-                                   gui::ServerBrowserView::MessageTone::Pending);
+                                   gui::MainMenuView::MessageTone::Pending);
     } else if (serverListFetcher && !isLanSelected()) {
         std::string statusText;
-        gui::ServerBrowserView::MessageTone tone = gui::ServerBrowserView::MessageTone::Notice;
+        gui::MainMenuView::MessageTone tone = gui::MainMenuView::MessageTone::Notice;
         const auto *source = getSelectedRemoteSource();
         if (source && !source->host.empty()) {
             for (const auto &status : cachedSourceStatuses) {
@@ -292,7 +293,7 @@ void ServerBrowserController::update() {
                     if (!source->host.empty()) {
                         statusText += " (" + source->host + ")";
                     }
-                    tone = gui::ServerBrowserView::MessageTone::Error;
+                    tone = gui::MainMenuView::MessageTone::Error;
                 } else if (status.activeCount == 0) {
                     statusText = "Community currently has no active servers";
                     if (status.inactiveCount >= 0) {
@@ -305,9 +306,9 @@ void ServerBrowserController::update() {
         browser.setCommunityStatus(statusText, tone);
     } else if (isLanSelected() && discovery.isScanning()) {
         browser.setCommunityStatus("Searching local network for servers...",
-                                   gui::ServerBrowserView::MessageTone::Pending);
+                                   gui::MainMenuView::MessageTone::Pending);
     } else {
-        browser.setCommunityStatus(std::string{}, gui::ServerBrowserView::MessageTone::Notice);
+        browser.setCommunityStatus(std::string{}, gui::MainMenuView::MessageTone::Notice);
     }
 
     const auto &servers = discovery.getServers();
@@ -325,13 +326,13 @@ void ServerBrowserController::update() {
         if (discovery.isScanning() && isLanSelected()) {
             browser.setStatus(std::string{}, false);
             browser.setCommunityStatus("Searching local network for servers...",
-                                       gui::ServerBrowserView::MessageTone::Pending);
+                                       gui::MainMenuView::MessageTone::Pending);
         } else if (remoteFetchingActive && serverListFetcher) {
             browser.setStatus(std::string{}, false);
         } else if (isLanSelected()) {
             browser.setStatus(std::string{}, false);
             browser.setCommunityStatus("No LAN servers found. Start one locally or refresh.",
-                                       gui::ServerBrowserView::MessageTone::Notice);
+                                       gui::MainMenuView::MessageTone::Notice);
         } else if (serverListFetcher) {
             browser.setStatus(std::string{}, false);
         } else {
@@ -340,7 +341,7 @@ void ServerBrowserController::update() {
     }
 }
 
-void ServerBrowserController::handleDisconnected(const std::string &reason) {
+void CommunityBrowserController::handleDisconnected(const std::string &reason) {
     std::string status = reason.empty()
         ? std::string("Disconnected from server. Select a server to reconnect.")
         : reason;
@@ -350,7 +351,7 @@ void ServerBrowserController::handleDisconnected(const std::string &reason) {
     triggerFullRefresh();
 }
 
-void ServerBrowserController::refreshGuiServerListOptions() {
+void CommunityBrowserController::refreshGuiServerListOptions() {
     std::vector<gui::ServerListOption> options;
 
     if (clientConfig.showLanServers) {
@@ -380,7 +381,7 @@ void ServerBrowserController::refreshGuiServerListOptions() {
     browser.setListOptions(options, activeServerListIndex);
 }
 
-std::vector<ClientServerListSource> ServerBrowserController::resolveActiveServerLists() const {
+std::vector<ClientServerListSource> CommunityBrowserController::resolveActiveServerLists() const {
     std::vector<ClientServerListSource> result;
     if (const auto *source = getSelectedRemoteSource()) {
         result.push_back(*source);
@@ -388,7 +389,7 @@ std::vector<ClientServerListSource> ServerBrowserController::resolveActiveServer
     return result;
 }
 
-void ServerBrowserController::rebuildServerListFetcher() {
+void CommunityBrowserController::rebuildServerListFetcher() {
     auto sources = resolveActiveServerLists();
     if (sources.empty()) {
         serverListFetcher.reset();
@@ -405,7 +406,7 @@ void ServerBrowserController::rebuildServerListFetcher() {
     serverListFetcher->requestRefresh();
 }
 
-void ServerBrowserController::handleServerListSelection(int selectedIndex) {
+void CommunityBrowserController::handleServerListSelection(int selectedIndex) {
     int optionCount = totalListOptionCount();
     if (optionCount == 0) {
         return;
@@ -434,7 +435,7 @@ void ServerBrowserController::handleServerListSelection(int selectedIndex) {
     triggerFullRefresh();
 }
 
-void ServerBrowserController::handleServerListAddition(const gui::ServerListOption &option) {
+void CommunityBrowserController::handleServerListAddition(const gui::ServerListOption &option) {
     std::string trimmedHost = trimCopy(option.host);
 
     if (trimmedHost.empty()) {
@@ -470,7 +471,7 @@ void ServerBrowserController::handleServerListAddition(const gui::ServerListOpti
     triggerFullRefresh();
 }
 
-void ServerBrowserController::handleJoinSelection(const gui::ServerBrowserSelection &selection) {
+void CommunityBrowserController::handleJoinSelection(const gui::CommunityBrowserSelection &selection) {
     std::string username = trimCopy(browser.getUsername());
     if (username.empty()) {
         browser.setStatus("Enter a username before joining.", true);
@@ -517,7 +518,7 @@ void ServerBrowserController::handleJoinSelection(const gui::ServerBrowserSelect
     authClient.requestAuth(communityHost, username, passhash, selection.worldName);
 }
 
-void ServerBrowserController::handleAuthResponse(const CommunityAuthClient::Response &response) {
+void CommunityBrowserController::handleAuthResponse(const CommunityAuthClient::Response &response) {
     if (!pendingJoin) {
         return;
     }
@@ -629,7 +630,7 @@ void ServerBrowserController::handleAuthResponse(const CommunityAuthClient::Resp
     pendingJoin.reset();
 }
 
-std::string ServerBrowserController::resolveCommunityHost(const gui::ServerBrowserSelection &selection) const {
+std::string CommunityBrowserController::resolveCommunityHost(const gui::CommunityBrowserSelection &selection) const {
     if (!selection.sourceHost.empty()) {
         return selection.sourceHost;
     }
@@ -641,11 +642,11 @@ std::string ServerBrowserController::resolveCommunityHost(const gui::ServerBrows
     return {};
 }
 
-std::string ServerBrowserController::makeAuthCacheKey(const std::string &host, const std::string &username) const {
+std::string CommunityBrowserController::makeAuthCacheKey(const std::string &host, const std::string &username) const {
     return host + "\n" + username;
 }
 
-void ServerBrowserController::updateServerListDisplayNamesFromCache() {
+void CommunityBrowserController::updateServerListDisplayNamesFromCache() {
     bool displayNamesChanged = false;
     bool configUpdated = false;
     std::vector<std::pair<std::size_t, std::string>> previousNames;
@@ -681,7 +682,7 @@ void ServerBrowserController::updateServerListDisplayNamesFromCache() {
             for (const auto &entry : previousNames) {
                 clientConfig.serverLists[entry.first].name = entry.second;
             }
-            spdlog::warn("ServerBrowserController: Failed to persist server list names to {}.", clientConfigPath);
+            spdlog::warn("CommunityBrowserController: Failed to persist server list names to {}.", clientConfigPath);
         } else {
             displayNamesChanged = true;
         }
@@ -692,7 +693,7 @@ void ServerBrowserController::updateServerListDisplayNamesFromCache() {
     }
 }
 
-std::string ServerBrowserController::resolveDisplayNameForSource(const ClientServerListSource &source) const {
+std::string CommunityBrowserController::resolveDisplayNameForSource(const ClientServerListSource &source) const {
     auto it = serverListDisplayNames.find(source.host);
     if (it != serverListDisplayNames.end() && !it->second.empty()) {
         return it->second;
@@ -705,23 +706,23 @@ std::string ServerBrowserController::resolveDisplayNameForSource(const ClientSer
     return source.host;
 }
 
-int ServerBrowserController::getLanOffset() const {
+int CommunityBrowserController::getLanOffset() const {
     return clientConfig.showLanServers ? 1 : 0;
 }
 
-int ServerBrowserController::totalListOptionCount() const {
+int CommunityBrowserController::totalListOptionCount() const {
     return getLanOffset() + static_cast<int>(clientConfig.serverLists.size());
 }
 
-bool ServerBrowserController::isLanIndex(int index) const {
+bool CommunityBrowserController::isLanIndex(int index) const {
     return clientConfig.showLanServers && index == 0;
 }
 
-bool ServerBrowserController::isLanSelected() const {
+bool CommunityBrowserController::isLanSelected() const {
     return isLanIndex(activeServerListIndex);
 }
 
-const ClientServerListSource* ServerBrowserController::getSelectedRemoteSource() const {
+const ClientServerListSource* CommunityBrowserController::getSelectedRemoteSource() const {
     if (activeServerListIndex < 0) {
         return nullptr;
     }
@@ -739,7 +740,7 @@ const ClientServerListSource* ServerBrowserController::getSelectedRemoteSource()
     return &clientConfig.serverLists[remoteIndex];
 }
 
-int ServerBrowserController::computeDefaultSelectionIndex(int optionCount) const {
+int CommunityBrowserController::computeDefaultSelectionIndex(int optionCount) const {
     if (optionCount == 0) {
         return -1;
     }

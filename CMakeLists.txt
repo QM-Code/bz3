@@ -92,7 +92,7 @@ target_include_directories(proto_lib PUBLIC ${CMAKE_BINARY_DIR})
 file(GLOB_RECURSE CLIENT_SOURCES CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/src/client/*.cpp")
 list(APPEND CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/client/actor.cpp
-    ${PROJECT_SOURCE_DIR}/src/client/server/server_browser_controller.cpp
+    ${PROJECT_SOURCE_DIR}/src/client/server/community_browser_controller.cpp
     ${PROJECT_SOURCE_DIR}/src/common/curl_global.cpp
     ${PROJECT_SOURCE_DIR}/src/common/config_helpers.cpp
     ${PROJECT_SOURCE_DIR}/src/common/data_path_resolver.cpp
@@ -118,7 +118,13 @@ set(ENGINE_CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/engine/components/render.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/components/input.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/components/gui.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/components/gui/server_browser.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/components/gui/main_menu.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/components/gui/thumbnail_cache.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/community_browser_panel.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/settings_panel.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/documentation_panel.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/start_server_panel.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/themes_panel.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/physics/physics_world.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/physics/rigid_body.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/physics/player_controller.cpp

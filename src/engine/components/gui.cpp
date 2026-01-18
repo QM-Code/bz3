@@ -35,7 +35,7 @@ GUI::GUI(GLFWwindow *window) {
         spdlog::warn("GUI: Failed to load font at {}", bigFontPathStr);
     }
 
-    serverBrowserView.initializeFonts(io);
+    mainMenuView.initializeFonts(io);
 
 	showFPS = bz::data::ReadBoolConfig({"debug.ShowFPS"}, false);
 
@@ -50,14 +50,17 @@ GUI::~GUI() {
 }
 
 void GUI::update() {
+    if (mainMenuView.consumeFontReloadRequest()) {
+        reloadFonts();
+    }
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGuiIO& io = ImGui::GetIO();
     io.FontGlobalScale = 1.0f; // keep text size constant across window resizes
     ImGui::NewFrame();
 
-    if (serverBrowserView.isVisible()) {
-        serverBrowserView.draw(io);
+    if (mainMenuView.isVisible()) {
+        mainMenuView.draw(io);
     } else {
         // Render HUD (scoreboard, console, crosshair)
         ImGui::SetNextWindowPos(ImVec2(20, 20));
@@ -131,6 +134,28 @@ void GUI::update() {
 
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+}
+
+void GUI::reloadFonts() {
+    ImGuiIO &io = ImGui::GetIO();
+    io.Fonts->Clear();
+    io.Fonts->AddFontDefault();
+
+    const auto bigFontPath = bz::data::ResolveConfiguredAsset("guiBigFont");
+    const std::string bigFontPathStr = bigFontPath.string();
+    bigFont = io.Fonts->AddFontFromFileTTF(
+        bigFontPathStr.c_str(),
+        100.0f
+    );
+
+    if (!bigFont) {
+        spdlog::warn("GUI: Failed to load font at {}", bigFontPathStr);
+    }
+
+    mainMenuView.initializeFonts(io);
+    io.Fonts->Build();
+    ImGui_ImplOpenGL3_DestroyFontsTexture();
+    ImGui_ImplOpenGL3_CreateFontsTexture();
 }
 
 void GUI::drawDeathScreen() {
@@ -352,10 +377,10 @@ void GUI::displayDeathScreen(bool show) {
     drawDeathScreenFlag = show;
 }
 
-gui::ServerBrowserView &GUI::serverBrowser() {
-    return serverBrowserView;
+gui::MainMenuView &GUI::mainMenu() {
+    return mainMenuView;
 }
 
-const gui::ServerBrowserView &GUI::serverBrowser() const {
-    return serverBrowserView;
+const gui::MainMenuView &GUI::mainMenu() const {
+    return mainMenuView;
 }
