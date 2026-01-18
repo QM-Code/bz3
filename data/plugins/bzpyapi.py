@@ -62,7 +62,7 @@ def handler(from_id: int, to_id: int, text: str):
     command.handler(tokens, from_id)
     return True
 
-bzapi.register_callback(bzapi.event_type.CHAT, handler)
+bzapi.register_callback(bzapi.EventType.CHAT, handler)
 
 
 c = Command("?")
@@ -124,8 +124,8 @@ class Flag:
     def get_parameter(self, key: str) -> object:
         return bzapi.get_data("flags/"+self.cname, key) or self.params.get(key)
     
-    def add_callback(self, event_type: bzapi.event_type, callback) -> None:
-        self.callbacks[event_type] = callback
+    def add_callback(self, EventType: bzapi.EventType, callback) -> None:
+        self.callbacks[EventType] = callback
     
     def register(self) -> None:
         bzapi.register_flag(self.cname, self.name, self.description, self.params)
