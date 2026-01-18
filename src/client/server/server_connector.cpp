@@ -23,7 +23,7 @@ bool ServerConnector::connect(const std::string &targetHost,
                               bool communityAdmin,
                               bool localAdmin) {
     std::string status = "Connecting to " + targetHost + ":" + std::to_string(targetPort) + "...";
-    auto &browser = engine.gui->serverBrowser();
+    auto &browser = engine.gui->mainMenu();
     browser.setStatus(status, false);
     spdlog::info("Attempting to connect to {}:{}", targetHost, targetPort);
 

@@ -14,6 +14,9 @@ struct ServerCLIOptions {
     bool dataDirExplicit = false;
     bool userConfigExplicit = false;
     bool verbose = false;
+    std::string logLevel;
+    bool logLevelExplicit = false;
+    bool timestampLogging = false;
 };
 
 ServerCLIOptions ParseServerCLIOptions(int argc, char *argv[]);

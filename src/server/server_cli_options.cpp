@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <cstdlib>
 #include <iostream>
+#include <algorithm>
 
 namespace {
 
@@ -24,6 +25,28 @@ std::string ConfiguredPortDefault() {
 
 } // namespace
 
+bool IsValidLogLevel(std::string level) {
+    std::transform(level.begin(), level.end(), level.begin(),
+                   [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+    return level == "trace" ||
+           level == "debug" ||
+           level == "info" ||
+           level == "warn" ||
+           level == "error" ||
+           level == "err" ||
+           level == "critical" ||
+           level == "off";
+}
+
+std::string NormalizeLogLevel(std::string level) {
+    std::transform(level.begin(), level.end(), level.begin(),
+                   [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+    if (level == "error") {
+        return "err";
+    }
+    return level;
+}
+
 ServerCLIOptions ParseServerCLIOptions(int argc, char *argv[]) {
     cxxopts::Options options("bz3-server", "BZ3 server");
     options.add_options()
@@ -32,7 +55,9 @@ ServerCLIOptions ParseServerCLIOptions(int argc, char *argv[]) {
         ("p,port", "Server listen port", cxxopts::value<uint16_t>()->default_value(ConfiguredPortDefault()))
         ("d,data-dir", "Data directory (overrides BZ3_DATA_DIR)", cxxopts::value<std::string>())
         ("c,config", "User config file path", cxxopts::value<std::string>())
-        ("v,verbose", "Enable verbose logging")
+        ("v,verbose", "Enable verbose logging (alias for --log-level trace)")
+        ("L,log-level", "Logging level (trace, debug, info, warn, err, critical, off)", cxxopts::value<std::string>())
+        ("T,timestamp-logging", "Enable timestamped logging output")
         ("h,help", "Show help");
 
     cxxopts::ParseResult result;
@@ -85,5 +110,16 @@ ServerCLIOptions ParseServerCLIOptions(int argc, char *argv[]) {
     parsed.dataDirExplicit = result.count("data-dir") > 0;
     parsed.userConfigExplicit = result.count("config") > 0;
     parsed.verbose = result.count("verbose") > 0;
+    parsed.logLevel = result.count("log-level") ? result["log-level"].as<std::string>() : std::string();
+    parsed.logLevelExplicit = result.count("log-level") > 0;
+    parsed.timestampLogging = result.count("timestamp-logging") > 0;
+    if (parsed.logLevelExplicit && !IsValidLogLevel(parsed.logLevel)) {
+        std::cerr << "Error: invalid --log-level value '" << parsed.logLevel << "'.\n";
+        std::cerr << options.help() << std::endl;
+        std::exit(1);
+    }
+    if (parsed.logLevelExplicit) {
+        parsed.logLevel = NormalizeLogLevel(parsed.logLevel);
+    }
     return parsed;
 }

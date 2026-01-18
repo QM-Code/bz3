@@ -35,11 +35,30 @@
         "moveBackward": ["DOWN"]
     },
     "assets" : {
-        "fonts" : {
-            "console" : {
-                "Regular": "fonts/GoogleSans.ttf",
-                "Heading": "fonts/Audiowide.ttf",
-                "Button": "fonts/Roboto.ttf"
+        "hud" : {
+            "fonts" : {
+                "console" : {
+                    "Regular": {
+                        "Font": "fonts/GoogleSans.ttf",
+                        "Size": 20,
+                        "Color": [1.0, 1.0, 0.0, 1.0]
+                    },
+                    "Title": {
+                        "Font": "fonts/GoogleSans.ttf",
+                        "Size": 28,
+                        "Color": [0.0, 1.0, 1.0, 1.0]
+                    },
+                    "Heading": {
+                        "Font": "fonts/Audiowide.ttf",
+                        "Size": 28,
+                        "Color": [1.0, 1.0, 1.0, 1.0]
+                    },
+                    "Button": {
+                        "Font": "fonts/Roboto.ttf",
+                        "Size": 18,
+                        "Color": [1.0, 1.0, 1.0, 1.0]
+                    }
+                }
             }
         },
         "audio" : {

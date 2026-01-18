@@ -9,7 +9,7 @@
 #include <array>
 #include <cstdint>
 
-#include "engine/components/gui/server_browser.hpp"
+#include "engine/components/gui/main_menu.hpp"
 
 struct ScoreboardEntry {
     std::string name;
@@ -23,13 +23,13 @@ class GUI {
     friend class ClientEngine;
 
 public:
-    gui::ServerBrowserView &serverBrowser();
-    const gui::ServerBrowserView &serverBrowser() const;
+    gui::MainMenuView &mainMenu();
+    const gui::MainMenuView &mainMenu() const;
 
 private:
     GLFWwindow *window;
     ImFont* bigFont;
-    gui::ServerBrowserView serverBrowserView;
+    gui::MainMenuView mainMenuView;
     bool showFPS = false;
     std::string spawnHint = "Press U to spawn";
 
@@ -47,6 +47,7 @@ private:
     void drawConsolePanel();
     void drawDeathScreen();
     bool drawDeathScreenFlag = false;
+    void reloadFonts();
 
     GUI(GLFWwindow *window);
     ~GUI();

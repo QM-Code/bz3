@@ -13,13 +13,13 @@
 #include "client/server/server_discovery.hpp"
 #include "client/server/server_list_fetcher.hpp"
 #include "engine/client_engine.hpp"
-#include "engine/components/gui/server_browser.hpp"
+#include "engine/components/gui/main_menu.hpp"
 
 class ServerConnector;
 
-class ServerBrowserController {
+class CommunityBrowserController {
 public:
-    ServerBrowserController(ClientEngine &engine,
+    CommunityBrowserController(ClientEngine &engine,
                             ClientConfig &clientConfig,
                             const std::string &configPath,
                             const std::string &defaultHost,
@@ -47,13 +47,13 @@ private:
     bool isLanSelected() const;
     const ClientServerListSource* getSelectedRemoteSource() const;
     int computeDefaultSelectionIndex(int optionCount) const;
-    void handleJoinSelection(const gui::ServerBrowserSelection &selection);
+    void handleJoinSelection(const gui::CommunityBrowserSelection &selection);
     void handleAuthResponse(const CommunityAuthClient::Response &response);
-    std::string resolveCommunityHost(const gui::ServerBrowserSelection &selection) const;
+    std::string resolveCommunityHost(const gui::CommunityBrowserSelection &selection) const;
     std::string makeAuthCacheKey(const std::string &host, const std::string &username) const;
 
     ClientEngine &engine;
-    gui::ServerBrowserView &browser;
+    gui::MainMenuView &browser;
     ClientConfig &clientConfig;
     std::string clientConfigPath;
     ServerConnector &connector;
@@ -61,7 +61,7 @@ private:
     std::unique_ptr<ServerListFetcher> serverListFetcher;
     std::vector<ServerListFetcher::ServerRecord> cachedRemoteServers;
     std::vector<ServerListFetcher::SourceStatus> cachedSourceStatuses;
-    std::vector<gui::ServerBrowserEntry> lastGuiEntries;
+    std::vector<gui::CommunityBrowserEntry> lastGuiEntries;
     std::string defaultHost;
     uint16_t defaultPort = 0;
     int activeServerListIndex = -1;
@@ -69,7 +69,7 @@ private:
     CommunityAuthClient authClient;
     std::unordered_map<std::string, std::string> passwordSaltCache;
     struct PendingJoin {
-        gui::ServerBrowserSelection selection;
+        gui::CommunityBrowserSelection selection;
         std::string communityHost;
         std::string username;
         std::string password;

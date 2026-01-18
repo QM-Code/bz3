@@ -1,6 +1,6 @@
 {
     "network" : {
-        "ServerPort" : 1234,
+        "ServerPort" : 11899,
         "ConnectTimeoutMs" : 2000
     },
     "assets": {
