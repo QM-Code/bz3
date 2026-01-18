@@ -23,7 +23,7 @@
         "rightTurnSpeedMultiplier": 1,
         "x_extent": 2,
         "y_extent": 1.5,
-        "z_extent": 3.4
+        "z_extent": 2.8
     },
     "plugins" : [
         {

@@ -63,7 +63,7 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/libs/effekseer/src)
 # Find external packages
 find_package(glfw3 REQUIRED)
 find_package(glm REQUIRED)
-find_package(Bullet REQUIRED)
+find_package(Jolt REQUIRED)
 find_package(assimp REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(cxxopts REQUIRED)
@@ -127,8 +127,8 @@ set(ENGINE_CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/themes_panel.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/physics/physics_world.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/physics/rigid_body.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/physics/static_body.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/physics/player_controller.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/physics/compound_body.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/components/audio.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/components/particle_effect_system.cpp
 )
@@ -141,8 +141,8 @@ set(ENGINE_SERVER_SOURCES
     ${PROJECT_SOURCE_DIR}/src/network/proto_codec.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/physics/physics_world.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/physics/rigid_body.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/physics/static_body.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/physics/player_controller.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/physics/compound_body.cpp
 )
 
 # Create executables
@@ -169,7 +169,6 @@ add_executable(bz3-server ${SERVER_SOURCES} ${ENGINE_SERVER_SOURCES})
 target_include_directories(bz3 PRIVATE
     ${PROJECT_SOURCE_DIR}/src/
     ${PROJECT_SOURCE_DIR}/src/client
-    ${BULLET_INCLUDE_DIRS}
     ${enet_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/libs/effekseer/src
     ${PROJECT_SOURCE_DIR}/libs/effekseer/src/Effekseer
@@ -178,7 +177,6 @@ target_include_directories(bz3 PRIVATE
 target_include_directories(bz3-server PRIVATE
     ${PROJECT_SOURCE_DIR}/src/
     ${PROJECT_SOURCE_DIR}/src/server
-    ${BULLET_INCLUDE_DIRS}
     ${enet_SOURCE_DIR}/include
 )
 
@@ -186,7 +184,7 @@ target_include_directories(bz3-server PRIVATE
 target_link_libraries(bz3 PRIVATE
     ${GLFW_TARGET}
     glm::glm
-    ${BULLET_LIBRARIES}
+    Jolt::Jolt
     enet_static
     assimp::assimp
     ${OPENGL_TARGET}
@@ -205,7 +203,7 @@ target_link_libraries(bz3 PRIVATE
 
 target_link_libraries(bz3-server PRIVATE
     glm::glm
-    ${BULLET_LIBRARIES}
+    Jolt::Jolt
     enet_static
     assimp::assimp
     pybind11::embed

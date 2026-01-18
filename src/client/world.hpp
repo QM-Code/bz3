@@ -4,8 +4,8 @@
 #include <string>
 #include <vector>
 #include "engine/types.hpp"
-#include "engine/physics/compound_body.hpp"
 #include <nlohmann/json.hpp>
+#include "engine/physics/static_body.hpp"
 
 class Game;
 
@@ -13,7 +13,7 @@ class World {
 private:
     Game &game;
     render_id renderId;
-    PhysicsCompoundBody physics;
+    PhysicsStaticBody physics;
     PlayerParameters defaultPlayerParams;
     bool initialized = false;
 

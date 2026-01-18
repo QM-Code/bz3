@@ -1,20 +1,27 @@
 #pragma once
 
+#include <Jolt/Jolt.h>
 #include "engine/physics/rigid_body.hpp"
-#include "engine/physics/compound_body.hpp"
-#include "engine/physics/player_controller.hpp"
+#include "engine/physics/static_body.hpp"
+#include <Jolt/Physics/Body/BodyID.h>
 #include <memory>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <string>
 
-class btBroadphaseInterface;
-class btDefaultCollisionConfiguration;
-class btCollisionDispatcher;
-class btSequentialImpulseConstraintSolver;
-class btDiscreteDynamicsWorld;
-class btCollisionShape;
-class btRigidBody;
+namespace JPH {
+class PhysicsSystem;
+class JobSystem;
+class TempAllocator;
+}
+
+class PhysicsPlayerController;
+
+namespace PhysicsLayers {
+using ObjectLayer = uint8_t;
+inline constexpr ObjectLayer NonMoving = 0;
+inline constexpr ObjectLayer Moving = 1;
+}
 
 struct PhysicsMaterial {
     float friction = 0.0f;
@@ -45,22 +52,23 @@ public:
 
     PhysicsPlayerController* playerController() { return playerController_.get(); }
 
-    PhysicsCompoundBody createStaticMesh(const std::string& meshPath, float mass);
+    PhysicsStaticBody createStaticMesh(const std::string& meshPath);
 
     bool raycast(const glm::vec3& from, const glm::vec3& to, glm::vec3& hitPoint, glm::vec3& hitNormal) const;
 
 private:
     friend class PhysicsRigidBody;
-    friend class PhysicsCompoundBody;
     friend class PhysicsPlayerController;
+    friend class PhysicsStaticBody;
 
-    void removeBody(btRigidBody* body) const;
+    void removeBody(const JPH::BodyID& id) const;
+
+    JPH::PhysicsSystem* physicsSystem() { return physicsSystem_.get(); }
+    const JPH::PhysicsSystem* physicsSystem() const { return physicsSystem_.get(); }
 
     std::unique_ptr<PhysicsPlayerController> playerController_;
 
-    btBroadphaseInterface* broadphase_ = nullptr;
-    btDefaultCollisionConfiguration* collisionConfig_ = nullptr;
-    btCollisionDispatcher* dispatcher_ = nullptr;
-    btSequentialImpulseConstraintSolver* solver_ = nullptr;
-    btDiscreteDynamicsWorld* world_ = nullptr;
+    std::unique_ptr<JPH::TempAllocator> tempAllocator_;
+    std::unique_ptr<JPH::JobSystem> jobSystem_;
+    std::unique_ptr<JPH::PhysicsSystem> physicsSystem_;
 };

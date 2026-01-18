@@ -2,14 +2,17 @@
 #include <cstdint>
 #include "engine/types.hpp"
 #include <glm/vec3.hpp>
+#include "engine/components/audio.hpp"
 #include "actor.hpp"
 
 #include <string>
 
 class Game;
+class AudioClip;
 
 class Client : public Actor {
 private:
+    AudioClip dieAudio;
     render_id renderId;
     bool justSpawned = false;
     glm::vec3 lastSpawnPosition{0.0f};

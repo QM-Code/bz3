@@ -90,7 +90,7 @@ World::World(Game &game,
         spdlog::debug("World::World: Skipping zip generation for bundled world at {}", this->worldDir);
     }
 
-    physics = game.engine.physics->createStaticMesh(getAssetPath("world"), 0.0f);
+    physics = game.engine.physics->createStaticMesh(getAssetPath("world"));
 }
 
 World::~World() {

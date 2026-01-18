@@ -180,7 +180,7 @@ void World::update() {
         }
 
         renderId = game.engine.render->create(getAssetPath("world").string());
-        physics = game.engine.physics->createStaticMesh(getAssetPath("world").string(), 0.0f);
+        physics = game.engine.physics->createStaticMesh(getAssetPath("world").string());
 
         spdlog::info("World::update: World initialized from server");
         initialized = true;
