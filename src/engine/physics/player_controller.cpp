@@ -41,7 +41,9 @@ PhysicsPlayerController::~PhysicsPlayerController() {
 	destroy();
 }
 
-glm::vec3 PhysicsPlayerController::getPosition() const { return position; }
+glm::vec3 PhysicsPlayerController::getPosition() const {
+	return position - glm::vec3(0.0f, halfExtents.y, 0.0f);
+}
 glm::quat PhysicsPlayerController::getRotation() const { return rotation; }
 glm::vec3 PhysicsPlayerController::getVelocity() const { return velocity; }
 glm::vec3 PhysicsPlayerController::getAngularVelocity() const { return angularVelocity; }
@@ -51,7 +53,9 @@ glm::vec3 PhysicsPlayerController::getForwardVector() const {
 	return rotation * glm::vec3(0, 0, -1);
 }
 
-void PhysicsPlayerController::setPosition(const glm::vec3& p) { position = p; }
+void PhysicsPlayerController::setPosition(const glm::vec3& p) {
+	position = p + glm::vec3(0.0f, halfExtents.y, 0.0f);
+}
 void PhysicsPlayerController::setRotation(const glm::quat& r) { rotation = glm::normalize(r); }
 void PhysicsPlayerController::setVelocity(const glm::vec3& v) { velocity = v; }
 void PhysicsPlayerController::setAngularVelocity(const glm::vec3& w) { angularVelocity = w; }

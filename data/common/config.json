@@ -6,7 +6,7 @@
     "assets": {
         "models" : {
             "world": "models/world.glb",
-            "playerModel": "models/tank/tank.glb",
+            "playerModel": "models/tank_final.glb",
             "shotModel": "models/shot.glb"
         },
         "fonts" : {
