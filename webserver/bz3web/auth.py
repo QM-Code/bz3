@@ -84,19 +84,7 @@ def ensure_admin_user(settings, conn):
     admin_row = db.get_user_by_username(conn, admin_user)
     if admin_row:
         return dict(admin_row)
-    password_hash = settings.get("admin_password_hash", "")
-    password_salt = settings.get("admin_password_salt", "")
-    email = f"{admin_user.lower()}@local"
-    db.add_user(conn, admin_user, email, password_hash, password_salt, is_admin=True, is_admin_manual=True)
-    admin_row = db.get_user_by_username(conn, admin_user)
-    if admin_row:
-        return dict(admin_row)
-    return {
-        "id": None,
-        "username": admin_user,
-        "email": "",
-        "is_admin": 1,
-    }
+    return None
 
 
 def is_admin(user):

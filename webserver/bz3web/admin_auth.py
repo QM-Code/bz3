@@ -1,15 +1,8 @@
-import hashlib
-import hmac
-
-from bz3web import config, webhttp
-
-
-def hash_password(password, salt):
-    return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 100_000).hex()
+from bz3web import auth, config, db, webhttp
 
 
 def config_ready(settings):
-    required = ("admin_password_hash", "admin_password_salt", "session_secret")
+    required = ("session_secret",)
     for key in required:
         value = settings.get(key, "")
         if not value or value == "CHANGE_ME":
@@ -28,7 +21,13 @@ def is_authenticated(request, settings):
 
 def verify_login(username, password, settings):
     expected_user = settings.get("admin_user")
-    expected_hash = settings.get("admin_password_hash", "")
-    salt = settings.get("admin_password_salt", "")
-    supplied_hash = hash_password(password, salt)
-    return username.lower() == str(expected_user).lower() and hmac.compare_digest(supplied_hash, expected_hash)
+    if username.lower() != str(expected_user).lower():
+        return False
+    conn = db.connect(db.default_db_path())
+    try:
+        user = db.get_user_by_username(conn, expected_user)
+        if not user or user["is_locked"] or user["deleted"]:
+            return False
+        return auth.verify_password(password, user["password_salt"], user["password_hash"])
+    finally:
+        conn.close()

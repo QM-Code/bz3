@@ -73,6 +73,39 @@ std::string buildServersUrl(const std::string &baseHost) {
 
     return normalized + "/api/servers";
 }
+
+std::string buildInfoUrl(const std::string &baseHost) {
+    if (baseHost.empty()) {
+        return {};
+    }
+
+    std::string normalized = baseHost;
+    while (!normalized.empty() && normalized.back() == '/') {
+        normalized.pop_back();
+    }
+
+    return normalized + "/api/info";
+}
+
+bool parseInfoResponse(const std::string &body,
+                       std::string &communityName,
+                       std::string &communityDetails) {
+    try {
+        nlohmann::json jsonData = nlohmann::json::parse(body);
+        if (auto nameIt = jsonData.find("community_name");
+            nameIt != jsonData.end() && nameIt->is_string()) {
+            communityName = nameIt->get<std::string>();
+        }
+        if (auto descIt = jsonData.find("community_description");
+            descIt != jsonData.end() && descIt->is_string()) {
+            communityDetails = descIt->get<std::string>();
+        }
+        return true;
+    } catch (const std::exception &ex) {
+        spdlog::warn("ServerListFetcher: Failed to parse /api/info: {}", ex.what());
+        return false;
+    }
+}
 }
 
 ServerListFetcher::ServerListFetcher(std::vector<ClientServerListSource> sources)
@@ -145,6 +178,7 @@ std::vector<ServerListFetcher::ServerRecord> ServerListFetcher::fetchOnce() {
 
     for (const auto &source : sources) {
         const std::string listUrl = buildServersUrl(source.host);
+        const std::string infoUrl = buildInfoUrl(source.host);
         if (listUrl.empty()) {
             spdlog::warn("ServerListFetcher: Skipping source with empty host");
             continue;
@@ -152,17 +186,35 @@ std::vector<ServerListFetcher::ServerRecord> ServerListFetcher::fetchOnce() {
 
         SourceStatus status;
         status.sourceHost = source.host;
+        std::string infoCommunityName;
+        std::string infoCommunityDetails;
+
+        if (!infoUrl.empty()) {
+            std::string infoBody;
+            if (fetchUrl(infoUrl, infoBody)) {
+                parseInfoResponse(infoBody, infoCommunityName, infoCommunityDetails);
+                if (!infoCommunityName.empty()) {
+                    status.communityName = infoCommunityName;
+                }
+                if (!infoCommunityDetails.empty()) {
+                    status.communityDetails = infoCommunityDetails;
+                }
+                status.hasData = true;
+            }
+        }
 
         std::string responseBody;
         if (!fetchUrl(listUrl, responseBody)) {
             status.ok = false;
-            status.hasData = false;
             status.error = "request_failed";
             statuses.push_back(std::move(status));
             continue;
         }
 
         auto parsed = parseResponse(source, responseBody, &status);
+        if (!infoCommunityName.empty()) {
+            status.communityName = infoCommunityName;
+        }
         combined.insert(combined.end(), parsed.begin(), parsed.end());
         statuses.push_back(std::move(status));
     }
@@ -251,7 +303,10 @@ std::vector<ServerListFetcher::ServerRecord> ServerListFetcher::parseResponse(
         }
 
         if (statusOut) {
-            statusOut->communityName = communityName.empty() ? sourceDisplayName : communityName;
+            const std::string resolvedCommunityName = communityName.empty() ? sourceDisplayName : communityName;
+            if (!resolvedCommunityName.empty() && statusOut->communityName.empty()) {
+                statusOut->communityName = resolvedCommunityName;
+            }
             statusOut->activeCount = activeCount;
             statusOut->inactiveCount = inactiveCount;
             statusOut->ok = true;

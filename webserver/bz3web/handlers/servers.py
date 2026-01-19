@@ -56,8 +56,9 @@ def handle(request):
 </form>"""
         return entry
 
-    refresh_interval = int(settings.get("servers_auto_refresh", 10) or 0)
-    refresh_animate = bool(settings.get("servers_auto_refresh_animate", False))
+    server_page = settings.get("pages", {}).get("servers", {})
+    refresh_interval = int(server_page.get("auto_refresh", 10) or 0)
+    refresh_animate = bool(server_page.get("auto_refresh_animate", False))
     refresh_url = None
     if refresh_interval > 0:
         refresh_url = "/api/servers"

@@ -77,18 +77,17 @@ public:
     void initializeFonts(ImGuiIO &io);
     void draw(ImGuiIO &io);
 
-    void show(const std::vector<CommunityBrowserEntry> &entries,
-              const std::string &defaultHost,
-              uint16_t defaultPort);
+    void show(const std::vector<CommunityBrowserEntry> &entries);
     void setEntries(const std::vector<CommunityBrowserEntry> &entries);
     void setListOptions(const std::vector<ServerListOption> &options, int selectedIndex);
     void hide();
     bool isVisible() const;
     void setStatus(const std::string &statusText, bool isErrorMessage);
-    void setCustomStatus(const std::string &statusText, bool isErrorMessage);
+    void setCommunityDetails(const std::string &detailsText);
     std::optional<CommunityBrowserSelection> consumeSelection();
     std::optional<int> consumeListSelection();
     std::optional<ServerListOption> consumeNewListRequest();
+    std::optional<std::string> consumeDeleteListRequest();
     void setListStatus(const std::string &statusText, bool isErrorMessage);
     void clearNewListInputs();
     std::string getUsername() const;
@@ -115,7 +114,6 @@ private:
 
     struct LocalServerProcess;
 
-    void resetBuffers(const std::string &defaultHost, uint16_t defaultPort);
     ThumbnailTexture *getOrLoadThumbnail(const std::string &url);
     MessageColors getMessageColors() const;
     void drawSettingsPanel(const MessageColors &colors);
@@ -165,25 +163,27 @@ private:
 
     std::vector<CommunityBrowserEntry> entries;
     int selectedIndex = -1;
-    std::array<char, 256> addressBuffer{};
     std::array<char, 64> usernameBuffer{};
     std::array<char, 128> passwordBuffer{};
     std::string statusText;
     bool statusIsError = false;
-    std::string customStatusText;
-    bool customStatusIsError = false;
     std::optional<CommunityBrowserSelection> pendingSelection;
 
     std::vector<ServerListOption> listOptions;
     int listSelectedIndex = -1;
     std::optional<int> pendingListSelection;
     std::optional<ServerListOption> pendingNewList;
+    std::optional<std::string> pendingDeleteListHost;
     bool refreshRequested = false;
     bool scanning = false;
+    bool showNewCommunityInput = false;
     std::array<char, 512> listUrlBuffer{};
     std::string listStatusText;
     bool listStatusIsError = false;
     std::string communityStatusText;
+    std::string communityDetailsText;
+    std::string communityLinkStatusText;
+    bool communityLinkStatusIsError = false;
     MessageTone communityStatusTone = MessageTone::Notice;
     int lastCredentialsListIndex = -1;
     std::string storedPasswordHash;

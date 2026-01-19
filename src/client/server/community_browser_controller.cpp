@@ -68,20 +68,16 @@ uint16_t applyPortFallback(uint16_t candidate) {
 CommunityBrowserController::CommunityBrowserController(ClientEngine &engine,
                                                        ClientConfig &clientConfig,
                                                        const std::string &configPath,
-                                                       const std::string &defaultHost,
-                                                       uint16_t defaultPort,
                                                        ServerConnector &connector)
     : engine(engine),
       browser(engine.gui->mainMenu()),
       clientConfig(clientConfig),
       clientConfigPath(configPath),
-      connector(connector),
-      defaultHost(defaultHost.empty() ? "localhost" : defaultHost),
-      defaultPort(applyPortFallback(defaultPort)) {
+      connector(connector) {
     refreshGuiServerListOptions();
     rebuildServerListFetcher();
 
-    browser.show({}, this->defaultHost, this->defaultPort);
+    browser.show({});
     browser.setUserConfigPath(clientConfigPath);
     triggerFullRefresh();
 }
@@ -242,6 +238,10 @@ void CommunityBrowserController::update() {
         handleServerListAddition(*newList);
     }
 
+    if (auto deleteHost = browser.consumeDeleteListRequest()) {
+        handleServerListDeletion(*deleteHost);
+    }
+
     if (browser.consumeRefreshRequest()) {
         triggerFullRefresh();
     }
@@ -339,6 +339,8 @@ void CommunityBrowserController::update() {
             browser.setStatus("No server sources configured. Add a server list or enable Local Area Network.", true);
         }
     }
+
+    updateCommunityDetails();
 }
 
 void CommunityBrowserController::handleDisconnected(const std::string &reason) {
@@ -346,7 +348,7 @@ void CommunityBrowserController::handleDisconnected(const std::string &reason) {
         ? std::string("Disconnected from server. Select a server to reconnect.")
         : reason;
 
-    browser.show(lastGuiEntries, defaultHost, defaultPort);
+    browser.show(lastGuiEntries);
     browser.setStatus(status, true);
     triggerFullRefresh();
 }
@@ -468,6 +470,61 @@ void CommunityBrowserController::handleServerListAddition(const gui::ServerListO
     activeServerListIndex = getLanOffset() + static_cast<int>(clientConfig.serverLists.size()) - 1;
     refreshGuiServerListOptions();
     rebuildServerListFetcher();
+    triggerFullRefresh();
+}
+
+void CommunityBrowserController::handleServerListDeletion(const std::string &host) {
+    std::string trimmedHost = trimCopy(host);
+    if (trimmedHost.empty()) {
+        browser.setStatus("Select a community to delete.", true);
+        return;
+    }
+
+    auto it = std::find_if(clientConfig.serverLists.begin(), clientConfig.serverLists.end(),
+        [&](const ClientServerListSource &source) {
+            return source.host == trimmedHost;
+        });
+    if (it == clientConfig.serverLists.end()) {
+        browser.setStatus("Community not found.", true);
+        return;
+    }
+
+    const int lanOffset = getLanOffset();
+    const int removedIndex = static_cast<int>(std::distance(clientConfig.serverLists.begin(), it));
+    const int removedOptionIndex = lanOffset + removedIndex;
+
+    ClientServerListSource removedSource = *it;
+    clientConfig.serverLists.erase(it);
+
+    std::string previousDefault = clientConfig.defaultServerList;
+    if (clientConfig.defaultServerList == trimmedHost) {
+        clientConfig.defaultServerList.clear();
+    }
+
+    if (!clientConfig.Save(clientConfigPath)) {
+        clientConfig.serverLists.insert(clientConfig.serverLists.begin() + removedIndex, removedSource);
+        clientConfig.defaultServerList = previousDefault;
+        browser.setStatus("Failed to update " + clientConfigPath + ". Check permissions.", true);
+        return;
+    }
+
+    serverListDisplayNames.erase(trimmedHost);
+
+    int optionCount = totalListOptionCount();
+    if (activeServerListIndex > removedOptionIndex) {
+        activeServerListIndex -= 1;
+    } else if (activeServerListIndex == removedOptionIndex) {
+        if (optionCount <= 0) {
+            activeServerListIndex = -1;
+        } else {
+            activeServerListIndex = std::min(activeServerListIndex, optionCount - 1);
+        }
+    }
+
+    browser.setStatus("Community removed.", false);
+    refreshGuiServerListOptions();
+    rebuildServerListFetcher();
+    rebuildEntries();
     triggerFullRefresh();
 }
 
@@ -689,6 +746,32 @@ void CommunityBrowserController::updateServerListDisplayNamesFromCache() {
         }
     }
 
+    for (const auto &status : cachedSourceStatuses) {
+        if (status.sourceHost.empty() || status.communityName.empty()) {
+            continue;
+        }
+
+        auto mapIt = serverListDisplayNames.find(status.sourceHost);
+        if (mapIt == serverListDisplayNames.end() || mapIt->second != status.communityName) {
+            serverListDisplayNames[status.sourceHost] = status.communityName;
+            displayNamesChanged = true;
+        }
+
+        for (std::size_t i = 0; i < clientConfig.serverLists.size(); ++i) {
+            auto &source = clientConfig.serverLists[i];
+            if (source.host != status.sourceHost) {
+                continue;
+            }
+
+            if (source.name != status.communityName) {
+                previousNames.emplace_back(i, source.name);
+                source.name = status.communityName;
+                configUpdated = true;
+            }
+            break;
+        }
+    }
+
     if (configUpdated) {
         if (!clientConfig.Save(clientConfigPath)) {
             for (const auto &entry : previousNames) {
@@ -703,6 +786,29 @@ void CommunityBrowserController::updateServerListDisplayNamesFromCache() {
     if (displayNamesChanged) {
         refreshGuiServerListOptions();
     }
+}
+
+void CommunityBrowserController::updateCommunityDetails() {
+    if (isLanSelected()) {
+        browser.setCommunityDetails(std::string{});
+        return;
+    }
+
+    const auto *source = getSelectedRemoteSource();
+    if (!source) {
+        browser.setCommunityDetails(std::string{});
+        return;
+    }
+
+    std::string details;
+    for (const auto &status : cachedSourceStatuses) {
+        if (status.sourceHost == source->host) {
+            details = status.communityDetails;
+            break;
+        }
+    }
+
+    browser.setCommunityDetails(details);
 }
 
 std::string CommunityBrowserController::resolveDisplayNameForSource(const ClientServerListSource &source) const {

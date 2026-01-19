@@ -2,7 +2,7 @@ import secrets
 import time
 from urllib.parse import quote
 
-from bz3web import admin_auth, auth, config, db, views, webhttp
+from bz3web import auth, config, db, views, webhttp
 
 
 def _first(form, key):
@@ -281,17 +281,11 @@ def handle(request):
                 else:
                     user = db.get_user_by_username(conn, identifier)
                 if not user or not auth.verify_password(password, user["password_salt"], user["password_hash"]):
-                    admin_user = settings.get("admin_user", "Admin")
-                    if _normalize_key(identifier) == _normalize_key(admin_user) and admin_auth.verify_login(
-                        identifier, password, settings
-                    ):
-                        user = auth.ensure_admin_user(settings, conn)
-                    else:
-                        return _render_login(
-                            "Login failed.",
-                            list_name=settings.get("community_name", "Server List"),
-                            form_data=form_data,
-                        )
+                    return _render_login(
+                        "Login failed.",
+                        list_name=settings.get("community_name", "Server List"),
+                        form_data=form_data,
+                    )
                 if user and (user["is_locked"] or user["deleted"]):
                     return _render_login(
                         "Account locked.",

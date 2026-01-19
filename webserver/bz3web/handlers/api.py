@@ -7,7 +7,7 @@ from bz3web import auth, config, db, webhttp
 
 def _handle_auth(request):
     settings = config.get_config()
-    debug_auth = bool(settings.get("debug_auth", False))
+    debug_auth = bool(settings.get("debug", {}).get("auth", False))
     if request.method not in ("GET", "POST"):
         return webhttp.json_response({"ok": False, "error": "method_not_allowed"}, status="405 Method Not Allowed")
     if request.method == "GET" and not debug_auth:
@@ -113,7 +113,7 @@ def _handle_heartbeat(request):
     if request.method not in ("GET", "POST"):
         return webhttp.json_response({"ok": False, "error": "method_not_allowed"}, status="405 Method Not Allowed")
     settings = config.get_config()
-    debug_heartbeat = bool(settings.get("debug_heartbeat", False))
+    debug_heartbeat = bool(settings.get("debug", {}).get("heartbeat", False))
     num_players = None
     max_players = None
     new_port = None
@@ -356,4 +356,15 @@ def handle(request):
         return _handle_heartbeat(request)
     if path == "/api/admins":
         return _handle_admins(request)
+    if path == "/api/info":
+        if request.method != "GET":
+            return webhttp.json_response({"ok": False, "error": "method_not_allowed"}, status="405 Method Not Allowed")
+        settings = config.get_config()
+        return webhttp.json_response(
+            {
+                "ok": True,
+                "community_name": settings.get("community_name", "Server List"),
+                "community_description": settings.get("community_description", ""),
+            }
+        )
     return webhttp.json_response({"ok": False, "error": "not_found"}, status="404 Not Found")

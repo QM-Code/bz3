@@ -195,8 +195,6 @@ int main(int argc, char *argv[]) {
         engine,
         clientConfig,
         clientUserConfigPath,
-        cliOptions.connectAddr,
-        cliOptions.connectPort,
         serverConnector);
 
     if (cliOptions.addrExplicit) {

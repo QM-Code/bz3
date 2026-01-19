@@ -2,39 +2,182 @@
 
 #include <algorithm>
 #include <cctype>
-#include <limits>
+#include <cstdlib>
+#include <sstream>
 #include <string>
+#include <utility>
 
-#include "common/data_path_resolver.hpp"
+#if defined(_WIN32)
+#include <shellapi.h>
+#include <windows.h>
+#endif
 
 namespace {
-std::string trimCopy(const std::string &value) {
-    auto begin = std::find_if_not(value.begin(), value.end(), [](unsigned char ch) {
-        return std::isspace(ch) != 0;
-    });
-    auto end = std::find_if_not(value.rbegin(), value.rend(), [](unsigned char ch) {
-        return std::isspace(ch) != 0;
-    }).base();
+std::string toSmallCaps(const std::string &value) {
+    std::string out = value;
+    for (char &ch : out) {
+        ch = static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
+    }
+    return out;
+}
 
-    if (begin >= end) {
+std::string normalizedCommunityUrl(const std::string &host) {
+    if (host.empty()) {
         return {};
     }
-
-    return std::string(begin, end);
+    if (host.rfind("http://", 0) == 0 || host.rfind("https://", 0) == 0) {
+        return host;
+    }
+    return "http://" + host;
 }
 
-uint16_t configuredServerPort() {
-    if (const auto configured = bz::data::ConfigValueUInt16("network.ServerPort")) {
-        return *configured;
+bool openUrlInBrowser(const std::string &url) {
+    if (url.empty()) {
+        return false;
     }
-    return 0;
+#if defined(_WIN32)
+    HINSTANCE result = ShellExecuteA(nullptr, "open", url.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+    return reinterpret_cast<intptr_t>(result) > 32;
+#elif defined(__APPLE__)
+    std::string command = "open \"" + url + "\"";
+    int result = std::system(command.c_str());
+    return result == 0;
+#else
+    std::string command = "xdg-open \"" + url + "\"";
+    int result = std::system(command.c_str());
+    return result == 0;
+#endif
 }
 
-std::string configuredServerPortLabel() {
-    if (const auto label = bz::data::ConfigValueString("network.ServerPort")) {
-        return *label;
+void renderInlineTextWithLinks(const std::string &text,
+                               const ImVec4 &linkColor,
+                               std::string &linkStatusText,
+                               bool &linkStatusIsError) {
+    std::size_t pos = 0;
+    bool first = true;
+
+    auto emitText = [&](const std::string &segment) {
+        if (segment.empty()) {
+            return;
+        }
+        if (!first) {
+            ImGui::SameLine(0.0f, 0.0f);
+        }
+        ImGui::TextUnformatted(segment.c_str());
+        first = false;
+    };
+
+    auto emitLink = [&](const std::string &label, const std::string &url) {
+        if (label.empty()) {
+            return;
+        }
+        if (!first) {
+            ImGui::SameLine(0.0f, 0.0f);
+        }
+        ImGui::PushStyleColor(ImGuiCol_Text, linkColor);
+        ImGui::TextUnformatted(label.c_str());
+        ImGui::PopStyleColor();
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Open in browser");
+        }
+        if (ImGui::IsItemClicked()) {
+            if (!openUrlInBrowser(url)) {
+                linkStatusText = "Failed to open your browser.";
+                linkStatusIsError = true;
+            } else {
+                linkStatusText.clear();
+                linkStatusIsError = false;
+            }
+        }
+        first = false;
+    };
+
+    while (pos < text.size()) {
+        std::size_t linkStart = text.find('[', pos);
+        if (linkStart == std::string::npos) {
+            emitText(text.substr(pos));
+            break;
+        }
+        std::size_t linkEnd = text.find(']', linkStart + 1);
+        if (linkEnd == std::string::npos) {
+            emitText(text.substr(pos));
+            break;
+        }
+        if (linkEnd + 1 >= text.size() || text[linkEnd + 1] != '(') {
+            emitText(text.substr(pos, linkEnd - pos + 1));
+            pos = linkEnd + 1;
+            continue;
+        }
+        std::size_t urlEnd = text.find(')', linkEnd + 2);
+        if (urlEnd == std::string::npos) {
+            emitText(text.substr(pos));
+            break;
+        }
+
+        emitText(text.substr(pos, linkStart - pos));
+        std::string label = text.substr(linkStart + 1, linkEnd - linkStart - 1);
+        std::string url = text.substr(linkEnd + 2, urlEnd - linkEnd - 2);
+        emitLink(label, url);
+
+        pos = urlEnd + 1;
     }
-    return std::to_string(configuredServerPort());
+}
+
+void renderMarkdown(const std::string &text,
+                    ImFont *titleFont,
+                    ImFont *headingFont,
+                    const ImVec4 &linkColor,
+                    std::string &linkStatusText,
+                    bool &linkStatusIsError) {
+    std::istringstream input(text);
+    std::string line;
+    bool firstLine = true;
+
+    while (std::getline(input, line)) {
+        if (!line.empty() && line.back() == '\r') {
+            line.pop_back();
+        }
+
+        if (!firstLine) {
+            ImGui::Spacing();
+        }
+        firstLine = false;
+
+        if (line.empty()) {
+            ImGui::Spacing();
+            continue;
+        }
+
+        std::size_t hashCount = 0;
+        while (hashCount < line.size() && line[hashCount] == '#') {
+            ++hashCount;
+        }
+        if (hashCount > 0 && hashCount < line.size() && line[hashCount] == ' ') {
+            std::string headingText = line.substr(hashCount + 1);
+            ImFont *font = (hashCount <= 2 && titleFont) ? titleFont : headingFont;
+            if (font) {
+                ImGui::PushFont(font);
+            }
+            ImGui::TextWrapped("%s", headingText.c_str());
+            if (font) {
+                ImGui::PopFont();
+            }
+            continue;
+        }
+
+        if (line.rfind("- ", 0) == 0 || line.rfind("* ", 0) == 0 || line.rfind("+ ", 0) == 0) {
+            ImGui::Bullet();
+            ImGui::SameLine();
+            renderInlineTextWithLinks(
+                line.substr(2),
+                linkColor,
+                linkStatusText,
+                linkStatusIsError);
+            continue;
+        }
+
+        renderInlineTextWithLinks(line, linkColor, linkStatusText, linkStatusIsError);
+    }
 }
 
 std::string normalizedHost(const std::string &host) {
@@ -76,35 +219,229 @@ void MainMenuView::drawCommunityPanel(const MessageColors &messageColors) {
         return std::string("Unnamed list");
     };
 
-    if (listOptions.empty() || listSelectedIndex < 0) {
-        ImGui::TextDisabled("Add a server list below to fetch public servers.");
-    } else {
+    ImGui::Spacing();
+
+    if (!listOptions.empty()) {
         listSelectedIndex = std::clamp(
             listSelectedIndex,
             0,
             static_cast<int>(listOptions.size()) - 1);
+    } else {
+        listSelectedIndex = -1;
+    }
+    const bool hasActiveServers = !entries.empty();
 
-        const auto &currentOption = listOptions[listSelectedIndex];
-        std::string comboLabel = formatListLabel(currentOption);
-        if (ImGui::BeginCombo("##ServerListSelector", comboLabel.c_str())) {
-            for (int i = 0; i < static_cast<int>(listOptions.size()); ++i) {
-                const auto &option = listOptions[i];
-                std::string optionLabel = formatListLabel(option);
-                bool selected = (i == listSelectedIndex);
-                if (ImGui::Selectable(optionLabel.c_str(), selected)) {
-                    if (!selected) {
-                        listSelectedIndex = i;
-                        pendingListSelection = i;
-                    }
-                }
-                if (selected) {
-                    ImGui::SetItemDefaultFocus();
+    const float newCommunityButtonWidth =
+        ImGui::CalcTextSize("New Community").x + style.FramePadding.x * 2.0f;
+    float selectorWidth = ImGui::GetContentRegionAvail().x - newCommunityButtonWidth - style.ItemSpacing.x;
+    if (selectorWidth < 0.0f) {
+        selectorWidth = 0.0f;
+    }
+
+    std::string comboLabel = "No communities";
+    if (listSelectedIndex >= 0 && listSelectedIndex < static_cast<int>(listOptions.size())) {
+        comboLabel = formatListLabel(listOptions[listSelectedIndex]);
+    }
+
+    ImGui::SetNextItemWidth(selectorWidth);
+    if (ImGui::BeginCombo("##ServerListSelector", comboLabel.c_str())) {
+        for (int i = 0; i < static_cast<int>(listOptions.size()); ++i) {
+            const auto &option = listOptions[i];
+            std::string optionLabel = formatListLabel(option);
+            bool selected = (i == listSelectedIndex);
+            if (ImGui::Selectable(optionLabel.c_str(), selected)) {
+                if (!selected) {
+                    listSelectedIndex = i;
+                    pendingListSelection = i;
                 }
             }
-            ImGui::EndCombo();
+            if (selected) {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
+        ImGui::EndCombo();
+    }
+
+    ImGui::SameLine(0.0f, style.ItemSpacing.x);
+    float rightAlignOffset = ImGui::GetContentRegionAvail().x - newCommunityButtonWidth;
+    if (rightAlignOffset > 0.0f) {
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + rightAlignOffset);
+    }
+    if (hasButtonFont) {
+        ImGui::PushFont(buttonFont);
+    }
+    ImGui::PushStyleColor(ImGuiCol_Text, buttonColor);
+    ImGui::BeginDisabled(showNewCommunityInput);
+    if (ImGui::Button("New Community")) {
+        showNewCommunityInput = true;
+    }
+    ImGui::EndDisabled();
+    ImGui::PopStyleColor();
+    if (hasButtonFont) {
+        ImGui::PopFont();
+    }
+
+    if (showNewCommunityInput) {
+        bool focusHostInput = ImGui::IsItemActivated();
+        ImGui::Spacing();
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted("Community Host");
+        ImGui::SameLine();
+        const float addButtonWidth = ImGui::CalcTextSize("Add").x + style.FramePadding.x * 2.0f;
+        const float cancelButtonWidth = ImGui::CalcTextSize("Cancel").x + style.FramePadding.x * 2.0f;
+        const float buttonsWidth = addButtonWidth + cancelButtonWidth + style.ItemSpacing.x;
+        float inputAvailable = ImGui::GetContentRegionAvail().x - buttonsWidth - style.ItemSpacing.x;
+        if (inputAvailable < 0.0f) {
+            inputAvailable = 0.0f;
+        }
+        ImGui::SetNextItemWidth(inputAvailable);
+        if (focusHostInput) {
+            ImGui::SetKeyboardFocusHere();
+        }
+        ImGui::InputTextWithHint(
+            "##CommunityHostInput",
+            "http://host[:port]",
+            listUrlBuffer.data(),
+            listUrlBuffer.size());
+
+        bool saveListClicked = false;
+        ImGui::SameLine();
+        float addAlignOffset = ImGui::GetContentRegionAvail().x - buttonsWidth;
+        if (addAlignOffset > 0.0f) {
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + addAlignOffset);
+        }
+        if (hasButtonFont) {
+            ImGui::PushFont(buttonFont);
+        }
+        ImGui::PushStyleColor(ImGuiCol_Text, buttonColor);
+        if (ImGui::Button("Add")) {
+            saveListClicked = true;
+        }
+        ImGui::PopStyleColor();
+        if (hasButtonFont) {
+            ImGui::PopFont();
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel")) {
+            showNewCommunityInput = false;
+            listUrlBuffer.fill('\0');
+            listStatusText.clear();
+            listStatusIsError = false;
+        }
+        if (saveListClicked) {
+            std::string urlValue(listUrlBuffer.data());
+            if (urlValue.empty()) {
+                listStatusText = "Enter a host before saving.";
+                listStatusIsError = true;
+            } else {
+                listStatusText.clear();
+                listStatusIsError = false;
+                pendingNewList = ServerListOption{ std::string{}, urlValue };
+            }
+        }
+
+        if (!listStatusText.empty()) {
+            ImGui::Spacing();
+            ImVec4 listColor = listStatusIsError ? messageColors.error : messageColors.action;
+            ImGui::TextColored(listColor, "%s", listStatusText.c_str());
         }
     }
 
+    ImGui::Spacing();
+    ImGui::Spacing();
+    refreshCommunityCredentials();
+
+    bool usernameChanged = false;
+    bool passwordChanged = false;
+
+    const bool isLanCommunity =
+        listSelectedIndex >= 0 &&
+        listSelectedIndex < static_cast<int>(listOptions.size()) &&
+        listOptions[listSelectedIndex].name == "Local Area Network";
+
+    const float joinInlineWidth = ImGui::CalcTextSize("Join").x + style.FramePadding.x * 2.0f;
+    const float labelSpacing = style.ItemSpacing.x * 2.0f;
+    const float inputWidth = 150.0f;
+    float rowWidth = ImGui::GetContentRegionAvail().x - joinInlineWidth - style.ItemSpacing.x;
+    float contentWidth = inputWidth + ImGui::CalcTextSize("Username").x + style.ItemInnerSpacing.x;
+    if (!isLanCommunity) {
+        contentWidth += labelSpacing;
+        contentWidth += ImGui::CalcTextSize("Password").x + style.ItemInnerSpacing.x + inputWidth;
+    }
+
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted("Username");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(inputWidth);
+    const bool usernameEdited = ImGui::InputText(
+        "##Username",
+        usernameBuffer.data(),
+        usernameBuffer.size(),
+        ImGuiInputTextFlags_EnterReturnsTrue);
+    joinFromIdentity |= usernameEdited;
+    usernameChanged |= usernameEdited;
+    if (usernameEdited) {
+        storedPasswordHash.clear();
+        passwordChanged = true;
+    }
+
+    if (!isLanCommunity) {
+        ImGui::SameLine(0.0f, labelSpacing);
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted("Password");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(inputWidth);
+        const char *passwordHint = storedPasswordHash.empty() ? "" : "stored";
+        const bool passwordEdited = ImGui::InputTextWithHint(
+            "##Password",
+            passwordHint,
+            passwordBuffer.data(),
+            passwordBuffer.size(),
+            ImGuiInputTextFlags_Password | ImGuiInputTextFlags_EnterReturnsTrue);
+        joinFromIdentity |= passwordEdited;
+        if (passwordEdited) {
+            storedPasswordHash.clear();
+            passwordChanged = true;
+        }
+    }
+
+    if (rowWidth > contentWidth) {
+        ImGui::SameLine(0.0f, rowWidth - contentWidth);
+    } else {
+        ImGui::SameLine();
+    }
+    if (hasButtonFont) {
+        ImGui::PushFont(buttonFont);
+    }
+    ImGui::PushStyleColor(ImGuiCol_Text, buttonColor);
+    ImGui::BeginDisabled(!hasActiveServers);
+    if (ImGui::Button("Join")) {
+        joinFromIdentity = true;
+    }
+    ImGui::EndDisabled();
+    ImGui::PopStyleColor();
+    if (hasButtonFont) {
+        ImGui::PopFont();
+    }
+
+    if (!hasActiveServers) {
+        joinFromIdentity = false;
+    }
+
+    if (usernameChanged || passwordChanged) {
+        persistCommunityCredentials(passwordChanged);
+    }
+
+    if (!statusText.empty()) {
+        ImGui::Spacing();
+        ImVec4 color = statusIsError ? messageColors.error : messageColors.action;
+        ImGui::TextColored(color, "%s", statusText.c_str());
+    }
+
+    ImGui::Spacing();
+    ImGui::Spacing();
+    ImGui::Separator();
     ImGui::Spacing();
 
     const float refreshButtonWidth = ImGui::CalcTextSize("Refresh").x + style.FramePadding.x * 2.0f;
@@ -115,7 +452,10 @@ void MainMenuView::drawCommunityPanel(const MessageColors &messageColors) {
         ImGuiTableFlags_BordersOuter |
         ImGuiTableFlags_ScrollY;
 
-    const float tableHeight = 260.0f;
+    float tableHeight = ImGui::GetContentRegionAvail().y;
+    if (tableHeight < 0.0f) {
+        tableHeight = 0.0f;
+    }
     const float playerColumnWidth = 120.0f;
 
     if (ImGui::BeginTable("##CommunityBrowserPresets", 2, tableFlags, ImVec2(-1.0f, tableHeight))) {
@@ -232,228 +572,105 @@ void MainMenuView::drawCommunityPanel(const MessageColors &messageColors) {
         ImGui::EndTable();
     }
 
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
-
-    refreshCommunityCredentials();
-
-    bool usernameChanged = false;
-    bool passwordChanged = false;
-
-    const bool isLanCommunity =
-        listSelectedIndex >= 0 &&
-        listSelectedIndex < static_cast<int>(listOptions.size()) &&
-        listOptions[listSelectedIndex].name == "Local Area Network";
-
-    const float joinInlineWidth = ImGui::CalcTextSize("Join").x + style.FramePadding.x * 2.0f;
-    const float labelSpacing = style.ItemSpacing.x * 2.0f;
-    const float inputWidth = 150.0f;
-    float rowWidth = ImGui::GetContentRegionAvail().x - joinInlineWidth - style.ItemSpacing.x;
-    float contentWidth = inputWidth + ImGui::CalcTextSize("Username").x + style.ItemInnerSpacing.x;
-    if (!isLanCommunity) {
-        contentWidth += labelSpacing;
-        contentWidth += ImGui::CalcTextSize("Password").x + style.ItemInnerSpacing.x + inputWidth;
-    }
-
-    ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted("Username");
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(inputWidth);
-    const bool usernameEdited = ImGui::InputText(
-        "##Username",
-        usernameBuffer.data(),
-        usernameBuffer.size(),
-        ImGuiInputTextFlags_EnterReturnsTrue);
-    joinFromIdentity |= usernameEdited;
-    usernameChanged |= usernameEdited;
-    if (usernameEdited) {
-        storedPasswordHash.clear();
-        passwordChanged = true;
-    }
-
-    if (!isLanCommunity) {
-        ImGui::SameLine(0.0f, labelSpacing);
-        ImGui::AlignTextToFramePadding();
-        ImGui::TextUnformatted("Password");
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(inputWidth);
-        const char *passwordHint = storedPasswordHash.empty() ? "" : "stored";
-        const bool passwordEdited = ImGui::InputTextWithHint(
-            "##Password",
-            passwordHint,
-            passwordBuffer.data(),
-            passwordBuffer.size(),
-            ImGuiInputTextFlags_Password | ImGuiInputTextFlags_EnterReturnsTrue);
-        joinFromIdentity |= passwordEdited;
-        if (passwordEdited) {
-            storedPasswordHash.clear();
-            passwordChanged = true;
-        }
-    }
-
-    if (rowWidth > contentWidth) {
-        ImGui::SameLine(0.0f, rowWidth - contentWidth);
-    } else {
-        ImGui::SameLine();
-    }
-    if (hasButtonFont) {
-        ImGui::PushFont(buttonFont);
-    }
-    ImGui::PushStyleColor(ImGuiCol_Text, buttonColor);
-    if (ImGui::Button("Join")) {
-        joinFromIdentity = true;
-    }
-    ImGui::PopStyleColor();
-    if (hasButtonFont) {
-        ImGui::PopFont();
-    }
-
-    if (usernameChanged || passwordChanged) {
-        persistCommunityCredentials(passwordChanged);
-    }
-
-    if (!statusText.empty()) {
-        ImGui::Spacing();
-        ImVec4 color = statusIsError ? messageColors.error : messageColors.action;
-        ImGui::TextColored(color, "%s", statusText.c_str());
-    }
-
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
-
-    ImGui::PushStyleColor(ImGuiCol_Text, headingColor);
-    ImGui::Text("Custom server");
-    ImGui::PopStyleColor();
-    ImGui::InputText("Address (host:port)", addressBuffer.data(), addressBuffer.size());
-
-    bool joinCustomClicked = false;
-    if (hasButtonFont) {
-        ImGui::PushFont(buttonFont);
-    }
-    ImGui::PushStyleColor(ImGuiCol_Text, buttonColor);
-    if (ImGui::Button("Join Custom")) {
-        joinCustomClicked = true;
-    }
-    ImGui::PopStyleColor();
-    if (hasButtonFont) {
-        ImGui::PopFont();
-    }
-    if (joinCustomClicked) {
-        std::string addressValue = trimCopy(addressBuffer.data());
-        if (addressValue.empty()) {
-            customStatusText = "Enter a server address before joining.";
-            customStatusIsError = true;
-        } else {
-            auto colonPos = addressValue.find_last_of(':');
-            if (colonPos == std::string::npos) {
-                const std::string exampleAddress = "localhost:" + configuredServerPortLabel();
-                customStatusText = "Use the format host:port (example: " + exampleAddress + ").";
-                customStatusIsError = true;
-            } else {
-                const std::string hostValue = addressValue.substr(0, colonPos);
-                const std::string portValue = addressValue.substr(colonPos + 1);
-                try {
-                    int port = std::stoi(portValue);
-                    if (port <= 0 || port > std::numeric_limits<uint16_t>::max()) {
-                        customStatusText = "Port must be a valid number.";
-                        customStatusIsError = true;
-                    } else {
-                        pendingSelection = CommunityBrowserSelection{
-                            hostValue,
-                            static_cast<uint16_t>(port),
-                            true,
-                            std::string{},
-                            std::string{}
-                        };
-                        customStatusText.clear();
-                        customStatusIsError = false;
-                    }
-                } catch (...) {
-                    customStatusText = "Port must be a valid number.";
-                    customStatusIsError = true;
-                }
-            }
-        }
-    }
-
-    if (!customStatusText.empty()) {
-        ImGui::Spacing();
-        ImVec4 color = customStatusIsError ? messageColors.error : messageColors.action;
-        ImGui::TextColored(color, "%s", customStatusText.c_str());
-    }
-
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
-
-    ImGui::PushStyleColor(ImGuiCol_Text, headingColor);
-    ImGui::Text("Add server list");
-    ImGui::PopStyleColor();
-    ImGui::InputText("Community host", listUrlBuffer.data(), listUrlBuffer.size());
-
-    bool saveListClicked = false;
-    if (hasButtonFont) {
-        ImGui::PushFont(buttonFont);
-    }
-    ImGui::PushStyleColor(ImGuiCol_Text, buttonColor);
-    if (ImGui::Button("Save Server List")) {
-        saveListClicked = true;
-    }
-    ImGui::PopStyleColor();
-    if (hasButtonFont) {
-        ImGui::PopFont();
-    }
-    if (saveListClicked) {
-        std::string urlValue(listUrlBuffer.data());
-        if (urlValue.empty()) {
-            listStatusText = "Enter a host before saving.";
-            listStatusIsError = true;
-        } else {
-            listStatusText.clear();
-            listStatusIsError = false;
-            pendingNewList = ServerListOption{ std::string{}, urlValue };
-        }
-    }
-
-    if (!listStatusText.empty()) {
-        ImGui::Spacing();
-        ImVec4 listColor = listStatusIsError ? messageColors.error : messageColors.action;
-        ImGui::TextColored(listColor, "%s", listStatusText.c_str());
-    }
-
     ImGui::EndChild();
 
     ImGui::SameLine();
+
+    const CommunityBrowserEntry *selectedEntry = nullptr;
+    if (selectedIndex >= 0 && selectedIndex < static_cast<int>(entries.size())) {
+        selectedEntry = &entries[selectedIndex];
+    }
+
+    std::string activeCommunityHost;
+    std::string activeCommunityLabel;
+    if (listSelectedIndex >= 0 && listSelectedIndex < static_cast<int>(listOptions.size())) {
+        activeCommunityHost = listOptions[listSelectedIndex].host;
+        activeCommunityLabel = formatListLabel(listOptions[listSelectedIndex]);
+    }
 
     ImGui::BeginChild("CommunityBrowserDetailsPane", ImVec2(0, 0), true);
     if (hasHeadingFont) {
         ImGui::PushFont(headingFont);
     }
     ImGui::PushStyleColor(ImGuiCol_Text, headingColor);
-    ImGui::TextUnformatted("Server Details");
+    ImGui::TextUnformatted(selectedEntry ? "Server Details" : "Community Details");
     ImGui::PopStyleColor();
     if (hasHeadingFont) {
         ImGui::PopFont();
     }
-    ImGui::SameLine();
-    const float joinButtonWidth = ImGui::CalcTextSize("Join").x + style.FramePadding.x * 2.0f;
-    const float joinButtonOffset = std::max(0.0f, ImGui::GetContentRegionAvail().x - joinButtonWidth);
-    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + joinButtonOffset);
-    bool joinSelectedClicked = joinFromIdentity;
-    if (hasButtonFont) {
-        ImGui::PushFont(buttonFont);
+    if (selectedEntry) {
+        ImGui::SameLine();
+        const float infoButtonWidth = ImGui::CalcTextSize("Community Info").x + style.FramePadding.x * 2.0f;
+        const float infoButtonOffset = std::max(0.0f, ImGui::GetContentRegionAvail().x - infoButtonWidth);
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + infoButtonOffset);
+        if (hasButtonFont) {
+            ImGui::PushFont(buttonFont);
+        }
+        ImGui::PushStyleColor(ImGuiCol_Text, buttonColor);
+        if (ImGui::Button("Community Info")) {
+            selectedIndex = -1;
+        }
+        ImGui::PopStyleColor();
+        if (hasButtonFont) {
+            ImGui::PopFont();
+        }
+    } else if (!isLanCommunity && !activeCommunityHost.empty()) {
+        ImGui::SameLine();
+        const float deleteButtonWidth = ImGui::CalcTextSize("Delete").x + style.FramePadding.x * 2.0f;
+        const float deleteButtonOffset = std::max(0.0f, ImGui::GetContentRegionAvail().x - deleteButtonWidth);
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + deleteButtonOffset);
+        if (hasButtonFont) {
+            ImGui::PushFont(buttonFont);
+        }
+        ImGui::PushStyleColor(ImGuiCol_Text, buttonColor);
+        if (ImGui::Button("Delete")) {
+            ImGui::OpenPopup("Delete Community?");
+        }
+        ImGui::PopStyleColor();
+        if (hasButtonFont) {
+            ImGui::PopFont();
+        }
     }
-    ImGui::PushStyleColor(ImGuiCol_Text, buttonColor);
-    if (ImGui::Button("Join")) {
-        joinSelectedClicked = true;
+
+    if (ImGui::IsPopupOpen("Delete Community?")) {
+        ImGuiViewport *viewport = ImGui::GetMainViewport();
+        const float targetWidth = std::min(viewport->Size.x * 0.45f, 1000.0f);
+        ImGui::SetNextWindowSize(ImVec2(targetWidth, 0.0f));
+        ImGui::SetNextWindowPos(viewport->GetCenter(), ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
     }
-    ImGui::PopStyleColor();
-    if (hasButtonFont) {
-        ImGui::PopFont();
+    if (ImGui::BeginPopupModal("Delete Community?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        std::string displayName = activeCommunityLabel.empty() ? activeCommunityHost : activeCommunityLabel;
+        ImGui::TextWrapped("Delete community \"%s\" from the list?", displayName.c_str());
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        bool confirmDelete = false;
+        if (hasButtonFont) {
+            ImGui::PushFont(buttonFont);
+        }
+        ImGui::PushStyleColor(ImGuiCol_Text, buttonColor);
+        if (ImGui::Button("Delete")) {
+            confirmDelete = true;
+        }
+        ImGui::PopStyleColor();
+        if (hasButtonFont) {
+            ImGui::PopFont();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel")) {
+            ImGui::CloseCurrentPopup();
+        }
+
+        if (confirmDelete && !activeCommunityHost.empty()) {
+            pendingDeleteListHost = activeCommunityHost;
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
     }
-    if (joinSelectedClicked) {
+
+    if (joinFromIdentity) {
         if (selectedIndex >= 0 && selectedIndex < static_cast<int>(entries.size())) {
             const auto &entry = entries[selectedIndex];
             pendingSelection = CommunityBrowserSelection{
@@ -471,19 +688,123 @@ void MainMenuView::drawCommunityPanel(const MessageColors &messageColors) {
         }
     }
 
-    const CommunityBrowserEntry *selectedEntry = nullptr;
-    if (selectedIndex >= 0 && selectedIndex < static_cast<int>(entries.size())) {
-        selectedEntry = &entries[selectedIndex];
-    }
-
     if (!selectedEntry) {
         ImGui::Spacing();
         ImGui::Separator();
-        ImGui::TextDisabled("Select a server to view details.");
+        ImGui::Spacing();
+        if (isLanCommunity) {
+            ImGui::TextWrapped(
+                "Local Area Network (LAN) shows servers running on your local network. "
+                "If you want to play with friends nearby, start a server from the Start Server panel "
+                "and it will appear here for everyone on the same LAN.");
+        } else if (!activeCommunityHost.empty()) {
+            const std::string displayName = activeCommunityLabel.empty()
+                ? std::string("Community")
+                : activeCommunityLabel;
+            const std::string website = normalizedCommunityUrl(activeCommunityHost);
+
+            const float baseScale = ImGui::GetIO().FontGlobalScale;
+            const float smallcapsScale = baseScale * 0.6f;
+            if (hasHeadingFont) {
+                ImGui::PushFont(headingFont);
+            }
+            ImGui::SetWindowFontScale(smallcapsScale);
+            ImGui::TextUnformatted(toSmallCaps("Community Name").c_str());
+            ImGui::SetWindowFontScale(baseScale);
+            if (hasHeadingFont) {
+                ImGui::PopFont();
+            }
+            if (titleFont) {
+                ImGui::PushFont(titleFont);
+            }
+            ImGui::TextWrapped("%s", displayName.c_str());
+            if (titleFont) {
+                ImGui::PopFont();
+            }
+
+            ImGui::Spacing();
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::Spacing();
+            ImGui::Spacing();
+
+            if (hasHeadingFont) {
+                ImGui::PushFont(headingFont);
+            }
+            ImGui::SetWindowFontScale(smallcapsScale);
+            ImGui::TextUnformatted(toSmallCaps("Website").c_str());
+            ImGui::SetWindowFontScale(baseScale);
+            if (hasHeadingFont) {
+                ImGui::PopFont();
+            }
+            if (titleFont) {
+                ImGui::PushFont(titleFont);
+            }
+            if (!website.empty()) {
+                ImGui::PushStyleColor(ImGuiCol_Text, messageColors.action);
+                ImGui::TextUnformatted(website.c_str());
+                ImGui::PopStyleColor();
+                if (ImGui::IsItemHovered()) {
+                    ImGui::SetTooltip("Open in browser");
+                }
+                if (ImGui::IsItemClicked()) {
+                    if (!openUrlInBrowser(website)) {
+                        communityLinkStatusText = "Failed to open your browser.";
+                        communityLinkStatusIsError = true;
+                    } else {
+                        communityLinkStatusText.clear();
+                        communityLinkStatusIsError = false;
+                    }
+                }
+            } else {
+                ImGui::TextDisabled("No website available.");
+            }
+            if (titleFont) {
+                ImGui::PopFont();
+            }
+
+            if (!communityLinkStatusText.empty()) {
+                ImGui::Spacing();
+                ImVec4 linkColor = communityLinkStatusIsError ? messageColors.error : messageColors.action;
+                ImGui::TextColored(linkColor, "%s", communityLinkStatusText.c_str());
+            }
+
+            ImGui::Spacing();
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::Spacing();
+            ImGui::Spacing();
+
+            if (hasHeadingFont) {
+                ImGui::PushFont(headingFont);
+            }
+            ImGui::SetWindowFontScale(smallcapsScale);
+            ImGui::TextUnformatted(toSmallCaps("Description").c_str());
+            ImGui::SetWindowFontScale(baseScale);
+            if (hasHeadingFont) {
+                ImGui::PopFont();
+            }
+            // TODO: Render community description as markdown.
+            if (!communityDetailsText.empty()) {
+                renderMarkdown(
+                    communityDetailsText,
+                    titleFont,
+                    headingFont,
+                    messageColors.action,
+                    communityLinkStatusText,
+                    communityLinkStatusIsError);
+            } else {
+                ImGui::TextDisabled("No description provided.");
+            }
+        } else {
+            ImGui::TextDisabled("No community details available.");
+        }
     } else {
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
+            ImGui::Spacing();
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::Spacing();
+            ImGui::Spacing();
 
         const std::string &displayHost = selectedEntry->displayHost.empty() ? selectedEntry->host : selectedEntry->displayHost;
         ImGui::Text("Host: %s", displayHost.c_str());
@@ -509,7 +830,13 @@ void MainMenuView::drawCommunityPanel(const MessageColors &messageColors) {
         ImGui::TextUnformatted("Description");
         ImGui::PopStyleColor();
         if (!selectedEntry->longDescription.empty()) {
-            ImGui::TextWrapped("%s", selectedEntry->longDescription.c_str());
+            renderMarkdown(
+                selectedEntry->longDescription,
+                titleFont,
+                headingFont,
+                messageColors.action,
+                communityLinkStatusText,
+                communityLinkStatusIsError);
         } else {
             ImGui::TextDisabled("No description provided.");
         }

@@ -21,6 +21,12 @@ def application(environ, start_response):
 def main():
     try:
         settings = config.get_config()
+        if not config.get_community_dir():
+            raise ValueError("[bz3web] Error: community directory must be provided.")
+        community_settings = config.get_community_config()
+        session_secret = community_settings.get("session_secret", "")
+        if not session_secret or session_secret == "CHANGE_ME":
+            raise ValueError("[bz3web] Error: community config.json must define a unique session_secret.")
         db.init_db(db.default_db_path())
     except ValueError as exc:
         print(str(exc))
@@ -30,7 +36,7 @@ def main():
     print(f"Server list server listening on http://{host}:{port}")
     try:
         if serve_app is not None:
-            threads = int(settings.get("waitress_threads", 8))
+            threads = int(settings.get("httpserver", {}).get("threads", 8))
             serve_app(application, host=host, port=port, threads=threads)
             return
         with make_server(host, port, application) as server:

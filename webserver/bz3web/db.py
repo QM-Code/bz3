@@ -10,11 +10,12 @@ def default_db_path():
 def _resolve_data_dir():
     from bz3web import config
 
-    data_dir = config.get_config().get("data_dir", "data")
-    base_dir = config.get_config_dir()
+    settings = config.get_config()
+    community_dir = config.get_community_dir() or config.get_config_dir()
+    data_dir = settings.get("data_dir", "data")
     if os.path.isabs(data_dir):
         return data_dir
-    return os.path.normpath(os.path.join(base_dir, data_dir))
+    return os.path.normpath(os.path.join(community_dir, data_dir))
 
 
 def init_db(db_path):

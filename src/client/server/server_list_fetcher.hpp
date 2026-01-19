@@ -13,6 +13,7 @@ public:
     struct SourceStatus {
         std::string sourceHost;
         std::string communityName;
+        std::string communityDetails;
         int activeCount = -1;
         int inactiveCount = -1;
         bool ok = false;

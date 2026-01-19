@@ -6,3 +6,5 @@ vcpkg_installed/
 build/
 _deps/
 vcpkg/
+__pycache__/
+*.pyc

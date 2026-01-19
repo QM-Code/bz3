@@ -28,20 +28,6 @@ std::string trimCopy(const std::string &value) {
     return std::string(begin, end);
 }
 
-uint16_t configuredServerPort() {
-    if (const auto configured = bz::data::ConfigValueUInt16("network.ServerPort")) {
-        return *configured;
-    }
-    return 0;
-}
-
-uint16_t applyPortFallback(uint16_t candidate) {
-    if (candidate != 0) {
-        return candidate;
-    }
-    return configuredServerPort();
-}
-
 ImVec4 readColorConfig(const char *path, const ImVec4 &fallback) {
     const auto *value = bz::data::ConfigValue(path);
     if (!value || !value->is_array()) {
@@ -251,24 +237,25 @@ void MainMenuView::drawPlaceholderPanel(const char *heading,
     ImGui::PopStyleColor();
 }
 
-void MainMenuView::show(const std::vector<CommunityBrowserEntry> &newEntries,
-              const std::string &defaultHost,
-              uint16_t defaultPort) {
+void MainMenuView::show(const std::vector<CommunityBrowserEntry> &newEntries) {
     visible = true;
     setEntries(newEntries);
     pendingSelection.reset();
-    statusText = "Select a server to connect or enter your own.";
+    statusText = "Select a server to connect.";
     statusIsError = false;
-    customStatusText.clear();
-    customStatusIsError = false;
     pendingListSelection.reset();
     pendingNewList.reset();
+    pendingDeleteListHost.reset();
     listStatusText.clear();
     listStatusIsError = false;
     communityStatusText.clear();
+    communityDetailsText.clear();
+    communityLinkStatusText.clear();
+    communityLinkStatusIsError = false;
     communityStatusTone = MessageTone::Notice;
     clearPassword();
-    resetBuffers(defaultHost, defaultPort);
+    showNewCommunityInput = false;
+    listUrlBuffer.fill(0);
 }
 
 MainMenuView::~MainMenuView() {
@@ -442,18 +429,21 @@ void MainMenuView::hide() {
     visible = false;
     statusText.clear();
     statusIsError = false;
-    customStatusText.clear();
-    customStatusIsError = false;
     pendingSelection.reset();
     pendingListSelection.reset();
     pendingNewList.reset();
+    pendingDeleteListHost.reset();
     refreshRequested = false;
     scanning = false;
     listStatusText.clear();
     listStatusIsError = false;
     communityStatusText.clear();
+    communityDetailsText.clear();
+    communityLinkStatusText.clear();
+    communityLinkStatusIsError = false;
     communityStatusTone = MessageTone::Notice;
     clearPassword();
+    showNewCommunityInput = false;
     thumbnails.shutdown();
 }
 
@@ -466,9 +456,8 @@ void MainMenuView::setStatus(const std::string &text, bool isErrorMessage) {
     statusIsError = isErrorMessage;
 }
 
-void MainMenuView::setCustomStatus(const std::string &text, bool isErrorMessage) {
-    customStatusText = text;
-    customStatusIsError = isErrorMessage;
+void MainMenuView::setCommunityDetails(const std::string &detailsText) {
+    communityDetailsText = detailsText;
 }
 
 std::optional<CommunityBrowserSelection> MainMenuView::consumeSelection() {
@@ -499,6 +488,16 @@ std::optional<ServerListOption> MainMenuView::consumeNewListRequest() {
     auto request = pendingNewList;
     pendingNewList.reset();
     return request;
+}
+
+std::optional<std::string> MainMenuView::consumeDeleteListRequest() {
+    if (!pendingDeleteListHost.has_value()) {
+        return std::nullopt;
+    }
+
+    auto host = pendingDeleteListHost;
+    pendingDeleteListHost.reset();
+    return host;
 }
 
 void MainMenuView::setListStatus(const std::string &text, bool isErrorMessage) {
@@ -541,19 +540,6 @@ bool MainMenuView::consumeRefreshRequest() {
 
 void MainMenuView::setScanning(bool isScanning) {
     scanning = isScanning;
-}
-
-void MainMenuView::resetBuffers(const std::string &defaultHost, uint16_t defaultPort) {
-    std::string hostValue = defaultHost.empty() ? std::string("localhost") : defaultHost;
-    uint16_t portValue = applyPortFallback(defaultPort);
-
-    addressBuffer.fill(0);
-    std::snprintf(
-        addressBuffer.data(),
-        addressBuffer.size(),
-        "%s:%u",
-        hostValue.c_str(),
-        portValue);
 }
 
 ThumbnailTexture *MainMenuView::getOrLoadThumbnail(const std::string &url) {

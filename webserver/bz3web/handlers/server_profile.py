@@ -1,7 +1,7 @@
 import time
 import urllib.parse
 
-from bz3web import auth, config, db, views, webhttp
+from bz3web import auth, config, db, markdown_utils, views, webhttp
 from bz3web.handlers import users as users_handler
 from bz3web.server_status import is_active
 
@@ -48,6 +48,7 @@ def handle(request):
             "port": str(server["port"]),
             "name": server["name"],
             "description": server["description"],
+            "description_html": markdown_utils.render_markdown(server["description"]),
             "max_players": server["max_players"],
             "num_players": server["num_players"],
             "owner": server["owner_username"],

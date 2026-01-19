@@ -326,6 +326,8 @@ def header(
     if logged_in and user_name:
         safe_name = webhttp.html_escape(user_name)
         user_html = f'<div class="header-user">Signed in as <span class="header-username">{safe_name}</span></div>'
+    if current_path != "/info":
+        links.append('<a class="admin-link" href="/info">Info</a>')
     if current_path != "/servers":
         links.append('<a class="admin-link" href="/servers">Servers</a>')
     if logged_in and profile_url and current_path != profile_url:
@@ -417,6 +419,7 @@ def render_server_cards(
         host = webhttp.html_escape(entry["host"])
         port = webhttp.html_escape(entry["port"])
         description = webhttp.html_escape(entry.get("description", ""))
+        description_html = entry.get("description_html")
         num_players = entry.get("num_players")
         max_players = entry.get("max_players")
         active = entry.get("active", False)
@@ -432,7 +435,12 @@ def render_server_cards(
             full_image = urls.get("full") or screenshot
         actions_html = entry.get("actions_html") or ""
         actions_block = f"<div class=\"card-actions\">{actions_html}</div>" if actions_html else ""
-        description_html = f"<p>{description}</p>" if description else "<p class=\"muted\">No description provided.</p>"
+        if description_html:
+            description_block = description_html
+        else:
+            description_block = (
+                f"<p>{description}</p>" if description else "<p class=\"muted\">No description provided.</p>"
+            )
         screenshot_html = ""
         card_class = "card-top"
         if screenshot:
@@ -479,7 +487,7 @@ def render_server_cards(
   <div class="{card_class}">
     {screenshot_html}
     <div class="card-details">
-      {description_html}
+      {description_block}
     </div>
   </div>
 </article>"""

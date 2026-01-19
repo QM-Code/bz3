@@ -22,8 +22,6 @@ public:
     CommunityBrowserController(ClientEngine &engine,
                             ClientConfig &clientConfig,
                             const std::string &configPath,
-                            const std::string &defaultHost,
-                            uint16_t defaultPort,
                             ServerConnector &connector);
 
     void update();
@@ -39,7 +37,9 @@ private:
     std::vector<ClientServerListSource> resolveActiveServerLists() const;
     void handleServerListSelection(int selectedIndex);
     void handleServerListAddition(const gui::ServerListOption &option);
+    void handleServerListDeletion(const std::string &host);
     void updateServerListDisplayNamesFromCache();
+    void updateCommunityDetails();
     std::string resolveDisplayNameForSource(const ClientServerListSource &source) const;
     int getLanOffset() const;
     int totalListOptionCount() const;
@@ -62,8 +62,6 @@ private:
     std::vector<ServerListFetcher::ServerRecord> cachedRemoteServers;
     std::vector<ServerListFetcher::SourceStatus> cachedSourceStatuses;
     std::vector<gui::CommunityBrowserEntry> lastGuiEntries;
-    std::string defaultHost;
-    uint16_t defaultPort = 0;
     int activeServerListIndex = -1;
     std::unordered_map<std::string, std::string> serverListDisplayNames;
     CommunityAuthClient authClient;

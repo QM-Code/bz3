@@ -1,26 +1,43 @@
 {
-  "community_name": "My Server List",
+  "community_name": "Community Name",
+  "community_description": "Community Description",
   "admin_user": "Admin",
-  "admin_password_hash": "CHANGE_ME",
-  "admin_password_salt": "CHANGE_ME",
-  "session_secret": "CHANGE_ME",
   "host": "0.0.0.0",
   "port": 8080,
   "data_dir": "data",
   "uploads_dir": "uploads",
-  "upload_max_bytes": 8388608,
-  "upload_min_width": 640,
-  "upload_min_height": 360,
-  "upload_max_width": 3840,
-  "upload_max_height": 2160,
-  "thumbnail_width": 480,
-  "thumbnail_height": 270,
-  "fullsize_width": 1600,
-  "fullsize_height": 900,
-  "debug_heartbeat": false,
-  "debug_auth": false,
-  "servers_auto_refresh": 10,
-  "servers_auto_refresh_animate": true,
+  "uploads": {
+    "screenshots": {
+      "limits": {
+        "min_bytes": 0,
+        "max_bytes": 8388608,
+        "min_width": 640,
+        "min_height": 360,
+        "max_width": 3840,
+        "max_height": 2160
+      },
+      "thumbnail": {
+        "width": 480,
+        "height": 270
+      },
+      "full": {
+        "width": 1600,
+        "height": 900
+      }
+    }
+  },
+  "debug": {
+    "heartbeat": false,
+    "auth": false
+  },
+  "pages": {
+    "servers": {
+      "auto_refresh": 10,
+      "auto_refresh_animate": true
+    }
+  },
   "heartbeat_timeout_seconds": 120,
-  "waitress_threads": 8
+  "httpserver": {
+    "threads": 8
+  }
 }

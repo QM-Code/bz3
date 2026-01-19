@@ -154,7 +154,7 @@ def handle(request):
             )
 
         content_length = int(request.environ.get("CONTENT_LENGTH") or 0)
-        max_bytes = int(settings.get("upload_max_bytes", 3 * 1024 * 1024))
+        max_bytes = uploads._screenshot_settings(settings)["max_bytes"]
         form, files = request.multipart()
         if not auth.verify_csrf(request, form):
             return webhttp.html_response("<h1>Forbidden</h1>", status="403 Forbidden")
