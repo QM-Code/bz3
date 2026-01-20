@@ -1,28 +1,33 @@
 import threading
 import time
 
-from bz3web import config, webhttp
+from bz3web import config, db, webhttp
 
 
 _LOCK = threading.Lock()
-_BUCKETS = {}
 
 
-def _prune(entries, cutoff):
-    return [stamp for stamp in entries if stamp >= cutoff]
-
-
-def allow(key, max_requests, window_seconds):
+def allow(conn, key, max_requests, window_seconds):
     now = time.time()
     cutoff = now - window_seconds
     with _LOCK:
-        entries = _BUCKETS.get(key, [])
-        entries = _prune(entries, cutoff)
-        if len(entries) >= max_requests:
-            _BUCKETS[key] = entries
+        conn.execute(
+            "DELETE FROM rate_limits WHERE bucket_key = ? AND created_at < ?",
+            (key, cutoff),
+        )
+        row = conn.execute(
+            "SELECT COUNT(*) AS total FROM rate_limits WHERE bucket_key = ?",
+            (key,),
+        ).fetchone()
+        total = row["total"] if row else 0
+        if total >= max_requests:
+            conn.commit()
             return False
-        entries.append(now)
-        _BUCKETS[key] = entries
+        conn.execute(
+            "INSERT INTO rate_limits (bucket_key, created_at) VALUES (?, ?)",
+            (key, now),
+        )
+        conn.commit()
     return True
 
 
@@ -30,6 +35,7 @@ def check(settings, request, action):
     limit_cfg = config.require_setting(settings, f"rate_limits.{action}")
     max_requests = config.require_setting(limit_cfg, "max_requests", f"config.json rate_limits.{action}")
     window_seconds = config.require_setting(limit_cfg, "window_seconds", f"config.json rate_limits.{action}")
+    reset_limits = bool(config.require_setting(settings, "debug.reset_rate_limits"))
     try:
         max_requests = int(max_requests)
         window_seconds = int(window_seconds)
@@ -37,4 +43,10 @@ def check(settings, request, action):
         raise ValueError(f"[bz3web] Error: rate_limits.{action} must include integer max_requests and window_seconds.")
     client_ip = webhttp.client_ip(request.environ)
     key = f"{action}:{client_ip}"
-    return allow(key, max_requests, window_seconds)
+    with db.connect_ctx() as conn:
+        if reset_limits:
+            with _LOCK:
+                conn.execute("DELETE FROM rate_limits")
+                conn.commit()
+            return True
+        return allow(conn, key, max_requests, window_seconds)

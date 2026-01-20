@@ -3,16 +3,27 @@ from urllib.parse import quote
 from bz3web import auth, config, db, views, webhttp
 
 
+def _action(key):
+    return config.ui_text(f"actions.{key}", "config.json ui_text.actions")
+
+
+def _title(key):
+    return config.ui_text(f"titles.{key}", "config.json ui_text.titles")
+
+
+def _section(key):
+    return config.ui_text(f"sections.{key}", "config.json ui_text.sections")
+
+
 def handle(request):
     if request.method != "GET":
-        return webhttp.html_response("<h1>Method Not Allowed</h1>", status="405 Method Not Allowed")
+        return views.error_page("405 Method Not Allowed", "method_not_allowed")
 
     settings = config.get_config()
     list_name = config.require_setting(settings, "community_name")
 
-    conn = db.connect(db.default_db_path())
-    rows = db.list_servers(conn)
-    conn.close()
+    with db.connect_ctx() as conn:
+        rows = db.list_servers(conn)
 
     show_inactive = request.query.get("show_inactive", [""])[0] == "1"
     overview_max = int(config.require_setting(settings, "pages.servers.overview_max_chars"))
@@ -49,14 +60,15 @@ def handle(request):
         if is_admin:
             server_id = entry.get("id")
             csrf_html = views.csrf_input(csrf_token)
+            confirm_delete = webhttp.html_escape(config.ui_text("confirmations.delete_server"))
             entry["actions_html"] = f"""<form method="get" action="/server/edit">
   <input type="hidden" name="id" value="{server_id}">
-  <button type="submit" class="secondary small">Edit</button>
+  <button type="submit" class="secondary small">{webhttp.html_escape(_action("edit"))}</button>
 </form>
-<form method="post" action="/server/delete" data-confirm="Delete this server permanently?">
+<form method="post" action="/server/delete" data-confirm="{confirm_delete}">
   {csrf_html}
   <input type="hidden" name="id" value="{server_id}">
-  <button type="submit" class="secondary small">Delete</button>
+  <button type="submit" class="secondary small">{webhttp.html_escape(_action("delete"))}</button>
 </form>"""
         return entry
 
@@ -73,7 +85,7 @@ def handle(request):
         timeout,
         show_inactive,
         _entry_builder,
-        header_title="Servers",
+        header_title=_section("servers"),
         toggle_on_url="/servers?show_inactive=1",
         toggle_off_url="/servers",
         refresh_url=refresh_url,
@@ -81,7 +93,6 @@ def handle(request):
         allow_actions=is_admin,
         refresh_animate=refresh_animate,
     )
-    body = f"""{header_html}
-{cards_html}
+    body = f"""{cards_html}
 """
-    return views.render_page("Server List", body)
+    return views.render_page_with_header(_title("server_list"), header_html, body)

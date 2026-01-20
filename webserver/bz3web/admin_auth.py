@@ -22,11 +22,8 @@ def verify_login(username, password, settings):
     expected_user = config.require_setting(settings, "admin_user")
     if username.lower() != str(expected_user).lower():
         return False
-    conn = db.connect(db.default_db_path())
-    try:
+    with db.connect_ctx() as conn:
         user = db.get_user_by_username(conn, expected_user)
         if not user or user["is_locked"] or user["deleted"]:
             return False
         return auth.verify_password(password, user["password_salt"], user["password_hash"])
-    finally:
-        conn.close()

@@ -70,6 +70,11 @@ def _scale_image(image, max_width, max_height):
     return scaled
 
 
+def _msg(key, **values):
+    template = config.ui_text(f"messages.uploads.{key}", "config.json ui_text.messages.uploads")
+    return config.format_text(template, **values)
+
+
 def handle_upload(file_item):
     settings = config.get_config()
     limits = _screenshot_settings(settings)
@@ -85,27 +90,27 @@ def handle_upload(file_item):
     full_height = limits["full_height"]
 
     if Image is None:
-        return None, "Image processing library (Pillow) is not installed."
+        return None, _msg("missing_pillow")
 
     data = file_item.file.read()
     if not data:
-        return None, "Uploaded file was empty."
+        return None, _msg("empty_file")
     if len(data) < min_bytes:
-        return None, f"File too small (min {min_bytes} bytes)."
+        return None, _msg("file_too_small", min_bytes=min_bytes)
     if len(data) > max_bytes:
-        return None, f"File too large (max {max_bytes} bytes)."
+        return None, _msg("file_too_large", max_bytes=max_bytes)
 
     try:
         image = Image.open(io.BytesIO(data))
         image.load()
     except Exception:
-        return None, "Uploaded file is not a valid image."
+        return None, _msg("invalid_image")
 
     width, height = image.size
     if width < min_width or height < min_height:
-        return None, "Image resolution too small."
+        return None, _msg("resolution_too_small")
     if width > max_width or height > max_height:
-        return None, "Image resolution too large."
+        return None, _msg("resolution_too_large")
 
     ensure_upload_dir()
     token = secrets.token_hex(12)

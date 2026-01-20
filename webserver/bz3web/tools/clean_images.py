@@ -18,11 +18,8 @@ def clean_images(dry_run=False):
     if not os.path.isdir(uploads_dir):
         return 0, 0
 
-    conn = db.connect(db.default_db_path())
-    try:
+    with db.connect_ctx() as conn:
         referenced = _list_referenced_ids(conn)
-    finally:
-        conn.close()
 
     removed = 0
     kept = 0

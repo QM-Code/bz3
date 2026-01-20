@@ -78,6 +78,23 @@ def html_escape(value):
 def html_response(body, status="200 OK", headers=None):
     headers = headers or []
     headers = [("Content-Type", "text/html; charset=utf-8")] + headers
+    try:
+        from bz3web import config
+
+        settings = config.get_config()
+        security = settings.get("security_headers", {})
+        csp = security.get("content_security_policy")
+        referrer = security.get("referrer_policy")
+        nosniff = security.get("x_content_type_options")
+        existing = {key.lower() for key, _ in headers}
+        if csp and "content-security-policy" not in existing:
+            headers.append(("Content-Security-Policy", csp))
+        if referrer and "referrer-policy" not in existing:
+            headers.append(("Referrer-Policy", referrer))
+        if nosniff and "x-content-type-options" not in existing:
+            headers.append(("X-Content-Type-Options", nosniff))
+    except Exception:
+        pass
     return status, headers, body.encode("utf-8")
 
 
@@ -119,10 +136,12 @@ def parse_cookies(environ):
     return cookies
 
 
-def set_cookie(headers, name, value, path="/", max_age=None, http_only=True, same_site="Lax"):
+def set_cookie(headers, name, value, path="/", max_age=None, http_only=True, same_site="Lax", secure=False):
     parts = [f"{name}={value}", f"Path={path}", f"SameSite={same_site}"]
     if max_age is not None:
         parts.append(f"Max-Age={max_age}")
+    if secure:
+        parts.append("Secure")
     if http_only:
         parts.append("HttpOnly")
     headers.append(("Set-Cookie", "; ".join(parts)))

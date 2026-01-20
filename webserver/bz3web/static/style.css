@@ -442,6 +442,38 @@ tr:nth-child(even) td {
   font-size: 0.8125rem;
 }
 
+.hint {
+  margin-top: 0.35rem;
+}
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.field-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: #9e9485;
+}
+
+.char-warning {
+  color: #f2b266;
+  font-weight: 600;
+}
+
+.char-warning.hidden {
+  display: none;
+}
+
+.field-error {
+  border-color: #f2b266;
+  box-shadow: 0 0 0 2px rgba(242, 178, 102, 0.18);
+}
+
 pre {
   background: #0f1318;
   border: 1px solid #2b3138;

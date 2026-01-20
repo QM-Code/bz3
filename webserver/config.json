@@ -1,9 +1,10 @@
 {
-  "community_name": "Fuck You",
+  "community_name": "My Community",
   "community_description": "",
-  "admin_user": "MasterBlaster",
+  "admin_user": "Admin",
   "host": "0.0.0.0",
-  "port": 8888,
+  "port": 8080,
+  "language": "en",
   "data_dir": "data",
   "uploads_dir": "uploads",
   "uploads": {
@@ -28,7 +29,9 @@
   },
   "debug": {
     "heartbeat": false,
-    "auth": false
+    "auth": false,
+    "disable_browser_language_detection": false,
+    "reset_rate_limits": false
   },
   "pages": {
     "servers": {
@@ -63,18 +66,15 @@
       "max_requests": 60
     }
   },
-  "placeholders": {
-    "add_server": {
-      "host": "example.com or 10.0.0.5",
-      "port": "11899",
-      "name": "Required unique name",
-      "overview": "Short summary for listings",
-      "description": "Optional description"
-    },
-    "users": {
-      "reset_password": "Leave blank to keep current password",
-      "new_password": "Leave blank to keep current password"
-    }
+  "session_cookie": {
+    "secure": false,
+    "same_site": "Lax",
+    "http_only": true
+  },
+  "security_headers": {
+    "content_security_policy": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'",
+    "referrer_policy": "same-origin",
+    "x_content_type_options": "nosniff"
   },
   "heartbeat_timeout_seconds": 120,
   "httpserver": {

@@ -58,12 +58,11 @@ def import_data(path, allow_merge=False, overwrite=False):
     if overwrite and db_exists:
         os.remove(db_path)
     db.init_db(db_path)
-    conn = db.connect(db_path)
     inserted_users = 0
     skipped_users = 0
     inserted_servers = 0
     skipped_servers = 0
-    try:
+    with db.connect_ctx(db_path) as conn:
         admin_username = config.require_setting(config.get_config(), "admin_user")
         admin_names = set()
         for entry in users:
@@ -80,6 +79,7 @@ def import_data(path, allow_merge=False, overwrite=False):
             is_deleted = bool(entry.get("deleted"))
             locked_at = _normalize(entry.get("locked_at")) or None
             deleted_at = _normalize(entry.get("deleted_at")) or None
+            language = _normalize(entry.get("language")) or None
             if not username or not email:
                 skipped_users += 1
                 continue
@@ -99,6 +99,8 @@ def import_data(path, allow_merge=False, overwrite=False):
                     db.set_user_password(conn, user_id, digest, salt)
                 db.set_user_locked(conn, user_id, is_locked, locked_at=locked_at)
                 db.set_user_deleted(conn, user_id, is_deleted, deleted_at=deleted_at)
+                if language is not None:
+                    db.update_user_language(conn, user_id, language)
                 if is_admin and username.lower() != admin_username.lower():
                     admin_names.add(username.lower())
                 inserted_users += 1
@@ -111,7 +113,7 @@ def import_data(path, allow_merge=False, overwrite=False):
                 salt = password_salt
             else:
                 digest, salt = auth.new_password(password)
-            db.add_user(conn, username, email, digest, salt, is_admin=False, is_admin_manual=False)
+            db.add_user(conn, username, email, digest, salt, is_admin=False, is_admin_manual=False, language=language)
             user_row = db.get_user_by_username(conn, username)
             if user_row:
                 db.set_user_locked(conn, user_row["id"], is_locked, locked_at=locked_at)
@@ -184,8 +186,6 @@ def import_data(path, allow_merge=False, overwrite=False):
             inserted_servers += 1
         if root_user:
             db.recompute_admin_flags(conn, root_user["id"])
-    finally:
-        conn.close()
 
     return inserted_users, skipped_users, inserted_servers, skipped_servers
 

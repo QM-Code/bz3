@@ -13,8 +13,7 @@ def handle(request):
     owner = request.query.get("owner", [""])[0].strip()
     show_inactive = request.query.get("show_inactive", [""])[0] == "1"
 
-    conn = db.connect(db.default_db_path())
-    try:
+    with db.connect_ctx() as conn:
         if owner:
             user = db.get_user_by_username(conn, owner)
             if not user or user["deleted"]:
@@ -26,8 +25,6 @@ def handle(request):
             rows = db.list_user_servers(conn, user["id"])
         else:
             rows = db.list_servers(conn)
-    finally:
-        conn.close()
 
     servers = []
     timeout = int(config.require_setting(settings, "heartbeat_timeout_seconds"))

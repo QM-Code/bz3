@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import signal
 import sys
 
 
@@ -31,6 +32,12 @@ def main():
     cli.bootstrap(directory, "usage: start.py <community-directory>")
     if port_override is not None:
         config.get_config()["port"] = port_override
+    def _handle_sigint(_sig, _frame):
+        print("\nServer stopped.")
+        raise SystemExit(0)
+
+    signal.signal(signal.SIGINT, _handle_sigint)
+    os.environ["BZ3WEB_SIGINT_HANDLED"] = "1"
     app.main()
 
 

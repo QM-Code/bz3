@@ -82,6 +82,7 @@ void MainMenuView::drawThemesPanel(const MessageColors &colors) {
 
     bool changed = false;
     changed |= editFont("Regular", currentTheme.regular);
+    changed |= editFont("Emoji", currentTheme.emoji);
     changed |= editFont("Title", currentTheme.title);
     changed |= editFont("Heading", currentTheme.heading);
     changed |= editFont("Button", currentTheme.button);
@@ -272,6 +273,7 @@ nlohmann::json MainMenuView::themeToJson(const ThemeConfig &theme) const {
     };
     nlohmann::json console = nlohmann::json::object();
     console["Regular"] = encodeFont(theme.regular);
+    console["Emoji"] = encodeFont(theme.emoji);
     console["Title"] = encodeFont(theme.title);
     console["Heading"] = encodeFont(theme.heading);
     console["Button"] = encodeFont(theme.button);
@@ -342,6 +344,7 @@ MainMenuView::ThemeConfig MainMenuView::themeFromJson(const nlohmann::json &them
 
     ThemeConfig theme = fallback;
     theme.regular = readFont("Regular", fallback.regular);
+    theme.emoji = readFont("Emoji", fallback.emoji);
     theme.title = readFont("Title", fallback.title);
     theme.heading = readFont("Heading", fallback.heading);
     theme.button = readFont("Button", fallback.button);
@@ -449,6 +452,7 @@ void MainMenuView::ensureThemesLoaded() {
     ThemeConfig fallback;
     fallback.name = "Default";
     fallback.regular = ThemeFontConfig{"", 20.0f, defaultTextColor};
+    fallback.emoji = ThemeFontConfig{"", 20.0f, defaultTextColor};
     fallback.title = ThemeFontConfig{"", 28.0f, defaultTextColor};
     fallback.heading = ThemeFontConfig{"", 28.0f, defaultTextColor};
     fallback.button = ThemeFontConfig{"", 18.0f, defaultTextColor};

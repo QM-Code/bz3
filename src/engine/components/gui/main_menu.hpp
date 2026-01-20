@@ -67,10 +67,11 @@ public:
 
     struct ThemeConfig {
         std::string name;
-        ThemeFontConfig regular;
-        ThemeFontConfig title;
-        ThemeFontConfig heading;
-        ThemeFontConfig button;
+    ThemeFontConfig regular;
+    ThemeFontConfig emoji;
+    ThemeFontConfig title;
+    ThemeFontConfig heading;
+    ThemeFontConfig button;
     };
 
     ~MainMenuView();
@@ -157,6 +158,7 @@ private:
 
     bool visible = false;
     ImFont *regularFont = nullptr;
+    ImFont *emojiFont = nullptr;
     ImFont *titleFont = nullptr;
     ImFont *headingFont = nullptr;
     ImFont *buttonFont = nullptr;

@@ -1,5 +1,6 @@
 import json
 import os
+import threading
 
 
 _CONFIG = None
@@ -7,6 +8,10 @@ _BASE_CONFIG = None
 _COMMUNITY_CONFIG = None
 _CONFIG_PATH = None
 _COMMUNITY_DIR = None
+_LANGUAGE_CONFIGS = {}
+_CONFIG_BY_LANGUAGE = {}
+_AVAILABLE_LANGUAGES = None
+_THREAD_LOCAL = threading.local()
 
 
 def _find_config_path():
@@ -35,6 +40,7 @@ def _load_config():
         raise ValueError(f"[bz3web] Error: corrupt config.json file ({location}).") from exc
     _CONFIG_PATH = config_path
     _BASE_CONFIG = data
+    _reset_language_cache()
     return data
 
 
@@ -43,6 +49,7 @@ def set_community_dir(path):
     _COMMUNITY_DIR = path
     _COMMUNITY_CONFIG = None
     _CONFIG = None
+    _reset_language_cache()
 
 
 def get_community_dir():
@@ -72,6 +79,7 @@ def _load_community_config():
         location = f"line {exc.lineno} column {exc.colno}" if exc.lineno and exc.colno else "unknown location"
         raise ValueError(f"[bz3web] Error: corrupt community config.json file ({location}).") from exc
     _COMMUNITY_CONFIG = data
+    _reset_language_cache()
     return data
 
 
@@ -87,13 +95,276 @@ def _deep_merge(base, override):
     return merged
 
 
-def get_config():
-    global _CONFIG
-    if _CONFIG is None:
+def get_base_config():
+    return _BASE_CONFIG or _load_config()
+
+
+def _reset_language_cache():
+    global _LANGUAGE_CONFIGS, _CONFIG_BY_LANGUAGE, _AVAILABLE_LANGUAGES
+    _LANGUAGE_CONFIGS = {}
+    _CONFIG_BY_LANGUAGE = {}
+    _AVAILABLE_LANGUAGES = None
+
+
+def _load_strings_config(language):
+    language = normalize_language(language)
+    if not language:
+        return None
+    if language in _LANGUAGE_CONFIGS:
+        return _LANGUAGE_CONFIGS[language]
+    config_dir = get_config_dir()
+    community_dir = get_community_dir()
+    base_path = os.path.join(config_dir, "strings", f"{language}.json") if config_dir else None
+    community_path = os.path.join(community_dir, "strings", f"{language}.json") if community_dir else None
+    base_data = None
+    community_data = None
+    if base_path:
+        try:
+            with open(base_path, "r", encoding="utf-8") as handle:
+                base_data = json.load(handle)
+        except FileNotFoundError:
+            base_data = None
+        except json.JSONDecodeError as exc:
+            location = f"line {exc.lineno} column {exc.colno}" if exc.lineno and exc.colno else "unknown location"
+            raise ValueError(f"[bz3web] Error: corrupt strings/{language}.json file ({location}).") from exc
+    if community_path:
+        try:
+            with open(community_path, "r", encoding="utf-8") as handle:
+                community_data = json.load(handle)
+        except FileNotFoundError:
+            community_data = None
+        except json.JSONDecodeError as exc:
+            location = f"line {exc.lineno} column {exc.colno}" if exc.lineno and exc.colno else "unknown location"
+            raise ValueError(f"[bz3web] Error: corrupt community strings/{language}.json file ({location}).") from exc
+    if base_data is None and community_data is None:
+        _LANGUAGE_CONFIGS[language] = None
+        return None
+    merged = dict(base_data or {})
+    if community_data:
+        merged = _deep_merge(merged, community_data)
+    _LANGUAGE_CONFIGS[language] = merged
+    return merged
+
+
+def get_available_languages():
+    global _AVAILABLE_LANGUAGES
+    if _AVAILABLE_LANGUAGES is None:
+        languages = {"en"}
+        for base_dir in (get_config_dir(), get_community_dir()):
+            if not base_dir or not os.path.isdir(base_dir):
+                continue
+            strings_dir = os.path.join(base_dir, "strings")
+            if not os.path.isdir(strings_dir):
+                continue
+            for name in os.listdir(strings_dir):
+                if not name.endswith(".json"):
+                    continue
+                code = name[: -len(".json")].strip().lower()
+                if code:
+                    languages.add(code)
+        _AVAILABLE_LANGUAGES = sorted(languages)
+    return list(_AVAILABLE_LANGUAGES)
+
+
+def normalize_language(language):
+    return str(language or "").strip().lower()
+
+
+def get_default_language():
+    base = get_base_config()
+    community = _COMMUNITY_CONFIG or _load_community_config() or {}
+    language = community.get("language") or require_setting(base, "language")
+    return normalize_language(language)
+
+
+def _collect_missing(node, paths, label):
+    missing = []
+    for path in paths:
+        target = node
+        parts = path.split(".")
+        found = True
+        for part in parts:
+            if not isinstance(target, dict) or part not in target:
+                found = False
+                break
+            target = target[part]
+        if not found or target is None or target == "":
+            missing.append(f"{label}: missing {path}")
+    return missing
+
+
+def _load_strings_en():
+    config_dir = get_config_dir()
+    if not config_dir:
+        raise ValueError("[bz3web] Error: config.json directory not found.")
+    path = os.path.join(config_dir, "strings", "en.json")
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            return json.load(handle)
+    except FileNotFoundError as exc:
+        raise ValueError("[bz3web] Error: missing strings/en.json.") from exc
+    except json.JSONDecodeError as exc:
+        location = f"line {exc.lineno} column {exc.colno}" if exc.lineno and exc.colno else "unknown location"
+        raise ValueError(f"[bz3web] Error: corrupt strings/en.json file ({location}).") from exc
+
+
+def validate_startup(settings):
+    base = get_base_config()
+    required_config_paths = [
+        "host",
+        "port",
+        "data_dir",
+        "uploads_dir",
+        "heartbeat_timeout_seconds",
+        "language",
+        "pages.servers.overview_max_chars",
+        "pages.servers.auto_refresh",
+        "pages.servers.auto_refresh_animate",
+        "uploads.screenshots.limits",
+        "uploads.screenshots.thumbnail",
+        "uploads.screenshots.full",
+        "debug.heartbeat",
+        "debug.auth",
+        "debug.disable_browser_language_detection",
+        "debug.reset_rate_limits",
+        "httpserver.threads",
+        "rate_limits.login",
+        "rate_limits.register",
+        "rate_limits.forgot",
+        "rate_limits.reset",
+        "rate_limits.api_auth",
+        "rate_limits.api_user_registered",
+        "session_cookie.secure",
+        "session_cookie.same_site",
+        "session_cookie.http_only",
+        "security_headers.content_security_policy",
+        "security_headers.referrer_policy",
+        "security_headers.x_content_type_options",
+    ]
+    missing = _collect_missing(base, required_config_paths, "config.json")
+
+    strings_en = _load_strings_en()
+    required_strings_paths = [
+        "meta.direction",
+        "languages",
+        "ui_text",
+        "ui_text.messages",
+        "ui_text.labels",
+        "ui_text.actions",
+        "ui_text.titles",
+        "ui_text.sections",
+        "ui_text.status",
+        "ui_text.errors",
+        "ui_text.confirm",
+        "ui_text.confirmations",
+        "ui_text.nav",
+        "ui_text.header",
+        "ui_text.templates",
+        "ui_text.admin_docs",
+        "ui_text.admin_notices",
+        "ui_text.empty_states",
+        "ui_text.hints",
+        "ui_text.counter",
+        "ui_text.warnings",
+    ]
+    missing.extend(_collect_missing(strings_en, required_strings_paths, "strings/en.json"))
+
+    if missing:
+        details = "\n".join(missing)
+        raise ValueError(f"[bz3web] Error: missing required configuration keys:\n{details}")
+
+    language = normalize_language(base.get("language"))
+    if language:
+        strings = _load_strings_config(language)
+        if not strings:
+            available = ", ".join(get_available_languages())
+            raise ValueError(
+                f"[bz3web] Error: missing strings/{language}.json. Available languages: {available}"
+            )
+
+
+def set_request_language(language):
+    _THREAD_LOCAL.language = normalize_language(language) or None
+
+
+def get_request_language():
+    return getattr(_THREAD_LOCAL, "language", None)
+
+
+def clear_request_language():
+    if hasattr(_THREAD_LOCAL, "language"):
+        delattr(_THREAD_LOCAL, "language")
+
+
+def parse_accept_language(header):
+    entries = []
+    for part in (header or "").split(","):
+        token = part.strip()
+        if not token or token == "*":
+            continue
+        quality = 1.0
+        if ";q=" in token:
+            lang, q_value = token.split(";q=", 1)
+            token = lang.strip()
+            try:
+                quality = float(q_value)
+            except ValueError:
+                quality = 0.0
+        entries.append((quality, token))
+    entries.sort(key=lambda item: item[0], reverse=True)
+    return [lang for _, lang in entries]
+
+
+def match_language(accept_language, available):
+    if not accept_language:
+        return None
+    available_map = {normalize_language(code): code for code in available}
+    for lang in parse_accept_language(accept_language):
+        normalized = normalize_language(lang)
+        if normalized in available_map:
+            return available_map[normalized]
+        primary = normalized.split("-", 1)[0]
+        if primary in available_map:
+            return available_map[primary]
+    return None
+
+
+def _require_strings_language(language):
+    strings = _load_strings_config(language)
+    if not strings:
+        raise ValueError(f"[bz3web] Error: missing strings/{language}.json.")
+    return strings
+
+
+def _build_strings(language):
+    default_strings = _require_strings_language("en")
+    if language == "en":
+        return default_strings
+    selected_strings = _load_strings_config(language)
+    if not selected_strings:
+        raise ValueError(f"[bz3web] Error: missing strings/{language}.json.")
+    return _deep_merge(default_strings, selected_strings)
+
+
+def get_config(language=None):
+    language = normalize_language(language or get_request_language() or get_default_language())
+    if not language:
+        language = "en"
+    if language not in _CONFIG_BY_LANGUAGE:
         base = _BASE_CONFIG or _load_config()
+        merged = dict(base)
         community = _COMMUNITY_CONFIG or _load_community_config()
-        _CONFIG = _deep_merge(base, community) if community else dict(base)
-    return _CONFIG
+        string_overrides = {}
+        if community:
+            string_overrides = {k: community[k] for k in ("languages", "ui_text", "placeholders") if k in community}
+            merged = _deep_merge(merged, community)
+        strings_config = _build_strings(language)
+        merged = _deep_merge(merged, strings_config)
+        if string_overrides:
+            merged = _deep_merge(merged, string_overrides)
+        merged["language"] = language
+        _CONFIG_BY_LANGUAGE[language] = merged
+    return _CONFIG_BY_LANGUAGE[language]
 
 
 def require_setting(settings, path, label="config.json"):
@@ -106,6 +377,17 @@ def require_setting(settings, path, label="config.json"):
     if node is None or node == "":
         raise ValueError(f"[bz3web] Error: Missing {path} in {label}. Add it to {label}.")
     return node
+
+
+def ui_text(path, label="config.json ui_text"):
+    return require_setting(get_config(), f"ui_text.{path}", label)
+
+
+def format_text(template, **values):
+    text = str(template)
+    for key, value in values.items():
+        text = text.replace(f"{{{key}}}", str(value))
+    return text
 
 
 def save_community_config(data):

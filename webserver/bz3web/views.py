@@ -1,9 +1,69 @@
+import json
 import urllib.parse
 
-from bz3web import webhttp
+from bz3web import config, webhttp
 
 
-def render_page(title, body_html, message=None, header_links_html=None):
+def _ui_text(path):
+    return config.ui_text(path)
+
+
+def _nav(path):
+    return config.ui_text(f"nav.{path}")
+
+
+def _label(path):
+    return config.ui_text(f"labels.{path}")
+
+
+def _action(path):
+    return config.ui_text(f"actions.{path}")
+
+
+def _title(path):
+    return config.ui_text(f"titles.{path}")
+
+
+def _section(path):
+    return config.ui_text(f"sections.{path}")
+
+
+def _status(path):
+    return config.ui_text(f"status.{path}")
+
+
+def _confirm(path):
+    return config.ui_text(f"confirm.{path}")
+
+
+def _confirm_text(path):
+    return config.ui_text(f"confirmations.{path}")
+
+
+def _template(path):
+    return config.ui_text(f"templates.{path}")
+
+
+def _header_text(path):
+    return config.ui_text(f"header.{path}")
+
+
+def error_page(status, key, message=None):
+    error_cfg = _ui_text(f"errors.{key}")
+    if isinstance(error_cfg, dict):
+        title = error_cfg.get("title") or "Error"
+        body_message = message if message is not None else error_cfg.get("message", "")
+    else:
+        title = str(error_cfg)
+        body_message = message or ""
+    body = f"<h1>{webhttp.html_escape(title)}</h1>"
+    if body_message:
+        body += f"<p class=\"muted\">{webhttp.html_escape(body_message)}</p>"
+    _, headers, response_body = render_page(title, body, message=None)
+    return status, headers, response_body
+
+
+def render_page(title, body_html, message=None, header_links_html=None, headers=None):
     nav_html = ""
     if header_links_html:
         nav_html = f"""
@@ -13,14 +73,22 @@ def render_page(title, body_html, message=None, header_links_html=None):
       </div>
     </div>
 """
+    overview_empty = _ui_text("empty_states.overview")
+    servers_empty = _ui_text("empty_states.servers")
+    overview_empty_js = json.dumps(f'<p class="muted">{overview_empty}</p>')
+    servers_empty_js = json.dumps(f'<p class="muted">{servers_empty}</p>')
+    confirm_title = webhttp.html_escape(_confirm("title"))
+    confirm_message = webhttp.html_escape(_confirm("message"))
+    confirm_cancel = webhttp.html_escape(_confirm("cancel_label"))
+    confirm_ok = webhttp.html_escape(_confirm("ok_label"))
     confirm_html = """
     <div class="confirm-modal" id="confirm-modal" hidden>
       <div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
-        <h3 id="confirm-title">Confirm action</h3>
-        <p id="confirm-message">Are you sure?</p>
+        <h3 id="confirm-title">__CONFIRM_TITLE__</h3>
+        <p id="confirm-message">__CONFIRM_MESSAGE__</p>
         <div class="actions">
-          <button type="button" class="secondary" id="confirm-cancel">Cancel</button>
-          <button type="button" id="confirm-ok">Delete</button>
+          <button type="button" class="secondary" id="confirm-cancel">__CONFIRM_CANCEL__</button>
+          <button type="button" id="confirm-ok">__CONFIRM_OK__</button>
         </div>
       </div>
     </div>
@@ -45,7 +113,7 @@ def render_page(title, body_html, message=None, header_links_html=None):
           if (label) {
             ok.textContent = label;
           } else {
-            ok.textContent = 'Delete';
+            ok.textContent = '__CONFIRM_OK__';
           }
           ok.classList.remove('danger', 'success');
           if (style === 'success') {
@@ -130,11 +198,11 @@ def render_page(title, body_html, message=None, header_links_html=None):
           const overviewText = server.overview || "";
           const description = overviewText
             ? `<p>${escapeHtml(overviewText)}</p>`
-            : '<p class="muted">No overview provided.</p>';
+            : __OVERVIEW_EMPTY__;
           const hasScreenshot = Boolean(server.screenshot_id);
           const cardClass = hasScreenshot ? "card-top" : "card-top no-thumb";
           const screenshotHtml = hasScreenshot
-            ? `<img class="thumb" src="/uploads/${escapeHtml(server.screenshot_id)}_thumb.jpg" data-full="/uploads/${escapeHtml(server.screenshot_id)}_full.jpg" alt="Screenshot">`
+            ? `<img class="thumb" src="/uploads/${escapeHtml(server.screenshot_id)}_thumb.jpg" data-full="/uploads/${escapeHtml(server.screenshot_id)}_full.jpg" alt="__SCREENSHOT_ALT__">`
             : "";
           let onlineValue = "—";
           if (server.num_players !== undefined && server.num_players !== null && server.max_players !== undefined && server.max_players !== null) {
@@ -145,8 +213,8 @@ def render_page(title, body_html, message=None, header_links_html=None):
             onlineValue = `— / ${server.max_players}`;
           }
           const onlineLabel = server.active
-            ? `<span class="online-label">Online:</span> <span class="online-value">${escapeHtml(onlineValue)}</span>`
-            : '<span class="online-label inactive">Offline</span>';
+            ? `<span class="online-label">__ONLINE_PREFIX__</span> <span class="online-value">${escapeHtml(onlineValue)}</span>`
+            : '<span class="online-label inactive">__OFFLINE_LABEL__</span>';
           const onlineClass = server.active ? "online active" : "online inactive";
           const endpointHtml = server.active
             ? `<div class="endpoint">${escapeHtml(server.host)}:${escapeHtml(server.port)}</div>`
@@ -156,11 +224,11 @@ def render_page(title, body_html, message=None, header_links_html=None):
             actionsBlock = `<div class="card-actions">
   <form method="get" action="/server/edit">
     <input type="hidden" name="id" value="${escapeHtml(server.id)}">
-    <button type="submit" class="secondary small">Edit</button>
+    <button type="submit" class="secondary small">__ACTION_EDIT__</button>
   </form>
-  <form method="post" action="/server/delete" data-confirm="Delete this server permanently?">
+  <form method="post" action="/server/delete" data-confirm="__CONFIRM_DELETE_SERVER__">
     <input type="hidden" name="id" value="${escapeHtml(server.id)}">
-    <button type="submit" class="secondary small">Delete</button>
+    <button type="submit" class="secondary small">__ACTION_DELETE__</button>
   </form>
 </div>`;
           }
@@ -168,7 +236,7 @@ def render_page(title, body_html, message=None, header_links_html=None):
   <header>
     <div class="title-block">
       <h3><a class="server-link" href="${serverUrl}">${name}</a></h3>
-      <div class="owner-line">by <a class="owner-link" href="${ownerUrl}">${owner}</a></div>
+      <div class="owner-line">__OWNER_BY__ <a class="owner-link" href="${ownerUrl}">${owner}</a></div>
     </div>
     <div class="online-block">
       <div class="${onlineClass}">${onlineLabel}</div>
@@ -192,7 +260,7 @@ def render_page(title, body_html, message=None, header_links_html=None):
           if (!container) return;
           const animate = section.dataset.animate === "1";
           if (!servers.length) {
-            container.innerHTML = '<p class="muted">No servers to display.</p>';
+            container.innerHTML = __SERVERS_EMPTY__;
             return;
           }
           const grid = container.querySelector(".card-grid") || document.createElement("div");
@@ -284,8 +352,62 @@ def render_page(title, body_html, message=None, header_links_html=None):
       })();
     </script>
     """
+    confirm_html = confirm_html.replace("__OVERVIEW_EMPTY__", overview_empty_js)
+    confirm_html = confirm_html.replace("__SERVERS_EMPTY__", servers_empty_js)
+    confirm_html = confirm_html.replace("__OWNER_BY__", webhttp.html_escape(_label("owner_by")))
+    confirm_html = confirm_html.replace("__ONLINE_PREFIX__", webhttp.html_escape(_status("online_prefix")))
+    confirm_html = confirm_html.replace("__OFFLINE_LABEL__", webhttp.html_escape(_status("offline")))
+    confirm_html = confirm_html.replace("__CONFIRM_DELETE_SERVER__", webhttp.html_escape(_confirm_text("delete_server")))
+    confirm_html = confirm_html.replace("__SCREENSHOT_ALT__", webhttp.html_escape(_label("screenshot_alt")))
+    confirm_html = confirm_html.replace("__ACTION_EDIT__", webhttp.html_escape(_action("edit")))
+    confirm_html = confirm_html.replace("__ACTION_DELETE__", webhttp.html_escape(_action("delete")))
+    confirm_html = confirm_html.replace("__CONFIRM_TITLE__", confirm_title)
+    confirm_html = confirm_html.replace("__CONFIRM_MESSAGE__", confirm_message)
+    confirm_html = confirm_html.replace("__CONFIRM_CANCEL__", confirm_cancel)
+    confirm_html = confirm_html.replace("__CONFIRM_OK__", confirm_ok)
+    confirm_html += """
+    <script>
+      (() => {
+        const formatTemplate = (template, count, max) =>
+          String(template || "")
+            .replace(/\\{count\\}/g, String(count))
+            .replace(/\\{max\\}/g, String(max));
+        const fields = document.querySelectorAll("[data-char-limit]");
+        fields.forEach((field) => {
+          const wrapper = field.closest("[data-char-field]") || field.parentElement;
+          if (!wrapper) return;
+          const counter = wrapper.querySelector(".char-counter");
+          const warning = wrapper.querySelector(".char-warning");
+          const max = parseInt(field.dataset.charLimit || "0", 10);
+          const counterTemplate = field.dataset.counterTemplate || "";
+          const warningTemplate = field.dataset.warningTemplate || "";
+          const update = () => {
+            const count = field.value.length;
+            if (counter) {
+              counter.textContent = formatTemplate(counterTemplate, count, max);
+            }
+            if (!warning) return;
+            if (max && count > max) {
+              warning.textContent = formatTemplate(warningTemplate, count, max);
+              warning.classList.remove("hidden");
+              field.classList.add("field-error");
+            } else {
+              warning.classList.add("hidden");
+              field.classList.remove("field-error");
+            }
+          };
+          field.addEventListener("input", update);
+          update();
+        });
+      })();
+    </script>
+    """
+    settings = config.get_config()
+    lang = webhttp.html_escape(settings.get("language") or "en")
+    direction = settings.get("meta", {}).get("direction", "ltr")
+    direction = "rtl" if str(direction).lower() == "rtl" else "ltr"
     html = f"""<!doctype html>
-<html lang="en">
+<html lang="{lang}" dir="{direction}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -301,7 +423,17 @@ def render_page(title, body_html, message=None, header_links_html=None):
 </body>
 </html>
 """
-    return webhttp.html_response(html)
+    return webhttp.html_response(html, headers=headers)
+
+
+def no_store_headers():
+    return [("Cache-Control", "no-store"), ("Pragma", "no-cache")]
+
+
+def render_page_with_header(title, header_html, body_html, message=None, header_links_html=None, headers=None):
+    full_body = f"""{header_html}
+{body_html}"""
+    return render_page(title, full_body, message=message, header_links_html=header_links_html, headers=headers)
 
 
 def csrf_input(token):
@@ -326,19 +458,20 @@ def header(
     user_html = ""
     if logged_in and user_name:
         safe_name = webhttp.html_escape(user_name)
-        user_html = f'<div class="header-user">Signed in as <span class="header-username">{safe_name}</span></div>'
+        signed_in_as = webhttp.html_escape(_header_text("signed_in_as"))
+        user_html = f'<div class="header-user">{signed_in_as} <span class="header-username">{safe_name}</span></div>'
     if current_path != "/info":
-        links.append('<a class="admin-link" href="/info">Info</a>')
+        links.append(f'<a class="admin-link" href="/info">{webhttp.html_escape(_nav("info"))}</a>')
     if current_path != "/servers":
-        links.append('<a class="admin-link" href="/servers">Servers</a>')
+        links.append(f'<a class="admin-link" href="/servers">{webhttp.html_escape(_nav("servers"))}</a>')
     if logged_in and profile_url and current_path != profile_url:
-        links.append(f'<a class="admin-link" href="{profile_url}">Account</a>')
+        links.append(f'<a class="admin-link" href="{profile_url}">{webhttp.html_escape(_nav("account"))}</a>')
     if logged_in and is_admin and current_path != "/users":
-        links.append('<a class="admin-link" href="/users">Users</a>')
+        links.append(f'<a class="admin-link" href="/users">{webhttp.html_escape(_nav("users"))}</a>')
     if logged_in:
-        links.append(f'<a class="admin-link secondary" href="{logout_url}">Logout</a>')
+        links.append(f'<a class="admin-link secondary" href="{logout_url}">{webhttp.html_escape(_nav("logout"))}</a>')
     elif show_login:
-        links.append('<a class="admin-link secondary" href="/login">Login</a>')
+        links.append(f'<a class="admin-link secondary" href="/login">{webhttp.html_escape(_nav("login"))}</a>')
     links_html = "".join(links)
     notice_html = ""
     if info:
@@ -439,8 +572,9 @@ def render_server_cards(
         if overview_html:
             description_block = overview_html
         else:
+            empty_overview = _ui_text("empty_states.overview")
             description_block = (
-                f"<p>{overview}</p>" if overview else "<p class=\"muted\">No overview provided.</p>"
+                f"<p>{overview}</p>" if overview else f"<p class=\"muted\">{webhttp.html_escape(empty_overview)}</p>"
             )
         screenshot_html = ""
         card_class = "card-top"
@@ -448,7 +582,7 @@ def render_server_cards(
             card_class = "card-top"
             screenshot_html = (
                 f"<img class=\"thumb\" src=\"{webhttp.html_escape(screenshot)}\" "
-                f"data-full=\"{webhttp.html_escape(full_image)}\" alt=\"Screenshot\">"
+                f"data-full=\"{webhttp.html_escape(full_image)}\" alt=\"{webhttp.html_escape(_label('screenshot_alt'))}\">"
             )
         else:
             card_class = "card-top no-thumb"
@@ -460,10 +594,12 @@ def render_server_cards(
             online_value = f"— / {max_players}"
         else:
             online_value = "—"
+        online_prefix = webhttp.html_escape(_status("online_prefix"))
+        offline_label = webhttp.html_escape(_status("offline"))
         online_label = (
-            f"<span class=\"online-label\">Online:</span> <span class=\"online-value\">{online_value}</span>"
+            f"<span class=\"online-label\">{online_prefix}</span> <span class=\"online-value\">{online_value}</span>"
             if active
-            else "<span class=\"online-label inactive\">Offline</span>"
+            else f"<span class=\"online-label inactive\">{offline_label}</span>"
         )
         online_class = "online active" if active else "online inactive"
         endpoint_html = f"<div class=\"endpoint\">{host}:{port}</div>" if active else ""
@@ -477,7 +613,7 @@ def render_server_cards(
   <header>
     <div class="title-block">
       <h3>{name_link}</h3>
-      <div class="owner-line">by <a class="owner-link" href="{owner_url}">{owner}</a></div>
+      <div class="owner-line">{webhttp.html_escape(_label("owner_by"))} <a class="owner-link" href="{owner_url}">{owner}</a></div>
     </div>
     <div class="online-block">
       <div class="{online_class}">{online_label}</div>
@@ -495,7 +631,8 @@ def render_server_cards(
         )
 
     if not cards:
-        cards_html = "<p class=\"muted\">No servers to display.</p>"
+        empty_servers = _ui_text("empty_states.servers")
+        cards_html = f"<p class=\"muted\">{webhttp.html_escape(empty_servers)}</p>"
     else:
         cards_html = "<div class=\"card-grid\">" + "".join(cards) + "</div>"
 
@@ -543,9 +680,9 @@ def render_server_section(
         entries.append(entry)
 
     entries.sort(key=lambda item: item.get("num_players") if item.get("num_players") is not None else -1, reverse=True)
-    summary_text = f"<strong>{active_count} online</strong> / {inactive_count} offline"
+    summary_text = config.format_text(_template("server_summary"), active=active_count, inactive=inactive_count)
     toggle_url = toggle_on_url if not show_inactive else toggle_off_url
-    toggle_label = "Show offline servers" if not show_inactive else "Show online servers"
+    toggle_label = _action("toggle_show_offline") if not show_inactive else _action("toggle_show_online")
     section_html = render_server_cards(
         entries,
         header_title=header_title,
@@ -578,7 +715,15 @@ def render_admins_section(
     csrf_token="",
 ):
     csrf_html = csrf_input(csrf_token)
+    username_label = webhttp.html_escape(_label("username"))
+    trust_label = webhttp.html_escape(_label("trust_admins"))
+    actions_label = webhttp.html_escape(_label("actions"))
+    yes_label = webhttp.html_escape(_status("yes"))
+    no_label = webhttp.html_escape(_status("no"))
+    add_admin_label = webhttp.html_escape(_label("add_admin_by_username"))
+    add_admin_button = webhttp.html_escape(_action("add_admin"))
     if show_controls:
+        remove_label = webhttp.html_escape(_action("remove"))
         admin_rows = "".join(
             f"""<tr>
   <td><a class="admin-user-link" href="/users/{urllib.parse.quote(admin["username"], safe='')}">{webhttp.html_escape(admin["username"])}</a></td>
@@ -596,31 +741,31 @@ def render_admins_section(
     <form method="post" action="{form_prefix}/admins/remove" class="admin-action">
       {csrf_html}
       <input type="hidden" name="username" value="{webhttp.html_escape(admin["username"])}">
-      <button type="submit" class="secondary small">Remove</button>
+      <button type="submit" class="secondary small">{remove_label}</button>
     </form>
   </td>
 </tr>"""
             for admin in admins
-        ) or "<tr><td colspan=\"3\">No admins assigned.</td></tr>"
+        ) or f"<tr><td colspan=\"3\">{webhttp.html_escape(_ui_text('empty_states.admins'))}</td></tr>"
         table_head = """<thead>
     <tr>
-      <th>Username</th>
-      <th class="center-cell">Trust user's admins</th>
-      <th class="center-cell">Actions</th>
+      <th>{username_label}</th>
+      <th class="center-cell">{trust_label}</th>
+      <th class="center-cell">{actions_label}</th>
     </tr>
   </thead>"""
     else:
         admin_rows = "".join(
             f"""<tr>
   <td><a class="admin-user-link" href="/users/{urllib.parse.quote(admin["username"], safe='')}">{webhttp.html_escape(admin["username"])}</a></td>
-  <td>{'Yes' if admin["trust_admins"] else 'No'}</td>
+  <td>{yes_label if admin["trust_admins"] else no_label}</td>
 </tr>"""
             for admin in admins
-        ) or "<tr><td colspan=\"2\">No admins assigned.</td></tr>"
+        ) or f"<tr><td colspan=\"2\">{webhttp.html_escape(_ui_text('empty_states.admins'))}</td></tr>"
         table_head = """<thead>
     <tr>
-      <th>Username</th>
-      <th class="center-cell">Trust user's admins</th>
+      <th>{username_label}</th>
+      <th class="center-cell">{trust_label}</th>
     </tr>
   </thead>"""
 
@@ -631,18 +776,18 @@ def render_admins_section(
   {csrf_html}
   <div class="row">
     <div>
-      <label for="admin_username">Add admin by username</label>
+      <label for="admin_username">{add_admin_label}</label>
       <input id="admin_username" name="username" required value="{safe_input}">
     </div>
   </div>
   <div class="actions">
-    <button type="submit">Add admin</button>
+    <button type="submit">{add_admin_button}</button>
   </div>
 </form>
 """
 
     notice_block = notice_html or ""
-    title_html = header_title_html or "Admins"
+    title_html = header_title_html or webhttp.html_escape(_section("admins"))
     return f"""<h2>{title_html}</h2>
 {notice_block}
 <table>

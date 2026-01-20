@@ -29,6 +29,9 @@ def csrf_token(request):
     if not session:
         return cookies.get(_CSRF_COOKIE, "")
     secret = config.require_setting(config.get_config(), "session_secret")
+    payload = webhttp.verify_session(session, secret)
+    if not payload:
+        return cookies.get(_CSRF_COOKIE, "")
     return hmac.new(secret.encode("utf-8"), session.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
@@ -50,7 +53,16 @@ def ensure_csrf_cookie(request, headers):
     if existing:
         return existing
     token = secrets.token_hex(16)
-    webhttp.set_cookie(headers, _CSRF_COOKIE, token, max_age=_CSRF_COOKIE_AGE, http_only=True)
+    cookie = cookie_settings()
+    webhttp.set_cookie(
+        headers,
+        _CSRF_COOKIE,
+        token,
+        max_age=_CSRF_COOKIE_AGE,
+        http_only=cookie["http_only"],
+        same_site=cookie["same_site"],
+        secure=cookie["secure"],
+    )
     return token
 
 
@@ -62,6 +74,15 @@ def sign_user_session(user_id):
 def sign_admin_session(username):
     secret = config.require_setting(config.get_config(), "session_secret")
     return webhttp.sign_session(f"admin:{username}", secret, expires_in=8 * 3600)
+
+
+def cookie_settings(settings=None):
+    settings = settings or config.get_config()
+    cookie = config.require_setting(settings, "session_cookie")
+    secure = bool(config.require_setting(cookie, "secure", "config.json session_cookie"))
+    same_site = str(config.require_setting(cookie, "same_site", "config.json session_cookie"))
+    http_only = bool(config.require_setting(cookie, "http_only", "config.json session_cookie"))
+    return {"secure": secure, "same_site": same_site, "http_only": http_only}
 
 
 def get_user_from_request(request):
@@ -80,16 +101,13 @@ def get_user_from_request(request):
                 "is_admin": 1,
             }
         return None
-    conn = db.connect(db.default_db_path())
-    try:
+    with db.connect_ctx() as conn:
         user = db.get_user_by_id(conn, int(payload))
         if not user:
             return None
         if user["is_locked"] or user["deleted"]:
             return None
         return user
-    finally:
-        conn.close()
 
 
 def ensure_admin_user(settings, conn):

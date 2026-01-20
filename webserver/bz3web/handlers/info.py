@@ -3,6 +3,18 @@ from urllib.parse import quote
 from bz3web import auth, config, markdown_utils, views, webhttp
 
 
+def _label(key):
+    return config.ui_text(f"labels.{key}", "config.json ui_text.labels")
+
+
+def _action(key):
+    return config.ui_text(f"actions.{key}", "config.json ui_text.actions")
+
+
+def _title(key):
+    return config.ui_text(f"titles.{key}", "config.json ui_text.titles")
+
+
 def _render_info_page(request, message=None, error=None, edit_mode=False):
     settings = config.get_config()
     community_name = config.require_setting(settings, "community_name")
@@ -18,7 +30,7 @@ def _render_info_page(request, message=None, error=None, edit_mode=False):
         community_name,
         "/info",
         logged_in=user is not None,
-        title="Community Info",
+        title=_title("community_info"),
         user_name=auth.display_username(user),
         is_admin=is_admin,
         profile_url=profile_url,
@@ -28,7 +40,8 @@ def _render_info_page(request, message=None, error=None, edit_mode=False):
 
     description_html = markdown_utils.render_markdown(community_description)
     if not description_html:
-        description_html = '<p class="muted">No description yet.</p>'
+        empty_desc = config.require_setting(settings, "ui_text.empty_states.community_description")
+        description_html = f'<p class="muted">{webhttp.html_escape(empty_desc)}</p>'
     info_panel = f"""<div class="info-panel">
   <strong>{webhttp.html_escape(community_name)}</strong>
   <div>{description_html}</div>
@@ -37,47 +50,54 @@ def _render_info_page(request, message=None, error=None, edit_mode=False):
     edit_link_html = ""
     if is_admin and not edit_mode:
         edit_link_html = """<div class="actions section-actions">
-  <a class="admin-link" href="/info?edit=1">Edit info</a>
+  <a class="admin-link" href="/info?edit=1">{edit_label}</a>
 </div>"""
+        edit_link_html = edit_link_html.format(edit_label=webhttp.html_escape(_action("edit_info")))
 
     form_html = ""
     if is_admin and edit_mode:
         csrf_html = views.csrf_input(auth.csrf_token(request))
         safe_name = webhttp.html_escape(community_name)
         safe_description = webhttp.html_escape(community_description)
+        markdown_hint = config.require_setting(settings, "ui_text.hints.markdown_supported")
         form_html = f"""<form method="post" action="/info">
   {csrf_html}
-  <label for="community_name">Community name</label>
+  <label for="community_name">{webhttp.html_escape(_label("community_name"))}</label>
   <input id="community_name" name="community_name" value="{safe_name}" required>
-  <label for="community_description">Community description</label>
+  <label for="community_description">{webhttp.html_escape(_label("community_description"))}</label>
   <textarea id="community_description" name="community_description" rows="6">{safe_description}</textarea>
+  <p class="muted hint">{webhttp.html_escape(markdown_hint)}</p>
   <div class="actions section-actions">
-    <button type="submit">Save</button>
-    <a class="admin-link secondary" href="/info">Cancel</a>
+    <button type="submit">{webhttp.html_escape(_action("save"))}</button>
+    <a class="admin-link secondary" href="/info">{webhttp.html_escape(_action("cancel"))}</a>
   </div>
 </form>"""
 
-    body = f"""{header_html}
-{info_panel}
+    body = f"""{info_panel}
 {edit_link_html}
 {form_html}
 """
-    return views.render_page("Community Info", body)
+    return views.render_page_with_header(
+        _title("community_info"),
+        header_html,
+        body,
+        headers=views.no_store_headers(),
+    )
 
 
 def handle(request):
     if request.method not in ("GET", "POST"):
-        return webhttp.html_response("<h1>Method Not Allowed</h1>", status="405 Method Not Allowed")
+        return views.error_page("405 Method Not Allowed", "method_not_allowed")
 
     user = auth.get_user_from_request(request)
     is_admin = auth.is_admin(user)
 
     if request.method == "POST":
         if not is_admin:
-            return webhttp.html_response("<h1>Forbidden</h1>", status="403 Forbidden")
+            return views.error_page("403 Forbidden", "forbidden")
         form = request.form()
         if not auth.verify_csrf(request, form):
-            return webhttp.html_response("<h1>Forbidden</h1>", status="403 Forbidden")
+            return views.error_page("403 Forbidden", "forbidden")
         name = form.get("community_name", [""])[0].strip()
         description = form.get("community_description", [""])[0].strip()
         if not name:
@@ -90,5 +110,5 @@ def handle(request):
 
     updated = request.query.get("updated", [""])[0] == "1"
     edit_mode = request.query.get("edit", [""])[0] == "1"
-    message = "Community info updated." if updated else None
+    message = config.ui_text("messages.info.updated", "config.json ui_text.messages.info") if updated else None
     return _render_info_page(request, message=message, edit_mode=edit_mode)

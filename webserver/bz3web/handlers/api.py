@@ -37,8 +37,7 @@ def _handle_auth(request):
             "username/email and password are required",
             status="400 Bad Request",
         )
-    conn = db.connect(db.default_db_path())
-    try:
+    with db.connect_ctx() as conn:
         if username:
             user = db.get_user_by_username(conn, username)
         else:
@@ -92,8 +91,6 @@ def _handle_auth(request):
         return webhttp.json_response(
             {"ok": True, "community_admin": community_admin, "local_admin": local_admin}
         )
-    finally:
-        conn.close()
 
 
 def _handle_user_registered(request):
@@ -120,8 +117,7 @@ def _handle_user_registered(request):
         )
     community_name = config.require_setting(settings, "community_name")
 
-    conn = db.connect(db.default_db_path())
-    try:
+    with db.connect_ctx() as conn:
         user = db.get_user_by_username(conn, username)
         if not user:
             return webhttp.json_response(
@@ -141,8 +137,6 @@ def _handle_user_registered(request):
                 "deleted": bool(user["deleted"]),
             }
         )
-    finally:
-        conn.close()
 
 
 def _handle_heartbeat(request):
@@ -252,8 +246,7 @@ def _handle_heartbeat(request):
                 "newport must be an integer in the range 1-65535",
                 status="400 Bad Request",
             )
-    conn = db.connect(db.default_db_path())
-    try:
+    with db.connect_ctx() as conn:
         server = db.get_server_by_host_port(conn, host, port)
         if not server:
             ports = db.list_ports_by_host(conn, host)
@@ -283,8 +276,6 @@ def _handle_heartbeat(request):
             db.update_server_port(conn, server["id"], new_port)
         db.update_heartbeat(conn, server["id"], int(time.time()), num_players=num_players, max_players=max_players)
         return webhttp.json_response({"ok": True})
-    finally:
-        conn.close()
 
 
 def _handle_admins(request):
@@ -319,8 +310,7 @@ def _handle_admins(request):
             "port must be an integer in the range 1-65535",
             status="400 Bad Request",
         )
-    conn = db.connect(db.default_db_path())
-    try:
+    with db.connect_ctx() as conn:
         servers = conn.execute(
             "SELECT owner_user_id FROM servers WHERE host = ? ORDER BY id",
             (host,),
@@ -356,8 +346,6 @@ def _handle_admins(request):
         return webhttp.json_response(
             {"ok": True, "host": host, "port": port, "owner": owner_user["username"], "admins": sorted(admin_names)}
         )
-    finally:
-        conn.close()
 
 
 def handle(request):

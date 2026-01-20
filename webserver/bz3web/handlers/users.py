@@ -18,6 +18,31 @@ def _placeholder_attr(value):
     return f' placeholder="{webhttp.html_escape(value)}"'
 
 
+def _msg(key, **values):
+    template = config.ui_text(f"messages.users.{key}", "config.json ui_text.messages.users")
+    return config.format_text(template, **values)
+
+
+def _label(key):
+    return config.ui_text(f"labels.{key}", "config.json ui_text.labels")
+
+
+def _action(key):
+    return config.ui_text(f"actions.{key}", "config.json ui_text.actions")
+
+
+def _title(key):
+    return config.ui_text(f"titles.{key}", "config.json ui_text.titles")
+
+
+def _section(key):
+    return config.ui_text(f"sections.{key}", "config.json ui_text.sections")
+
+
+def _status(key):
+    return config.ui_text(f"status.{key}", "config.json ui_text.status")
+
+
 def _is_admin(user):
     return auth.is_admin(user)
 
@@ -74,9 +99,9 @@ def _render_users_list(
     if show_admin_fields:
         rows = []
         for user in users:
-            admin_flag = "Yes" if user["is_admin"] else "No"
-            locked = "Yes" if user["is_locked"] else "No"
-            deleted = "Yes" if user["deleted"] else "No"
+            admin_flag = _status("yes") if user["is_admin"] else _status("no")
+            locked = _status("yes") if user["is_locked"] else _status("no")
+            deleted = _status("yes") if user["deleted"] else _status("no")
             is_root_target = _normalize_key(user["username"]) == _normalize_key(root_admin_name)
             can_lock = not is_root_target and (not user["is_admin"] or _is_root_admin(current_user, config.get_config()))
             can_edit = _can_manage_user(current_user, user, admin_levels or {}, root_id)
@@ -90,7 +115,7 @@ def _render_users_list(
     </form>"""
             edit_html = ""
             if can_edit:
-                edit_html = f"""<a class="admin-link secondary" href="/users/{urllib.parse.quote(user["username"], safe='')}/edit">Edit</a>"""
+                edit_html = f"""<a class="admin-link secondary" href="/users/{urllib.parse.quote(user["username"], safe='')}/edit">{webhttp.html_escape(_action("edit"))}</a>"""
             rows.append(
                 f"""<tr>
   <td><a class="plain-link bold-link" href="/users/{urllib.parse.quote(user["username"], safe='')}">{webhttp.html_escape(user["username"])}</a></td>
@@ -104,14 +129,15 @@ def _render_users_list(
   </td>
 </tr>"""
             )
-        rows_html = "".join(rows) or "<tr><td colspan=\"5\">No users yet.</td></tr>"
+        empty_users = config.require_setting(config.get_config(), "ui_text.empty_states.users")
+        rows_html = "".join(rows) or f"<tr><td colspan=\"5\">{webhttp.html_escape(empty_users)}</td></tr>"
         new_admin_checked = "checked" if form_data.get("is_admin") else ""
         show_admin_toggle = _is_root_admin(current_user, config.get_config())
         admin_toggle_html = ""
         if show_admin_toggle:
             admin_toggle_html = f"""  <div class="row">
     <div>
-      <label for="new_is_admin">Admin</label>
+      <label for="new_is_admin">{webhttp.html_escape(_label("admin"))}</label>
       <input id="new_is_admin" name="is_admin" type="checkbox" {new_admin_checked}>
     </div>
   </div>
@@ -119,38 +145,38 @@ def _render_users_list(
         body = f"""<table class="users-table">
   <thead>
     <tr>
-      <th class="center-cell">Username</th>
-      <th class="center-cell">Admin</th>
-      <th class="center-cell">Lock</th>
-      <th class="center-cell">Deleted</th>
-      <th class="center-cell">Actions</th>
+      <th class="center-cell">{webhttp.html_escape(_label("username"))}</th>
+      <th class="center-cell">{webhttp.html_escape(_label("admin"))}</th>
+      <th class="center-cell">{webhttp.html_escape(_label("lock"))}</th>
+      <th class="center-cell">{webhttp.html_escape(_label("deleted"))}</th>
+      <th class="center-cell">{webhttp.html_escape(_label("actions"))}</th>
     </tr>
   </thead>
   <tbody>
     {rows_html}
   </tbody>
 </table>
-<h2>Add User</h2>
+<h2>{webhttp.html_escape(_section("add_user"))}</h2>
 <form method="post" action="/users/create">
   {csrf_html}
   <div class="row">
     <div>
-      <label for="new_username">Username</label>
+      <label for="new_username">{webhttp.html_escape(_label("username"))}</label>
       <input id="new_username" name="username" required value="{webhttp.html_escape(form_data.get("username", ""))}">
     </div>
     <div>
-      <label for="new_email">Email</label>
+      <label for="new_email">{webhttp.html_escape(_label("email"))}</label>
       <input id="new_email" name="email" type="email" required value="{webhttp.html_escape(form_data.get("email", ""))}">
     </div>
   </div>
   <div class="row">
     <div>
-      <label for="new_password">Password</label>
+      <label for="new_password">{webhttp.html_escape(_label("password"))}</label>
       <input id="new_password" name="password" type="password" required>
     </div>
   </div>
 {admin_toggle_html}  <div class="actions">
-    <button type="submit">Create User</button>
+    <button type="submit">{webhttp.html_escape(_action("create_user"))}</button>
   </div>
 </form>
 """
@@ -161,11 +187,12 @@ def _render_users_list(
 </tr>"""
             for user in users
         )
-        rows_html = rows or "<tr><td>No users yet.</td></tr>"
+        empty_users = config.require_setting(config.get_config(), "ui_text.empty_states.users")
+        rows_html = rows or f"<tr><td>{webhttp.html_escape(empty_users)}</td></tr>"
         body = f"""<table>
   <thead>
     <tr>
-      <th>Username</th>
+      <th>{webhttp.html_escape(_label("username"))}</th>
     </tr>
   </thead>
   <tbody>
@@ -179,15 +206,18 @@ def _render_users_list(
         list_name,
         "/users",
         logged_in=True,
-        title="Users",
+        title=_title("users"),
         error=message,
         user_name=auth.display_username(current_user),
         is_admin=auth.is_admin(current_user),
         profile_url=profile_url,
     )
-    body = f"""{header_html}
-{body}"""
-    return views.render_page("Users", body)
+    return views.render_page_with_header(
+        _title("users"),
+        header_html,
+        body,
+        headers=views.no_store_headers(),
+    )
 
 
 def _render_user_edit(
@@ -210,42 +240,42 @@ def _render_user_edit(
   {csrf_html}
   <input type="hidden" name="id" value="{user["id"]}">
   <div>
-    <label for="username">Username</label>
+    <label for="username">{webhttp.html_escape(_label("username"))}</label>
     <input id="username" name="username" required value="{webhttp.html_escape(username_value)}">
   </div>
   <div>
-    <label for="email">Email</label>
+    <label for="email">{webhttp.html_escape(_label("email"))}</label>
     <input id="email" name="email" type="email" required value="{webhttp.html_escape(email_value)}">
   </div>
   <div>
-    <label for="password">Reset password (optional)</label>
+    <label for="password">{webhttp.html_escape(_label("reset_password_optional"))}</label>
     <input id="password" name="password" type="password"{_placeholder_attr(placeholders.get("reset_password"))}>
   </div>
   <div class="actions">
-    <button type="submit">Save changes</button>
-    <a class="admin-link align-right" href="{cancel_url}">Cancel</a>
+    <button type="submit">{webhttp.html_escape(_action("save_changes"))}</button>
+    <a class="admin-link align-right" href="{cancel_url}">{webhttp.html_escape(_action("cancel"))}</a>
   </div>
 </form>
 """
     if auth.is_admin(current_user):
-        action_label = "Delete user"
+        action_label = _action("delete_user")
         action_class = "danger"
         action_url = "/users/delete"
-        confirm_text = "Delete this user permanently?"
-        confirm_label = "Delete"
+        confirm_text = config.ui_text("confirmations.delete_user")
+        confirm_label = _action("delete")
         confirm_style = "danger"
         if user["deleted"]:
-            action_label = "Reinstate user"
+            action_label = _action("reinstate_user")
             action_class = "success"
             action_url = "/users/reinstate"
-            confirm_text = "Reinstate this user?"
-            confirm_label = "Reinstate"
+            confirm_text = config.ui_text("confirmations.reinstate_user")
+            confirm_label = _action("reinstate")
             confirm_style = "success"
         body += f"""<form method="post" action="{action_url}" data-confirm="{confirm_text}" data-confirm-label="{confirm_label}" data-confirm-style="{confirm_style}">
   {csrf_html}
   <input type="hidden" name="id" value="{user["id"]}">
   <div class="actions center">
-    <button type="submit" class="{action_class}">{action_label}</button>
+    <button type="submit" class="{action_class}">{webhttp.html_escape(action_label)}</button>
   </div>
 </form>
 """
@@ -254,37 +284,61 @@ def _render_user_edit(
         config.require_setting(config.get_config(), "community_name"),
         "/users/edit",
         logged_in=True,
-        title="Edit user",
+        title=_title("edit_user"),
         error=message,
         user_name=auth.display_username(current_user),
         is_admin=auth.is_admin(current_user),
         profile_url=profile_url,
     )
-    body = f"""{header_html}
-{body}"""
-    return views.render_page("Edit User", body)
+    return views.render_page_with_header(
+        _title("edit_user"),
+        header_html,
+        body,
+        headers=views.no_store_headers(),
+    )
 
 
 def _render_user_settings(user, message=None, form_data=None, current_user=None, csrf_token=""):
     form_data = form_data or {}
     placeholders = config.get_config().get("placeholders", {}).get("users", {})
     email_value = form_data.get("email", user["email"])
+    language_value = form_data.get("language", user.get("language") or "")
+    language_options = []
+    languages = config.get_available_languages()
+    language_labels = config.get_config().get("languages", {})
+    auto_label = _label("language_auto")
+    language_options.append(("", auto_label))
+    for code in languages:
+        label = language_labels.get(code, code)
+        language_options.append((code, label))
     csrf_html = views.csrf_input(csrf_token)
+    language_options_html = []
+    for code, label in language_options:
+        selected = " selected" if code == language_value else ""
+        language_options_html.append(
+            f'<option value="{webhttp.html_escape(code)}"{selected}>{webhttp.html_escape(label)}</option>'
+        )
     body = f"""<form method="post" action="/users/{urllib.parse.quote(user["username"], safe='')}/edit">
   {csrf_html}
   <div class="row">
     <div>
-      <label for="email">Email</label>
+      <label for="email">{webhttp.html_escape(_label("email"))}</label>
       <input id="email" name="email" type="email" required value="{webhttp.html_escape(email_value)}">
+    </div>
+    <div>
+      <label for="language">{webhttp.html_escape(_label("language"))}</label>
+      <select id="language" name="language">
+        {"".join(language_options_html)}
+      </select>
     </div>
   </div>
   <div>
-    <label for="password">New password (optional)</label>
+    <label for="password">{webhttp.html_escape(_label("new_password_optional"))}</label>
     <input id="password" name="password" type="password"{_placeholder_attr(placeholders.get("new_password"))}>
   </div>
   <div class="actions">
-    <button type="submit">Save changes</button>
-    <a class="admin-link align-right" href="/users/{urllib.parse.quote(user["username"], safe='')}">Cancel</a>
+    <button type="submit">{webhttp.html_escape(_action("save_changes"))}</button>
+    <a class="admin-link align-right" href="/users/{urllib.parse.quote(user["username"], safe='')}">{webhttp.html_escape(_action("cancel"))}</a>
   </div>
 </form>
 """
@@ -293,15 +347,18 @@ def _render_user_settings(user, message=None, form_data=None, current_user=None,
         config.require_setting(config.get_config(), "community_name"),
         f"/users/{urllib.parse.quote(user['username'], safe='')}/edit",
         logged_in=True,
-        title="Personal settings",
+        title=_title("personal_settings"),
         error=message,
         user_name=auth.display_username(current_user),
         is_admin=auth.is_admin(current_user),
         profile_url=profile_url,
     )
-    body = f"""{header_html}
-{body}"""
-    return views.render_page("Personal settings", body)
+    return views.render_page_with_header(
+        _title("personal_settings"),
+        header_html,
+        body,
+        headers=views.no_store_headers(),
+    )
 
 
 def _handle_admin_edit(
@@ -329,7 +386,7 @@ def _handle_admin_edit(
     if not username or not email:
         return _render_user_edit(
             target_user,
-            "Username and email are required.",
+            _msg("username_email_required"),
             form_data=form_data,
             current_user=current_user,
             root_admin_name=admin_username,
@@ -339,7 +396,7 @@ def _handle_admin_edit(
     if " " in username:
         return _render_user_edit(
             target_user,
-            "Username cannot contain spaces.",
+            _msg("username_spaces"),
             form_data=form_data,
             current_user=current_user,
             root_admin_name=admin_username,
@@ -349,7 +406,7 @@ def _handle_admin_edit(
     if _normalize_key(username) == _normalize_key(admin_username):
         return _render_user_edit(
             target_user,
-            "Username is reserved.",
+            _msg("username_reserved"),
             form_data=form_data,
             current_user=current_user,
             root_admin_name=admin_username,
@@ -359,7 +416,7 @@ def _handle_admin_edit(
     if is_root_target and _normalize_key(username) != _normalize_key(admin_username):
         return _render_user_edit(
             target_user,
-            "Root admin username cannot be changed.",
+            _msg("root_username_locked"),
             form_data=form_data,
             current_user=current_user,
             root_admin_name=admin_username,
@@ -370,7 +427,7 @@ def _handle_admin_edit(
     if existing and existing["id"] != target_user["id"]:
         return _render_user_edit(
             target_user,
-            "Username already taken.",
+            _msg("username_taken"),
             form_data=form_data,
             current_user=current_user,
             root_admin_name=admin_username,
@@ -382,7 +439,7 @@ def _handle_admin_edit(
         if existing_email and existing_email["id"] != target_user["id"]:
             return _render_user_edit(
                 target_user,
-                "Email already in use.",
+                _msg("email_in_use"),
                 form_data=form_data,
                 current_user=current_user,
                 root_admin_name=admin_username,
@@ -422,13 +479,12 @@ def handle(request):
     is_root_admin = _is_root_admin(current_user, settings)
 
     path = request.path.rstrip("/") or "/users"
-    conn = db.connect(db.default_db_path())
-    try:
+    with db.connect_ctx() as conn:
         admin_levels, root_id = _admin_levels(conn, settings)
         if path.startswith("/users/") and path.endswith("/edit"):
             username = request.query.get("name", [""])[0].strip()
             if not username:
-                return webhttp.html_response("<h1>Missing user</h1>", status="400 Bad Request")
+                return views.error_page("400 Bad Request", "missing_user")
             target_user = db.get_user_by_username(conn, username)
             if request.method == "POST" and not target_user:
                 form = request.form()
@@ -436,45 +492,58 @@ def handle(request):
                 if user_id.isdigit():
                     target_user = db.get_user_by_id(conn, int(user_id))
             if not target_user:
-                return webhttp.html_response("<h1>User not found</h1>", status="404 Not Found")
+                return views.error_page("404 Not Found", "user_not_found")
             if current_user["id"] == target_user["id"]:
                 if request.method == "GET":
                     return _render_user_settings(target_user, current_user=current_user, csrf_token=csrf_token)
                 if request.method == "POST":
                     form = request.form()
                     if not auth.verify_csrf(request, form):
-                        return webhttp.html_response("<h1>Forbidden</h1>", status="403 Forbidden")
+                        return views.error_page("403 Forbidden", "forbidden")
                     email = _first(form, "email").lower()
                     password = _first(form, "password")
-                    form_data = {"email": email}
+                    language = _first(form, "language")
+                    form_data = {"email": email, "language": language}
                     if not email:
                         return _render_user_settings(
                             target_user,
-                            "Email is required.",
+                            _msg("email_required"),
                             form_data=form_data,
                             current_user=current_user,
                             csrf_token=csrf_token,
                         )
+                    language = config.normalize_language(language)
+                    if language:
+                        available = config.get_available_languages()
+                        if language not in available:
+                            return _render_user_settings(
+                                target_user,
+                                _msg("language_invalid"),
+                                form_data=form_data,
+                                current_user=current_user,
+                                csrf_token=csrf_token,
+                            )
                     if email != target_user["email"]:
                         existing_email = db.get_user_by_email(conn, email)
                         if existing_email and existing_email["id"] != target_user["id"]:
                             return _render_user_settings(
                                 target_user,
-                                "Email already in use.",
+                                _msg("email_in_use"),
                                 form_data=form_data,
                                 current_user=current_user,
                                 csrf_token=csrf_token,
                             )
                     db.update_user_email(conn, target_user["id"], email)
+                    db.update_user_language(conn, target_user["id"], language or None)
                     if password:
                         digest, salt = auth.new_password(password)
                         db.set_user_password(conn, target_user["id"], digest, salt)
                     return webhttp.redirect(f"/users/{urllib.parse.quote(target_user['username'], safe='')}")
-                return webhttp.html_response("<h1>Method Not Allowed</h1>", status="405 Method Not Allowed")
+                return views.error_page("405 Method Not Allowed", "method_not_allowed")
             if not is_admin:
-                return webhttp.html_response("<h1>Forbidden</h1>", status="403 Forbidden")
+                return views.error_page("403 Forbidden", "forbidden")
             if not _can_manage_user(current_user, target_user, admin_levels, root_id):
-                return webhttp.html_response("<h1>Forbidden</h1>", status="403 Forbidden")
+                return views.error_page("403 Forbidden", "forbidden")
             if request.method == "GET":
                 return _render_user_edit(
                     target_user,
@@ -496,7 +565,7 @@ def handle(request):
                     redirect_url=f"/users/{urllib.parse.quote(target_user['username'], safe='')}",
                     csrf_token=csrf_token,
                 )
-            return webhttp.html_response("<h1>Method Not Allowed</h1>", status="405 Method Not Allowed")
+            return views.error_page("405 Method Not Allowed", "method_not_allowed")
         if path in ("/users", "/users/"):
             users = db.list_users(conn)
             return _render_users_list(
@@ -514,7 +583,7 @@ def handle(request):
                 return webhttp.redirect("/users")
             form = request.form()
             if not auth.verify_csrf(request, form):
-                return webhttp.html_response("<h1>Forbidden</h1>", status="403 Forbidden")
+                return views.error_page("403 Forbidden", "forbidden")
             username = _first(form, "username")
             email = _first(form, "email").lower()
             password = _first(form, "password")
@@ -529,7 +598,7 @@ def handle(request):
                 return _render_users_list(
                     users,
                     current_user,
-                    message="Username, email, and password are required.",
+                    message=_msg("create_missing_fields"),
                     form_data=form_data,
                     show_admin_fields=True,
                     root_admin_name=admin_username,
@@ -540,7 +609,7 @@ def handle(request):
                 return _render_users_list(
                     users,
                     current_user,
-                    message="Username cannot contain spaces.",
+                    message=_msg("username_spaces"),
                     form_data=form_data,
                     show_admin_fields=True,
                     root_admin_name=admin_username,
@@ -551,7 +620,7 @@ def handle(request):
                 return _render_users_list(
                     users,
                     current_user,
-                    message="Username is reserved.",
+                    message=_msg("username_reserved"),
                     form_data=form_data,
                     show_admin_fields=True,
                     root_admin_name=admin_username,
@@ -562,7 +631,7 @@ def handle(request):
                 return _render_users_list(
                     users,
                     current_user,
-                    message="Username already taken.",
+                    message=_msg("username_taken"),
                     form_data=form_data,
                     show_admin_fields=True,
                     root_admin_name=admin_username,
@@ -573,7 +642,7 @@ def handle(request):
                 return _render_users_list(
                     users,
                     current_user,
-                    message="Email already registered.",
+                    message=_msg("email_registered"),
                     form_data=form_data,
                     show_admin_fields=True,
                     root_admin_name=admin_username,
@@ -595,7 +664,7 @@ def handle(request):
                 return webhttp.redirect("/users")
             form = request.form()
             if not auth.verify_csrf(request, form):
-                return webhttp.html_response("<h1>Forbidden</h1>", status="403 Forbidden")
+                return views.error_page("403 Forbidden", "forbidden")
             user_id = _first(form, "id")
             if not user_id.isdigit():
                 return webhttp.redirect("/users")
@@ -633,7 +702,7 @@ def handle(request):
             if request.method == "POST":
                 form = request.form()
                 if not auth.verify_csrf(request, form):
-                    return webhttp.html_response("<h1>Forbidden</h1>", status="403 Forbidden")
+                    return views.error_page("403 Forbidden", "forbidden")
                 user_id = _first(form, "id")
                 if not user_id.isdigit():
                     return webhttp.redirect("/users")
@@ -657,7 +726,7 @@ def handle(request):
                 return webhttp.redirect("/users")
             form = request.form()
             if not auth.verify_csrf(request, form):
-                return webhttp.html_response("<h1>Forbidden</h1>", status="403 Forbidden")
+                return views.error_page("403 Forbidden", "forbidden")
             user_id = _first(form, "id")
             if user_id.isdigit():
                 user = db.get_user_by_id(conn, int(user_id))
@@ -676,7 +745,7 @@ def handle(request):
                 return webhttp.redirect("/users")
             form = request.form()
             if not auth.verify_csrf(request, form):
-                return webhttp.html_response("<h1>Forbidden</h1>", status="403 Forbidden")
+                return views.error_page("403 Forbidden", "forbidden")
             user_id = _first(form, "id")
             if user_id.isdigit():
                 user = db.get_user_by_id(conn, int(user_id))
@@ -689,7 +758,4 @@ def handle(request):
                         return webhttp.redirect("/users")
                     db.set_user_deleted(conn, int(user_id), False)
             return webhttp.redirect("/users")
-    finally:
-        conn.close()
-
-    return webhttp.html_response("<h1>Not Found</h1>", status="404 Not Found")
+    return views.error_page("404 Not Found", "not_found")

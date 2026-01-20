@@ -74,6 +74,34 @@ void MainMenuView::initializeFonts(ImGuiIO &io) {
         spdlog::warn("Failed to load console regular font for community browser ({}).", regularFontPathStr);
     }
 
+    const auto emojiFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Emoji.Font");
+    if (!emojiFontPath.empty()) {
+        const std::string emojiFontPathStr = emojiFontPath.string();
+        const float emojiFontSize = useThemeOverrides
+            ? currentTheme.emoji.size
+            : bz::data::ReadFloatConfig({"assets.hud.fonts.console.Emoji.Size"}, regularFontSize);
+        ImFontConfig emojiConfig;
+        emojiConfig.MergeMode = true;
+        emojiConfig.PixelSnapH = true;
+        emojiConfig.OversampleH = 1;
+        emojiConfig.OversampleV = 1;
+#ifdef IMGUI_USE_WCHAR32
+        static const ImWchar emojiRanges[] = { 0x1, 0x1FFFF, 0 };
+#else
+        static const ImWchar emojiRanges[] = { 0x1, 0xFFFF, 0 };
+        spdlog::warn("Emoji font loaded without IMGUI_USE_WCHAR32; codepoints above U+FFFF will not render.");
+#endif
+        emojiFont = io.Fonts->AddFontFromFileTTF(
+            emojiFontPathStr.c_str(),
+            emojiFontSize,
+            &emojiConfig,
+            emojiRanges
+        );
+        if (!emojiFont) {
+            spdlog::warn("Failed to load emoji font for community browser ({}).", emojiFontPathStr);
+        }
+    }
+
     const auto titleFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Title.Font");
     const std::string titleFontPathStr = titleFontPath.string();
     const float titleFontSize = useThemeOverrides
