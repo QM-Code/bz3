@@ -146,7 +146,7 @@ def main():
     if root_dir not in sys.path:
         sys.path.insert(0, root_dir)
 
-    from bz3web import cli, auth, db
+    from bz3web import cli, auth, config, db
 
     cli.bootstrap(directory, _usage())
     db_path = db.default_db_path()
@@ -175,12 +175,18 @@ def main():
         if not user_ids:
             raise SystemExit("No users available to own servers.")
 
+        settings = config.get_config()
+        overview_max = int(config.require_setting(settings, "pages.servers.overview_max_chars"))
         for _ in range(server_num):
             name = _random_title(existing_servers)
             host, port = _random_host(used_pairs)
             owner_user_id = random.choice(user_ids)
+            overview = _random_description()
+            if len(overview) > overview_max:
+                overview = overview[:overview_max]
             record = {
                 "name": name,
+                "overview": overview,
                 "description": _random_description(),
                 "host": host,
                 "port": port,

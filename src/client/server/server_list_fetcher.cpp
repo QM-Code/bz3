@@ -347,7 +347,9 @@ std::vector<ServerListFetcher::ServerRecord> ServerListFetcher::parseResponse(
             if (server.contains("screenshot_id") && server["screenshot_id"].is_string()) {
                 record.screenshotId = server["screenshot_id"].get<std::string>();
             }
-            record.description = server.value("description", server.value("descrpition", std::string{}));
+            record.overview = server.value("overview",
+                                            server.value("description",
+                                                         server.value("descrpition", std::string{})));
             record.flags.clear();
             if (server.contains("flags") && server["flags"].is_array()) {
                 for (const auto &flagValue : server["flags"]) {

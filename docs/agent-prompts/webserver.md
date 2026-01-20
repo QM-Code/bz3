@@ -20,6 +20,7 @@ Use this prompt when working on the community webserver in `webserver/`.
 ## Guardrails
 - Do not store plaintext passwords.
 - Keep unauthenticated forms in mind (CSRF TODO).
+- Treat `webserver/config.json` as the authoritative source of defaults; do not hardcode any configurable defaults in code. If a value is missing, prefer surfacing a clear error instead of falling back.
 
 ## Sanity checks
 - If `python` is missing, try `python3`.

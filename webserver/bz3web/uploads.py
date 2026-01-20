@@ -13,28 +13,28 @@ except ImportError:  # Optional dependency
 def _uploads_dir():
     settings = config.get_config()
     community_dir = config.get_community_dir() or config.get_config_dir()
-    uploads_dir = settings.get("uploads_dir", "uploads")
+    uploads_dir = config.require_setting(settings, "uploads_dir")
     if os.path.isabs(uploads_dir):
         return uploads_dir
     return os.path.normpath(os.path.join(community_dir, uploads_dir))
 
 
 def _screenshot_settings(settings):
-    screenshots = settings.get("uploads", {}).get("screenshots", {})
-    limits = screenshots.get("limits", {})
-    thumb = screenshots.get("thumbnail", {})
-    full = screenshots.get("full", {})
+    screenshots = config.require_setting(settings, "uploads.screenshots")
+    limits = config.require_setting(settings, "uploads.screenshots.limits")
+    thumb = config.require_setting(settings, "uploads.screenshots.thumbnail")
+    full = config.require_setting(settings, "uploads.screenshots.full")
     return {
-        "min_bytes": int(limits.get("min_bytes", 0)),
-        "max_bytes": int(limits.get("max_bytes", 3 * 1024 * 1024)),
-        "min_width": int(limits.get("min_width", 640)),
-        "min_height": int(limits.get("min_height", 360)),
-        "max_width": int(limits.get("max_width", 3840)),
-        "max_height": int(limits.get("max_height", 2160)),
-        "thumb_width": int(thumb.get("width", 480)),
-        "thumb_height": int(thumb.get("height", 270)),
-        "full_width": int(full.get("width", 1600)),
-        "full_height": int(full.get("height", 900)),
+        "min_bytes": int(config.require_setting(limits, "min_bytes", "config.json uploads.screenshots.limits")),
+        "max_bytes": int(config.require_setting(limits, "max_bytes", "config.json uploads.screenshots.limits")),
+        "min_width": int(config.require_setting(limits, "min_width", "config.json uploads.screenshots.limits")),
+        "min_height": int(config.require_setting(limits, "min_height", "config.json uploads.screenshots.limits")),
+        "max_width": int(config.require_setting(limits, "max_width", "config.json uploads.screenshots.limits")),
+        "max_height": int(config.require_setting(limits, "max_height", "config.json uploads.screenshots.limits")),
+        "thumb_width": int(config.require_setting(thumb, "width", "config.json uploads.screenshots.thumbnail")),
+        "thumb_height": int(config.require_setting(thumb, "height", "config.json uploads.screenshots.thumbnail")),
+        "full_width": int(config.require_setting(full, "width", "config.json uploads.screenshots.full")),
+        "full_height": int(config.require_setting(full, "height", "config.json uploads.screenshots.full")),
     }
 
 

@@ -12,17 +12,23 @@ def _normalize_key(value):
     return value.strip().lower()
 
 
+def _placeholder_attr(value):
+    if not value:
+        return ""
+    return f' placeholder="{webhttp.html_escape(value)}"'
+
+
 def _is_admin(user):
     return auth.is_admin(user)
 
 
 def _is_root_admin(user, settings):
-    admin_username = settings.get("admin_user", "Admin")
+    admin_username = config.require_setting(settings, "admin_user")
     return _normalize_key(user["username"]) == _normalize_key(admin_username)
 
 
 def _admin_levels(conn, settings):
-    admin_username = settings.get("admin_user", "Admin")
+    admin_username = config.require_setting(settings, "admin_user")
     root_user = db.get_user_by_username(conn, admin_username)
     if not root_user:
         return {}, None
@@ -61,7 +67,7 @@ def _render_users_list(
     root_id=None,
     csrf_token="",
 ):
-    list_name = config.get_config().get("community_name", "Server List")
+    list_name = config.require_setting(config.get_config(), "community_name")
     form_data = form_data or {}
 
     csrf_html = views.csrf_input(csrf_token)
@@ -194,6 +200,7 @@ def _render_user_edit(
     csrf_token="",
 ):
     form_data = form_data or {}
+    placeholders = config.get_config().get("placeholders", {}).get("users", {})
     username_value = form_data.get("username", user["username"])
     email_value = form_data.get("email", user["email"])
     action_url = f"/users/{urllib.parse.quote(user['username'], safe='')}/edit"
@@ -212,7 +219,7 @@ def _render_user_edit(
   </div>
   <div>
     <label for="password">Reset password (optional)</label>
-    <input id="password" name="password" type="password" placeholder="Leave blank to keep current password">
+    <input id="password" name="password" type="password"{_placeholder_attr(placeholders.get("reset_password"))}>
   </div>
   <div class="actions">
     <button type="submit">Save changes</button>
@@ -244,7 +251,7 @@ def _render_user_edit(
 """
     profile_url = f"/users/{urllib.parse.quote(current_user['username'], safe='')}"
     header_html = views.header_with_title(
-        config.get_config().get("community_name", "Server List"),
+        config.require_setting(config.get_config(), "community_name"),
         "/users/edit",
         logged_in=True,
         title="Edit user",
@@ -260,6 +267,7 @@ def _render_user_edit(
 
 def _render_user_settings(user, message=None, form_data=None, current_user=None, csrf_token=""):
     form_data = form_data or {}
+    placeholders = config.get_config().get("placeholders", {}).get("users", {})
     email_value = form_data.get("email", user["email"])
     csrf_html = views.csrf_input(csrf_token)
     body = f"""<form method="post" action="/users/{urllib.parse.quote(user["username"], safe='')}/edit">
@@ -272,7 +280,7 @@ def _render_user_settings(user, message=None, form_data=None, current_user=None,
   </div>
   <div>
     <label for="password">New password (optional)</label>
-    <input id="password" name="password" type="password" placeholder="Leave blank to keep current password">
+    <input id="password" name="password" type="password"{_placeholder_attr(placeholders.get("new_password"))}>
   </div>
   <div class="actions">
     <button type="submit">Save changes</button>
@@ -282,7 +290,7 @@ def _render_user_settings(user, message=None, form_data=None, current_user=None,
 """
     profile_url = f"/users/{urllib.parse.quote(current_user['username'], safe='')}"
     header_html = views.header_with_title(
-        config.get_config().get("community_name", "Server List"),
+        config.require_setting(config.get_config(), "community_name"),
         f"/users/{urllib.parse.quote(user['username'], safe='')}/edit",
         logged_in=True,
         title="Personal settings",
@@ -410,7 +418,7 @@ def handle(request):
         return webhttp.redirect("/login")
     is_admin = _is_admin(current_user)
     csrf_token = auth.csrf_token(request)
-    admin_username = settings.get("admin_user", "Admin")
+    admin_username = config.require_setting(settings, "admin_user")
     is_root_admin = _is_root_admin(current_user, settings)
 
     path = request.path.rstrip("/") or "/users"

@@ -77,6 +77,10 @@ def _render_form(server, user, message=None, form_data=None, usernames=None, is_
     <input id=\"name\" name=\"name\" required value=\"{val('name')}\">
   </div>
   <div>
+    <label for=\"overview\">Overview</label>
+    <textarea id=\"overview\" name=\"overview\">{val('overview')}</textarea>
+  </div>
+  <div>
     <label for=\"description\">Description</label>
     <textarea id=\"description\" name=\"description\">{val('description')}</textarea>
   </div>
@@ -92,7 +96,7 @@ def _render_form(server, user, message=None, form_data=None, usernames=None, is_
 """
     profile_url = _profile_url(user["username"])
     header_html = views.header_with_title(
-        config.get_config().get("community_name", "Server List"),
+        config.require_setting(config.get_config(), "community_name"),
         "/server/edit",
         logged_in=True,
         title="Edit server",
@@ -169,7 +173,7 @@ def handle(request):
             return webhttp.redirect(_profile_url(user["username"]))
         form_data = _form_values(
             form,
-            ["host", "port", "name", "description", "owner_username"],
+            ["host", "port", "name", "overview", "description", "owner_username"],
         )
         usernames = [row["username"] for row in db.list_users(conn) if not row["deleted"]] if is_admin else []
         if content_length > max_bytes + 1024 * 1024:
@@ -190,6 +194,19 @@ def handle(request):
                 server,
                 user,
                 message="Host, port, and server name are required.",
+                form_data=form_data,
+                usernames=usernames,
+                is_admin=is_admin,
+                csrf_token=auth.csrf_token(request),
+            )
+
+        overview = _first(form, "overview")
+        overview_max = int(config.require_setting(settings, "pages.servers.overview_max_chars"))
+        if overview and len(overview) > overview_max:
+            return _render_form(
+                server,
+                user,
+                message=f"Overview must be at most {overview_max} characters.",
                 form_data=form_data,
                 usernames=usernames,
                 is_admin=is_admin,
@@ -238,6 +255,7 @@ def handle(request):
             )
         record = {
             "name": name,
+            "overview": overview or None,
             "description": _first(form, "description") or None,
             "host": host,
             "port": port,

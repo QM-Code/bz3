@@ -20,30 +20,42 @@ def _parse_int(value):
 
 def _render_form(message=None, user=None, form_data=None, csrf_token=""):
     form_data = form_data or {}
+    settings = config.get_config()
+    placeholders = settings.get("placeholders", {}).get("add_server", {})
     host_value = webhttp.html_escape(form_data.get("host", ""))
     port_value = webhttp.html_escape(form_data.get("port", ""))
     name_value = webhttp.html_escape(form_data.get("name", ""))
+    overview_value = webhttp.html_escape(form_data.get("overview", ""))
     description_value = webhttp.html_escape(form_data.get("description", ""))
+    def _ph(key):
+        value = placeholders.get(key, "")
+        if not value:
+            return ""
+        return f' placeholder="{webhttp.html_escape(value)}"'
     csrf_html = views.csrf_input(csrf_token)
     body = f"""<form method="post" action="/submit" enctype="multipart/form-data">
   {csrf_html}
   <div class="row">
     <div>
       <label for="host">Host</label>
-      <input id="host" name="host" required placeholder="example.com or 10.0.0.5" value="{host_value}">
+      <input id="host" name="host" required{_ph("host")} value="{host_value}">
     </div>
     <div>
       <label for="port">Port</label>
-      <input id="port" name="port" required placeholder="5154" value="{port_value}">
+      <input id="port" name="port" required{_ph("port")} value="{port_value}">
     </div>
   </div>
   <div>
     <label for="name">Server Name</label>
-    <input id="name" name="name" required placeholder="Required unique name" value="{name_value}">
+    <input id="name" name="name" required{_ph("name")} value="{name_value}">
+  </div>
+  <div>
+    <label for="overview">Overview</label>
+    <textarea id="overview" name="overview"{_ph("overview")}>{overview_value}</textarea>
   </div>
   <div>
     <label for="description">Description</label>
-    <textarea id="description" name="description" placeholder="Optional description">{description_value}</textarea>
+    <textarea id="description" name="description"{_ph("description")}>{description_value}</textarea>
   </div>
 """
     body += """
@@ -61,7 +73,7 @@ def _render_form(message=None, user=None, form_data=None, csrf_token=""):
     if user:
         profile_url = f"/users/{quote(user['username'], safe='')}"
     header_html = views.header_with_title(
-        config.get_config().get("community_name", "Server List"),
+        config.require_setting(config.get_config(), "community_name"),
         "/submit",
         logged_in=bool(user),
         title="Add Server",
@@ -86,7 +98,7 @@ def _render_success(user=None):
     if user:
         profile_url = f"/users/{quote(user['username'], safe='')}"
     header_html = views.header_with_title(
-        config.get_config().get("community_name", "Server List"),
+        config.require_setting(config.get_config(), "community_name"),
         "/submit",
         logged_in=True,
         title="Server added",
@@ -119,6 +131,7 @@ def handle(request):
     host = _first(form, "host")
     port_text = _first(form, "port")
     name = _first(form, "name")
+    overview = _first(form, "overview")
     description = _first(form, "description")
     max_players = None
     num_players = None
@@ -126,6 +139,7 @@ def handle(request):
         "host": host,
         "port": port_text,
         "name": name,
+        "overview": overview,
         "description": description,
     }
     if content_length > max_bytes + 1024 * 1024:
@@ -139,6 +153,15 @@ def handle(request):
     if not host or not port_text or not name:
         return _render_form(
             "Host, port, and server name are required.",
+            user=user,
+            form_data=form_data,
+            csrf_token=auth.csrf_token(request),
+        )
+
+    overview_max = int(config.require_setting(settings, "pages.servers.overview_max_chars"))
+    if overview and len(overview) > overview_max:
+        return _render_form(
+            f"Overview must be at most {overview_max} characters.",
             user=user,
             form_data=form_data,
             csrf_token=auth.csrf_token(request),
@@ -180,6 +203,7 @@ def handle(request):
 
     record = {
         "name": name or None,
+        "overview": overview or None,
         "description": description or None,
         "host": host,
         "port": port,

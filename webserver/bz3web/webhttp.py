@@ -88,6 +88,15 @@ def json_response(payload, status="200 OK", headers=None):
     return status, headers, body.encode("utf-8")
 
 
+def json_error(error, message=None, status="400 Bad Request", headers=None, extra=None):
+    payload = {"ok": False, "error": error}
+    if message:
+        payload["message"] = message
+    if extra:
+        payload.update(extra)
+    return json_response(payload, status=status, headers=headers)
+
+
 def redirect(location):
     headers = [("Location", location)]
     return "302 Found", headers, b""
@@ -117,6 +126,10 @@ def set_cookie(headers, name, value, path="/", max_age=None, http_only=True, sam
     if http_only:
         parts.append("HttpOnly")
     headers.append(("Set-Cookie", "; ".join(parts)))
+
+
+def client_ip(environ):
+    return environ.get("REMOTE_ADDR", "")
 
 
 def sign_session(payload, secret, expires_in=3600):

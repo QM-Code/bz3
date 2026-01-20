@@ -65,6 +65,7 @@ def export_data():
         servers = conn.execute(
             """
             SELECT servers.name,
+                   servers.overview,
                    servers.description,
                    servers.host,
                    servers.port,
@@ -79,6 +80,7 @@ def export_data():
         for server in servers:
             entry = {
                 "name": server["name"],
+                "overview": server["overview"],
                 "description": server["description"],
                 "host": server["host"],
                 "port": server["port"],

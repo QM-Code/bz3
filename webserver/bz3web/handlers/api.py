@@ -2,16 +2,22 @@ import hmac
 import time
 import urllib.parse
 
-from bz3web import auth, config, db, webhttp
+from bz3web import auth, config, db, ratelimit, webhttp
 
 
 def _handle_auth(request):
     settings = config.get_config()
-    debug_auth = bool(settings.get("debug", {}).get("auth", False))
+    debug_auth = bool(config.require_setting(settings, "debug.auth"))
     if request.method not in ("GET", "POST"):
-        return webhttp.json_response({"ok": False, "error": "method_not_allowed"}, status="405 Method Not Allowed")
+        return webhttp.json_error("method_not_allowed", status="405 Method Not Allowed")
     if request.method == "GET" and not debug_auth:
-        return webhttp.json_response({"ok": False, "error": "method_not_allowed"}, status="405 Method Not Allowed")
+        return webhttp.json_error("method_not_allowed", status="405 Method Not Allowed")
+    if not ratelimit.check(settings, request, "api_auth"):
+        return webhttp.json_error(
+            "rate_limited",
+            "Too many requests. Please wait and try again.",
+            status="429 Too Many Requests",
+        )
 
     if request.method == "GET":
         source = request.query
@@ -26,7 +32,11 @@ def _handle_auth(request):
     if not debug_auth:
         password = ""
     if not (password or passhash) or (not email and not username):
-        return webhttp.json_response({"ok": False, "error": "missing_credentials"}, status="400 Bad Request")
+        return webhttp.json_error(
+            "missing_credentials",
+            "username/email and password are required",
+            status="400 Bad Request",
+        )
     conn = db.connect(db.default_db_path())
     try:
         if username:
@@ -34,15 +44,31 @@ def _handle_auth(request):
         else:
             user = db.get_user_by_email(conn, email)
         if not user:
-            return webhttp.json_response({"ok": False, "error": "invalid_credentials"}, status="401 Unauthorized")
+            return webhttp.json_error(
+                "invalid_credentials",
+                "Invalid credentials.",
+                status="401 Unauthorized",
+            )
         if user["is_locked"] or user["deleted"]:
-            return webhttp.json_response({"ok": False, "error": "invalid_credentials"}, status="401 Unauthorized")
+            return webhttp.json_error(
+                "invalid_credentials",
+                "Invalid credentials.",
+                status="401 Unauthorized",
+            )
         if passhash:
             if not hmac.compare_digest(passhash, user["password_hash"]):
-                return webhttp.json_response({"ok": False, "error": "invalid_credentials"}, status="401 Unauthorized")
+                return webhttp.json_error(
+                    "invalid_credentials",
+                    "Invalid credentials.",
+                    status="401 Unauthorized",
+                )
         else:
             if not auth.verify_password(password, user["password_salt"], user["password_hash"]):
-                return webhttp.json_response({"ok": False, "error": "invalid_credentials"}, status="401 Unauthorized")
+                return webhttp.json_error(
+                    "invalid_credentials",
+                    "Invalid credentials.",
+                    status="401 Unauthorized",
+                )
         community_admin = bool(auth.is_admin(user))
         resolved_username = user["username"]
         local_admin = False
@@ -72,17 +98,27 @@ def _handle_auth(request):
 
 def _handle_user_registered(request):
     if request.method not in ("GET", "POST"):
-        return webhttp.json_response({"ok": False, "error": "method_not_allowed"}, status="405 Method Not Allowed")
+        return webhttp.json_error("method_not_allowed", status="405 Method Not Allowed")
     if request.method == "GET":
         username = request.query.get("username", [""])[0].strip()
     else:
         form = request.form()
         username = form.get("username", [""])[0].strip()
     if not username:
-        return webhttp.json_response({"ok": False, "error": "missing_username"}, status="400 Bad Request")
+        return webhttp.json_error(
+            "missing_username",
+            "username is required",
+            status="400 Bad Request",
+        )
 
     settings = config.get_config()
-    community_name = settings.get("community_name", "Server List")
+    if not ratelimit.check(settings, request, "api_user_registered"):
+        return webhttp.json_error(
+            "rate_limited",
+            "Too many requests. Please wait and try again.",
+            status="429 Too Many Requests",
+        )
+    community_name = config.require_setting(settings, "community_name")
 
     conn = db.connect(db.default_db_path())
     try:
@@ -111,9 +147,15 @@ def _handle_user_registered(request):
 
 def _handle_heartbeat(request):
     if request.method not in ("GET", "POST"):
-        return webhttp.json_response({"ok": False, "error": "method_not_allowed"}, status="405 Method Not Allowed")
+        return webhttp.json_error("method_not_allowed", status="405 Method Not Allowed")
     settings = config.get_config()
-    debug_heartbeat = bool(settings.get("debug", {}).get("heartbeat", False))
+    debug_heartbeat = bool(config.require_setting(settings, "debug.heartbeat"))
+    if request.method == "GET" and not debug_heartbeat:
+        return webhttp.json_error(
+            "heartbeat_debug_disabled",
+            "Heartbeat debugging must be enabled in config.json to allow GET requests.",
+            status="403 Forbidden",
+        )
     num_players = None
     max_players = None
     new_port = None
@@ -128,8 +170,9 @@ def _handle_heartbeat(request):
     newport_text = source.get("newport", [""])[0].strip()
 
     if not server_text:
-        return webhttp.json_response(
-            {"ok": False, "error": "missing_server", "message": "server is required"},
+        return webhttp.json_error(
+            "missing_server",
+            "server is required",
             status="400 Bad Request",
         )
 
@@ -155,25 +198,19 @@ def _handle_heartbeat(request):
         host = remote_addr
 
     if port is None or port < 1 or port > 65535:
-        return webhttp.json_response(
-            {
-                "ok": False,
-                "error": "invalid_port",
-                "message": "server must include a port in the range 1-65535",
-            },
+        return webhttp.json_error(
+            "invalid_port",
+            "server must include a port in the range 1-65535",
             status="400 Bad Request",
         )
     if not host and debug_heartbeat:
-        return webhttp.json_response(
-            {
-                "ok": False,
-                "error": "missing_host",
-                "message": "server must include a host in debug_heartbeat mode",
-            },
+        return webhttp.json_error(
+            "missing_host",
+            "server must include a host in debug_heartbeat mode",
             status="400 Bad Request",
         )
     if not debug_heartbeat and host != remote_addr:
-        return webhttp.json_response({"ok": False, "error": "host_mismatch"}, status="403 Forbidden")
+        return webhttp.json_error("host_mismatch", status="403 Forbidden")
     if players_text:
         try:
             num_players = int(players_text)
@@ -181,8 +218,9 @@ def _handle_heartbeat(request):
                 raise ValueError
         except ValueError:
             num_players = 0
-            return webhttp.json_response(
-                {"ok": False, "error": "invalid_players", "message": "players must be a non-negative integer"},
+            return webhttp.json_error(
+                "invalid_players",
+                "players must be a non-negative integer",
                 status="400 Bad Request",
             )
     if max_text:
@@ -191,17 +229,15 @@ def _handle_heartbeat(request):
             if max_players < 0:
                 raise ValueError
         except ValueError:
-            return webhttp.json_response(
-                {"ok": False, "error": "invalid_max", "message": "max must be a non-negative integer"},
+            return webhttp.json_error(
+                "invalid_max",
+                "max must be a non-negative integer",
                 status="400 Bad Request",
             )
     if max_players is not None and num_players is not None and num_players > max_players:
-        return webhttp.json_response(
-            {
-                "ok": False,
-                "error": "invalid_players",
-                "message": "players must be less than or equal to max",
-            },
+        return webhttp.json_error(
+            "invalid_players",
+            "players must be less than or equal to max",
             status="400 Bad Request",
         )
 
@@ -211,12 +247,9 @@ def _handle_heartbeat(request):
             if new_port < 1 or new_port > 65535:
                 raise ValueError
         except ValueError:
-            return webhttp.json_response(
-                {
-                    "ok": False,
-                    "error": "invalid_newport",
-                    "message": "newport must be an integer in the range 1-65535",
-                },
+            return webhttp.json_error(
+                "invalid_newport",
+                "newport must be an integer in the range 1-65535",
                 status="400 Bad Request",
             )
     conn = db.connect(db.default_db_path())
@@ -225,35 +258,26 @@ def _handle_heartbeat(request):
         if not server:
             ports = db.list_ports_by_host(conn, host)
             if ports:
-                return webhttp.json_response(
-                    {
-                        "ok": False,
-                        "error": "port_mismatch",
-                        "message": (
-                            f"Heartbeat received for {host}:{port}, but there is no game registered on port "
-                            f"{port} for host {host}."
-                        ),
-                    },
+                return webhttp.json_error(
+                    "port_mismatch",
+                    (
+                        f"Heartbeat received for {host}:{port}, but there is no game registered on port "
+                        f"{port} for host {host}."
+                    ),
                     status="404 Not Found",
                 )
             host_label = "specified host" if debug_heartbeat else "source host"
-            return webhttp.json_response(
-                {
-                    "ok": False,
-                    "error": "host_not_found",
-                    "message": f"The {host_label} ({host}) does not exist in the database of registered servers.",
-                },
+            return webhttp.json_error(
+                "host_not_found",
+                f"The {host_label} ({host}) does not exist in the database of registered servers.",
                 status="404 Not Found",
             )
         if new_port is not None and new_port != port:
             existing = db.get_server_by_host_port(conn, host, new_port)
             if existing:
-                return webhttp.json_response(
-                    {
-                        "ok": False,
-                        "error": "port_in_use",
-                        "message": f"newport ({new_port}) is already in use for host {host}",
-                    },
+                return webhttp.json_error(
+                    "port_in_use",
+                    f"newport ({new_port}) is already in use for host {host}",
                     status="409 Conflict",
                 )
             db.update_server_port(conn, server["id"], new_port)
@@ -265,7 +289,7 @@ def _handle_heartbeat(request):
 
 def _handle_admins(request):
     if request.method not in ("GET", "POST"):
-        return webhttp.json_response({"ok": False, "error": "method_not_allowed"}, status="405 Method Not Allowed")
+        return webhttp.json_error("method_not_allowed", status="405 Method Not Allowed")
     if request.method == "GET":
         host = request.query.get("host", [""])[0].strip()
         port_text = request.query.get("port", [""])[0].strip()
@@ -274,13 +298,15 @@ def _handle_admins(request):
         host = form.get("host", [""])[0].strip()
         port_text = form.get("port", [""])[0].strip()
     if not host:
-        return webhttp.json_response(
-            {"ok": False, "error": "missing_host", "message": "host is required"},
+        return webhttp.json_error(
+            "missing_host",
+            "host is required",
             status="400 Bad Request",
         )
     if not port_text:
-        return webhttp.json_response(
-            {"ok": False, "error": "missing_port", "message": "port is required"},
+        return webhttp.json_error(
+            "missing_port",
+            "port is required",
             status="400 Bad Request",
         )
     try:
@@ -288,12 +314,9 @@ def _handle_admins(request):
         if port < 1 or port > 65535:
             raise ValueError
     except ValueError:
-        return webhttp.json_response(
-            {
-                "ok": False,
-                "error": "invalid_port",
-                "message": "port must be an integer in the range 1-65535",
-            },
+        return webhttp.json_error(
+            "invalid_port",
+            "port must be an integer in the range 1-65535",
             status="400 Bad Request",
         )
     conn = db.connect(db.default_db_path())
@@ -303,33 +326,24 @@ def _handle_admins(request):
             (host,),
         ).fetchall()
         if not servers:
-            return webhttp.json_response(
-                {
-                    "ok": False,
-                    "error": "host_not_found",
-                    "message": f"host not found: {host}",
-                },
+            return webhttp.json_error(
+                "host_not_found",
+                f"host not found: {host}",
                 status="404 Not Found",
             )
         server = db.get_server_by_host_port(conn, host, port)
         if not server:
-            return webhttp.json_response(
-                {
-                    "ok": False,
-                    "error": "port_not_found",
-                    "message": f"port not found for host {host}: {port}",
-                },
+            return webhttp.json_error(
+                "port_not_found",
+                f"port not found for host {host}: {port}",
                 status="404 Not Found",
             )
         owner_id = server["owner_user_id"]
         owner_user = db.get_user_by_id(conn, owner_id)
         if not owner_user or owner_user["deleted"]:
-            return webhttp.json_response(
-                {
-                    "ok": False,
-                    "error": "owner_not_found",
-                    "message": f"owner not found for host {host}:{port}",
-                },
+            return webhttp.json_error(
+                "owner_not_found",
+                f"owner not found for host {host}:{port}",
                 status="404 Not Found",
             )
         direct_admins = db.list_user_admins(conn, owner_id)
@@ -356,15 +370,19 @@ def handle(request):
         return _handle_heartbeat(request)
     if path == "/api/admins":
         return _handle_admins(request)
+    if path == "/api/health":
+        if request.method != "GET":
+            return webhttp.json_error("method_not_allowed", status="405 Method Not Allowed")
+        return webhttp.json_response({"ok": True})
     if path == "/api/info":
         if request.method != "GET":
-            return webhttp.json_response({"ok": False, "error": "method_not_allowed"}, status="405 Method Not Allowed")
+            return webhttp.json_error("method_not_allowed", status="405 Method Not Allowed")
         settings = config.get_config()
         return webhttp.json_response(
             {
                 "ok": True,
-                "community_name": settings.get("community_name", "Server List"),
+                "community_name": config.require_setting(settings, "community_name"),
                 "community_description": settings.get("community_description", ""),
             }
         )
-    return webhttp.json_response({"ok": False, "error": "not_found"}, status="404 Not Found")
+    return webhttp.json_error("not_found", status="404 Not Found")

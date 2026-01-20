@@ -2,12 +2,11 @@ from bz3web import auth, config, db, webhttp
 
 
 def config_ready(settings):
-    required = ("session_secret",)
-    for key in required:
-        value = settings.get(key, "")
-        if not value or value == "CHANGE_ME":
-            return False
-    return True
+    try:
+        value = config.require_setting(settings, "session_secret")
+    except ValueError:
+        return False
+    return value != "CHANGE_ME"
 
 
 def is_authenticated(request, settings):
@@ -15,12 +14,12 @@ def is_authenticated(request, settings):
     token = cookies.get("session", "")
     if not token:
         return False
-    payload = webhttp.verify_session(token, settings.get("session_secret", ""))
-    return payload == settings.get("admin_user")
+    payload = webhttp.verify_session(token, config.require_setting(settings, "session_secret"))
+    return payload == config.require_setting(settings, "admin_user")
 
 
 def verify_login(username, password, settings):
-    expected_user = settings.get("admin_user")
+    expected_user = config.require_setting(settings, "admin_user")
     if username.lower() != str(expected_user).lower():
         return False
     conn = db.connect(db.default_db_path())

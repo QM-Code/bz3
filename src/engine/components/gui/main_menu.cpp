@@ -252,6 +252,12 @@ void MainMenuView::show(const std::vector<CommunityBrowserEntry> &newEntries) {
     communityDetailsText.clear();
     communityLinkStatusText.clear();
     communityLinkStatusIsError = false;
+    serverLinkStatusText.clear();
+    serverLinkStatusIsError = false;
+    serverDescriptionLoadingKey.clear();
+    serverDescriptionLoading = false;
+    serverDescriptionErrorKey.clear();
+    serverDescriptionErrorText.clear();
     communityStatusTone = MessageTone::Notice;
     clearPassword();
     showNewCommunityInput = false;
@@ -441,6 +447,12 @@ void MainMenuView::hide() {
     communityDetailsText.clear();
     communityLinkStatusText.clear();
     communityLinkStatusIsError = false;
+    serverLinkStatusText.clear();
+    serverLinkStatusIsError = false;
+    serverDescriptionLoadingKey.clear();
+    serverDescriptionLoading = false;
+    serverDescriptionErrorKey.clear();
+    serverDescriptionErrorText.clear();
     communityStatusTone = MessageTone::Notice;
     clearPassword();
     showNewCommunityInput = false;
@@ -458,6 +470,36 @@ void MainMenuView::setStatus(const std::string &text, bool isErrorMessage) {
 
 void MainMenuView::setCommunityDetails(const std::string &detailsText) {
     communityDetailsText = detailsText;
+}
+
+void MainMenuView::setServerDescriptionLoading(const std::string &key, bool loading) {
+    serverDescriptionLoadingKey = key;
+    serverDescriptionLoading = loading;
+}
+
+bool MainMenuView::isServerDescriptionLoading(const std::string &key) const {
+    if (!serverDescriptionLoading || key.empty()) {
+        return false;
+    }
+    return serverDescriptionLoadingKey == key;
+}
+
+void MainMenuView::setServerDescriptionError(const std::string &key, const std::string &message) {
+    serverDescriptionErrorKey = key;
+    serverDescriptionErrorText = message;
+}
+
+std::optional<std::string> MainMenuView::getServerDescriptionError(const std::string &key) const {
+    if (key.empty() || serverDescriptionErrorKey.empty()) {
+        return std::nullopt;
+    }
+    if (serverDescriptionErrorKey != key) {
+        return std::nullopt;
+    }
+    if (serverDescriptionErrorText.empty()) {
+        return std::nullopt;
+    }
+    return serverDescriptionErrorText;
 }
 
 std::optional<CommunityBrowserSelection> MainMenuView::consumeSelection() {
@@ -512,6 +554,13 @@ void MainMenuView::clearNewListInputs() {
 void MainMenuView::setCommunityStatus(const std::string &text, MessageTone tone) {
     communityStatusText = text;
     communityStatusTone = tone;
+}
+
+std::optional<CommunityBrowserEntry> MainMenuView::getSelectedEntry() const {
+    if (selectedIndex < 0 || selectedIndex >= static_cast<int>(entries.size())) {
+        return std::nullopt;
+    }
+    return entries[static_cast<std::size_t>(selectedIndex)];
 }
 
 std::string MainMenuView::getUsername() const {

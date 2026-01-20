@@ -64,7 +64,7 @@ def import_data(path, allow_merge=False, overwrite=False):
     inserted_servers = 0
     skipped_servers = 0
     try:
-        admin_username = config.get_config().get("admin_user", "Admin")
+        admin_username = config.require_setting(config.get_config(), "admin_user")
         admin_names = set()
         for entry in users:
             if not isinstance(entry, dict):
@@ -173,6 +173,7 @@ def import_data(path, allow_merge=False, overwrite=False):
                 continue
             record = {
                 "name": name,
+                "overview": entry.get("overview") or None,
                 "description": entry.get("description") or None,
                 "host": host,
                 "port": port,

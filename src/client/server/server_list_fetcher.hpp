@@ -30,7 +30,8 @@ public:
         int maxPlayers = -1;
         int activePlayers = -1;
         std::string gameMode;
-        std::string description;
+        std::string overview;
+        std::string detailDescription;
         std::vector<std::string> flags;
         std::string screenshotId;
         std::string communityName;

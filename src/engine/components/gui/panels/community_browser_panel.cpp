@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
+#include <iomanip>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -29,6 +30,52 @@ std::string normalizedCommunityUrl(const std::string &host) {
         return host;
     }
     return "http://" + host;
+}
+
+std::string urlEncode(const std::string &value) {
+    std::ostringstream encoded;
+    encoded << std::uppercase << std::hex << std::setfill('0');
+    for (unsigned char ch : value) {
+        if ((ch >= 'a' && ch <= 'z') ||
+            (ch >= 'A' && ch <= 'Z') ||
+            (ch >= '0' && ch <= '9') ||
+            ch == '-' || ch == '_' || ch == '.' || ch == '~') {
+            encoded << ch;
+        } else if (ch == ' ') {
+            encoded << "%20";
+        } else {
+            encoded << '%' << std::setw(2) << static_cast<int>(ch);
+        }
+    }
+    return encoded.str();
+}
+
+std::string buildServerPageUrl(const std::string &communityHost, const std::string &serverName) {
+    if (communityHost.empty() || serverName.empty()) {
+        return {};
+    }
+    std::string base = normalizedCommunityUrl(communityHost);
+    if (base.empty()) {
+        return {};
+    }
+    while (!base.empty() && base.back() == '/') {
+        base.pop_back();
+    }
+    return base + "/servers/" + urlEncode(serverName);
+}
+
+std::string makeServerDetailsKey(const gui::CommunityBrowserEntry &entry) {
+    if (entry.sourceHost.empty()) {
+        return {};
+    }
+    std::string name = entry.worldName;
+    if (name.empty()) {
+        name = entry.label.empty() ? entry.host : entry.label;
+    }
+    if (name.empty()) {
+        return {};
+    }
+    return entry.sourceHost + "|" + name + "|" + entry.host + ":" + std::to_string(entry.port);
 }
 
 bool openUrlInBrowser(const std::string &url) {
@@ -587,6 +634,8 @@ void MainMenuView::drawCommunityPanel(const MessageColors &messageColors) {
         activeCommunityHost = listOptions[listSelectedIndex].host;
         activeCommunityLabel = formatListLabel(listOptions[listSelectedIndex]);
     }
+    const float baseScale = ImGui::GetIO().FontGlobalScale;
+    const float smallcapsScale = baseScale * 0.6f;
 
     ImGui::BeginChild("CommunityBrowserDetailsPane", ImVec2(0, 0), true);
     if (hasHeadingFont) {
@@ -703,8 +752,6 @@ void MainMenuView::drawCommunityPanel(const MessageColors &messageColors) {
                 : activeCommunityLabel;
             const std::string website = normalizedCommunityUrl(activeCommunityHost);
 
-            const float baseScale = ImGui::GetIO().FontGlobalScale;
-            const float smallcapsScale = baseScale * 0.6f;
             if (hasHeadingFont) {
                 ImGui::PushFont(headingFont);
             }
@@ -784,7 +831,6 @@ void MainMenuView::drawCommunityPanel(const MessageColors &messageColors) {
             if (hasHeadingFont) {
                 ImGui::PopFont();
             }
-            // TODO: Render community description as markdown.
             if (!communityDetailsText.empty()) {
                 renderMarkdown(
                     communityDetailsText,
@@ -805,6 +851,72 @@ void MainMenuView::drawCommunityPanel(const MessageColors &messageColors) {
             ImGui::Separator();
             ImGui::Spacing();
             ImGui::Spacing();
+
+        const std::string serverName = selectedEntry->worldName.empty()
+            ? (selectedEntry->label.empty() ? std::string("Server") : selectedEntry->label)
+            : selectedEntry->worldName;
+        const std::string serverCommunityHost = selectedEntry->sourceHost.empty()
+            ? activeCommunityHost
+            : selectedEntry->sourceHost;
+        const std::string serverPageUrl = buildServerPageUrl(serverCommunityHost, serverName);
+
+        if (hasHeadingFont) {
+            ImGui::PushFont(headingFont);
+        }
+        ImGui::SetWindowFontScale(smallcapsScale);
+        ImGui::TextUnformatted(toSmallCaps("Server").c_str());
+        ImGui::SetWindowFontScale(baseScale);
+        if (hasHeadingFont) {
+            ImGui::PopFont();
+        }
+        if (titleFont) {
+            ImGui::PushFont(titleFont);
+        }
+        ImGui::TextWrapped("%s", serverName.c_str());
+        if (titleFont) {
+            ImGui::PopFont();
+        }
+
+        ImGui::Spacing();
+        if (hasHeadingFont) {
+            ImGui::PushFont(headingFont);
+        }
+        ImGui::SetWindowFontScale(smallcapsScale);
+        ImGui::TextUnformatted(toSmallCaps("Website").c_str());
+        ImGui::SetWindowFontScale(baseScale);
+        if (hasHeadingFont) {
+            ImGui::PopFont();
+        }
+        if (titleFont) {
+            ImGui::PushFont(titleFont);
+        }
+        if (!serverPageUrl.empty()) {
+            ImGui::PushStyleColor(ImGuiCol_Text, messageColors.action);
+            ImGui::TextUnformatted(serverPageUrl.c_str());
+            ImGui::PopStyleColor();
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Open in browser");
+            }
+            if (ImGui::IsItemClicked()) {
+                if (!openUrlInBrowser(serverPageUrl)) {
+                    serverLinkStatusText = "Failed to open your browser.";
+                    serverLinkStatusIsError = true;
+                } else {
+                    serverLinkStatusText.clear();
+                    serverLinkStatusIsError = false;
+                }
+            }
+        } else {
+            ImGui::TextDisabled("No website available.");
+        }
+        if (titleFont) {
+            ImGui::PopFont();
+        }
+        if (!serverLinkStatusText.empty()) {
+            ImGui::Spacing();
+            ImVec4 linkColor = serverLinkStatusIsError ? messageColors.error : messageColors.action;
+            ImGui::TextColored(linkColor, "%s", serverLinkStatusText.c_str());
+        }
 
         const std::string &displayHost = selectedEntry->displayHost.empty() ? selectedEntry->host : selectedEntry->displayHost;
         ImGui::Text("Host: %s", displayHost.c_str());
@@ -835,10 +947,16 @@ void MainMenuView::drawCommunityPanel(const MessageColors &messageColors) {
                 titleFont,
                 headingFont,
                 messageColors.action,
-                communityLinkStatusText,
-                communityLinkStatusIsError);
+                serverLinkStatusText,
+                serverLinkStatusIsError);
+        } else if (isServerDescriptionLoading(makeServerDetailsKey(*selectedEntry))) {
+            ImGui::TextDisabled("Fetching server description...");
         } else {
-            ImGui::TextDisabled("No description provided.");
+            if (auto errorText = getServerDescriptionError(makeServerDetailsKey(*selectedEntry))) {
+                ImGui::TextDisabled("Description unavailable: %s", errorText->c_str());
+            } else {
+                ImGui::TextDisabled("No description provided.");
+            }
         }
 
         if (!selectedEntry->screenshotId.empty() && !selectedEntry->sourceHost.empty()) {

@@ -5,7 +5,7 @@ from bz3web import auth, config, markdown_utils, views, webhttp
 
 def _render_info_page(request, message=None, error=None, edit_mode=False):
     settings = config.get_config()
-    community_name = settings.get("community_name", "Server List")
+    community_name = config.require_setting(settings, "community_name")
     community_description = settings.get("community_description", "")
 
     user = auth.get_user_from_request(request)

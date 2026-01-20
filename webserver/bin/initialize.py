@@ -78,9 +78,23 @@ def main():
         if not os.path.isfile(config_path):
             raise SystemExit(f"Missing config.json at {config_path}")
 
-        community_name = _prompt_text("Community name", "My Community")
-        server_port = _prompt_port(8080)
-        admin_user = _prompt_text("Admin username", "Admin")
+        with open(config_path, "r", encoding="utf-8") as handle:
+            config = json.load(handle)
+
+        if "community_name" not in config:
+            raise SystemExit("Missing community_name in config.json. Add it to config.json.")
+        if "port" not in config:
+            raise SystemExit("Missing port in config.json. Add it to config.json.")
+        if "admin_user" not in config:
+            raise SystemExit("Missing admin_user in config.json. Add it to config.json.")
+        if "data_dir" not in config:
+            raise SystemExit("Missing data_dir in config.json. Add it to config.json.")
+        if "uploads_dir" not in config:
+            raise SystemExit("Missing uploads_dir in config.json. Add it to config.json.")
+
+        community_name = _prompt_text("Community name", config.get("community_name"))
+        server_port = _prompt_port(int(config.get("port")))
+        admin_user = _prompt_text("Admin username", config.get("admin_user"))
 
         try:
             admin_password = getpass.getpass("Admin password: ")
@@ -89,11 +103,8 @@ def main():
         if not admin_password:
             raise SystemExit("Password is required.")
 
-        with open(config_path, "r", encoding="utf-8") as handle:
-            config = json.load(handle)
-
-        data_dir = config.get("data_dir", "data")
-        uploads_dir = config.get("uploads_dir", "uploads")
+        data_dir = config.get("data_dir")
+        uploads_dir = config.get("uploads_dir")
         if not os.path.isabs(data_dir):
             data_dir = os.path.normpath(os.path.join(directory, data_dir))
         if not os.path.isabs(uploads_dir):
@@ -111,7 +122,6 @@ def main():
 
         community_config = {
             "community_name": community_name,
-            "community_description": "",
             "port": server_port,
             "session_secret": session_secret,
             "admin_user": admin_user,

@@ -96,6 +96,18 @@ def get_config():
     return _CONFIG
 
 
+def require_setting(settings, path, label="config.json"):
+    node = settings
+    parts = path.split(".")
+    for part in parts:
+        if not isinstance(node, dict) or part not in node:
+            raise ValueError(f"[bz3web] Error: Missing {path} in {label}. Add it to {label}.")
+        node = node[part]
+    if node is None or node == "":
+        raise ValueError(f"[bz3web] Error: Missing {path} in {label}. Add it to {label}.")
+    return node
+
+
 def save_community_config(data):
     global _CONFIG, _COMMUNITY_CONFIG
     community_path = get_community_config_path()

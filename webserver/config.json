@@ -1,9 +1,9 @@
 {
-  "community_name": "Community Name",
-  "community_description": "Community Description",
-  "admin_user": "Admin",
+  "community_name": "Fuck You",
+  "community_description": "",
+  "admin_user": "MasterBlaster",
   "host": "0.0.0.0",
-  "port": 8080,
+  "port": 8888,
   "data_dir": "data",
   "uploads_dir": "uploads",
   "uploads": {
@@ -32,8 +32,48 @@
   },
   "pages": {
     "servers": {
+      "overview_max_chars": 160,
       "auto_refresh": 10,
       "auto_refresh_animate": true
+    }
+  },
+  "rate_limits": {
+    "login": {
+      "window_seconds": 60,
+      "max_requests": 10
+    },
+    "register": {
+      "window_seconds": 60,
+      "max_requests": 5
+    },
+    "forgot": {
+      "window_seconds": 60,
+      "max_requests": 5
+    },
+    "reset": {
+      "window_seconds": 60,
+      "max_requests": 5
+    },
+    "api_auth": {
+      "window_seconds": 60,
+      "max_requests": 30
+    },
+    "api_user_registered": {
+      "window_seconds": 60,
+      "max_requests": 60
+    }
+  },
+  "placeholders": {
+    "add_server": {
+      "host": "example.com or 10.0.0.5",
+      "port": "11899",
+      "name": "Required unique name",
+      "overview": "Short summary for listings",
+      "description": "Optional description"
+    },
+    "users": {
+      "reset_password": "Leave blank to keep current password",
+      "new_password": "Leave blank to keep current password"
     }
   },
   "heartbeat_timeout_seconds": 120,

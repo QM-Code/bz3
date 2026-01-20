@@ -127,9 +127,10 @@ def render_page(title, body_html, message=None, header_links_html=None):
           const serverUrl = `/servers/${encodeURIComponent(rawName)}`;
           const owner = escapeHtml(server.owner || "");
           const ownerUrl = `/users/${encodeURIComponent(server.owner || "")}`;
-          const description = server.description
-            ? `<p>${escapeHtml(server.description)}</p>`
-            : '<p class="muted">No description provided.</p>';
+          const overviewText = server.overview || "";
+          const description = overviewText
+            ? `<p>${escapeHtml(overviewText)}</p>`
+            : '<p class="muted">No overview provided.</p>';
           const hasScreenshot = Boolean(server.screenshot_id);
           const cardClass = hasScreenshot ? "card-top" : "card-top no-thumb";
           const screenshotHtml = hasScreenshot
@@ -418,8 +419,8 @@ def render_server_cards(
         name = webhttp.html_escape(raw_name)
         host = webhttp.html_escape(entry["host"])
         port = webhttp.html_escape(entry["port"])
-        description = webhttp.html_escape(entry.get("description", ""))
-        description_html = entry.get("description_html")
+        overview = webhttp.html_escape(entry.get("overview", ""))
+        overview_html = entry.get("overview_html")
         num_players = entry.get("num_players")
         max_players = entry.get("max_players")
         active = entry.get("active", False)
@@ -435,11 +436,11 @@ def render_server_cards(
             full_image = urls.get("full") or screenshot
         actions_html = entry.get("actions_html") or ""
         actions_block = f"<div class=\"card-actions\">{actions_html}</div>" if actions_html else ""
-        if description_html:
-            description_block = description_html
+        if overview_html:
+            description_block = overview_html
         else:
             description_block = (
-                f"<p>{description}</p>" if description else "<p class=\"muted\">No description provided.</p>"
+                f"<p>{overview}</p>" if overview else "<p class=\"muted\">No overview provided.</p>"
             )
         screenshot_html = ""
         card_class = "card-top"

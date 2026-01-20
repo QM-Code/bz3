@@ -12,7 +12,7 @@ def _resolve_data_dir():
 
     settings = config.get_config()
     community_dir = config.get_community_dir() or config.get_config_dir()
-    data_dir = settings.get("data_dir", "data")
+    data_dir = config.require_setting(settings, "data_dir")
     if os.path.isabs(data_dir):
         return data_dir
     return os.path.normpath(os.path.join(community_dir, data_dir))
@@ -46,6 +46,7 @@ def init_db(db_path):
         CREATE TABLE IF NOT EXISTS servers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+            overview TEXT,
             description TEXT,
             host TEXT NOT NULL,
             port INTEGER NOT NULL,
@@ -114,13 +115,14 @@ def add_server(conn, record):
     conn.execute(
         """
         INSERT INTO servers
-            (name, description, host, port, max_players, num_players, owner_user_id,
+            (name, overview, description, host, port, max_players, num_players, owner_user_id,
              screenshot_id, last_heartbeat)
         VALUES
-            (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             record.get("name"),
+            record.get("overview"),
             record.get("description"),
             record["host"],
             record["port"],
@@ -139,6 +141,7 @@ def update_server(conn, server_id, record):
         """
         UPDATE servers
         SET name = ?,
+            overview = ?,
             description = ?,
             host = ?,
             port = ?,
@@ -151,6 +154,7 @@ def update_server(conn, server_id, record):
         """,
         (
             record.get("name"),
+            record.get("overview"),
             record.get("description"),
             record["host"],
             record["port"],

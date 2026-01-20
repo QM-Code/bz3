@@ -1,11 +1,14 @@
 #pragma once
 
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
+#include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "client/config_client.hpp"
@@ -23,6 +26,7 @@ public:
                             ClientConfig &clientConfig,
                             const std::string &configPath,
                             ServerConnector &connector);
+    ~CommunityBrowserController();
 
     void update();
     void handleDisconnected(const std::string &reason);
@@ -40,6 +44,9 @@ private:
     void handleServerListDeletion(const std::string &host);
     void updateServerListDisplayNamesFromCache();
     void updateCommunityDetails();
+    std::string makeServerDetailsKey(const gui::CommunityBrowserEntry &entry) const;
+    std::string makeServerDetailsKey(const ServerListFetcher::ServerRecord &record) const;
+    void startServerDetailsRequest(const gui::CommunityBrowserEntry &entry);
     std::string resolveDisplayNameForSource(const ClientServerListSource &source) const;
     int getLanOffset() const;
     int totalListOptionCount() const;
@@ -64,6 +71,21 @@ private:
     std::vector<gui::CommunityBrowserEntry> lastGuiEntries;
     int activeServerListIndex = -1;
     std::unordered_map<std::string, std::string> serverListDisplayNames;
+    std::unordered_map<std::string, std::string> serverDescriptionCache;
+    std::unordered_set<std::string> serverDescriptionFailed;
+    std::unordered_map<std::string, std::string> serverDescriptionErrors;
+    std::string selectedServerKey;
+    struct ServerDetailsRequest {
+        std::string key;
+        std::string sourceHost;
+        std::string serverName;
+        std::string description;
+        std::atomic<bool> done{false};
+        bool ok = false;
+        std::thread worker;
+    };
+    std::unique_ptr<ServerDetailsRequest> serverDetailsRequest;
+    bool curlReady = false;
     CommunityAuthClient authClient;
     std::unordered_map<std::string, std::string> passwordSaltCache;
     struct PendingJoin {

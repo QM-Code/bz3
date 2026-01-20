@@ -30,7 +30,7 @@ def handle(request):
             return webhttp.html_response("<h1>Server not found</h1>", status="404 Not Found")
 
         settings = config.get_config()
-        timeout = int(settings.get("heartbeat_timeout_seconds", 120))
+        timeout = int(config.require_setting(settings, "heartbeat_timeout_seconds"))
         active = is_active(server, timeout)
         user = auth.get_user_from_request(request)
         is_admin = auth.is_admin(user)
@@ -47,8 +47,7 @@ def handle(request):
             "host": server["host"],
             "port": str(server["port"]),
             "name": server["name"],
-            "description": server["description"],
-            "description_html": markdown_utils.render_markdown(server["description"]),
+            "overview": server["overview"] or "",
             "max_players": server["max_players"],
             "num_players": server["num_players"],
             "owner": server["owner_username"],
@@ -72,7 +71,7 @@ def handle(request):
         if user:
             profile_url = f"/users/{urllib.parse.quote(user['username'], safe='')}"
         header_html = views.header(
-            settings.get("community_name", "Server List"),
+            config.require_setting(settings, "community_name"),
             request.path,
             logged_in=user is not None,
             user_name=auth.display_username(user),
@@ -95,6 +94,9 @@ def handle(request):
         elif server["max_players"] is not None:
             players_html = f"— / {server['max_players']}"
 
+        description_html = markdown_utils.render_markdown(server["description"])
+        if not description_html:
+            description_html = '<p class="muted">No description provided.</p>'
         info_html = f"""<div class="info-panel">
   <div><strong>Status:</strong> {"Online" if active else "Offline"}</div>
   <div><strong>Owner:</strong> {owner_html}</div>
@@ -103,9 +105,15 @@ def handle(request):
   <div><strong>Last heartbeat:</strong> {_format_heartbeat(server["last_heartbeat"])}</div>
 </div>"""
 
+        description_section = f"""<div class="info-panel">
+  <div><strong>Description</strong></div>
+  {description_html}
+</div>"""
+
         body = f"""{header_html}
 {cards_html}
 {info_html}
+{description_section}
 """
         return views.render_page("Server profile", body)
     finally:

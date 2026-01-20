@@ -3,6 +3,7 @@ import os
 import random
 import sys
 import time
+import json
 import urllib.parse
 import urllib.request
 
@@ -33,6 +34,24 @@ def _parse_args():
     return directory, wait_seconds
 
 
+def _report_error(body):
+    if not body:
+        return
+    try:
+        payload = json.loads(body)
+    except Exception:
+        print(f"Details: {body.strip()}")
+        return
+    if isinstance(payload, dict):
+        message = payload.get("message")
+        error = payload.get("error")
+        if message or error:
+            detail = message or error
+            print(f"Details: {detail}")
+            return
+    print(f"Details: {body.strip()}")
+
+
 def main():
     directory, wait_seconds = _parse_args()
 
@@ -44,8 +63,11 @@ def main():
 
     cli.bootstrap(directory, _usage())
     settings = config.get_config()
-    host = settings.get("host", "127.0.0.1")
-    port = int(settings.get("port", 8080))
+    host = settings.get("host")
+    port = settings.get("port")
+    if port is None:
+        raise SystemExit("No port specified in config.json.")
+    port = int(port)
     endpoint = f"http://{host}:{port}/api/heartbeat"
 
     conn = db.connect(db.default_db_path())
@@ -83,19 +105,22 @@ def main():
                             successes += 1
                         else:
                             failures += 1
-                            print(f"Heartbeat failed for {server['host']}:{server['port']}: {response.status} {body}")
+                            print(f"Heartbeat failed for {server['host']}:{server['port']}: HTTP {response.status}")
+                            _report_error(body)
                 except urllib.error.HTTPError as exc:
                     failures += 1
                     try:
                         body = exc.read().decode("utf-8", errors="replace")
                     except Exception:
                         body = ""
-                    print(f"Heartbeat failed for {server['host']}:{server['port']}: {exc.code} {body}")
-                except Exception as exc:
+                    print(f"Heartbeat failed for {server['host']}:{server['port']}: HTTP {exc.code}")
+                    _report_error(body)
+                except Exception:
                     failures += 1
-                    print(f"Heartbeat failed for {server['host']}:{server['port']}: {exc}")
+                    print(f"Heartbeat failed to connect to server {server['host']}:{server['port']}.")
                 time.sleep(wait_seconds)
     except KeyboardInterrupt:
+        print()
         print(f"Stopped after {successes} ok, {failures} failed.")
 
 

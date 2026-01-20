@@ -8,14 +8,15 @@ def handle(request):
         return webhttp.html_response("<h1>Method Not Allowed</h1>", status="405 Method Not Allowed")
 
     settings = config.get_config()
-    list_name = settings.get("community_name", "Server List")
+    list_name = config.require_setting(settings, "community_name")
 
     conn = db.connect(db.default_db_path())
     rows = db.list_servers(conn)
     conn.close()
 
     show_inactive = request.query.get("show_inactive", [""])[0] == "1"
-    timeout = int(settings.get("heartbeat_timeout_seconds", 120))
+    overview_max = int(config.require_setting(settings, "pages.servers.overview_max_chars"))
+    timeout = int(config.require_setting(settings, "heartbeat_timeout_seconds"))
     user = auth.get_user_from_request(request)
     is_admin = auth.is_admin(user)
     csrf_token = auth.csrf_token(request)
@@ -34,8 +35,11 @@ def handle(request):
         entry = {"id": row["id"], "host": row["host"], "port": str(row["port"])}
         if row["name"]:
             entry["name"] = row["name"]
-        if row["description"]:
-            entry["description"] = row["description"]
+        overview = row["overview"] or ""
+        if overview and len(overview) > overview_max:
+            overview = overview[:overview_max]
+        if overview:
+            entry["overview"] = overview
         if row["max_players"] is not None:
             entry["max_players"] = row["max_players"]
         if row["num_players"] is not None:
@@ -56,9 +60,9 @@ def handle(request):
 </form>"""
         return entry
 
-    server_page = settings.get("pages", {}).get("servers", {})
-    refresh_interval = int(server_page.get("auto_refresh", 10) or 0)
-    refresh_animate = bool(server_page.get("auto_refresh_animate", False))
+    server_page = config.require_setting(settings, "pages.servers")
+    refresh_interval = int(config.require_setting(server_page, "auto_refresh", "config.json pages.servers") or 0)
+    refresh_animate = bool(config.require_setting(server_page, "auto_refresh_animate", "config.json pages.servers"))
     refresh_url = None
     if refresh_interval > 0:
         refresh_url = "/api/servers"

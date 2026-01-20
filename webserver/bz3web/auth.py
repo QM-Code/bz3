@@ -4,6 +4,9 @@ import secrets
 
 from bz3web import config, db, webhttp
 
+_CSRF_COOKIE = "csrf_token"
+_CSRF_COOKIE_AGE = 2 * 3600
+
 
 def hash_password(password, salt):
     return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 100_000).hex()
@@ -24,15 +27,15 @@ def csrf_token(request):
     cookies = webhttp.parse_cookies(request.environ)
     session = cookies.get("user_session", "")
     if not session:
-        return ""
-    secret = config.get_config().get("session_secret", "")
+        return cookies.get(_CSRF_COOKIE, "")
+    secret = config.require_setting(config.get_config(), "session_secret")
     return hmac.new(secret.encode("utf-8"), session.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
 def verify_csrf(request, form):
     expected = csrf_token(request)
     if not expected:
-        return True
+        return False
     supplied = form.get("csrf_token", "")
     if isinstance(supplied, list):
         supplied = supplied[0] if supplied else ""
@@ -41,13 +44,23 @@ def verify_csrf(request, form):
     return hmac.compare_digest(supplied, expected)
 
 
+def ensure_csrf_cookie(request, headers):
+    cookies = webhttp.parse_cookies(request.environ)
+    existing = cookies.get(_CSRF_COOKIE, "")
+    if existing:
+        return existing
+    token = secrets.token_hex(16)
+    webhttp.set_cookie(headers, _CSRF_COOKIE, token, max_age=_CSRF_COOKIE_AGE, http_only=True)
+    return token
+
+
 def sign_user_session(user_id):
-    secret = config.get_config().get("session_secret", "")
+    secret = config.require_setting(config.get_config(), "session_secret")
     return webhttp.sign_session(str(user_id), secret, expires_in=8 * 3600)
 
 
 def sign_admin_session(username):
-    secret = config.get_config().get("session_secret", "")
+    secret = config.require_setting(config.get_config(), "session_secret")
     return webhttp.sign_session(f"admin:{username}", secret, expires_in=8 * 3600)
 
 
@@ -56,10 +69,10 @@ def get_user_from_request(request):
     token = cookies.get("user_session", "")
     if not token:
         return None
-    payload = webhttp.verify_session(token, config.get_config().get("session_secret", ""))
+    payload = webhttp.verify_session(token, config.require_setting(config.get_config(), "session_secret"))
     if not payload or not payload.isdigit():
         if payload and payload.startswith("admin:"):
-            username = payload.split("admin:", 1)[1] or config.get_config().get("admin_user", "Admin")
+            username = payload.split("admin:", 1)[1] or config.require_setting(config.get_config(), "admin_user")
             return {
                 "id": None,
                 "username": username,
@@ -80,7 +93,7 @@ def get_user_from_request(request):
 
 
 def ensure_admin_user(settings, conn):
-    admin_user = settings.get("admin_user", "Admin")
+    admin_user = config.require_setting(settings, "admin_user")
     admin_row = db.get_user_by_username(conn, admin_user)
     if admin_row:
         return dict(admin_row)
@@ -94,7 +107,7 @@ def is_admin(user):
 def display_username(user):
     if not user:
         return None
-    admin_user = config.get_config().get("admin_user", "Admin")
+    admin_user = config.require_setting(config.get_config(), "admin_user")
     name = None
     if isinstance(user, dict):
         name = user.get("username")

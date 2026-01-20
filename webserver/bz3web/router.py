@@ -2,7 +2,7 @@ import os
 import urllib.parse
 
 from bz3web import auth, uploads, webhttp
-from bz3web.handlers import account, admin_docs, api, api_servers, info, servers, submit, user_profile, users, server_edit, server_profile
+from bz3web.handlers import account, admin_docs, api, api_server, api_servers, info, servers, submit, user_profile, users, server_edit, server_profile
 
 
 def _serve_static(path):
@@ -52,6 +52,11 @@ def dispatch(request):
     path = request.path.rstrip("/") or "/"
     if path == "/api/servers":
         return api_servers.handle(request)
+    if path.startswith("/api/servers/"):
+        name = urllib.parse.unquote(path[len("/api/servers/") :])
+        if name:
+            request.query.setdefault("name", [name])
+            return api_server.handle(request)
     if path == "/":
         return webhttp.redirect("/servers")
     if path == "/servers":
@@ -105,6 +110,6 @@ def dispatch(request):
         return _serve_static(path)
     if path.startswith("/uploads/"):
         return _serve_upload(path)
-    if path in ("/api/auth", "/api/heartbeat", "/api/admins", "/api/user_registered", "/api/info"):
+    if path in ("/api/auth", "/api/heartbeat", "/api/admins", "/api/user_registered", "/api/info", "/api/health"):
         return api.handle(request)
     return None

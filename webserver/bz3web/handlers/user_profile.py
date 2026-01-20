@@ -31,7 +31,8 @@ def _render_profile(
     csrf_token="",
 ):
     settings = config.get_config()
-    timeout = int(settings.get("heartbeat_timeout_seconds", 120))
+    timeout = int(config.require_setting(settings, "heartbeat_timeout_seconds"))
+    overview_max = int(config.require_setting(settings, "pages.servers.overview_max_chars"))
     safe_username = webhttp.html_escape(target_user["username"])
     header_title_html = f'<span class="server-owner">{safe_username}:</span> Servers'
 
@@ -41,7 +42,7 @@ def _render_profile(
             "host": server["host"],
             "port": str(server["port"]),
             "name": server["name"],
-            "description": server["description"],
+            "overview": server["overview"] or "",
             "max_players": server["max_players"],
             "num_players": server["num_players"],
             "owner": server["owner_username"],
@@ -59,12 +60,15 @@ def _render_profile(
   <input type="hidden" name="id" value="{server_id}">
   <button type="submit" class="secondary small">Delete</button>
 </form>"""
+        overview = entry.get("overview")
+        if overview and len(overview) > overview_max:
+            entry["overview"] = overview[:overview_max]
         return entry
 
     encoded_user = quote(target_user["username"])
-    server_page = settings.get("pages", {}).get("servers", {})
-    refresh_interval = int(server_page.get("auto_refresh", 10) or 0)
-    refresh_animate = bool(server_page.get("auto_refresh_animate", False))
+    server_page = config.require_setting(settings, "pages.servers")
+    refresh_interval = int(config.require_setting(server_page, "auto_refresh", "config.json pages.servers") or 0)
+    refresh_animate = bool(config.require_setting(server_page, "auto_refresh_animate", "config.json pages.servers"))
     refresh_url = None
     if refresh_interval > 0:
         refresh_url = f"/api/servers?owner={encoded_user}"
@@ -107,7 +111,7 @@ def _render_profile(
     if current_user:
         profile_url = _profile_url(current_user["username"])
     header_html = views.header(
-        settings.get("community_name", "Server List"),
+        config.require_setting(settings, "community_name"),
         f"/users/{encoded_user}",
         logged_in=current_user is not None,
         user_name=auth.display_username(current_user),

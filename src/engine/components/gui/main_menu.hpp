@@ -84,6 +84,10 @@ public:
     bool isVisible() const;
     void setStatus(const std::string &statusText, bool isErrorMessage);
     void setCommunityDetails(const std::string &detailsText);
+    void setServerDescriptionLoading(const std::string &key, bool loading);
+    bool isServerDescriptionLoading(const std::string &key) const;
+    void setServerDescriptionError(const std::string &key, const std::string &message);
+    std::optional<std::string> getServerDescriptionError(const std::string &key) const;
     std::optional<CommunityBrowserSelection> consumeSelection();
     std::optional<int> consumeListSelection();
     std::optional<ServerListOption> consumeNewListRequest();
@@ -99,6 +103,7 @@ public:
                             const std::string &passhash,
                             const std::string &salt);
     void setCommunityStatus(const std::string &text, MessageTone tone);
+    std::optional<CommunityBrowserEntry> getSelectedEntry() const;
     bool consumeRefreshRequest();
     void setScanning(bool scanning);
     void setUserConfigPath(const std::string &path);
@@ -184,6 +189,12 @@ private:
     std::string communityDetailsText;
     std::string communityLinkStatusText;
     bool communityLinkStatusIsError = false;
+    std::string serverLinkStatusText;
+    bool serverLinkStatusIsError = false;
+    std::string serverDescriptionLoadingKey;
+    bool serverDescriptionLoading = false;
+    std::string serverDescriptionErrorKey;
+    std::string serverDescriptionErrorText;
     MessageTone communityStatusTone = MessageTone::Notice;
     int lastCredentialsListIndex = -1;
     std::string storedPasswordHash;
