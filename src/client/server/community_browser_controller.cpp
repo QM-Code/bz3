@@ -151,7 +151,7 @@ std::string buildServerDetailsUrl(const std::string &host, const std::string &se
     if (base.empty()) {
         return {};
     }
-    return base + "/api/servers/" + urlEncode(serverName);
+    return base + "/api/server/" + urlEncode(serverName);
 }
 }
 

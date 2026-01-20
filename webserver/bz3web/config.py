@@ -240,6 +240,8 @@ def validate_startup(settings):
         "security_headers.content_security_policy",
         "security_headers.referrer_policy",
         "security_headers.x_content_type_options",
+        "cache_headers.static",
+        "cache_headers.uploads",
     ]
     missing = _collect_missing(base, required_config_paths, "config.json")
 
@@ -401,6 +403,7 @@ def save_community_config(data):
         handle.write("\n")
     _COMMUNITY_CONFIG = data
     _CONFIG = None
+    _reset_language_cache()
 
 
 def get_community_config():

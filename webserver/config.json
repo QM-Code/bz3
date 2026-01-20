@@ -76,6 +76,10 @@
     "referrer_policy": "same-origin",
     "x_content_type_options": "nosniff"
   },
+  "cache_headers": {
+    "static": "public, max-age=86400",
+    "uploads": "public, max-age=86400"
+  },
   "heartbeat_timeout_seconds": 120,
   "httpserver": {
     "threads": 8

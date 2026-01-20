@@ -5,6 +5,9 @@
 #include <cstdio>
 #include <imgui.h>
 #include <imgui_internal.h>
+#if defined(IMGUI_ENABLE_FREETYPE) && __has_include("imgui_freetype.h")
+#include <imgui_freetype.h>
+#endif
 #include <spdlog/spdlog.h>
 #include <string>
 #include <vector>
@@ -59,6 +62,9 @@ namespace gui {
 
 void MainMenuView::initializeFonts(ImGuiIO &io) {
     const ImVec4 defaultTextColor = ImGui::GetStyle().Colors[ImGuiCol_Text];
+#if defined(IMGUI_ENABLE_FREETYPE) && defined(ImGuiFreeTypeBuilderFlags_LoadColor)
+    io.Fonts->FontBuilderFlags |= ImGuiFreeTypeBuilderFlags_LoadColor;
+#endif
     const auto regularFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Regular.Font");
     const std::string regularFontPathStr = regularFontPath.string();
     const float regularFontSize = useThemeOverrides
@@ -85,6 +91,9 @@ void MainMenuView::initializeFonts(ImGuiIO &io) {
         emojiConfig.PixelSnapH = true;
         emojiConfig.OversampleH = 1;
         emojiConfig.OversampleV = 1;
+#if defined(IMGUI_ENABLE_FREETYPE) && defined(ImGuiFreeTypeBuilderFlags_LoadColor)
+        emojiConfig.FontBuilderFlags |= ImGuiFreeTypeBuilderFlags_LoadColor;
+#endif
 #ifdef IMGUI_USE_WCHAR32
         static const ImWchar emojiRanges[] = { 0x1, 0x1FFFF, 0 };
 #else
@@ -99,6 +108,19 @@ void MainMenuView::initializeFonts(ImGuiIO &io) {
         );
         if (!emojiFont) {
             spdlog::warn("Failed to load emoji font for community browser ({}).", emojiFontPathStr);
+        } else {
+            const ImWchar rocketGlyph = static_cast<ImWchar>(0x1F680);
+            if (!emojiFont->FindGlyphNoFallback(rocketGlyph)) {
+                spdlog::warn("Emoji font loaded but U+1F680 (🚀) glyph is missing from the atlas.");
+            } else {
+                spdlog::info("Emoji font loaded; U+1F680 (🚀) glyph is present.");
+            }
+            const ImWchar partyGlyph = static_cast<ImWchar>(0x1F973);
+            if (!emojiFont->FindGlyphNoFallback(partyGlyph)) {
+                spdlog::warn("Emoji font loaded but U+1F973 (🥳) glyph is missing from the atlas.");
+            } else {
+                spdlog::info("Emoji font loaded; U+1F973 (🥳) glyph is present.");
+            }
         }
     }
 

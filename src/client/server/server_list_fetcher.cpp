@@ -71,7 +71,7 @@ std::string buildServersUrl(const std::string &baseHost) {
         normalized.pop_back();
     }
 
-    return normalized + "/api/servers";
+    return normalized + "/api/servers/active";
 }
 
 std::string buildInfoUrl(const std::string &baseHost) {

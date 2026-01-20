@@ -42,7 +42,7 @@ def _title(key):
     return config.ui_text(f"titles.{key}", "config.json ui_text.titles")
 
 
-def _render_form(message=None, user=None, form_data=None, csrf_token=""):
+def _render_form(request, message=None, user=None, form_data=None):
     form_data = form_data or {}
     settings = config.get_config()
     ui_text = config.require_setting(settings, "ui_text")
@@ -61,7 +61,7 @@ def _render_form(message=None, user=None, form_data=None, csrf_token=""):
         if not value:
             return ""
         return f' placeholder="{webhttp.html_escape(value)}"'
-    csrf_html = views.csrf_input(csrf_token)
+    csrf_html = views.csrf_input(auth.csrf_token(request))
     body = f"""<form method="post" action="/submit" enctype="multipart/form-data">
   {csrf_html}
   <div class="row">
@@ -147,7 +147,7 @@ def handle(request):
         user = auth.get_user_from_request(request)
         if not user:
             return webhttp.redirect("/login")
-        return _render_form(user=user, csrf_token=auth.csrf_token(request))
+        return _render_form(request, user=user)
     if request.method != "POST":
         return views.error_page("405 Method Not Allowed", "method_not_allowed")
 
@@ -177,18 +177,18 @@ def handle(request):
     }
     if content_length > max_bytes + 1024 * 1024:
         return _render_form(
+            request,
             _msg("upload_too_large"),
             user=user,
             form_data=form_data,
-            csrf_token=auth.csrf_token(request),
         )
 
     if not host or not port_text or not name:
         return _render_form(
+            request,
             _msg("missing_required"),
             user=user,
             form_data=form_data,
-            csrf_token=auth.csrf_token(request),
         )
 
     if overview and len(overview) > overview_max:
@@ -198,30 +198,30 @@ def handle(request):
             "config.json ui_text.warnings",
         )
         return _render_form(
+            request,
             _format_template(warning_template, max=overview_max),
             user=user,
             form_data=form_data,
-            csrf_token=auth.csrf_token(request),
         )
 
     try:
         port = int(port_text)
     except ValueError:
         return _render_form(
+            request,
             _msg("port_number"),
             user=user,
             form_data=form_data,
-            csrf_token=auth.csrf_token(request),
         )
 
     with db.connect_ctx() as conn:
         existing = db.get_server_by_name(conn, name)
         if existing:
             return _render_form(
+                request,
                 _msg("name_taken"),
                 user=user,
                 form_data=form_data,
-                csrf_token=auth.csrf_token(request),
             )
 
     screenshot_id = None
@@ -230,10 +230,10 @@ def handle(request):
         upload_info, error = uploads.handle_upload(file_item)
         if error:
             return _render_form(
+                request,
                 error,
                 user=user,
                 form_data=form_data,
-                csrf_token=auth.csrf_token(request),
             )
         screenshot_id = upload_info.get("id")
 

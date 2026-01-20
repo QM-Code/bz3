@@ -27,11 +27,11 @@ def csrf_token(request):
     cookies = webhttp.parse_cookies(request.environ)
     session = cookies.get("user_session", "")
     if not session:
-        return cookies.get(_CSRF_COOKIE, "")
+        return request.environ.get("BZ3WEB_CSRF_TOKEN", "") or cookies.get(_CSRF_COOKIE, "")
     secret = config.require_setting(config.get_config(), "session_secret")
     payload = webhttp.verify_session(session, secret)
     if not payload:
-        return cookies.get(_CSRF_COOKIE, "")
+        return request.environ.get("BZ3WEB_CSRF_TOKEN", "") or cookies.get(_CSRF_COOKIE, "")
     return hmac.new(secret.encode("utf-8"), session.encode("utf-8"), hashlib.sha256).hexdigest()
 
 

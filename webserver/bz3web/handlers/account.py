@@ -35,11 +35,11 @@ def _title(key):
     return config.ui_text(f"titles.{key}", "config.json ui_text.titles")
 
 
-def _render_register(message=None, form_data=None, csrf_token="", headers=None):
+def _render_register(request, message=None, form_data=None, headers=None):
     form_data = form_data or {}
     username_value = webhttp.html_escape(form_data.get("username", ""))
     email_value = webhttp.html_escape(form_data.get("email", ""))
-    csrf_html = views.csrf_input(csrf_token)
+    csrf_html = views.csrf_input(auth.csrf_token(request))
     body = f"""<form method="post" action="/register">
   {csrf_html}
   <div class="row">
@@ -75,10 +75,10 @@ def _render_register(message=None, form_data=None, csrf_token="", headers=None):
     return views.render_page_with_header(_title("create_account"), header_html, body, headers=headers)
 
 
-def _render_login(message=None, list_name=None, logged_in=False, form_data=None, csrf_token="", headers=None):
+def _render_login(request, message=None, list_name=None, logged_in=False, form_data=None, headers=None):
     form_data = form_data or {}
     identifier_value = webhttp.html_escape(form_data.get("identifier", ""))
-    csrf_html = views.csrf_input(csrf_token)
+    csrf_html = views.csrf_input(auth.csrf_token(request))
     body = f"""<form method="post" action="/login">
   {csrf_html}
   <div class="row">
@@ -112,14 +112,14 @@ def _render_login(message=None, list_name=None, logged_in=False, form_data=None,
     return views.render_page_with_header(_title("login"), header_html, body, headers=headers)
 
 
-def _render_forgot(message=None, reset_link=None, level="info", form_data=None, csrf_token="", headers=None):
+def _render_forgot(request, message=None, reset_link=None, level="info", form_data=None, headers=None):
     link_html = ""
     if reset_link:
         prefix = webhttp.html_escape(config.ui_text("messages.account.reset_link_prefix", "config.json ui_text.messages.account"))
         link_html = f'<p class="muted">{prefix} <a href="{reset_link}">{reset_link}</a></p>'
     form_data = form_data or {}
     email_value = webhttp.html_escape(form_data.get("email", ""))
-    csrf_html = views.csrf_input(csrf_token)
+    csrf_html = views.csrf_input(auth.csrf_token(request))
     body = f"""<form method="post" action="/forgot">
   {csrf_html}
   <div>
@@ -148,8 +148,8 @@ def _render_forgot(message=None, reset_link=None, level="info", form_data=None, 
     return views.render_page_with_header(_title("reset_password"), header_html, body, headers=headers)
 
 
-def _render_reset(token, message=None, csrf_token="", headers=None):
-    csrf_html = views.csrf_input(csrf_token)
+def _render_reset(request, token, message=None, headers=None):
+    csrf_html = views.csrf_input(auth.csrf_token(request))
     body = f"""<form method="post" action="/reset">
   {csrf_html}
   <input type="hidden" name="token" value="{webhttp.html_escape(token)}">
@@ -240,21 +240,19 @@ def handle(request):
     with db.connect_ctx() as conn:
         if path == "/register":
             if request.method == "GET":
-                headers = []
-                csrf_token = auth.ensure_csrf_cookie(request, headers)
                 status, response_headers, body = _render_register(
-                    csrf_token=csrf_token,
+                    request,
                     headers=_no_store_headers(),
                 )
-                return status, response_headers + headers, body
+                return status, response_headers, body
             if request.method == "POST":
                 form = request.form()
                 if not auth.verify_csrf(request, form):
                     return views.error_page("403 Forbidden", "forbidden")
                 if not ratelimit.check(settings, request, "register"):
                     return _render_register(
+                        request,
                         _msg("rate_limited"),
-                        csrf_token=auth.csrf_token(request),
                         headers=_no_store_headers(),
                     )
                 username = _first(form, "username")
@@ -263,38 +261,38 @@ def handle(request):
                 form_data = _form_values(form, ["username", "email"])
                 if not username or not email or not password:
                     return _render_register(
+                        request,
                         _msg("register_missing_fields"),
                         form_data=form_data,
-                        csrf_token=auth.csrf_token(request),
                         headers=_no_store_headers(),
                     )
                 if " " in username:
                     return _render_register(
+                        request,
                         _msg("register_username_spaces"),
                         form_data=form_data,
-                        csrf_token=auth.csrf_token(request),
                         headers=_no_store_headers(),
                     )
                 admin_username = config.require_setting(settings, "admin_user")
                 if _normalize_key(username) == _normalize_key(admin_username):
                     return _render_register(
+                        request,
                         _msg("register_username_reserved"),
                         form_data=form_data,
-                        csrf_token=auth.csrf_token(request),
                         headers=_no_store_headers(),
                     )
                 if db.get_user_by_username(conn, username):
                     return _render_register(
+                        request,
                         _msg("register_username_taken", username=username),
                         form_data=form_data,
-                        csrf_token=auth.csrf_token(request),
                         headers=_no_store_headers(),
                     )
                 if db.get_user_by_email(conn, email):
                     return _render_register(
+                        request,
                         _msg("register_email_taken"),
                         form_data=form_data,
-                        csrf_token=auth.csrf_token(request),
                         headers=_no_store_headers(),
                     )
                 digest, salt = auth.new_password(password)
@@ -321,24 +319,22 @@ def handle(request):
 
         if path == "/login":
             if request.method == "GET":
-                headers = []
-                csrf_token = auth.ensure_csrf_cookie(request, headers)
                 list_name = config.require_setting(settings, "community_name")
                 status, response_headers, body = _render_login(
+                    request,
                     list_name=list_name,
-                    csrf_token=csrf_token,
                     headers=_no_store_headers(),
                 )
-                return status, response_headers + headers, body
+                return status, response_headers, body
             if request.method == "POST":
                 form = request.form()
                 if not auth.verify_csrf(request, form):
                     return views.error_page("403 Forbidden", "forbidden")
                 if not ratelimit.check(settings, request, "login"):
                     return _render_login(
+                        request,
                         _msg("rate_limited"),
                         list_name=config.require_setting(settings, "community_name"),
-                        csrf_token=auth.csrf_token(request),
                         headers=_no_store_headers(),
                     )
                 identifier = _first(form, "email")
@@ -350,18 +346,18 @@ def handle(request):
                     user = db.get_user_by_username(conn, identifier)
                 if not user or not auth.verify_password(password, user["password_salt"], user["password_hash"]):
                     return _render_login(
+                        request,
                         _msg("login_failed"),
                         list_name=config.require_setting(settings, "community_name"),
                         form_data=form_data,
-                        csrf_token=auth.csrf_token(request),
                         headers=_no_store_headers(),
                     )
                 if user and (user["is_locked"] or user["deleted"]):
                     return _render_login(
+                        request,
                         _msg("account_locked"),
                         list_name=config.require_setting(settings, "community_name"),
                         form_data=form_data,
-                        csrf_token=auth.csrf_token(request),
                         headers=_no_store_headers(),
                     )
                 headers = []
@@ -405,26 +401,25 @@ def handle(request):
 
         if path == "/forgot":
             if request.method == "GET":
-                headers = []
-                csrf_token = auth.ensure_csrf_cookie(request, headers)
                 status, response_headers, body = _render_forgot(
-                    csrf_token=csrf_token,
+                    request,
                     headers=_no_store_headers(),
                 )
-                return status, response_headers + headers, body
+                return status, response_headers, body
             if request.method == "POST":
                 form = request.form()
                 if not auth.verify_csrf(request, form):
                     return views.error_page("403 Forbidden", "forbidden")
                 if not ratelimit.check(settings, request, "forgot"):
                     return _render_forgot(
+                        request,
                         _msg("rate_limited"),
                         level="warning",
-                        csrf_token=auth.csrf_token(request),
                         headers=_no_store_headers(),
                     )
                 email = _first(form, "email").lower()
                 form_data = _form_values(form, ["email"])
+                db.delete_expired_password_resets(conn, int(time.time()))
                 user = db.get_user_by_email(conn, email)
                 reset_link = None
                 if user:
@@ -433,11 +428,11 @@ def handle(request):
                     db.add_password_reset(conn, user["id"], token, expires_at)
                     reset_link = f"/reset?token={token}"
                 return _render_forgot(
+                    request,
                     _msg("forgot_notice"),
                     reset_link=reset_link,
                     level="info",
                     form_data=form_data,
-                    csrf_token=auth.csrf_token(request),
                     headers=_no_store_headers(),
                 )
             return views.error_page("405 Method Not Allowed", "method_not_allowed")
@@ -445,57 +440,56 @@ def handle(request):
         if path == "/reset":
             if request.method == "GET":
                 token = request.query.get("token", [""])[0]
+                db.delete_expired_password_resets(conn, int(time.time()))
                 reset = db.get_password_reset(conn, token)
                 if not reset or reset["expires_at"] < int(time.time()):
-                    headers = []
-                    csrf_token = auth.ensure_csrf_cookie(request, headers)
                     status, response_headers, body = _render_forgot(
+                        request,
                         _msg("reset_invalid"),
                         level="error",
-                        csrf_token=csrf_token,
                         headers=_no_store_headers(),
                     )
-                    return status, response_headers + headers, body
-                headers = []
-                csrf_token = auth.ensure_csrf_cookie(request, headers)
+                    return status, response_headers, body
                 status, response_headers, body = _render_reset(
+                    request,
                     token,
-                    csrf_token=csrf_token,
                     headers=_no_store_headers(),
                 )
-                return status, response_headers + headers, body
+                return status, response_headers, body
             if request.method == "POST":
                 form = request.form()
                 if not auth.verify_csrf(request, form):
                     return views.error_page("403 Forbidden", "forbidden")
                 if not ratelimit.check(settings, request, "reset"):
                     return _render_forgot(
+                        request,
                         _msg("rate_limited"),
                         level="warning",
-                        csrf_token=auth.csrf_token(request),
                         headers=_no_store_headers(),
                     )
                 token = _first(form, "token")
                 password = _first(form, "password")
+                db.delete_expired_password_resets(conn, int(time.time()))
                 reset = db.get_password_reset(conn, token)
                 if not reset or reset["expires_at"] < int(time.time()):
                     return _render_forgot(
+                        request,
                         _msg("reset_invalid"),
                         level="error",
-                        csrf_token=auth.csrf_token(request),
                         headers=_no_store_headers(),
                     )
                 if not password:
                     return _render_reset(
+                        request,
                         token,
                         _msg("reset_password_required"),
-                        csrf_token=auth.csrf_token(request),
                         headers=_no_store_headers(),
                     )
                 digest, salt = auth.new_password(password)
                 db.set_user_password(conn, reset["user_id"], digest, salt)
                 db.delete_password_reset(conn, token)
                 return _render_login(
+                    request,
                     _msg("reset_success"),
                     list_name=config.require_setting(settings, "community_name"),
                     headers=_no_store_headers(),

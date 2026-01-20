@@ -6,16 +6,28 @@ except ImportError:
     serve_app = None
 from wsgiref.simple_server import make_server
 
-from bz3web import config, db, router, views, webhttp
+from bz3web import auth, config, db, router, views, webhttp
 
 
 def application(environ, start_response):
     request = webhttp.Request(environ)
+    pending_headers = []
+    if request.method == "GET":
+        token = auth.ensure_csrf_cookie(request, pending_headers)
+        if token:
+            request.environ["BZ3WEB_CSRF_TOKEN"] = token
     result = router.dispatch(request)
     if result is None:
-        status, headers, body = views.error_page("404 Not Found", "not_found")
-    else:
-        status, headers, body = result
+        result = views.error_page("404 Not Found", "not_found")
+    status, headers, body = result
+    if pending_headers:
+        content_type = ""
+        for key, value in headers:
+            if key.lower() == "content-type":
+                content_type = value or ""
+                break
+        if content_type.startswith("text/html"):
+            headers = headers + pending_headers
     start_response(status, headers)
     return [body]
 

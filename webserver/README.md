@@ -51,6 +51,8 @@ If a required key is missing from `webserver/config.json`, the server **errors o
 - `debug.reset_rate_limits`
 - `session_cookie.*`
 - `security_headers.*`
+- `cache_headers.static`
+- `cache_headers.uploads`
 - `httpserver.threads`
 - `rate_limits.*`
 
@@ -158,6 +160,10 @@ You can also add:
     "content_security_policy": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'",
     "referrer_policy": "same-origin",
     "x_content_type_options": "nosniff"
+  },
+  "cache_headers": {
+    "static": "public, max-age=86400",
+    "uploads": "public, max-age=86400"
   },
   "heartbeat_timeout_seconds": 120,
   "httpserver": {
@@ -555,8 +561,10 @@ Import/export JSON matches `communities/*/data/test-data.json` and includes:
 - `/` → `/servers`
 - `/servers` HTML list
 - `/servers/<server>` server profile
-- `/api/servers` JSON list (overview only)
-- `/api/servers/<name|id>` JSON for a single server (overview + full description)
+- `/api/servers` JSON list (overview only; includes active + inactive)
+- `/api/servers/active` JSON list (overview only; active servers)
+- `/api/servers/inactive` JSON list (overview only; inactive servers)
+- `/api/server/<name|id>` JSON for a single server (overview + full description)
 - `/api/users/<name>` JSON for user + server list
 - `/submit` submit a server (login required)
 - `/server/edit?id=<id>` edit server (owner/admin)

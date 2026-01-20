@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdint>
 #include <cstdlib>
 #include <iomanip>
 #include <sstream>
@@ -62,6 +63,66 @@ std::string buildServerPageUrl(const std::string &communityHost, const std::stri
         base.pop_back();
     }
     return base + "/servers/" + urlEncode(serverName);
+}
+
+std::string sanitizeTextForImGui(const std::string &text) {
+#ifdef IMGUI_USE_WCHAR32
+    return text;
+#else
+    std::string out;
+    out.reserve(text.size());
+    std::size_t i = 0;
+    while (i < text.size()) {
+        unsigned char c = static_cast<unsigned char>(text[i]);
+        if (c < 0x80) {
+            out.push_back(static_cast<char>(c));
+            ++i;
+            continue;
+        }
+
+        std::size_t len = 0;
+        uint32_t codepoint = 0;
+        if ((c & 0xE0) == 0xC0) {
+            len = 2;
+            codepoint = c & 0x1F;
+        } else if ((c & 0xF0) == 0xE0) {
+            len = 3;
+            codepoint = c & 0x0F;
+        } else if ((c & 0xF8) == 0xF0) {
+            len = 4;
+            codepoint = c & 0x07;
+        } else {
+            ++i;
+            continue;
+        }
+
+        if (i + len > text.size()) {
+            break;
+        }
+
+        bool valid = true;
+        for (std::size_t j = 1; j < len; ++j) {
+            unsigned char cc = static_cast<unsigned char>(text[i + j]);
+            if ((cc & 0xC0) != 0x80) {
+                valid = false;
+                break;
+            }
+            codepoint = (codepoint << 6) | (cc & 0x3F);
+        }
+
+        if (!valid) {
+            ++i;
+            continue;
+        }
+
+        if (codepoint <= 0xFFFF) {
+            out.append(text.substr(i, len));
+        }
+
+        i += len;
+    }
+    return out;
+#endif
 }
 
 std::string makeServerDetailsKey(const gui::CommunityBrowserEntry &entry) {
@@ -176,7 +237,8 @@ void renderMarkdown(const std::string &text,
                     const ImVec4 &linkColor,
                     std::string &linkStatusText,
                     bool &linkStatusIsError) {
-    std::istringstream input(text);
+    const std::string safeText = sanitizeTextForImGui(text);
+    std::istringstream input(safeText);
     std::string line;
     bool firstLine = true;
 

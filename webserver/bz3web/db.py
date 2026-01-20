@@ -576,3 +576,8 @@ def get_password_reset(conn, token):
 def delete_password_reset(conn, token):
     conn.execute("DELETE FROM password_resets WHERE token = ?", (token,))
     conn.commit()
+
+
+def delete_expired_password_resets(conn, now_timestamp):
+    conn.execute("DELETE FROM password_resets WHERE expires_at < ?", (int(now_timestamp),))
+    conn.commit()

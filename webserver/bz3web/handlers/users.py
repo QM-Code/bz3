@@ -82,6 +82,7 @@ def _can_manage_user(current_user, target_user, levels, root_id):
 
 
 def _render_users_list(
+    request,
     users,
     current_user,
     message=None,
@@ -90,12 +91,11 @@ def _render_users_list(
     root_admin_name="Admin",
     admin_levels=None,
     root_id=None,
-    csrf_token="",
 ):
     list_name = config.require_setting(config.get_config(), "community_name")
     form_data = form_data or {}
 
-    csrf_html = views.csrf_input(csrf_token)
+    csrf_html = views.csrf_input(auth.csrf_token(request))
     if show_admin_fields:
         rows = []
         for user in users:
@@ -221,13 +221,13 @@ def _render_users_list(
 
 
 def _render_user_edit(
+    request,
     user,
     message=None,
     form_data=None,
     current_user=None,
     root_admin_name="Admin",
     admin_levels=None,
-    csrf_token="",
 ):
     form_data = form_data or {}
     placeholders = config.get_config().get("placeholders", {}).get("users", {})
@@ -235,7 +235,7 @@ def _render_user_edit(
     email_value = form_data.get("email", user["email"])
     action_url = f"/users/{urllib.parse.quote(user['username'], safe='')}/edit"
     cancel_url = f"/users/{urllib.parse.quote(user['username'], safe='')}"
-    csrf_html = views.csrf_input(csrf_token)
+    csrf_html = views.csrf_input(auth.csrf_token(request))
     body = f"""<form method="post" action="{action_url}">
   {csrf_html}
   <input type="hidden" name="id" value="{user["id"]}">
@@ -298,7 +298,7 @@ def _render_user_edit(
     )
 
 
-def _render_user_settings(user, message=None, form_data=None, current_user=None, csrf_token=""):
+def _render_user_settings(request, user, message=None, form_data=None, current_user=None):
     form_data = form_data or {}
     placeholders = config.get_config().get("placeholders", {}).get("users", {})
     email_value = form_data.get("email", user["email"])
@@ -311,7 +311,7 @@ def _render_user_settings(user, message=None, form_data=None, current_user=None,
     for code in languages:
         label = language_labels.get(code, code)
         language_options.append((code, label))
-    csrf_html = views.csrf_input(csrf_token)
+    csrf_html = views.csrf_input(auth.csrf_token(request))
     language_options_html = []
     for code, label in language_options:
         selected = " selected" if code == language_value else ""
@@ -362,6 +362,7 @@ def _render_user_settings(user, message=None, form_data=None, current_user=None,
 
 
 def _handle_admin_edit(
+    request,
     conn,
     current_user,
     target_user,
@@ -371,7 +372,6 @@ def _handle_admin_edit(
     root_id,
     is_root_admin,
     redirect_url="/users",
-    csrf_token="",
 ):
     is_root_target = _normalize_key(target_user["username"]) == _normalize_key(admin_username)
     if not is_root_admin and is_root_target:
@@ -385,66 +385,66 @@ def _handle_admin_edit(
     form_data = {"username": username, "email": email, "is_admin": is_admin_value}
     if not username or not email:
         return _render_user_edit(
+            request,
             target_user,
             _msg("username_email_required"),
             form_data=form_data,
             current_user=current_user,
             root_admin_name=admin_username,
             admin_levels=admin_levels,
-            csrf_token=csrf_token,
         )
     if " " in username:
         return _render_user_edit(
+            request,
             target_user,
             _msg("username_spaces"),
             form_data=form_data,
             current_user=current_user,
             root_admin_name=admin_username,
             admin_levels=admin_levels,
-            csrf_token=csrf_token,
         )
     if _normalize_key(username) == _normalize_key(admin_username):
         return _render_user_edit(
+            request,
             target_user,
             _msg("username_reserved"),
             form_data=form_data,
             current_user=current_user,
             root_admin_name=admin_username,
             admin_levels=admin_levels,
-            csrf_token=csrf_token,
         )
     if is_root_target and _normalize_key(username) != _normalize_key(admin_username):
         return _render_user_edit(
+            request,
             target_user,
             _msg("root_username_locked"),
             form_data=form_data,
             current_user=current_user,
             root_admin_name=admin_username,
             admin_levels=admin_levels,
-            csrf_token=csrf_token,
         )
     existing = db.get_user_by_username(conn, username)
     if existing and existing["id"] != target_user["id"]:
         return _render_user_edit(
+            request,
             target_user,
             _msg("username_taken"),
             form_data=form_data,
             current_user=current_user,
             root_admin_name=admin_username,
             admin_levels=admin_levels,
-            csrf_token=csrf_token,
         )
     if email != target_user["email"]:
         existing_email = db.get_user_by_email(conn, email)
         if existing_email and existing_email["id"] != target_user["id"]:
             return _render_user_edit(
+                request,
                 target_user,
                 _msg("email_in_use"),
                 form_data=form_data,
                 current_user=current_user,
                 root_admin_name=admin_username,
                 admin_levels=admin_levels,
-                csrf_token=csrf_token,
             )
     db.update_user_email(conn, target_user["id"], email)
     if username != target_user["username"]:
@@ -474,7 +474,6 @@ def handle(request):
     if not current_user:
         return webhttp.redirect("/login")
     is_admin = _is_admin(current_user)
-    csrf_token = auth.csrf_token(request)
     admin_username = config.require_setting(settings, "admin_user")
     is_root_admin = _is_root_admin(current_user, settings)
 
@@ -495,7 +494,7 @@ def handle(request):
                 return views.error_page("404 Not Found", "user_not_found")
             if current_user["id"] == target_user["id"]:
                 if request.method == "GET":
-                    return _render_user_settings(target_user, current_user=current_user, csrf_token=csrf_token)
+                    return _render_user_settings(request, target_user, current_user=current_user)
                 if request.method == "POST":
                     form = request.form()
                     if not auth.verify_csrf(request, form):
@@ -506,32 +505,32 @@ def handle(request):
                     form_data = {"email": email, "language": language}
                     if not email:
                         return _render_user_settings(
+                            request,
                             target_user,
                             _msg("email_required"),
                             form_data=form_data,
                             current_user=current_user,
-                            csrf_token=csrf_token,
                         )
                     language = config.normalize_language(language)
                     if language:
                         available = config.get_available_languages()
                         if language not in available:
                             return _render_user_settings(
+                                request,
                                 target_user,
                                 _msg("language_invalid"),
                                 form_data=form_data,
                                 current_user=current_user,
-                                csrf_token=csrf_token,
                             )
                     if email != target_user["email"]:
                         existing_email = db.get_user_by_email(conn, email)
                         if existing_email and existing_email["id"] != target_user["id"]:
                             return _render_user_settings(
+                                request,
                                 target_user,
                                 _msg("email_in_use"),
                                 form_data=form_data,
                                 current_user=current_user,
-                                csrf_token=csrf_token,
                             )
                     db.update_user_email(conn, target_user["id"], email)
                     db.update_user_language(conn, target_user["id"], language or None)
@@ -546,14 +545,15 @@ def handle(request):
                 return views.error_page("403 Forbidden", "forbidden")
             if request.method == "GET":
                 return _render_user_edit(
+                    request,
                     target_user,
                     current_user=current_user,
                     root_admin_name=admin_username,
                     admin_levels=admin_levels,
-                    csrf_token=csrf_token,
                 )
             if request.method == "POST":
                 return _handle_admin_edit(
+                    request,
                     conn,
                     current_user,
                     target_user,
@@ -563,19 +563,18 @@ def handle(request):
                     root_id,
                     is_root_admin,
                     redirect_url=f"/users/{urllib.parse.quote(target_user['username'], safe='')}",
-                    csrf_token=csrf_token,
                 )
             return views.error_page("405 Method Not Allowed", "method_not_allowed")
         if path in ("/users", "/users/"):
             users = db.list_users(conn)
             return _render_users_list(
+                request,
                 users,
                 current_user,
                 show_admin_fields=is_admin,
                 root_admin_name=admin_username,
                 admin_levels=admin_levels,
                 root_id=root_id,
-                csrf_token=csrf_token,
             )
 
         if path in ("/users/create", "/users/create/") and request.method == "POST":
@@ -596,57 +595,57 @@ def handle(request):
             if not username or not email or not password:
                 users = db.list_users(conn)
                 return _render_users_list(
+                    request,
                     users,
                     current_user,
                     message=_msg("create_missing_fields"),
                     form_data=form_data,
                     show_admin_fields=True,
                     root_admin_name=admin_username,
-                    csrf_token=csrf_token,
                 )
             if " " in username:
                 users = db.list_users(conn)
                 return _render_users_list(
+                    request,
                     users,
                     current_user,
                     message=_msg("username_spaces"),
                     form_data=form_data,
                     show_admin_fields=True,
                     root_admin_name=admin_username,
-                    csrf_token=csrf_token,
                 )
             if _normalize_key(username) == _normalize_key(admin_username):
                 users = db.list_users(conn)
                 return _render_users_list(
+                    request,
                     users,
                     current_user,
                     message=_msg("username_reserved"),
                     form_data=form_data,
                     show_admin_fields=True,
                     root_admin_name=admin_username,
-                    csrf_token=csrf_token,
                 )
             if db.get_user_by_username(conn, username):
                 users = db.list_users(conn)
                 return _render_users_list(
+                    request,
                     users,
                     current_user,
                     message=_msg("username_taken"),
                     form_data=form_data,
                     show_admin_fields=True,
                     root_admin_name=admin_username,
-                    csrf_token=csrf_token,
                 )
             if db.get_user_by_email(conn, email):
                 users = db.list_users(conn)
                 return _render_users_list(
+                    request,
                     users,
                     current_user,
                     message=_msg("email_registered"),
                     form_data=form_data,
                     show_admin_fields=True,
                     root_admin_name=admin_username,
-                    csrf_token=csrf_token,
                 )
             digest, salt = auth.new_password(password)
             db.add_user(conn, username, email, digest, salt, is_admin=False, is_admin_manual=False)
@@ -692,11 +691,11 @@ def handle(request):
                         if not _can_manage_user(current_user, user, admin_levels, root_id):
                             return webhttp.redirect("/users")
                         return _render_user_edit(
+                            request,
                             user,
                             current_user=current_user,
                             root_admin_name=admin_username,
                             admin_levels=admin_levels,
-                            csrf_token=csrf_token,
                         )
                 return webhttp.redirect("/users")
             if request.method == "POST":
@@ -710,6 +709,7 @@ def handle(request):
                 if not user:
                     return webhttp.redirect("/users")
                 return _handle_admin_edit(
+                    request,
                     conn,
                     current_user,
                     user,
@@ -718,7 +718,6 @@ def handle(request):
                     admin_levels,
                     root_id,
                     is_root_admin,
-                    csrf_token=csrf_token,
                 )
 
         if path in ("/users/delete", "/users/delete/") and request.method == "POST":

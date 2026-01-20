@@ -41,6 +41,7 @@ def _title(key):
 
 
 def _render_profile(
+    request,
     target_user,
     current_user,
     servers,
@@ -49,7 +50,6 @@ def _render_profile(
     can_manage,
     message=None,
     admin_notice="",
-    csrf_token="",
 ):
     settings = config.get_config()
     timeout = int(config.require_setting(settings, "heartbeat_timeout_seconds"))
@@ -71,7 +71,7 @@ def _render_profile(
         }
         if can_manage:
             server_id = entry.get("id")
-            csrf_html = views.csrf_input(csrf_token)
+            csrf_html = views.csrf_input(auth.csrf_token(request))
             confirm_delete = webhttp.html_escape(config.ui_text("confirmations.delete_server"))
             entry["actions_html"] = f"""<form method="get" action="/server/edit">
   <input type="hidden" name="id" value="{server_id}">
@@ -93,9 +93,9 @@ def _render_profile(
     refresh_animate = bool(config.require_setting(server_page, "auto_refresh_animate", "config.json pages.servers"))
     refresh_url = None
     if refresh_interval > 0:
-        refresh_url = f"/api/servers?owner={encoded_user}"
+        refresh_url = f"/api/servers/active?owner={encoded_user}"
         if show_inactive:
-            refresh_url = f"{refresh_url}&show_inactive=1"
+            refresh_url = f"/api/servers/inactive?owner={encoded_user}"
     cards_html = views.render_server_section(
         servers,
         timeout,
@@ -118,7 +118,7 @@ def _render_profile(
         form_prefix=f"/users/{encoded_user}",
         notice_html=admin_notice,
         header_title_html=admins_header_html,
-        csrf_token=csrf_token,
+        csrf_token=auth.csrf_token(request),
     )
 
     submit_html = ""
@@ -234,6 +234,7 @@ def handle(request):
             if current_user and current_user["id"] == target_user["id"]:
                 notice_html = account._trusted_primary_notice(conn, current_user, settings)
             return _render_profile(
+                request,
                 target_user,
                 current_user,
                 servers,
@@ -242,7 +243,6 @@ def handle(request):
                 can_manage,
                 message=message,
                 admin_notice=notice_html,
-                csrf_token=auth.csrf_token(request),
             )
 
         servers = []
@@ -253,6 +253,7 @@ def handle(request):
         if current_user and current_user["id"] == target_user["id"]:
             notice_html = account._trusted_primary_notice(conn, current_user, settings)
         return _render_profile(
+            request,
             target_user,
             current_user,
             servers,
@@ -260,5 +261,4 @@ def handle(request):
             show_inactive,
             can_manage,
             admin_notice=notice_html,
-            csrf_token=auth.csrf_token(request),
         )

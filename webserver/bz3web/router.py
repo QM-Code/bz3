@@ -11,10 +11,15 @@ def _serve_static(path):
     rel_path = path[len("/static/") :]
     if not rel_path:
         return None
-    normalized = os.path.normpath(rel_path)
-    if normalized.startswith(".."):
+    if os.path.isabs(rel_path) or rel_path.startswith(("/", "\\")):
         return None
-    file_path = os.path.join(static_dir, normalized)
+    normalized = os.path.normpath(rel_path)
+    if normalized.startswith("..") or os.path.isabs(normalized):
+        return None
+    static_root = os.path.realpath(static_dir)
+    file_path = os.path.realpath(os.path.join(static_root, normalized))
+    if not file_path.startswith(static_root + os.sep) and file_path != static_root:
+        return None
     if not os.path.isfile(file_path):
         return None
     with open(file_path, "rb") as handle:
@@ -24,7 +29,10 @@ def _serve_static(path):
         content_type = "text/css; charset=utf-8"
     if file_path.endswith(".svg"):
         content_type = "image/svg+xml"
-    return webhttp.file_response(data, content_type)
+    settings = config.get_config()
+    cache_control = config.require_setting(settings, "cache_headers.static", "config.json cache_headers.static")
+    headers = [("Cache-Control", cache_control)]
+    return webhttp.file_response(data, content_type, headers=headers)
 
 
 def _serve_upload(path):
@@ -32,10 +40,15 @@ def _serve_upload(path):
     rel_path = path[len("/uploads/") :]
     if not rel_path:
         return None
-    normalized = os.path.normpath(rel_path)
-    if normalized.startswith(".."):
+    if os.path.isabs(rel_path) or rel_path.startswith(("/", "\\")):
         return None
-    file_path = os.path.join(upload_dir, normalized)
+    normalized = os.path.normpath(rel_path)
+    if normalized.startswith("..") or os.path.isabs(normalized):
+        return None
+    upload_root = os.path.realpath(upload_dir)
+    file_path = os.path.realpath(os.path.join(upload_root, normalized))
+    if not file_path.startswith(upload_root + os.sep) and file_path != upload_root:
+        return None
     if not os.path.isfile(file_path):
         return None
     with open(file_path, "rb") as handle:
@@ -45,7 +58,10 @@ def _serve_upload(path):
         content_type = "image/png"
     if file_path.endswith(".jpg") or file_path.endswith(".jpeg"):
         content_type = "image/jpeg"
-    return webhttp.file_response(data, content_type)
+    settings = config.get_config()
+    cache_control = config.require_setting(settings, "cache_headers.uploads", "config.json cache_headers.uploads")
+    headers = [("Cache-Control", cache_control)]
+    return webhttp.file_response(data, content_type, headers=headers)
 
 
 def dispatch(request):
@@ -73,9 +89,13 @@ def dispatch(request):
     path = request.path.rstrip("/") or "/"
     try:
         if path == "/api/servers":
-            return api_servers.handle(request)
-        if path.startswith("/api/servers/"):
-            token = urllib.parse.unquote(path[len("/api/servers/") :])
+            return api_servers.handle(request, status="all")
+        if path == "/api/servers/active":
+            return api_servers.handle(request, status="active")
+        if path == "/api/servers/inactive":
+            return api_servers.handle(request, status="inactive")
+        if path.startswith("/api/server/"):
+            token = urllib.parse.unquote(path[len("/api/server/") :])
             if token:
                 if token.isdigit():
                     request.query.setdefault("id", [token])

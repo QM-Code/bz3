@@ -747,7 +747,7 @@ def render_admins_section(
 </tr>"""
             for admin in admins
         ) or f"<tr><td colspan=\"3\">{webhttp.html_escape(_ui_text('empty_states.admins'))}</td></tr>"
-        table_head = """<thead>
+        table_head = f"""<thead>
     <tr>
       <th>{username_label}</th>
       <th class="center-cell">{trust_label}</th>
@@ -762,7 +762,7 @@ def render_admins_section(
 </tr>"""
             for admin in admins
         ) or f"<tr><td colspan=\"2\">{webhttp.html_escape(_ui_text('empty_states.admins'))}</td></tr>"
-        table_head = """<thead>
+        table_head = f"""<thead>
     <tr>
       <th>{username_label}</th>
       <th class="center-cell">{trust_label}</th>

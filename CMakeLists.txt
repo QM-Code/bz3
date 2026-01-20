@@ -201,6 +201,12 @@ target_link_libraries(bz3 PRIVATE
     EffekseerRendererGL
 )
 
+# ImGui: enable full Unicode range (required for emoji codepoints > U+FFFF)
+if(TARGET imgui::imgui)
+    target_compile_definitions(imgui::imgui INTERFACE IMGUI_USE_WCHAR32)
+endif()
+target_compile_definitions(bz3 PRIVATE IMGUI_USE_WCHAR32)
+
 target_link_libraries(bz3-server PRIVATE
     glm::glm
     Jolt::Jolt

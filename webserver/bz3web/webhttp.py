@@ -3,6 +3,7 @@ import cgi
 import hashlib
 import hmac
 import html
+import io
 import json
 import time
 import urllib.parse
@@ -39,15 +40,7 @@ class Request:
                 body = self.body().decode("utf-8", errors="replace")
                 self._form = urllib.parse.parse_qs(body, keep_blank_values=True)
             elif "multipart/form-data" in content_type:
-                form = {}
-                files = {}
-                storage = cgi.FieldStorage(fp=self.environ["wsgi.input"], environ=self.environ, keep_blank_values=True)
-                if storage.list:
-                    for item in storage.list:
-                        if item.filename:
-                            files[item.name] = item
-                        else:
-                            form.setdefault(item.name, []).append(item.value)
+                form, files = self._parse_multipart()
                 self._form = form
                 self._multipart = (form, files)
             else:
@@ -56,19 +49,31 @@ class Request:
 
     def multipart(self):
         if self._multipart is None:
-            form = {}
-            files = {}
             content_type = self.environ.get("CONTENT_TYPE", "")
             if "multipart/form-data" in content_type:
-                storage = cgi.FieldStorage(fp=self.environ["wsgi.input"], environ=self.environ, keep_blank_values=True)
-                if storage.list:
-                    for item in storage.list:
-                        if item.filename:
-                            files[item.name] = item
-                        else:
-                            form.setdefault(item.name, []).append(item.value)
+                form, files = self._parse_multipart()
+            else:
+                form, files = {}, {}
             self._multipart = (form, files)
         return self._multipart
+
+    def _parse_multipart(self):
+        form = {}
+        files = {}
+        body = self.body()
+        environ = {
+            "REQUEST_METHOD": self.method,
+            "CONTENT_TYPE": self.environ.get("CONTENT_TYPE", ""),
+            "CONTENT_LENGTH": str(len(body)),
+        }
+        storage = cgi.FieldStorage(fp=io.BytesIO(body), environ=environ, keep_blank_values=True)
+        if storage.list:
+            for item in storage.list:
+                if item.filename:
+                    files[item.name] = item
+                else:
+                    form.setdefault(item.name, []).append(item.value)
+        return form, files
 
 
 def html_escape(value):

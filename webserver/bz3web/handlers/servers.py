@@ -77,9 +77,9 @@ def handle(request):
     refresh_animate = bool(config.require_setting(server_page, "auto_refresh_animate", "config.json pages.servers"))
     refresh_url = None
     if refresh_interval > 0:
-        refresh_url = "/api/servers"
+        refresh_url = "/api/servers/active"
         if show_inactive:
-            refresh_url = "/api/servers?show_inactive=1"
+            refresh_url = "/api/servers/inactive"
     cards_html = views.render_server_section(
         rows,
         timeout,

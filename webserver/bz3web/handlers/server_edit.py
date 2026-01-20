@@ -59,13 +59,13 @@ def _can_manage_owner(user, owner_user, conn, settings):
 
 
 def _render_form(
+    request,
     server,
     user,
     message=None,
     form_data=None,
     usernames=None,
     is_admin=False,
-    csrf_token="",
     message_html=None,
 ):
     form_data = form_data or {}
@@ -97,7 +97,7 @@ def _render_form(
   </div>
 """
     cancel_href = _profile_url(server["owner_username"])
-    csrf_html = views.csrf_input(csrf_token)
+    csrf_html = views.csrf_input(auth.csrf_token(request))
     body = f"""<form method=\"post\" action=\"/server/edit\" enctype=\"multipart/form-data\">
   {csrf_html}
   <input type=\"hidden\" name=\"id\" value=\"{server['id']}\">
@@ -201,11 +201,11 @@ def handle(request):
                 return webhttp.redirect(_profile_url(user["username"]))
             usernames = [row["username"] for row in db.list_users(conn) if not row["deleted"]] if is_admin else []
             return _render_form(
+                request,
                 server,
                 user,
                 usernames=usernames,
                 is_admin=is_admin,
-                csrf_token=auth.csrf_token(request),
             )
 
         content_length = int(request.environ.get("CONTENT_LENGTH") or 0)
@@ -229,26 +229,26 @@ def handle(request):
         usernames = [row["username"] for row in db.list_users(conn) if not row["deleted"]] if is_admin else []
         if content_length > max_bytes + 1024 * 1024:
             return _render_form(
+                request,
                 server,
                 user,
                 message=_msg("upload_too_large"),
                 form_data=form_data,
                 usernames=usernames,
                 is_admin=is_admin,
-                csrf_token=auth.csrf_token(request),
             )
         host = _first(form, "host")
         port_text = _first(form, "port")
         name = _first(form, "name")
         if not host or not port_text or not name:
             return _render_form(
+                request,
                 server,
                 user,
                 message=_msg("missing_required"),
                 form_data=form_data,
                 usernames=usernames,
                 is_admin=is_admin,
-                csrf_token=auth.csrf_token(request),
             )
 
         overview = _first(form, "overview")
@@ -260,25 +260,25 @@ def handle(request):
                 "config.json ui_text.warnings",
             )
             return _render_form(
+                request,
                 server,
                 user,
                 message=_format_template(warning_template, max=overview_max),
                 form_data=form_data,
                 usernames=usernames,
                 is_admin=is_admin,
-                csrf_token=auth.csrf_token(request),
             )
         try:
             port = int(port_text)
         except ValueError:
             return _render_form(
+                request,
                 server,
                 user,
                 message=_msg("port_number"),
                 form_data=form_data,
                 usernames=usernames,
                 is_admin=is_admin,
-                csrf_token=auth.csrf_token(request),
             )
 
         owner_user_id = server["owner_user_id"]
@@ -288,26 +288,26 @@ def handle(request):
                 owner_user = db.get_user_by_username(conn, owner_input)
                 if not owner_user or owner_user["deleted"]:
                     return _render_form(
+                        request,
                         server,
                         user,
                         message=_msg("owner_not_found"),
                         form_data=form_data,
                         usernames=usernames,
                         is_admin=is_admin,
-                        csrf_token=auth.csrf_token(request),
                     )
                 owner_user_id = owner_user["id"]
 
         existing = db.get_server_by_name(conn, name)
         if existing and existing["id"] != server["id"]:
             return _render_form(
+                request,
                 server,
                 user,
                 message=_msg("name_taken"),
                 form_data=form_data,
                 usernames=usernames,
                 is_admin=is_admin,
-                csrf_token=auth.csrf_token(request),
             )
         existing_host = db.get_server_by_host_port(conn, host, port)
         if existing_host and existing_host["id"] != server["id"]:
@@ -318,6 +318,7 @@ def handle(request):
                 f'<a class="admin-link" href="{server_url}">{view_label}</a>'
             )
             return _render_form(
+                request,
                 server,
                 user,
                 message=_msg(
@@ -330,7 +331,6 @@ def handle(request):
                 form_data=form_data,
                 usernames=usernames,
                 is_admin=is_admin,
-                csrf_token=auth.csrf_token(request),
             )
         record = {
             "name": name,
@@ -349,6 +349,7 @@ def handle(request):
             upload_info, error = uploads.handle_upload(file_item)
             if error:
                 return _render_form(
+                    request,
                     server,
                     user,
                     message=error,

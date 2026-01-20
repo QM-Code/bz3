@@ -2,7 +2,7 @@ from bz3web import config, db, webhttp
 from bz3web.server_status import is_active
 
 
-def handle(request):
+def handle(request, status="all"):
     if request.method != "GET":
         return webhttp.json_error("method_not_allowed", status="405 Method Not Allowed")
 
@@ -11,7 +11,9 @@ def handle(request):
     overview_max = int(config.require_setting(settings, "pages.servers.overview_max_chars"))
 
     owner = request.query.get("owner", [""])[0].strip()
-    show_inactive = request.query.get("show_inactive", [""])[0] == "1"
+    status = (status or "all").lower()
+    if status not in ("all", "active", "inactive"):
+        return webhttp.json_error("invalid_status", status="400 Bad Request")
 
     with db.connect_ctx() as conn:
         if owner:
@@ -36,12 +38,10 @@ def handle(request):
             active_count += 1
         else:
             inactive_count += 1
-        if show_inactive:
-            if active:
-                continue
-        else:
-            if not active:
-                continue
+        if status == "active" and not active:
+            continue
+        if status == "inactive" and active:
+            continue
         entry = {
             "id": row["id"],
             "name": row["name"],
