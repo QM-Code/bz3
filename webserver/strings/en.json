@@ -298,6 +298,29 @@
       "password_required": "Password is required.",
       "default_community_name": "My Community",
       "default_admin_user": "Admin"
+    },
+    "start": {
+      "usage": "usage: start.py <community-directory> [-p <port>]",
+      "port_invalid_integer": "Port must be an integer.",
+      "stopped": "Server stopped."
+    },
+    "db_restore": {
+      "usage": "usage: db-restore.py <community-directory> -f <json-file>",
+      "json_required": "-f <json-file> is mandatory",
+      "db_exists": "Database already exists.",
+      "imported_users": "Imported {count} users; skipped {skipped}.",
+      "imported_servers": "Imported {count} servers; skipped {skipped}."
+    },
+    "db_merge": {
+      "usage": "usage: db-merge.py <community-directory> -f <json-file>",
+      "json_required": "-f <json-file> is mandatory",
+      "imported_users": "Imported {count} users; skipped {skipped}.",
+      "imported_servers": "Imported {count} servers; skipped {skipped}."
+    },
+    "db_snapshot": {
+      "usage": "usage: db-snapshot.py <community-directory> [output.json|-] [-z]",
+      "exporting": "Exporting snapshot to {path}",
+      "wrote_zip": "Wrote {path}"
     }
   }
 }

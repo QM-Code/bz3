@@ -24,6 +24,7 @@ Use this prompt when working on the community webserver in `webserver/`.
 - Do not store plaintext passwords.
 - Treat `webserver/config.json` as the authoritative source of defaults; do not hardcode any configurable defaults in code. If a value is missing, prefer surfacing a clear error instead of falling back.
 - Strings should be configurable via `strings/<lang>.json`; avoid hardcoding UI text.
+- For any new strings, add a translation for every language file. English text must only live in `strings/en.json`.
 - `cache_headers.static` and `cache_headers.uploads` are required config keys; static/uploads responses use them.
 - Static/uploads serving enforces path containment; do not relax the realpath checks in `bz3web/router.py`.
 - CSRF cookies are centralized in `bz3web/app.py` (GET + HTML responses); render helpers should call `auth.csrf_token(request)` internally.

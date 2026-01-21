@@ -16,7 +16,7 @@
 #include "client/server/server_discovery.hpp"
 #include "client/server/server_list_fetcher.hpp"
 #include "engine/client_engine.hpp"
-#include "engine/components/gui/main_menu.hpp"
+#include "engine/components/gui/main_menu_interface.hpp"
 
 class ServerConnector;
 
@@ -60,7 +60,7 @@ private:
     std::string makeAuthCacheKey(const std::string &host, const std::string &username) const;
 
     ClientEngine &engine;
-    gui::MainMenuView &browser;
+    gui::MainMenuInterface &browser;
     ClientConfig &clientConfig;
     std::string clientConfigPath;
     ServerConnector &connector;

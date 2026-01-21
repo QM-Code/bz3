@@ -8,10 +8,10 @@
     "ru": "Русский",
     "jp": "Японский",
     "zh": "Китайский",
-    "ko": "Korean",
-    "it": "Italian",
-    "hi": "Hindi",
-    "ar": "Arabic"
+    "ko": "Корейский",
+    "it": "Итальянский",
+    "hi": "Хинди",
+    "ar": "Арабский"
   },
   "ui_text": {
     "hints": {
@@ -61,8 +61,8 @@
         "message": "Сервер не найден."
       },
       "generic": {
-        "title": "Error",
-        "message": ""
+        "title": "Ошибка",
+        "message": "Произошла ошибка."
       }
     },
     "messages": {
@@ -283,10 +283,10 @@
       "language_prompt": "Язык [{default}]",
       "language_tab_hint": "(? для списка):",
       "language_list_header": "Доступные языки:",
-      "language_list_item": "  {code} - {label}",
+      "language_list_item": "  {code}: {label}",
       "language_invalid": "Неверный код языка.",
       "language_codes_header": "Допустимые коды языков:",
-      "language_code_item": "  {code} - {label}",
+      "language_code_item": "  {code}: {label}",
       "community_name": "Название сообщества",
       "port": "Порт",
       "admin_username": "Админ Имя пользователя",
@@ -298,6 +298,29 @@
       "create_dir_suffix": "[д/н]",
       "default_community_name": "Моё сообщество",
       "default_admin_user": "Админ"
+    },
+    "start": {
+      "usage": "использование: start.py <каталог-сообщества> [-p <порт>]",
+      "port_invalid_integer": "Порт должен быть целым числом.",
+      "stopped": "Сервер остановлен."
+    },
+    "db_restore": {
+      "usage": "использование: db-restore.py <каталог-сообщества> -f <json-файл>",
+      "json_required": "-f <json-файл> обязательно",
+      "db_exists": "База данных уже существует.",
+      "imported_users": "Импортировано пользователей: {count}; пропущено: {skipped}.",
+      "imported_servers": "Импортировано серверов: {count}; пропущено: {skipped}."
+    },
+    "db_merge": {
+      "usage": "использование: db-merge.py <каталог-сообщества> -f <json-файл>",
+      "json_required": "-f <json-файл> обязательно",
+      "imported_users": "Импортировано пользователей: {count}; пропущено: {skipped}.",
+      "imported_servers": "Импортировано серверов: {count}; пропущено: {skipped}."
+    },
+    "db_snapshot": {
+      "usage": "использование: db-snapshot.py <каталог-сообщества> [output.json|-] [-z]",
+      "exporting": "Экспорт снимка в {path}",
+      "wrote_zip": "Записано: {path}"
     }
   }
 }

@@ -91,7 +91,7 @@ def main():
         print("[bz3web] Error: No port specified in config.json. Use -p <port> to specify a port.")
         return
     port = int(port)
-    print(f"Server list server listening on http://{host}:{port}")
+    print(f"Community server listening on http://{host}:{port}")
     try:
         if serve_app is not None:
             threads = int(config.require_setting(settings, "httpserver.threads"))

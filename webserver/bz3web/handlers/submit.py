@@ -155,10 +155,28 @@ def handle(request):
     user = auth.get_user_from_request(request)
     if not user:
         return webhttp.redirect("/login")
-    content_length = int(request.environ.get("CONTENT_LENGTH") or 0)
     overview_max = int(config.require_setting(settings, "pages.servers.overview_max_chars"))
-    max_bytes = uploads._screenshot_settings(settings)["max_bytes"]
-    form, files = request.multipart()
+    max_bytes = int(config.require_setting(settings, "uploads.max_request_bytes"))
+    try:
+        content_length = int(request.environ.get("CONTENT_LENGTH") or 0)
+    except ValueError:
+        content_length = 0
+    if content_length > max_bytes:
+        return _render_form(
+            request,
+            _msg("upload_too_large"),
+            user=user,
+        )
+    try:
+        form, files = request.multipart()
+    except ValueError as exc:
+        if str(exc) == "request_too_large":
+            return _render_form(
+                request,
+                _msg("upload_too_large"),
+                user=user,
+            )
+        raise
     if not auth.verify_csrf(request, form):
         return views.error_page("403 Forbidden", "forbidden")
     host = _first(form, "host")
@@ -175,14 +193,6 @@ def handle(request):
         "overview": overview,
         "description": description,
     }
-    if content_length > max_bytes + 1024 * 1024:
-        return _render_form(
-            request,
-            _msg("upload_too_large"),
-            user=user,
-            form_data=form_data,
-        )
-
     if not host or not port_text or not name:
         return _render_form(
             request,

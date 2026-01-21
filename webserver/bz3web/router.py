@@ -6,7 +6,7 @@ from bz3web import auth, config, uploads, views, webhttp
 from bz3web.handlers import account, admin_docs, api, api_server, api_servers, api_user, info, servers, submit, user_profile, users, server_edit, server_profile
 
 
-def _serve_static(path):
+def _serve_static(request, path):
     base_dir = os.path.dirname(__file__)
     static_dir = os.path.join(base_dir, "static")
     rel_path = path[len("/static/") :]
@@ -23,8 +23,6 @@ def _serve_static(path):
         return None
     if not os.path.isfile(file_path):
         return None
-    with open(file_path, "rb") as handle:
-        data = handle.read()
     content_type = "text/plain"
     if file_path.endswith(".css"):
         content_type = "text/css; charset=utf-8"
@@ -33,10 +31,10 @@ def _serve_static(path):
     settings = config.get_config()
     cache_control = config.require_setting(settings, "cache_headers.static", "config.json cache_headers.static")
     headers = [("Cache-Control", cache_control)]
-    return webhttp.file_response(data, content_type, headers=headers)
+    return webhttp.stream_file_response(file_path, content_type, headers=headers, environ=request.environ)
 
 
-def _serve_upload(path):
+def _serve_upload(request, path):
     upload_dir = uploads._uploads_dir()
     rel_path = path[len("/uploads/") :]
     if not rel_path:
@@ -52,8 +50,6 @@ def _serve_upload(path):
         return None
     if not os.path.isfile(file_path):
         return None
-    with open(file_path, "rb") as handle:
-        data = handle.read()
     content_type = "application/octet-stream"
     if file_path.endswith(".png"):
         content_type = "image/png"
@@ -62,7 +58,7 @@ def _serve_upload(path):
     settings = config.get_config()
     cache_control = config.require_setting(settings, "cache_headers.uploads", "config.json cache_headers.uploads")
     headers = [("Cache-Control", cache_control)]
-    return webhttp.file_response(data, content_type, headers=headers)
+    return webhttp.stream_file_response(file_path, content_type, headers=headers, environ=request.environ)
 
 
 def dispatch(request):
@@ -176,9 +172,9 @@ def dispatch(request):
         if path == "/admin-docs":
             return admin_docs.handle(request)
         if path.startswith("/static/"):
-            return _serve_static(path)
+            return _serve_static(request, path)
         if path.startswith("/uploads/"):
-            return _serve_upload(path)
+            return _serve_upload(request, path)
         if path in ("/api/auth", "/api/heartbeat", "/api/admins", "/api/user_registered", "/api/info", "/api/health"):
             return api.handle(request)
         return None

@@ -212,13 +212,13 @@ void CommunityBrowserController::triggerFullRefresh() {
 
     if (lanActive && serverListFetcher) {
         browser.setCommunityStatus("Searching local network and fetching the selected server list...",
-                                   gui::MainMenuView::MessageTone::Pending);
+                                   gui::MessageTone::Pending);
     } else if (lanActive) {
         browser.setCommunityStatus("Searching local network for servers...",
-                                   gui::MainMenuView::MessageTone::Pending);
+                                   gui::MessageTone::Pending);
     } else {
         browser.setCommunityStatus("Fetching " + selectionLabel + "...",
-                                   gui::MainMenuView::MessageTone::Pending);
+                                   gui::MessageTone::Pending);
     }
 
     browser.setScanning(issuedRequest);
@@ -381,10 +381,10 @@ void CommunityBrowserController::update() {
             selectionLabel = resolveDisplayNameForSource(*source);
         }
         browser.setCommunityStatus("Fetching " + selectionLabel + "...",
-                                   gui::MainMenuView::MessageTone::Pending);
+                                   gui::MessageTone::Pending);
     } else if (serverListFetcher && !isLanSelected()) {
         std::string statusText;
-        gui::MainMenuView::MessageTone tone = gui::MainMenuView::MessageTone::Notice;
+        gui::MessageTone tone = gui::MessageTone::Notice;
         const auto *source = getSelectedRemoteSource();
         if (source && !source->host.empty()) {
             for (const auto &status : cachedSourceStatuses) {
@@ -396,7 +396,7 @@ void CommunityBrowserController::update() {
                     if (!source->host.empty()) {
                         statusText += " (" + source->host + ")";
                     }
-                    tone = gui::MainMenuView::MessageTone::Error;
+                    tone = gui::MessageTone::Error;
                 } else if (status.activeCount == 0) {
                     statusText = "Community currently has no active servers";
                     if (status.inactiveCount >= 0) {
@@ -409,9 +409,9 @@ void CommunityBrowserController::update() {
         browser.setCommunityStatus(statusText, tone);
     } else if (isLanSelected() && discovery.isScanning()) {
         browser.setCommunityStatus("Searching local network for servers...",
-                                   gui::MainMenuView::MessageTone::Pending);
+                                   gui::MessageTone::Pending);
     } else {
-        browser.setCommunityStatus(std::string{}, gui::MainMenuView::MessageTone::Notice);
+        browser.setCommunityStatus(std::string{}, gui::MessageTone::Notice);
     }
 
     const auto &servers = discovery.getServers();
@@ -428,14 +428,14 @@ void CommunityBrowserController::update() {
     if (lanEmpty && remoteEmpty) {
         if (discovery.isScanning() && isLanSelected()) {
             browser.setStatus(std::string{}, false);
-            browser.setCommunityStatus("Searching local network for servers...",
-                                       gui::MainMenuView::MessageTone::Pending);
+        browser.setCommunityStatus("Searching local network for servers...",
+                                       gui::MessageTone::Pending);
         } else if (remoteFetchingActive && serverListFetcher) {
             browser.setStatus(std::string{}, false);
         } else if (isLanSelected()) {
             browser.setStatus(std::string{}, false);
-            browser.setCommunityStatus("No LAN servers found. Start one locally or refresh.",
-                                       gui::MainMenuView::MessageTone::Notice);
+        browser.setCommunityStatus("No LAN servers found. Start one locally or refresh.",
+                                       gui::MessageTone::Notice);
         } else if (serverListFetcher) {
             browser.setStatus(std::string{}, false);
         } else {

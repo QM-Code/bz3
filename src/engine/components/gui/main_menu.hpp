@@ -18,47 +18,15 @@ struct ImFont;
 #include <imgui.h>
 #include <nlohmann/json.hpp>
 
+#include "engine/components/gui/main_menu_interface.hpp"
 #include "engine/components/gui/thumbnail_cache.hpp"
 #include "engine/components/gui/rich_text_renderer.hpp"
 
 namespace gui {
 
-struct CommunityBrowserEntry {
-    std::string label;
-    std::string host;
-    uint16_t port;
-    std::string description;
-    std::string displayHost;
-    std::string longDescription;
-    std::vector<std::string> flags;
-    int activePlayers = -1;
-    int maxPlayers = -1;
-    std::string gameMode;
-    std::string screenshotId;
-    std::string sourceHost;
-    std::string worldName;
-};
-
-struct CommunityBrowserSelection {
-    std::string host;
-    uint16_t port;
-    bool fromPreset;
-    std::string sourceHost;
-    std::string worldName;
-};
-
-struct ServerListOption {
-    std::string name;
-    std::string host;
-};
-
-class MainMenuView {
+class MainMenuView : public MainMenuInterface {
 public:
-    enum class MessageTone {
-        Notice,
-        Error,
-        Pending
-    };
+    using MessageTone = gui::MessageTone;
 
     struct ThemeFontConfig {
         std::string font;
@@ -79,38 +47,38 @@ public:
     void initializeFonts(ImGuiIO &io);
     void draw(ImGuiIO &io);
 
-    void show(const std::vector<CommunityBrowserEntry> &entries);
-    void setEntries(const std::vector<CommunityBrowserEntry> &entries);
-    void setListOptions(const std::vector<ServerListOption> &options, int selectedIndex);
-    void hide();
-    bool isVisible() const;
-    void setStatus(const std::string &statusText, bool isErrorMessage);
-    void setCommunityDetails(const std::string &detailsText);
-    void setServerDescriptionLoading(const std::string &key, bool loading);
-    bool isServerDescriptionLoading(const std::string &key) const;
-    void setServerDescriptionError(const std::string &key, const std::string &message);
-    std::optional<std::string> getServerDescriptionError(const std::string &key) const;
+    void show(const std::vector<CommunityBrowserEntry> &entries) override;
+    void setEntries(const std::vector<CommunityBrowserEntry> &entries) override;
+    void setListOptions(const std::vector<ServerListOption> &options, int selectedIndex) override;
+    void hide() override;
+    bool isVisible() const override;
+    void setStatus(const std::string &statusText, bool isErrorMessage) override;
+    void setCommunityDetails(const std::string &detailsText) override;
+    void setServerDescriptionLoading(const std::string &key, bool loading) override;
+    bool isServerDescriptionLoading(const std::string &key) const override;
+    void setServerDescriptionError(const std::string &key, const std::string &message) override;
+    std::optional<std::string> getServerDescriptionError(const std::string &key) const override;
     RichTextRenderer *getRichTextRenderer();
-    std::optional<CommunityBrowserSelection> consumeSelection();
-    std::optional<int> consumeListSelection();
-    std::optional<ServerListOption> consumeNewListRequest();
-    std::optional<std::string> consumeDeleteListRequest();
-    void setListStatus(const std::string &statusText, bool isErrorMessage);
-    void clearNewListInputs();
-    std::string getUsername() const;
-    std::string getPassword() const;
-    std::string getStoredPasswordHash() const;
-    void clearPassword();
+    std::optional<CommunityBrowserSelection> consumeSelection() override;
+    std::optional<int> consumeListSelection() override;
+    std::optional<ServerListOption> consumeNewListRequest() override;
+    std::optional<std::string> consumeDeleteListRequest() override;
+    void setListStatus(const std::string &statusText, bool isErrorMessage) override;
+    void clearNewListInputs() override;
+    std::string getUsername() const override;
+    std::string getPassword() const override;
+    std::string getStoredPasswordHash() const override;
+    void clearPassword() override;
     void storeCommunityAuth(const std::string &communityHost,
                             const std::string &username,
                             const std::string &passhash,
-                            const std::string &salt);
-    void setCommunityStatus(const std::string &text, MessageTone tone);
-    std::optional<CommunityBrowserEntry> getSelectedEntry() const;
-    bool consumeRefreshRequest();
-    void setScanning(bool scanning);
-    void setUserConfigPath(const std::string &path);
-    bool consumeFontReloadRequest();
+                            const std::string &salt) override;
+    void setCommunityStatus(const std::string &text, MessageTone tone) override;
+    std::optional<CommunityBrowserEntry> getSelectedEntry() const override;
+    bool consumeRefreshRequest() override;
+    void setScanning(bool scanning) override;
+    void setUserConfigPath(const std::string &path) override;
+    bool consumeFontReloadRequest() override;
 
 private:
     struct MessageColors {

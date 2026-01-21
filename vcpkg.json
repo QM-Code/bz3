@@ -17,6 +17,7 @@
     "miniaudio",
     "miniz",
     "cxxopts",
+    "rmlui",
     {
       "name": "imgui",
       "version>=": "1.90.7",

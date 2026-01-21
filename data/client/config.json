@@ -39,13 +39,41 @@
             "fonts" : {
                 "console" : {
                     "Emoji": {
-                        "Font": "fonts/NotoColorEmoji-Regular.ttf",
+                        "Font": "fonts/NotoEmoji-VariableFont_wght.ttf",
                         "Size": 20
                     },
                     "Regular": {
                         "Font": "fonts/GoogleSans.ttf",
                         "Size": 20,
                         "Color": [1.0, 1.0, 0.0, 1.0]
+                    },
+                    "FallbackLatin": {
+                        "Font": "fonts/NotoSans-Regular.ttf",
+                        "Size": 20
+                    },
+                    "FallbackArabic": {
+                        "Font": "fonts/NotoSansArabic-Regular.ttf",
+                        "Size": 20
+                    },
+                    "FallbackDevanagari": {
+                        "Font": "fonts/NotoSansDevanagari-Regular.ttf",
+                        "Size": 20
+                    },
+                    "FallbackCJK_JP": {
+                        "Font": "fonts/NotoSansCJKjp-Regular.otf",
+                        "Size": 20
+                    },
+                    "FallbackCJK_KR": {
+                        "Font": "fonts/NotoSansCJKkr-Regular.otf",
+                        "Size": 20
+                    },
+                    "FallbackCJK_SC": {
+                        "Font": "fonts/NotoSansCJKsc-Regular.otf",
+                        "Size": 20
+                    },
+                    "FallbackCJK_TC": {
+                        "Font": "fonts/NotoSansCJKtc-Regular.otf",
+                        "Size": 20
                     },
                     "Title": {
                         "Font": "fonts/GoogleSans.ttf",

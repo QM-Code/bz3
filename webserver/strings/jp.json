@@ -8,10 +8,10 @@
     "ru": "ロシア語",
     "jp": "日本語",
     "zh": "中国語",
-    "ko": "Korean",
-    "it": "Italian",
-    "hi": "Hindi",
-    "ar": "Arabic"
+    "ko": "韓国語",
+    "it": "イタリア語",
+    "hi": "ヒンディー語",
+    "ar": "アラビア語"
   },
   "ui_text": {
     "hints": {
@@ -61,8 +61,8 @@
         "message": "サーバーが見つかりません。"
       },
       "generic": {
-        "title": "Error",
-        "message": ""
+        "title": "エラー",
+        "message": "エラーが発生しました。"
       }
     },
     "messages": {
@@ -159,7 +159,7 @@
       "no": "いいえ"
     },
     "labels": {
-      "owner_by": "by",
+      "owner_by": "作成者",
       "username": "ユーザー名",
       "email": "メール",
       "email_or_username": "メールまたはユーザー名",
@@ -283,10 +283,10 @@
       "language_prompt": "言語 [{default}]",
       "language_tab_hint": "(? で一覧):",
       "language_list_header": "利用可能な言語:",
-      "language_list_item": "  {code} - {label}",
+      "language_list_item": "  {code}：{label}",
       "language_invalid": "無効な言語コードです。",
       "language_codes_header": "有効な言語コード:",
-      "language_code_item": "  {code} - {label}",
+      "language_code_item": "  {code}：{label}",
       "community_name": "コミュニティ名",
       "port": "ポート",
       "admin_username": "管理者 ユーザー名",
@@ -298,6 +298,29 @@
       "create_dir_suffix": "[はい/いいえ]",
       "default_community_name": "私のコミュニティ",
       "default_admin_user": "管理者"
+    },
+    "start": {
+      "usage": "使用法: start.py <コミュニティ-ディレクトリ> [-p <ポート>]",
+      "port_invalid_integer": "ポートは整数でなければなりません。",
+      "stopped": "サーバーを停止しました。"
+    },
+    "db_restore": {
+      "usage": "使用法: db-restore.py <コミュニティ-ディレクトリ> -f <json-ファイル>",
+      "json_required": "-f <json-ファイル> は必須です",
+      "db_exists": "データベースは既に存在します。",
+      "imported_users": "{count} 件のユーザーをインポートし、{skipped} 件をスキップしました。",
+      "imported_servers": "{count} 件のサーバーをインポートし、{skipped} 件をスキップしました。"
+    },
+    "db_merge": {
+      "usage": "使用法: db-merge.py <コミュニティ-ディレクトリ> -f <json-ファイル>",
+      "json_required": "-f <json-ファイル> は必須です",
+      "imported_users": "{count} 件のユーザーをインポートし、{skipped} 件をスキップしました。",
+      "imported_servers": "{count} 件のサーバーをインポートし、{skipped} 件をスキップしました。"
+    },
+    "db_snapshot": {
+      "usage": "使用法: db-snapshot.py <コミュニティ-ディレクトリ> [output.json|-] [-z]",
+      "exporting": "スナップショットを {path} にエクスポートしています",
+      "wrote_zip": "{path} を書き込みました"
     }
   }
 }

@@ -44,6 +44,7 @@ If a required key is missing from `webserver/config.json`, the server **errors o
 - `database.database_directory`
 - `database.database_file`
 - `uploads.upload_directory`
+- `uploads.max_request_bytes`
 - `heartbeat.timeout_seconds`
 - `server.language`
 - `pages.servers.overview_max_chars`
@@ -53,6 +54,7 @@ If a required key is missing from `webserver/config.json`, the server **errors o
 - `debug.*`
 - `debug.disable_browser_language_detection`
 - `debug.reset_rate_limits`
+- `debug.pretty_print_json`
 - `session_cookie.*`
 - `security_headers.*`
 - `cache_headers.static`
@@ -118,7 +120,8 @@ You can also add:
     "host": "0.0.0.0",
     "port": 8080,
     "language": "en",
-    "session_secret": null
+    "session_secret": null,
+    "trusted_proxies": []
   },
   "database": {
     "database_directory": "data",
@@ -126,6 +129,7 @@ You can also add:
   },
   "uploads": {
     "upload_directory": "uploads",
+    "max_request_bytes": 10485760,
     "screenshots": {
       "limits": {
         "min_bytes": 0,
@@ -149,7 +153,8 @@ You can also add:
     "heartbeat": false,
     "auth": false,
     "disable_browser_language_detection": false,
-    "reset_rate_limits": false
+    "reset_rate_limits": false,
+    "pretty_print_json": false
   },
   "pages": {
     "servers": {

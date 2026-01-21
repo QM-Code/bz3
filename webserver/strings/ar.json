@@ -64,8 +64,8 @@
         "message": "الخادم غير موجود."
       },
       "generic": {
-        "title": "Error",
-        "message": ""
+        "title": "خطأ",
+        "message": "حدث خطأ."
       }
     },
     "messages": {
@@ -283,10 +283,10 @@
       "language_prompt": "اللغة [{default}]",
       "language_tab_hint": "(? لعرض القائمة):",
       "language_list_header": "اللغات المتاحة:",
-      "language_list_item": "  {code} - {label}",
+      "language_list_item": "  {code} : {label}",
       "language_invalid": "رمز اللغة غير صالح.",
       "language_codes_header": "رموز اللغات الصحيحة:",
-      "language_code_item": "  {code} - {label}",
+      "language_code_item": "  {code} : {label}",
       "community_name": "اسم المجتمع",
       "port": "المنفذ",
       "admin_username": "مشرف اسم المستخدم",
@@ -298,6 +298,29 @@
       "create_dir_suffix": "[ن/ل]",
       "default_community_name": "مجتمعي",
       "default_admin_user": "المشرف"
+    },
+    "start": {
+      "usage": "الاستخدام: start.py <دليل-المجتمع> [-p <المنفذ>]",
+      "port_invalid_integer": "يجب أن يكون المنفذ عددًا صحيحًا.",
+      "stopped": "تم إيقاف الخادم."
+    },
+    "db_restore": {
+      "usage": "الاستخدام: db-restore.py <دليل-المجتمع> -f <ملف-json>",
+      "json_required": "-f <ملف-json> إلزامي",
+      "db_exists": "قاعدة البيانات موجودة بالفعل.",
+      "imported_users": "تم استيراد {count} مستخدمين؛ تم تخطي {skipped}.",
+      "imported_servers": "تم استيراد {count} خوادم؛ تم تخطي {skipped}."
+    },
+    "db_merge": {
+      "usage": "الاستخدام: db-merge.py <دليل-المجتمع> -f <ملف-json>",
+      "json_required": "-f <ملف-json> إلزامي",
+      "imported_users": "تم استيراد {count} مستخدمين؛ تم تخطي {skipped}.",
+      "imported_servers": "تم استيراد {count} خوادم؛ تم تخطي {skipped}."
+    },
+    "db_snapshot": {
+      "usage": "الاستخدام: db-snapshot.py <دليل-المجتمع> [output.json|-] [-z]",
+      "exporting": "جارٍ تصدير اللقطة إلى {path}",
+      "wrote_zip": "تمت كتابة {path}"
     }
   }
 }

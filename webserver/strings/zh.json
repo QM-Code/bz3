@@ -8,10 +8,10 @@
     "ru": "俄语",
     "jp": "日语",
     "zh": "中文",
-    "ko": "Korean",
-    "it": "Italian",
-    "hi": "Hindi",
-    "ar": "Arabic"
+    "ko": "韩语",
+    "it": "意大利语",
+    "hi": "印地语",
+    "ar": "阿拉伯语"
   },
   "ui_text": {
     "hints": {
@@ -61,8 +61,8 @@
         "message": "服务器未找到。"
       },
       "generic": {
-        "title": "Error",
-        "message": ""
+        "title": "错误",
+        "message": "发生错误。"
       }
     },
     "messages": {
@@ -283,10 +283,10 @@
       "language_prompt": "语言 [{default}]",
       "language_tab_hint": "(? 查看列表):",
       "language_list_header": "可用语言:",
-      "language_list_item": "  {code} - {label}",
+      "language_list_item": "  {code}：{label}",
       "language_invalid": "无效的语言代码。",
       "language_codes_header": "有效的语言代码:",
-      "language_code_item": "  {code} - {label}",
+      "language_code_item": "  {code}：{label}",
       "community_name": "社区名称",
       "port": "端口",
       "admin_username": "管理员 用户名",
@@ -298,6 +298,29 @@
       "create_dir_suffix": "[是/否]",
       "default_community_name": "我的社区",
       "default_admin_user": "管理员"
+    },
+    "start": {
+      "usage": "用法：start.py <社区目录> [-p <端口>]",
+      "port_invalid_integer": "端口必须是整数。",
+      "stopped": "服务器已停止。"
+    },
+    "db_restore": {
+      "usage": "用法：db-restore.py <社区目录> -f <json-文件>",
+      "json_required": "-f <json-文件> 为必填",
+      "db_exists": "数据库已存在。",
+      "imported_users": "已导入 {count} 个用户；跳过 {skipped} 个。",
+      "imported_servers": "已导入 {count} 个服务器；跳过 {skipped} 个。"
+    },
+    "db_merge": {
+      "usage": "用法：db-merge.py <社区目录> -f <json-文件>",
+      "json_required": "-f <json-文件> 为必填",
+      "imported_users": "已导入 {count} 个用户；跳过 {skipped} 个。",
+      "imported_servers": "已导入 {count} 个服务器；跳过 {skipped} 个。"
+    },
+    "db_snapshot": {
+      "usage": "用法：db-snapshot.py <社区目录> [output.json|-] [-z]",
+      "exporting": "正在导出快照到 {path}",
+      "wrote_zip": "已写入 {path}"
     }
   }
 }

@@ -98,7 +98,7 @@ def _render_form(
 """
     cancel_href = _profile_url(server["owner_username"])
     csrf_html = views.csrf_input(auth.csrf_token(request))
-    body = f"""<form method=\"post\" action=\"/server/edit\" enctype=\"multipart/form-data\">
+    body = f"""<form method=\"post\" action=\"/server/edit?id={server['id']}\" enctype=\"multipart/form-data\">
   {csrf_html}
   <input type=\"hidden\" name=\"id\" value=\"{server['id']}\">
   <div class=\"row\">
@@ -208,9 +208,53 @@ def handle(request):
                 is_admin=is_admin,
             )
 
-        content_length = int(request.environ.get("CONTENT_LENGTH") or 0)
-        max_bytes = uploads._screenshot_settings(settings)["max_bytes"]
-        form, files = request.multipart()
+        max_bytes = int(config.require_setting(settings, "uploads.max_request_bytes"))
+        try:
+            content_length = int(request.environ.get("CONTENT_LENGTH") or 0)
+        except ValueError:
+            content_length = 0
+        if content_length > max_bytes:
+            server_id = request.query.get("id", [""])[0]
+            if not server_id.isdigit():
+                return views.error_page("400 Bad Request", "missing_server")
+            server = db.get_server(conn, int(server_id))
+            if not server:
+                return webhttp.redirect(_profile_url(user["username"]))
+            owner_user = db.get_user_by_id(conn, server["owner_user_id"])
+            if not _can_manage_owner(user, owner_user, conn, settings):
+                return webhttp.redirect(_profile_url(user["username"]))
+            usernames = [row["username"] for row in db.list_users(conn) if not row["deleted"]] if is_admin else []
+            return _render_form(
+                request,
+                server,
+                user,
+                message=_msg("upload_too_large"),
+                usernames=usernames,
+                is_admin=is_admin,
+            )
+        try:
+            form, files = request.multipart()
+        except ValueError as exc:
+            if str(exc) == "request_too_large":
+                server_id = request.query.get("id", [""])[0]
+                if not server_id.isdigit():
+                    return views.error_page("400 Bad Request", "missing_server")
+                server = db.get_server(conn, int(server_id))
+                if not server:
+                    return webhttp.redirect(_profile_url(user["username"]))
+                owner_user = db.get_user_by_id(conn, server["owner_user_id"])
+                if not _can_manage_owner(user, owner_user, conn, settings):
+                    return webhttp.redirect(_profile_url(user["username"]))
+                usernames = [row["username"] for row in db.list_users(conn) if not row["deleted"]] if is_admin else []
+                return _render_form(
+                    request,
+                    server,
+                    user,
+                    message=_msg("upload_too_large"),
+                    usernames=usernames,
+                    is_admin=is_admin,
+                )
+            raise
         if not auth.verify_csrf(request, form):
             return views.error_page("403 Forbidden", "forbidden")
         server_id = _first(form, "id")
@@ -227,16 +271,6 @@ def handle(request):
             ["host", "port", "name", "overview", "description", "owner_username"],
         )
         usernames = [row["username"] for row in db.list_users(conn) if not row["deleted"]] if is_admin else []
-        if content_length > max_bytes + 1024 * 1024:
-            return _render_form(
-                request,
-                server,
-                user,
-                message=_msg("upload_too_large"),
-                form_data=form_data,
-                usernames=usernames,
-                is_admin=is_admin,
-            )
         host = _first(form, "host")
         port_text = _first(form, "port")
         name = _first(form, "name")
