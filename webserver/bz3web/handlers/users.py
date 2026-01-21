@@ -48,12 +48,12 @@ def _is_admin(user):
 
 
 def _is_root_admin(user, settings):
-    admin_username = config.require_setting(settings, "admin_user")
+    admin_username = config.require_setting(settings, "server.admin_user")
     return _normalize_key(user["username"]) == _normalize_key(admin_username)
 
 
 def _admin_levels(conn, settings):
-    admin_username = config.require_setting(settings, "admin_user")
+    admin_username = config.require_setting(settings, "server.admin_user")
     root_user = db.get_user_by_username(conn, admin_username)
     if not root_user:
         return {}, None
@@ -92,7 +92,7 @@ def _render_users_list(
     admin_levels=None,
     root_id=None,
 ):
-    list_name = config.require_setting(config.get_config(), "community_name")
+    list_name = config.require_setting(config.get_config(), "server.community_name")
     form_data = form_data or {}
 
     csrf_html = views.csrf_input(auth.csrf_token(request))
@@ -281,7 +281,7 @@ def _render_user_edit(
 """
     profile_url = f"/users/{urllib.parse.quote(current_user['username'], safe='')}"
     header_html = views.header_with_title(
-        config.require_setting(config.get_config(), "community_name"),
+        config.require_setting(config.get_config(), "server.community_name"),
         "/users/edit",
         logged_in=True,
         title=_title("edit_user"),
@@ -344,7 +344,7 @@ def _render_user_settings(request, user, message=None, form_data=None, current_u
 """
     profile_url = f"/users/{urllib.parse.quote(current_user['username'], safe='')}"
     header_html = views.header_with_title(
-        config.require_setting(config.get_config(), "community_name"),
+        config.require_setting(config.get_config(), "server.community_name"),
         f"/users/{urllib.parse.quote(user['username'], safe='')}/edit",
         logged_in=True,
         title=_title("personal_settings"),
@@ -474,7 +474,7 @@ def handle(request):
     if not current_user:
         return webhttp.redirect("/login")
     is_admin = _is_admin(current_user)
-    admin_username = config.require_setting(settings, "admin_user")
+    admin_username = config.require_setting(settings, "server.admin_user")
     is_root_admin = _is_root_admin(current_user, settings)
 
     path = request.path.rstrip("/") or "/users"

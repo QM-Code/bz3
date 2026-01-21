@@ -11,7 +11,7 @@ def handle(request):
         return webhttp.redirect("/login")
     profile_url = f"/users/{quote(user['username'], safe='')}"
     header_html = views.header_with_title(
-        config.require_setting(config.get_config(), "community_name"),
+        config.require_setting(config.get_config(), "server.community_name"),
         "/admin-docs",
         logged_in=True,
         title=config.ui_text("titles.admin_docs"),

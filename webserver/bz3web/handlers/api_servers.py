@@ -7,7 +7,7 @@ def handle(request, status="all"):
         return webhttp.json_error("method_not_allowed", status="405 Method Not Allowed")
 
     settings = config.get_config()
-    community_name = config.require_setting(settings, "community_name")
+    community_name = config.require_setting(settings, "server.community_name")
     overview_max = int(config.require_setting(settings, "pages.servers.overview_max_chars"))
 
     owner = request.query.get("owner", [""])[0].strip()
@@ -29,7 +29,7 @@ def handle(request, status="all"):
             rows = db.list_servers(conn)
 
     servers = []
-    timeout = int(config.require_setting(settings, "heartbeat_timeout_seconds"))
+    timeout = int(config.require_setting(settings, "heartbeat.timeout_seconds"))
     active_count = 0
     inactive_count = 0
     for row in rows:

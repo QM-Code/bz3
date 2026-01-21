@@ -115,7 +115,7 @@ def _handle_user_registered(request):
             "Too many requests. Please wait and try again.",
             status="429 Too Many Requests",
         )
-    community_name = config.require_setting(settings, "community_name")
+    community_name = config.require_setting(settings, "server.community_name")
 
     with db.connect_ctx() as conn:
         user = db.get_user_by_username(conn, username)
@@ -369,8 +369,8 @@ def handle(request):
         return webhttp.json_response(
             {
                 "ok": True,
-                "community_name": config.require_setting(settings, "community_name"),
-                "community_description": settings.get("community_description", ""),
+                "community_name": config.require_setting(settings, "server.community_name"),
+                "community_description": (settings.get("server") or {}).get("community_description", ""),
             }
         )
     return webhttp.json_error("not_found", status="404 Not Found")

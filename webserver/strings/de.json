@@ -8,7 +8,6 @@
     "ru": "Russisch",
     "jp": "Japanisch",
     "zh": "Chinesisch",
-    "sw": "Swahili",
     "ko": "Korean",
     "it": "Italian",
     "hi": "Hindi",
@@ -60,6 +59,10 @@
       "server_not_found": {
         "title": "Server nicht gefunden",
         "message": "Server nicht gefunden."
+      },
+      "generic": {
+        "title": "Error",
+        "message": ""
       }
     },
     "messages": {
@@ -271,5 +274,30 @@
   },
   "meta": {
     "direction": "ltr"
+  },
+  "scripts": {
+    "initialize": {
+      "cancelled": "Abgebrochen",
+      "init_complete": "Initialisiert {directory} und {config_path} aktualisiert.",
+      "dir_not_empty": "Das Verzeichnis muss leer sein.",
+      "language_prompt": "Sprache [{default}]",
+      "language_tab_hint": "(? für Liste):",
+      "language_list_header": "Verfügbare Sprachen:",
+      "language_list_item": "  {code} - {label}",
+      "language_invalid": "Ungültiger Sprachcode.",
+      "language_codes_header": "Gültige Sprachcodes:",
+      "language_code_item": "  {code} - {label}",
+      "community_name": "Community-Name",
+      "port": "Port",
+      "admin_username": "Admin Benutzername",
+      "admin_password": "Admin Passwort",
+      "port_invalid_integer": "Der Port muss eine ganze Zahl sein.",
+      "port_invalid_range": "Der Port muss zwischen 1 und 65535 liegen.",
+      "password_required": "Passwort ist erforderlich.",
+      "create_dir_prefix": "Erstellen",
+      "create_dir_suffix": "[J/n]",
+      "default_community_name": "Meine Community",
+      "default_admin_user": "Admin"
+    }
   }
 }

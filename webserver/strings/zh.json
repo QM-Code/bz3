@@ -8,7 +8,6 @@
     "ru": "俄语",
     "jp": "日语",
     "zh": "中文",
-    "sw": "Swahili",
     "ko": "Korean",
     "it": "Italian",
     "hi": "Hindi",
@@ -60,6 +59,10 @@
       "server_not_found": {
         "title": "服务器未找到",
         "message": "服务器未找到。"
+      },
+      "generic": {
+        "title": "Error",
+        "message": ""
       }
     },
     "messages": {
@@ -271,5 +274,30 @@
   },
   "meta": {
     "direction": "ltr"
+  },
+  "scripts": {
+    "initialize": {
+      "cancelled": "已取消",
+      "init_complete": "已初始化 {directory} 并更新 {config_path}。",
+      "dir_not_empty": "目录必须为空。",
+      "language_prompt": "语言 [{default}]",
+      "language_tab_hint": "(? 查看列表):",
+      "language_list_header": "可用语言:",
+      "language_list_item": "  {code} - {label}",
+      "language_invalid": "无效的语言代码。",
+      "language_codes_header": "有效的语言代码:",
+      "language_code_item": "  {code} - {label}",
+      "community_name": "社区名称",
+      "port": "端口",
+      "admin_username": "管理员 用户名",
+      "admin_password": "管理员 密码",
+      "port_invalid_integer": "端口必须是整数。",
+      "port_invalid_range": "端口必须在 1 到 65535 之间。",
+      "password_required": "需要密码。",
+      "create_dir_prefix": "创建",
+      "create_dir_suffix": "[是/否]",
+      "default_community_name": "我的社区",
+      "default_admin_user": "管理员"
+    }
   }
 }

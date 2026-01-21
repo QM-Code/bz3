@@ -60,6 +60,10 @@ ImVec4 readColorConfig(const char *path, const ImVec4 &fallback) {
 
 namespace gui {
 
+namespace {
+constexpr bool kEnableRichTextRenderer = false;
+}
+
 void MainMenuView::initializeFonts(ImGuiIO &io) {
     const ImVec4 defaultTextColor = ImGui::GetStyle().Colors[ImGuiCol_Text];
 #if defined(IMGUI_ENABLE_FREETYPE) && defined(ImGuiFreeTypeBuilderFlags_LoadColor)
@@ -70,6 +74,7 @@ void MainMenuView::initializeFonts(ImGuiIO &io) {
     const float regularFontSize = useThemeOverrides
         ? currentTheme.regular.size
         : bz::data::ReadFloatConfig({"assets.hud.fonts.console.Regular.Size"}, 20.0f);
+    this->regularFontSize = regularFontSize;
     regularFont = io.Fonts->AddFontFromFileTTF(
         regularFontPathStr.c_str(),
         regularFontSize
@@ -81,11 +86,13 @@ void MainMenuView::initializeFonts(ImGuiIO &io) {
     }
 
     const auto emojiFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Emoji.Font");
+    this->emojiFontSize = 0.0f;
     if (!emojiFontPath.empty()) {
         const std::string emojiFontPathStr = emojiFontPath.string();
         const float emojiFontSize = useThemeOverrides
             ? currentTheme.emoji.size
             : bz::data::ReadFloatConfig({"assets.hud.fonts.console.Emoji.Size"}, regularFontSize);
+        this->emojiFontSize = emojiFontSize;
         ImFontConfig emojiConfig;
         emojiConfig.MergeMode = true;
         emojiConfig.PixelSnapH = true;
@@ -108,19 +115,6 @@ void MainMenuView::initializeFonts(ImGuiIO &io) {
         );
         if (!emojiFont) {
             spdlog::warn("Failed to load emoji font for community browser ({}).", emojiFontPathStr);
-        } else {
-            const ImWchar rocketGlyph = static_cast<ImWchar>(0x1F680);
-            if (!emojiFont->FindGlyphNoFallback(rocketGlyph)) {
-                spdlog::warn("Emoji font loaded but U+1F680 (🚀) glyph is missing from the atlas.");
-            } else {
-                spdlog::info("Emoji font loaded; U+1F680 (🚀) glyph is present.");
-            }
-            const ImWchar partyGlyph = static_cast<ImWchar>(0x1F973);
-            if (!emojiFont->FindGlyphNoFallback(partyGlyph)) {
-                spdlog::warn("Emoji font loaded but U+1F973 (🥳) glyph is missing from the atlas.");
-            } else {
-                spdlog::info("Emoji font loaded; U+1F973 (🥳) glyph is present.");
-            }
         }
     }
 
@@ -129,6 +123,7 @@ void MainMenuView::initializeFonts(ImGuiIO &io) {
     const float titleFontSize = useThemeOverrides
         ? currentTheme.title.size
         : bz::data::ReadFloatConfig({"assets.hud.fonts.console.Title.Size"}, 30.0f);
+    this->titleFontSize = titleFontSize;
     titleFont = io.Fonts->AddFontFromFileTTF(
         titleFontPathStr.c_str(),
         titleFontSize
@@ -144,6 +139,7 @@ void MainMenuView::initializeFonts(ImGuiIO &io) {
     const float headingFontSize = useThemeOverrides
         ? currentTheme.heading.size
         : bz::data::ReadFloatConfig({"assets.hud.fonts.console.Heading.Size"}, 28.0f);
+    this->headingFontSize = headingFontSize;
     headingFont = io.Fonts->AddFontFromFileTTF(
         headingFontPathStr.c_str(),
         headingFontSize
@@ -167,6 +163,22 @@ void MainMenuView::initializeFonts(ImGuiIO &io) {
 
     if (!buttonFont) {
         spdlog::warn("Failed to load console button font for community browser ({}).", buttonFontPathStr);
+    }
+
+    if (kEnableRichTextRenderer) {
+        RichTextRenderer::FontSpec regularSpec{regularFontPathStr, regularFontSize};
+        RichTextRenderer::FontSpec titleSpec{titleFontPathStr, titleFontSize};
+        RichTextRenderer::FontSpec headingSpec{headingFontPathStr, headingFontSize};
+        RichTextRenderer::FontSpec emojiSpec{};
+        if (!emojiFontPath.empty()) {
+            emojiSpec.path = emojiFontPath.string();
+            emojiSpec.size = emojiFontSize;
+        }
+        if (!richTextRenderer.initialize(regularSpec, titleSpec, headingSpec, emojiSpec)) {
+            spdlog::warn("RichTextRenderer: failed to initialize; falling back to ImGui text.");
+        }
+    } else {
+        richTextRenderer.shutdown();
     }
 }
 
@@ -244,6 +256,23 @@ void MainMenuView::draw(ImGuiIO &io) {
     }
 
     ImGui::End();
+
+    if (kEnableRichTextRenderer && richTextRenderer.isInitialized()) {
+        ImDrawList *drawList = ImGui::GetForegroundDrawList();
+        ImGuiViewport *viewport = ImGui::GetMainViewport();
+        const char *emojiText = "\xF0\x9F\xA5\xB3";
+        float emojiSize = regularFontSize > 0.0f ? regularFontSize * 3.0f : 48.0f;
+        RichTextRenderer::TextStyle emojiStyle;
+        emojiStyle.role = RichTextRenderer::FontRole::Regular;
+        emojiStyle.size = emojiSize;
+        emojiStyle.color = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+        RichTextRenderer::InlineLayout layout;
+        ImVec2 center = viewport->GetCenter();
+        layout.start = ImVec2(center.x - emojiSize * 0.5f, center.y - emojiSize * 0.5f);
+        layout.cursor = layout.start;
+        layout.maxWidth = 0.0f;
+        richTextRenderer.drawInline(drawList, layout, emojiText, emojiStyle, nullptr);
+    }
 
     if (pushedRegularColor) {
         ImGui::PopStyleColor();
@@ -506,6 +535,7 @@ void MainMenuView::hide() {
     communityStatusTone = MessageTone::Notice;
     clearPassword();
     showNewCommunityInput = false;
+    richTextRenderer.shutdown();
     thumbnails.shutdown();
 }
 
@@ -550,6 +580,10 @@ std::optional<std::string> MainMenuView::getServerDescriptionError(const std::st
         return std::nullopt;
     }
     return serverDescriptionErrorText;
+}
+
+RichTextRenderer *MainMenuView::getRichTextRenderer() {
+    return richTextRenderer.isInitialized() ? &richTextRenderer : nullptr;
 }
 
 std::optional<CommunityBrowserSelection> MainMenuView::consumeSelection() {

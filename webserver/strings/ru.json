@@ -8,7 +8,6 @@
     "ru": "Русский",
     "jp": "Японский",
     "zh": "Китайский",
-    "sw": "Swahili",
     "ko": "Korean",
     "it": "Italian",
     "hi": "Hindi",
@@ -60,6 +59,10 @@
       "server_not_found": {
         "title": "Сервер не найден",
         "message": "Сервер не найден."
+      },
+      "generic": {
+        "title": "Error",
+        "message": ""
       }
     },
     "messages": {
@@ -271,5 +274,30 @@
   },
   "meta": {
     "direction": "ltr"
+  },
+  "scripts": {
+    "initialize": {
+      "cancelled": "Отменено",
+      "init_complete": "Инициализировано {directory} и обновлён {config_path}.",
+      "dir_not_empty": "Каталог должен быть пустым.",
+      "language_prompt": "Язык [{default}]",
+      "language_tab_hint": "(? для списка):",
+      "language_list_header": "Доступные языки:",
+      "language_list_item": "  {code} - {label}",
+      "language_invalid": "Неверный код языка.",
+      "language_codes_header": "Допустимые коды языков:",
+      "language_code_item": "  {code} - {label}",
+      "community_name": "Название сообщества",
+      "port": "Порт",
+      "admin_username": "Админ Имя пользователя",
+      "admin_password": "Админ Пароль",
+      "port_invalid_integer": "Порт должен быть целым числом.",
+      "port_invalid_range": "Порт должен быть между 1 и 65535.",
+      "password_required": "Требуется пароль.",
+      "create_dir_prefix": "Создать",
+      "create_dir_suffix": "[д/н]",
+      "default_community_name": "Моё сообщество",
+      "default_admin_user": "Админ"
+    }
   }
 }

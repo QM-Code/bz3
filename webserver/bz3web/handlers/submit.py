@@ -94,7 +94,7 @@ def _render_form(request, message=None, user=None, form_data=None):
     <p class="muted hint">{webhttp.html_escape(markdown_hint)}</p>
   </div>
 """
-    body += """
+    body += f"""
   <div>
     <label for="screenshot">{webhttp.html_escape(_label("screenshot_upload"))}</label>
     <input id="screenshot" name="screenshot" type="file" accept="image/*">
@@ -109,7 +109,7 @@ def _render_form(request, message=None, user=None, form_data=None):
     if user:
         profile_url = f"/users/{quote(user['username'], safe='')}"
     header_html = views.header_with_title(
-        config.require_setting(config.get_config(), "community_name"),
+        config.require_setting(config.get_config(), "server.community_name"),
         "/submit",
         logged_in=bool(user),
         title=_title("submit_server"),
@@ -132,7 +132,7 @@ def _render_success(user=None):
     if user:
         profile_url = f"/users/{quote(user['username'], safe='')}"
     header_html = views.header_with_title(
-        config.require_setting(config.get_config(), "community_name"),
+        config.require_setting(config.get_config(), "server.community_name"),
         "/submit",
         logged_in=True,
         title=_title("server_added"),

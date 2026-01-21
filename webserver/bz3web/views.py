@@ -50,12 +50,22 @@ def _header_text(path):
 
 def error_page(status, key, message=None):
     error_cfg = _ui_text(f"errors.{key}")
-    if isinstance(error_cfg, dict):
-        title = error_cfg.get("title") or "Error"
-        body_message = message if message is not None else error_cfg.get("message", "")
+    generic_cfg = _ui_text("errors.generic")
+    if isinstance(generic_cfg, dict):
+        generic_title = generic_cfg.get("title") or ""
+        generic_message = generic_cfg.get("message") or ""
     else:
-        title = str(error_cfg)
-        body_message = message or ""
+        generic_title = str(generic_cfg)
+        generic_message = ""
+    if isinstance(error_cfg, dict):
+        title = error_cfg.get("title") or generic_title
+        if message is not None:
+            body_message = message
+        else:
+            body_message = error_cfg.get("message") or generic_message
+    else:
+        title = str(error_cfg) or generic_title
+        body_message = message or generic_message
     body = f"<h1>{webhttp.html_escape(title)}</h1>"
     if body_message:
         body += f"<p class=\"muted\">{webhttp.html_escape(body_message)}</p>"
@@ -325,10 +335,16 @@ def render_page(title, body_html, message=None, header_links_html=None, headers=
             }
           }
         };
+        const formatSummary = (template, activeCount, inactiveCount) =>
+          String(template || "")
+            .replace(/\\{active\\}/g, String(activeCount))
+            .replace(/\\{inactive\\}/g, String(inactiveCount));
         const updateSummary = (section, activeCount, inactiveCount) => {
           const summary = section.querySelector('[data-role="server-summary"]');
           if (!summary) return;
-          summary.innerHTML = `<strong>${activeCount} online</strong> / ${inactiveCount} offline`;
+          const template = summary.dataset.summaryTemplate || "";
+          if (!template) return;
+          summary.innerHTML = formatSummary(template, activeCount, inactiveCount);
         };
         const refreshSection = (section) => {
           const url = section.dataset.refreshUrl;
@@ -403,7 +419,7 @@ def render_page(title, body_html, message=None, header_links_html=None, headers=
     </script>
     """
     settings = config.get_config()
-    lang = webhttp.html_escape(settings.get("language") or "en")
+    lang = webhttp.html_escape((settings.get("server") or {}).get("language") or "en")
     direction = settings.get("meta", {}).get("direction", "ltr")
     direction = "rtl" if str(direction).lower() == "rtl" else "ltr"
     html = f"""<!doctype html>
@@ -537,7 +553,13 @@ def render_server_cards(
     header_html = ""
     if header_title or header_title_html:
         title_html = header_title_html or webhttp.html_escape(header_title)
-        summary_html = f'<div class="summary server-summary" data-role="server-summary">{summary_text}</div>' if summary_text else ""
+        summary_template = _template("server_summary")
+        summary_html = (
+            f'<div class="summary server-summary" data-role="server-summary" '
+            f'data-summary-template="{webhttp.html_escape(summary_template)}">{summary_text}</div>'
+            if summary_text
+            else ""
+        )
         toggle_html = f'<a class="admin-link secondary" href="{toggle_url}">{toggle_label}</a>' if toggle_url else ""
         header_html = f"""<div class="section-header">
   <h2>{title_html}</h2>

@@ -8,7 +8,6 @@
     "ru": "ロシア語",
     "jp": "日本語",
     "zh": "中国語",
-    "sw": "Swahili",
     "ko": "Korean",
     "it": "Italian",
     "hi": "Hindi",
@@ -60,6 +59,10 @@
       "server_not_found": {
         "title": "サーバーが見つかりません",
         "message": "サーバーが見つかりません。"
+      },
+      "generic": {
+        "title": "Error",
+        "message": ""
       }
     },
     "messages": {
@@ -271,5 +274,30 @@
   },
   "meta": {
     "direction": "ltr"
+  },
+  "scripts": {
+    "initialize": {
+      "cancelled": "キャンセルしました",
+      "init_complete": "{directory} を初期化し、{config_path} を更新しました。",
+      "dir_not_empty": "ディレクトリは空である必要があります。",
+      "language_prompt": "言語 [{default}]",
+      "language_tab_hint": "(? で一覧):",
+      "language_list_header": "利用可能な言語:",
+      "language_list_item": "  {code} - {label}",
+      "language_invalid": "無効な言語コードです。",
+      "language_codes_header": "有効な言語コード:",
+      "language_code_item": "  {code} - {label}",
+      "community_name": "コミュニティ名",
+      "port": "ポート",
+      "admin_username": "管理者 ユーザー名",
+      "admin_password": "管理者 パスワード",
+      "port_invalid_integer": "ポートは整数である必要があります。",
+      "port_invalid_range": "ポートは1から65535の間でなければなりません。",
+      "password_required": "パスワードが必要です。",
+      "create_dir_prefix": "作成",
+      "create_dir_suffix": "[はい/いいえ]",
+      "default_community_name": "私のコミュニティ",
+      "default_admin_user": "管理者"
+    }
   }
 }

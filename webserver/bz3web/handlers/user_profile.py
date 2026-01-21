@@ -52,7 +52,7 @@ def _render_profile(
     admin_notice="",
 ):
     settings = config.get_config()
-    timeout = int(config.require_setting(settings, "heartbeat_timeout_seconds"))
+    timeout = int(config.require_setting(settings, "heartbeat.timeout_seconds"))
     overview_max = int(config.require_setting(settings, "pages.servers.overview_max_chars"))
     safe_username = webhttp.html_escape(target_user["username"])
     header_title_html = f'<span class="server-owner">{safe_username}:</span> {webhttp.html_escape(_section("servers"))}'
@@ -137,7 +137,7 @@ def _render_profile(
     if current_user:
         profile_url = _profile_url(current_user["username"])
     header_html = views.header(
-        config.require_setting(settings, "community_name"),
+        config.require_setting(settings, "server.community_name"),
         f"/users/{encoded_user}",
         logged_in=current_user is not None,
         user_name=auth.display_username(current_user),

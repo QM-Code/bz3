@@ -19,6 +19,7 @@ struct ImFont;
 #include <nlohmann/json.hpp>
 
 #include "engine/components/gui/thumbnail_cache.hpp"
+#include "engine/components/gui/rich_text_renderer.hpp"
 
 namespace gui {
 
@@ -89,6 +90,7 @@ public:
     bool isServerDescriptionLoading(const std::string &key) const;
     void setServerDescriptionError(const std::string &key, const std::string &message);
     std::optional<std::string> getServerDescriptionError(const std::string &key) const;
+    RichTextRenderer *getRichTextRenderer();
     std::optional<CommunityBrowserSelection> consumeSelection();
     std::optional<int> consumeListSelection();
     std::optional<ServerListOption> consumeNewListRequest();
@@ -166,6 +168,10 @@ private:
     ImVec4 titleColor{};
     ImVec4 headingColor{};
     ImVec4 buttonColor{};
+    float regularFontSize = 0.0f;
+    float emojiFontSize = 0.0f;
+    float titleFontSize = 0.0f;
+    float headingFontSize = 0.0f;
     bool fontReloadRequested = false;
 
     std::vector<CommunityBrowserEntry> entries;
@@ -202,6 +208,7 @@ private:
     std::string storedPasswordHash;
 
     ThumbnailCache thumbnails;
+    RichTextRenderer richTextRenderer;
 
     std::string userConfigPath;
     bool themesLoaded = false;

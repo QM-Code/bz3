@@ -17,8 +17,8 @@ def _title(key):
 
 def _render_info_page(request, message=None, error=None, edit_mode=False):
     settings = config.get_config()
-    community_name = config.require_setting(settings, "community_name")
-    community_description = settings.get("community_description", "")
+    community_name = config.require_setting(settings, "server.community_name")
+    community_description = (settings.get("server") or {}).get("community_description", "")
 
     user = auth.get_user_from_request(request)
     is_admin = auth.is_admin(user)
@@ -103,8 +103,9 @@ def handle(request):
         if not name:
             return _render_info_page(request, error="Community name is required.", edit_mode=True)
         community_settings = dict(config.get_community_config())
-        community_settings["community_name"] = name
-        community_settings["community_description"] = description
+        community_settings.setdefault("server", {})
+        community_settings["server"]["community_name"] = name
+        community_settings["server"]["community_description"] = description
         config.save_community_config(community_settings)
         return webhttp.redirect("/info?updated=1")
 

@@ -5,7 +5,8 @@ import sqlite3
 
 def default_db_path():
     data_dir = _resolve_data_dir()
-    return os.path.join(data_dir, "bz3web.db")
+    db_file = _resolve_db_file()
+    return os.path.join(data_dir, db_file)
 
 
 def _resolve_data_dir():
@@ -13,10 +14,18 @@ def _resolve_data_dir():
 
     settings = config.get_config()
     community_dir = config.get_community_dir() or config.get_config_dir()
-    data_dir = config.require_setting(settings, "data_dir")
+    data_dir = config.require_setting(settings, "database.database_directory")
     if os.path.isabs(data_dir):
         return data_dir
     return os.path.normpath(os.path.join(community_dir, data_dir))
+
+
+def _resolve_db_file():
+    from bz3web import config
+
+    settings = config.get_config()
+    db_file = config.require_setting(settings, "database.database_file")
+    return str(db_file)
 
 
 def init_db(db_path):

@@ -32,6 +32,7 @@ def main():
         sys.path.insert(0, root_dir)
 
     from bz3web import cli
+    from bz3web import db
     from bz3web.tools import export_data as tool
 
     cli.bootstrap(directory, "usage: db-snapshot.py <community-directory> [output.json|-] [-z]")
@@ -45,7 +46,8 @@ def main():
     path = output_path
     if not path:
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        path = os.path.join(directory, "data", f"snapshot-{timestamp}.json")
+        database_dir = os.path.dirname(db.default_db_path())
+        path = os.path.join(database_dir, f"snapshot-{timestamp}.json")
         print(f"Exporting snapshot to {path}")
     path = os.path.abspath(path)
     os.makedirs(os.path.dirname(path), exist_ok=True)

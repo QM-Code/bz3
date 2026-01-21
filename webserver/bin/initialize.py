@@ -7,17 +7,18 @@ import secrets
 import sys
 
 
-def _ensure_community_dir(path):
+def _ensure_community_dir(path, messages):
     if not path:
         raise SystemExit("usage: initialize.py <community-directory>")
     if not os.path.isdir(path):
-        answer = input(f"Create {path} [Y/n] ").strip().lower()
+        prompt = f"{messages['create_dir_prefix']} {path} {messages['create_dir_suffix']}"
+        answer = input(f"{prompt} ").strip().lower()
         if answer not in ("", "y", "yes"):
-            raise SystemExit("Cancelled")
+            raise SystemExit(messages["cancelled"])
         os.makedirs(path, exist_ok=True)
         return True
     if os.listdir(path):
-        raise SystemExit("Directory must be empty.")
+        raise SystemExit(messages["dir_not_empty"])
     return False
 
 
@@ -47,19 +48,94 @@ def _prompt_text(label, default_value):
     return response or default_value
 
 
-def _prompt_port(default_value):
+def _format(template, **values):
+    text = str(template or "")
+    for key, value in values.items():
+        text = text.replace(f"{{{key}}}", str(value))
+    return text
+
+
+def _require_message(messages, key):
+    value = messages.get(key)
+    if not isinstance(value, str) or not value:
+        raise SystemExit(f"Missing scripts.initialize.{key} in strings/en.json.")
+    return value
+
+
+def _load_init_messages(settings):
+    init_strings = (settings.get("scripts") or {}).get("initialize", {})
+    keys = [
+        "create_dir_prefix",
+        "create_dir_suffix",
+        "cancelled",
+        "init_complete",
+        "dir_not_empty",
+        "language_prompt",
+        "language_tab_hint",
+        "language_list_header",
+        "language_list_item",
+        "language_invalid",
+        "language_codes_header",
+        "language_code_item",
+        "community_name",
+        "default_community_name",
+        "port",
+        "admin_username",
+        "default_admin_user",
+        "admin_password",
+        "port_invalid_integer",
+        "port_invalid_range",
+        "password_required",
+    ]
+    return {key: _require_message(init_strings, key) for key in keys}
+
+
+def _prompt_port(label, default_value, messages):
     while True:
-        response = input(f"Server port [{default_value}]: ").strip()
+        response = input(f"{label} [{default_value}]: ").strip()
         if not response:
             return default_value
         try:
             port = int(response)
         except ValueError:
-            print("Port must be an integer.")
+            print(messages["port_invalid_integer"])
             continue
         if 1 <= port <= 65535:
             return port
-        print("Port must be between 1 and 65535.")
+        print(messages["port_invalid_range"])
+
+
+def _prompt_language(default_language, available_languages, labels, messages):
+    prompt_text = _format(messages["language_prompt"], default=default_language)
+    tab_hint = messages.get("language_tab_hint")
+    if tab_hint:
+        prompt_text = f"{prompt_text} {tab_hint}"
+    while True:
+        response = input(f"{prompt_text} ").strip()
+        if not response:
+            return default_language
+        if response == "?":
+            print(messages["language_list_header"])
+            for code in available_languages:
+                label = labels.get(code, code)
+                print(_format(messages["language_list_item"], code=code, label=label))
+            continue
+        language = response.strip().lower()
+        if len(language) != 2 or not language.isalpha():
+            print(messages["language_invalid"])
+            print(messages["language_codes_header"])
+            for code in available_languages:
+                label = labels.get(code, code)
+                print(_format(messages["language_code_item"], code=code, label=label))
+            continue
+        if language not in available_languages:
+            print(messages["language_invalid"])
+            print(messages["language_codes_header"])
+            for code in available_languages:
+                label = labels.get(code, code)
+                print(_format(messages["language_code_item"], code=code, label=label))
+            continue
+        return language
 
 
 def main():
@@ -69,11 +145,9 @@ def main():
 
     created_paths = []
     try:
-        created_dir = _ensure_community_dir(directory)
-        if created_dir:
-            created_paths.append(directory)
-
         root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        if root_dir not in sys.path:
+            sys.path.insert(0, root_dir)
         config_path = os.path.join(root_dir, "config.json")
         if not os.path.isfile(config_path):
             raise SystemExit(f"Missing config.json at {config_path}")
@@ -81,30 +155,62 @@ def main():
         with open(config_path, "r", encoding="utf-8") as handle:
             config = json.load(handle)
 
-        if "community_name" not in config:
-            raise SystemExit("Missing community_name in config.json. Add it to config.json.")
-        if "port" not in config:
-            raise SystemExit("Missing port in config.json. Add it to config.json.")
-        if "admin_user" not in config:
-            raise SystemExit("Missing admin_user in config.json. Add it to config.json.")
-        if "data_dir" not in config:
-            raise SystemExit("Missing data_dir in config.json. Add it to config.json.")
-        if "uploads_dir" not in config:
-            raise SystemExit("Missing uploads_dir in config.json. Add it to config.json.")
+        from bz3web import config as config_lib
 
-        community_name = _prompt_text("Community name", config.get("community_name"))
-        server_port = _prompt_port(int(config.get("port")))
-        admin_user = _prompt_text("Admin username", config.get("admin_user"))
+        if "server" not in config:
+            raise SystemExit("Missing server in config.json. Add it to config.json.")
+        if "port" not in config.get("server", {}):
+            raise SystemExit("Missing server.port in config.json. Add it to config.json.")
+        if "language" not in config.get("server", {}):
+            raise SystemExit("Missing server.language in config.json. Add it to config.json.")
+        if "database" not in config:
+            raise SystemExit("Missing database in config.json. Add it to config.json.")
+        if "database_directory" not in config.get("database", {}):
+            raise SystemExit("Missing database.database_directory in config.json. Add it to config.json.")
+        if "database_file" not in config.get("database", {}):
+            raise SystemExit("Missing database.database_file in config.json. Add it to config.json.")
+        if "uploads" not in config:
+            raise SystemExit("Missing uploads in config.json. Add it to config.json.")
+        if "upload_directory" not in config.get("uploads", {}):
+            raise SystemExit("Missing uploads.upload_directory in config.json. Add it to config.json.")
+
+        server_defaults = config.get("server", {})
+        base_language = config_lib.normalize_language(server_defaults.get("language") or "en")
+        default_settings = config_lib.get_config(language=base_language)
+        messages = _load_init_messages(default_settings)
+
+        available_languages = config_lib.get_available_languages()
+        language_labels = default_settings.get("languages", {})
+        language = _prompt_language(base_language, available_languages, language_labels, messages)
+
+        settings = config_lib.get_config(language=language)
+        messages = _load_init_messages(settings)
+
+        created_dir = _ensure_community_dir(directory, messages)
+        if created_dir:
+            created_paths.append(directory)
+
+        community_name = _prompt_text(messages["community_name"], messages["default_community_name"])
+        server_port = _prompt_port(messages["port"], int(server_defaults.get("port")), messages)
+        admin_user = _prompt_text(messages["admin_username"], messages["default_admin_user"])
 
         try:
-            admin_password = getpass.getpass("Admin password: ")
+            admin_password = getpass.getpass(f"{messages['admin_password']}: ")
         except KeyboardInterrupt:
             raise
         if not admin_password:
-            raise SystemExit("Password is required.")
+            print(messages["password_required"])
+            while True:
+                try:
+                    admin_password = getpass.getpass(f"{messages['admin_password']}: ")
+                except KeyboardInterrupt:
+                    raise
+                if admin_password:
+                    break
+                print(messages["password_required"])
 
-        data_dir = config.get("data_dir")
-        uploads_dir = config.get("uploads_dir")
+        data_dir = config.get("database", {}).get("database_directory")
+        uploads_dir = config.get("uploads", {}).get("upload_directory")
         if not os.path.isabs(data_dir):
             data_dir = os.path.normpath(os.path.join(directory, data_dir))
         if not os.path.isabs(uploads_dir):
@@ -121,19 +227,19 @@ def main():
         session_secret = secrets.token_hex(32)
 
         community_config = {
-            "community_name": community_name,
-            "port": server_port,
-            "session_secret": session_secret,
-            "admin_user": admin_user,
+            "server": {
+                "community_name": community_name,
+                "language": language,
+                "port": server_port,
+                "admin_user": admin_user,
+                "session_secret": session_secret,
+            }
         }
         community_config_path = os.path.join(directory, "config.json")
         with open(community_config_path, "w", encoding="utf-8") as handle:
             json.dump(community_config, handle, indent=2)
             handle.write("\n")
         created_paths.append(community_config_path)
-
-        if root_dir not in sys.path:
-            sys.path.insert(0, root_dir)
 
         from bz3web import cli
         from bz3web import db
@@ -152,11 +258,11 @@ def main():
         finally:
             conn.close()
 
-        print(f"Initialized {directory} and updated {community_config_path}.")
+        print(_format(messages["init_complete"], directory=directory, config_path=community_config_path))
     except KeyboardInterrupt:
         _cleanup_paths(created_paths)
         print()
-        print("Canceled")
+        print(messages["cancelled"])
 
 
 if __name__ == "__main__":

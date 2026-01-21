@@ -142,7 +142,7 @@ def _render_form(
 """
     profile_url = _profile_url(user["username"])
     header_html = views.header_with_title(
-        config.require_setting(config.get_config(), "community_name"),
+        config.require_setting(config.get_config(), "server.community_name"),
         "/server/edit",
         logged_in=True,
         title=_title("edit_server"),

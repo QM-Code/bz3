@@ -8,7 +8,6 @@
     "ru": "Russe",
     "jp": "Japonais",
     "zh": "Chinois",
-    "sw": "Swahili",
     "ko": "Korean",
     "it": "Italian",
     "hi": "Hindi",
@@ -60,6 +59,10 @@
       "server_not_found": {
         "title": "Serveur introuvable",
         "message": "Serveur introuvable."
+      },
+      "generic": {
+        "title": "Error",
+        "message": ""
       }
     },
     "messages": {
@@ -271,5 +274,30 @@
   },
   "meta": {
     "direction": "ltr"
+  },
+  "scripts": {
+    "initialize": {
+      "cancelled": "Annulé",
+      "init_complete": "Initialisé {directory} et mis à jour {config_path}.",
+      "dir_not_empty": "Le dossier doit être vide.",
+      "language_prompt": "Langue [{default}]",
+      "language_tab_hint": "(? pour la liste) :",
+      "language_list_header": "Langues disponibles :",
+      "language_list_item": "  {code} - {label}",
+      "language_invalid": "Code de langue invalide.",
+      "language_codes_header": "Codes de langue valides :",
+      "language_code_item": "  {code} - {label}",
+      "community_name": "Nom de la communauté",
+      "port": "Port",
+      "admin_username": "Admin Nom d'utilisateur",
+      "admin_password": "Admin Mot de passe",
+      "port_invalid_integer": "Le port doit être un nombre entier.",
+      "port_invalid_range": "Le port doit être entre 1 et 65535.",
+      "password_required": "Le mot de passe est requis.",
+      "create_dir_prefix": "Créer",
+      "create_dir_suffix": "[O/n]",
+      "default_community_name": "Ma communauté",
+      "default_admin_user": "Administrateur"
+    }
   }
 }

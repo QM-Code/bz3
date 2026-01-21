@@ -63,7 +63,7 @@ def import_data(path, allow_merge=False, overwrite=False):
     inserted_servers = 0
     skipped_servers = 0
     with db.connect_ctx(db_path) as conn:
-        admin_username = config.require_setting(config.get_config(), "admin_user")
+        admin_username = config.require_setting(config.get_config(), "server.admin_user")
         admin_names = set()
         for entry in users:
             if not isinstance(entry, dict):

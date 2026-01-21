@@ -20,14 +20,14 @@ def handle(request):
         return views.error_page("405 Method Not Allowed", "method_not_allowed")
 
     settings = config.get_config()
-    list_name = config.require_setting(settings, "community_name")
+    list_name = config.require_setting(settings, "server.community_name")
 
     with db.connect_ctx() as conn:
         rows = db.list_servers(conn)
 
     show_inactive = request.query.get("show_inactive", [""])[0] == "1"
     overview_max = int(config.require_setting(settings, "pages.servers.overview_max_chars"))
-    timeout = int(config.require_setting(settings, "heartbeat_timeout_seconds"))
+    timeout = int(config.require_setting(settings, "heartbeat.timeout_seconds"))
     user = auth.get_user_from_request(request)
     is_admin = auth.is_admin(user)
     csrf_token = auth.csrf_token(request)

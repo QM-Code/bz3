@@ -22,7 +22,7 @@ def handle(request):
             return webhttp.json_error("not_found", status="404 Not Found")
 
     settings = config.get_config()
-    timeout = int(config.require_setting(settings, "heartbeat_timeout_seconds"))
+    timeout = int(config.require_setting(settings, "heartbeat.timeout_seconds"))
     active = is_active(server, timeout)
 
     payload = {

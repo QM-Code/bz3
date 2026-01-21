@@ -22,8 +22,8 @@ If a required key is missing from `webserver/config.json`, the server **errors o
 
 ### Language / localization
 
-- Default language is set by `webserver/config.json` → `language`.
-- A community can override it with `<community>/config.json` → `language`.
+- Default language is set by `webserver/config.json` → `server.language`.
+- A community can override it with `<community>/config.json` → `server.language`.
 - Translation files live under `webserver/strings/<lang>.json` (for example `webserver/strings/es.json`).
 - Community overrides can be placed under `<community>/strings/<lang>.json` and will override the distribution strings (for matching keys).
 - If a `language` is selected, its `strings/<lang>.json` must exist (distribution or community). Missing keys fall back to `strings/en.json`.
@@ -31,17 +31,21 @@ If a required key is missing from `webserver/config.json`, the server **errors o
 - Language selection order:
   1) User preference (Account → Personal settings)
   2) Browser `Accept-Language` header (if a matching `strings/<lang>.json` exists)
-  3) Community config `language`
-  4) Distribution config `language`
+  3) Community config `server.language`
+  4) Distribution config `server.language`
 
 ### Required keys in `webserver/config.json`
 
-- `host`
-- `port`
-- `data_dir`
-- `uploads_dir`
-- `heartbeat_timeout_seconds`
-- `language`
+- `server.host`
+- `server.port`
+- `server.community_name`
+- `server.admin_user`
+- `server.session_secret`
+- `database.database_directory`
+- `database.database_file`
+- `uploads.upload_directory`
+- `heartbeat.timeout_seconds`
+- `server.language`
 - `pages.servers.overview_max_chars`
 - `pages.servers.auto_refresh`
 - `pages.servers.auto_refresh_animate`
@@ -53,11 +57,34 @@ If a required key is missing from `webserver/config.json`, the server **errors o
 - `security_headers.*`
 - `cache_headers.static`
 - `cache_headers.uploads`
+- `logging.enabled`
+- `logging.level`
+- `logging.rotation`
+- `logging.max_bytes`
+- `logging.backups`
+- `logging.utc`
+- `logging.dir`
+- `logging.server_file`
+- `logging.include_user`
+- `logging.paths`
 - `httpserver.threads`
 - `rate_limits.*`
 
 Rate limiting is stored in the community SQLite database so limits work across processes. Set
 `debug.reset_rate_limits` to `true` during development to clear all stored rate-limit entries.
+
+### Logging
+
+Logs are written under `<community>/<logging.dir>/`. `logging.server_file` defines the main
+application log file. Request logs are controlled by `logging.paths`, which is a map of path
+prefixes (case-sensitive) to logging rules (e.g. `logging.paths["/api/"]`). Paths are matched by prefix, with more specific
+paths taking priority. If a matched entry has `override: true`, logging stops at that entry;
+otherwise, logging continues to less specific matches. If a `file` is `null`, logging for
+that prefix is disabled while still honoring `override`.
+
+Set `logging.include_user` to include the logged-in username in request logs.
+
+Rotation is controlled by `logging.rotation` (`daily` or `size`).
 
 ### Required keys in `webserver/strings/en.json`
 
@@ -68,31 +95,37 @@ Rate limiting is stored in the community SQLite database so limits work across p
 
 ### Community config fields
 
-`bin/initialize.py` creates a minimal community config with:
+`bin/initialize.py` creates a minimal community config with (defaults come from `strings/<lang>.json` under `scripts.initialize.*`):
 
-- `community_name`
-- `port`
-- `session_secret`
-- `admin_user`
+- `server.community_name`
+- `server.port`
+- `server.admin_user`
+- `server.session_secret`
 
 You can also add:
 
-- `community_description`
-- `language`
+- `server.community_description`
+- `server.language`
 
 ### Example: full `webserver/config.json`
 
 ```json
 {
-  "community_name": "My Community",
-  "community_description": "",
-  "admin_user": "Admin",
-  "host": "0.0.0.0",
-  "port": 8080,
-  "language": "en",
-  "data_dir": "data",
-  "uploads_dir": "uploads",
+  "server": {
+    "community_name": "My Community",
+    "community_description": "",
+    "admin_user": "Admin",
+    "host": "0.0.0.0",
+    "port": 8080,
+    "language": "en",
+    "session_secret": null
+  },
+  "database": {
+    "database_directory": "data",
+    "database_file": "bz3web.db"
+  },
   "uploads": {
+    "upload_directory": "uploads",
     "screenshots": {
       "limits": {
         "min_bytes": 0,
@@ -165,7 +198,33 @@ You can also add:
     "static": "public, max-age=86400",
     "uploads": "public, max-age=86400"
   },
-  "heartbeat_timeout_seconds": 120,
+  "logging": {
+    "enabled": true,
+    "level": "INFO",
+    "rotation": "daily",
+    "max_bytes": 10485760,
+    "backups": 7,
+    "utc": true,
+    "dir": "logs",
+    "server_file": "server.log",
+    "include_user": false,
+    "paths": {
+      "/api/": {
+        "file": "api.log",
+        "override": true
+      },
+      "/api/heartbeat": {
+        "file": null,
+        "override": true
+      },
+      "/": {
+        "file": "access.log"
+      }
+    }
+  },
+  "heartbeat": {
+    "timeout_seconds": 120
+  },
   "httpserver": {
     "threads": 8
   }
@@ -452,10 +511,12 @@ You can also add:
 
 ```json
 {
-  "community_name": "My Community",
-  "port": 8080,
-  "session_secret": "CHANGE_ME",
-  "admin_user": "Admin"
+  "server": {
+    "community_name": "My Community",
+    "port": 8080,
+    "admin_user": "Admin",
+    "session_secret": "CHANGE_ME"
+  }
 }
 ```
 
@@ -471,12 +532,12 @@ You can also add:
 
 Community directories are **user-writable** and contain:
 - `config.json`
-- `data/` (SQLite DB)
-- `uploads/` (screenshots)
+- `<database.database_directory>/` (SQLite DB)
+- `<uploads.upload_directory>/` (screenshots)
 
 ## Getting started
 
-1) Initialize a community directory (must be empty). This writes `config.json`, creates `data/` + `uploads/`, and seeds the admin user:
+1) Initialize a community directory (must be empty). This writes `config.json`, creates the database directory + uploads directory, and seeds the admin user:
 
 ```
 python3 ./bin/initialize.py /path/to/communities/example1
@@ -521,11 +582,11 @@ python3 ./bin/db-snapshot.py ./communities/example1 /path/to/export.json
 ```
 
 If no output path is provided, `db-snapshot.py` writes to:
-`communities/<name>/data/snapshot-<timestamp>.json`. Use `-z` to write a zip.
+`communities/<name>/<database.database_directory>/snapshot-<timestamp>.json`. Use `-z` to write a zip.
 
 ## JSON format
 
-Import/export JSON matches `communities/*/data/test-data.json` and includes:
+Import/export JSON matches `communities/*/<database.database_directory>/test-data.json` and includes:
 
 - Users:
   - `username`, `email`
@@ -552,8 +613,8 @@ Import/export JSON matches `communities/*/data/test-data.json` and includes:
 
 ## Admin user behavior
 
-- `admin_user` is the **root admin name** for admin propagation.
-- Changing `admin_user` does **not** grant admin rights; the DB flag controls that.
+- `server.admin_user` is the **root admin name** for admin propagation.
+- Changing `server.admin_user` does **not** grant admin rights; the DB flag controls that.
 - Admin propagation updates when admin flags are recomputed.
 
 ## URLs
@@ -576,6 +637,7 @@ Import/export JSON matches `communities/*/data/test-data.json` and includes:
 - `/api/admins` admin list for a host+port
 - `/api/heartbeat` game server heartbeat
 - `/api/auth` game server auth (POST only unless `debug.auth` is true)
+- `/api/info` community info
 - `/api/user_registered` check username
 - `/api/health` health check
 
@@ -583,4 +645,4 @@ Import/export JSON matches `communities/*/data/test-data.json` and includes:
 
 - Markdown is rendered on `/servers/<server>` (description) and `/info` (community description) with sanitization.
 - Placeholders are configurable under `placeholders.*` in `webserver/config.json`.
-- `host` may be `0.0.0.0` for binding, but clients should use a reachable address.
+- `server.host` may be `0.0.0.0` for binding, but clients should use a reachable address.

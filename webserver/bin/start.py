@@ -29,9 +29,14 @@ def main():
     from bz3web import app, config
     from bz3web import cli
 
-    cli.bootstrap(directory, "usage: start.py <community-directory>")
-    if port_override is not None:
-        config.get_config()["port"] = port_override
+    try:
+        cli.bootstrap(directory, "usage: start.py <community-directory>")
+        if port_override is not None:
+            config.get_config().setdefault("server", {})["port"] = port_override
+            config.set_port_override(port_override)
+    except ValueError as exc:
+        print(str(exc))
+        raise SystemExit(1)
     def _handle_sigint(_sig, _frame):
         print("\nServer stopped.")
         raise SystemExit(0)

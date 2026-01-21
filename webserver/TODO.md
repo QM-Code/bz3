@@ -41,3 +41,7 @@
 ## Streams
 
 - Look into having a link for a Twitch stream of a game in progress.
+
+## Localization
+
+- Internationalize all scripts using strings/*.json.

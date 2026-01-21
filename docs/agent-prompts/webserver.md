@@ -12,6 +12,7 @@ Use this prompt when working on the community webserver in `webserver/`.
 - Config defaults live in `webserver/config.json` and are authoritative; avoid hardcoded defaults in code.
 - Language strings live under `webserver/strings/<lang>.json` (distribution) and `<community>/strings/<lang>.json` (overrides). Missing keys fall back to `strings/en.json`.
 - Database lives under `<community>/data/bz3web.db`, uploads under `<community>/uploads/`.
+- `bin/initialize.py` defaults for community name/admin come from `strings/<lang>.json` under `scripts.initialize.*`.
 - `/` redirects to `/servers`. `/servers` is HTML list. `/api/servers` is JSON list (overview only; includes active + inactive). `/api/servers/active` and `/api/servers/inactive` return active/inactive lists. `/api/server/<name|id>` returns a full server record. `/api/users/<name>` returns a user + server list. `/api/admins` takes host+port and returns owner’s admin list (1-level trust). `/api/auth` accepts POST `passhash` only; GET is allowed only when `debug.auth` is true and accepts `password` or `passhash`.
 - The client (`bz3`) should only consume `/api/servers/active` (web UI can show inactive).
 - Host+port is enforced unique at DB level via unique index + CHECK constraints for player counts.

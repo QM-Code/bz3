@@ -8,6 +8,7 @@
 #include <sstream>
 #include <string>
 #include <utility>
+#include <vector>
 
 #if defined(_WIN32)
 #include <shellapi.h>
@@ -286,6 +287,174 @@ void renderMarkdown(const std::string &text,
         }
 
         renderInlineTextWithLinks(line, linkColor, linkStatusText, linkStatusIsError);
+    }
+}
+
+void renderInlineTextWithLinksRich(gui::RichTextRenderer &renderer,
+                                   ImDrawList *drawList,
+                                   gui::RichTextRenderer::InlineLayout &layout,
+                                   const gui::RichTextRenderer::TextStyle &style,
+                                   const std::string &text,
+                                   const ImVec4 &linkColor,
+                                   std::string &linkStatusText,
+                                   bool &linkStatusIsError,
+                                   int &linkIdCounter) {
+    std::size_t pos = 0;
+    ImVec2 savedCursor = ImGui::GetCursorScreenPos();
+
+    auto emitSegment = [&](const std::string &segment, bool isLink, const std::string &url) {
+        if (segment.empty()) {
+            return;
+        }
+        gui::RichTextRenderer::TextStyle segmentStyle = style;
+        if (isLink) {
+            segmentStyle.color = linkColor;
+        }
+        std::vector<gui::RichTextRenderer::Rect> rects;
+        renderer.drawInline(drawList, layout, segment, segmentStyle, isLink ? &rects : nullptr);
+
+        if (!isLink || rects.empty()) {
+            return;
+        }
+
+        for (const auto &rect : rects) {
+            ImGui::SetCursorScreenPos(rect.min);
+            ImGui::PushID(linkIdCounter++);
+            ImGui::InvisibleButton("##link", ImVec2(rect.max.x - rect.min.x, rect.max.y - rect.min.y));
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Open in browser");
+            }
+            if (ImGui::IsItemClicked()) {
+                if (!openUrlInBrowser(url)) {
+                    linkStatusText = "Failed to open your browser.";
+                    linkStatusIsError = true;
+                } else {
+                    linkStatusText.clear();
+                    linkStatusIsError = false;
+                }
+            }
+            ImGui::PopID();
+        }
+    };
+
+    while (pos < text.size()) {
+        std::size_t linkStart = text.find('[', pos);
+        if (linkStart == std::string::npos) {
+            emitSegment(text.substr(pos), false, {});
+            break;
+        }
+        std::size_t linkEnd = text.find(']', linkStart + 1);
+        if (linkEnd == std::string::npos) {
+            emitSegment(text.substr(pos), false, {});
+            break;
+        }
+        if (linkEnd + 1 >= text.size() || text[linkEnd + 1] != '(') {
+            emitSegment(text.substr(pos, linkEnd - pos + 1), false, {});
+            pos = linkEnd + 1;
+            continue;
+        }
+        std::size_t urlEnd = text.find(')', linkEnd + 2);
+        if (urlEnd == std::string::npos) {
+            emitSegment(text.substr(pos), false, {});
+            break;
+        }
+
+        emitSegment(text.substr(pos, linkStart - pos), false, {});
+        std::string label = text.substr(linkStart + 1, linkEnd - linkStart - 1);
+        std::string url = text.substr(linkEnd + 2, urlEnd - linkEnd - 2);
+        emitSegment(label, true, url);
+
+        pos = urlEnd + 1;
+    }
+
+    ImGui::SetCursorScreenPos(savedCursor);
+}
+
+void renderMarkdownRich(gui::RichTextRenderer &renderer,
+                        const std::string &text,
+                        float regularSize,
+                        float titleSize,
+                        float headingSize,
+                        const ImVec4 &textColor,
+                        const ImVec4 &linkColor,
+                        std::string &linkStatusText,
+                        bool &linkStatusIsError) {
+    ImDrawList *drawList = ImGui::GetWindowDrawList();
+    std::istringstream input(text);
+    std::string line;
+    bool firstLine = true;
+    int linkIdCounter = 0;
+
+    const ImGuiStyle &style = ImGui::GetStyle();
+
+    while (std::getline(input, line)) {
+        if (!line.empty() && line.back() == '\r') {
+            line.pop_back();
+        }
+
+        if (!firstLine) {
+            ImGui::Dummy(ImVec2(0.0f, style.ItemSpacing.y));
+        }
+        firstLine = false;
+
+        if (line.empty()) {
+            ImGui::Dummy(ImVec2(0.0f, regularSize * 0.6f));
+            continue;
+        }
+
+        std::size_t hashCount = 0;
+        while (hashCount < line.size() && line[hashCount] == '#') {
+            ++hashCount;
+        }
+        bool isHeading = (hashCount > 0 && hashCount < line.size() && line[hashCount] == ' ');
+        bool isBullet = (line.rfind("- ", 0) == 0 || line.rfind("* ", 0) == 0 || line.rfind("+ ", 0) == 0);
+
+        gui::RichTextRenderer::TextStyle styleSpec;
+        styleSpec.color = textColor;
+        if (isHeading) {
+            styleSpec.role = (hashCount <= 2) ? gui::RichTextRenderer::FontRole::Title
+                                              : gui::RichTextRenderer::FontRole::Heading;
+            styleSpec.size = (hashCount <= 2) ? titleSize : headingSize;
+            line = line.substr(hashCount + 1);
+        } else {
+            styleSpec.role = gui::RichTextRenderer::FontRole::Regular;
+            styleSpec.size = regularSize;
+        }
+
+        if (isBullet) {
+            line = line.substr(2);
+        }
+
+        ImVec2 lineStart = ImGui::GetCursorScreenPos();
+        float availableWidth = ImGui::GetContentRegionAvail().x;
+        float indent = 0.0f;
+        if (isBullet) {
+            float bulletRadius = std::max(2.0f, styleSpec.size * 0.18f);
+            ImVec2 bulletCenter(lineStart.x + bulletRadius, lineStart.y + styleSpec.size * 0.6f);
+            drawList->AddCircleFilled(bulletCenter, bulletRadius, ImGui::ColorConvertFloat4ToU32(textColor));
+            indent = bulletRadius * 2.5f;
+        }
+
+        gui::RichTextRenderer::InlineLayout layout;
+        layout.start = ImVec2(lineStart.x + indent, lineStart.y);
+        layout.cursor = layout.start;
+        layout.maxWidth = std::max(0.0f, availableWidth - indent);
+
+        renderInlineTextWithLinksRich(renderer,
+                                      drawList,
+                                      layout,
+                                      styleSpec,
+                                      line,
+                                      linkColor,
+                                      linkStatusText,
+                                      linkStatusIsError,
+                                      linkIdCounter);
+
+        float consumedHeight = (layout.cursor.y - layout.start.y) + layout.lineHeight;
+        if (consumedHeight <= 0.0f) {
+            consumedHeight = styleSpec.size;
+        }
+        ImGui::Dummy(ImVec2(0.0f, consumedHeight));
     }
 }
 

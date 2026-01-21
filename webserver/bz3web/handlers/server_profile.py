@@ -41,7 +41,7 @@ def handle(request):
             return views.error_page("404 Not Found", "server_not_found")
 
         settings = config.get_config()
-        timeout = int(config.require_setting(settings, "heartbeat_timeout_seconds"))
+        timeout = int(config.require_setting(settings, "heartbeat.timeout_seconds"))
         active = is_active(server, timeout)
         user = auth.get_user_from_request(request)
         is_admin = auth.is_admin(user)
@@ -85,7 +85,7 @@ def handle(request):
         if user:
             profile_url = f"/users/{urllib.parse.quote(user['username'], safe='')}"
         header_html = views.header(
-            config.require_setting(settings, "community_name"),
+            config.require_setting(settings, "server.community_name"),
             request.path,
             logged_in=user is not None,
             user_name=auth.display_username(user),

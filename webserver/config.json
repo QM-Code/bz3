@@ -1,13 +1,19 @@
 {
-  "community_name": "My Community",
-  "community_description": "",
-  "admin_user": "Admin",
-  "host": "0.0.0.0",
-  "port": 8080,
-  "language": "en",
-  "data_dir": "data",
-  "uploads_dir": "uploads",
+  "server": {
+    "community_name": null,
+    "community_description": null,
+    "admin_user": null,
+    "host": "0.0.0.0",
+    "port": 8080,
+    "language": "en",
+    "session_secret": null
+  },
+  "database": {
+    "database_directory": "data",
+    "database_file": "bz3web.db"
+  },
   "uploads": {
+    "upload_directory": "uploads",
     "screenshots": {
       "limits": {
         "min_bytes": 0,
@@ -80,7 +86,33 @@
     "static": "public, max-age=86400",
     "uploads": "public, max-age=86400"
   },
-  "heartbeat_timeout_seconds": 120,
+  "logging": {
+    "enabled": true,
+    "level": "INFO",
+    "rotation": "daily",
+    "max_bytes": 10485760,
+    "backups": 7,
+    "utc": true,
+    "dir": "logs",
+    "server_file": "server.log",
+    "include_user": false,
+    "paths": {
+      "/": {
+        "file": "access.log"
+      },
+      "/api/": {
+        "file": "api.log",
+        "override": true
+      },
+      "/api/heartbeat": {
+        "file": null,
+        "override": true
+      }
+    }
+  },
+  "heartbeat": {
+    "timeout_seconds": 120
+  },
   "httpserver": {
     "threads": 8
   }

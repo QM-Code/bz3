@@ -65,7 +65,7 @@ def _render_register(request, message=None, form_data=None, headers=None):
 </form>
 """
     header_html = views.header_with_title(
-        config.require_setting(config.get_config(), "community_name"),
+        config.require_setting(config.get_config(), "server.community_name"),
         "/register",
         logged_in=False,
         title=_title("create_account"),
@@ -138,7 +138,7 @@ def _render_forgot(request, message=None, reset_link=None, level="info", form_da
     if level in notice_kwargs:
         notice_kwargs[level] = message
         header_html = views.header_with_title(
-        config.require_setting(config.get_config(), "community_name"),
+        config.require_setting(config.get_config(), "server.community_name"),
         "/forgot",
         logged_in=False,
         title=_title("reset_password"),
@@ -166,7 +166,7 @@ def _render_reset(request, token, message=None, headers=None):
 </form>
 """
     header_html = views.header_with_title(
-        config.require_setting(config.get_config(), "community_name"),
+        config.require_setting(config.get_config(), "server.community_name"),
         "/reset",
         logged_in=False,
         title=_title("set_new_password"),
@@ -185,12 +185,12 @@ def _owns_server(user, server):
 
 
 def _is_root_admin(user, settings):
-    admin_username = config.require_setting(settings, "admin_user")
+    admin_username = config.require_setting(settings, "server.admin_user")
     return _normalize_key(user["username"]) == _normalize_key(admin_username)
 
 
 def _sync_root_admin_privileges(conn, settings):
-    admin_username = config.require_setting(settings, "admin_user")
+    admin_username = config.require_setting(settings, "server.admin_user")
     root_user = db.get_user_by_username(conn, admin_username)
     if not root_user:
         return
@@ -199,7 +199,7 @@ def _sync_root_admin_privileges(conn, settings):
 
 def _recompute_root_admins(conn, user, settings):
     if not _is_root_admin(user, settings):
-        admin_username = config.require_setting(settings, "admin_user")
+        admin_username = config.require_setting(settings, "server.admin_user")
         root_user = db.get_user_by_username(conn, admin_username)
         if not root_user:
             return
@@ -210,7 +210,7 @@ def _recompute_root_admins(conn, user, settings):
         if user["id"] not in trusted_admin_ids:
             return
     else:
-        admin_username = config.require_setting(settings, "admin_user")
+        admin_username = config.require_setting(settings, "server.admin_user")
         root_user = db.get_user_by_username(conn, admin_username)
         if not root_user:
             return
@@ -219,7 +219,7 @@ def _recompute_root_admins(conn, user, settings):
 
 
 def _trusted_primary_notice(conn, target_user, settings):
-    admin_username = config.require_setting(settings, "admin_user")
+    admin_username = config.require_setting(settings, "server.admin_user")
     root_user = db.get_user_by_username(conn, admin_username)
     if not root_user:
         return ""
@@ -273,7 +273,7 @@ def handle(request):
                         form_data=form_data,
                         headers=_no_store_headers(),
                     )
-                admin_username = config.require_setting(settings, "admin_user")
+                admin_username = config.require_setting(settings, "server.admin_user")
                 if _normalize_key(username) == _normalize_key(admin_username):
                     return _render_register(
                         request,
@@ -319,7 +319,7 @@ def handle(request):
 
         if path == "/login":
             if request.method == "GET":
-                list_name = config.require_setting(settings, "community_name")
+                list_name = config.require_setting(settings, "server.community_name")
                 status, response_headers, body = _render_login(
                     request,
                     list_name=list_name,
@@ -334,7 +334,7 @@ def handle(request):
                     return _render_login(
                         request,
                         _msg("rate_limited"),
-                        list_name=config.require_setting(settings, "community_name"),
+                        list_name=config.require_setting(settings, "server.community_name"),
                         headers=_no_store_headers(),
                     )
                 identifier = _first(form, "email")
@@ -348,7 +348,7 @@ def handle(request):
                     return _render_login(
                         request,
                         _msg("login_failed"),
-                        list_name=config.require_setting(settings, "community_name"),
+                        list_name=config.require_setting(settings, "server.community_name"),
                         form_data=form_data,
                         headers=_no_store_headers(),
                     )
@@ -356,7 +356,7 @@ def handle(request):
                     return _render_login(
                         request,
                         _msg("account_locked"),
-                        list_name=config.require_setting(settings, "community_name"),
+                        list_name=config.require_setting(settings, "server.community_name"),
                         form_data=form_data,
                         headers=_no_store_headers(),
                     )
@@ -491,7 +491,7 @@ def handle(request):
                 return _render_login(
                     request,
                     _msg("reset_success"),
-                    list_name=config.require_setting(settings, "community_name"),
+                    list_name=config.require_setting(settings, "server.community_name"),
                     headers=_no_store_headers(),
                 )
             return views.error_page("405 Method Not Allowed", "method_not_allowed")

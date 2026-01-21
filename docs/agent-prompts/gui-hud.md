@@ -28,3 +28,7 @@ Use this prompt when working on the MainMenu and its panels.
 - Do not store plaintext passwords. Password hashes are used for auth when needed.
 - LAN mode should never use passwords.
 - Keep UI responsive; background work stays off the UI thread.
+
+## RichTextRenderer toggle (emoji work-in-progress)
+- The custom RichTextRenderer is currently disabled. Toggle `kEnableRichTextRenderer` to `true` in `src/engine/components/gui/main_menu.cpp` to re-enable font initialization and the debug emoji draw.
+- The Community/Server Details panels are hard-wired to use the standard `renderMarkdown()` path; switch those back to `renderMarkdownRich()` if you want the rich renderer active there again.

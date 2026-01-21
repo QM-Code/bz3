@@ -8,7 +8,6 @@
     "ru": "Russo",
     "jp": "Japonês",
     "zh": "Chinês",
-    "sw": "Swahili",
     "ko": "Korean",
     "it": "Italian",
     "hi": "Hindi",
@@ -60,6 +59,10 @@
       "server_not_found": {
         "title": "Servidor não encontrado",
         "message": "Servidor não encontrado."
+      },
+      "generic": {
+        "title": "Error",
+        "message": ""
       }
     },
     "messages": {
@@ -271,5 +274,30 @@
   },
   "meta": {
     "direction": "ltr"
+  },
+  "scripts": {
+    "initialize": {
+      "cancelled": "Cancelado",
+      "init_complete": "Inicializado {directory} e atualizado {config_path}.",
+      "dir_not_empty": "O diretório deve estar vazio.",
+      "language_prompt": "Idioma [{default}]",
+      "language_tab_hint": "(? para listar):",
+      "language_list_header": "Idiomas disponíveis:",
+      "language_list_item": "  {code} - {label}",
+      "language_invalid": "Código de idioma inválido.",
+      "language_codes_header": "Códigos de idioma válidos:",
+      "language_code_item": "  {code} - {label}",
+      "community_name": "Nome da comunidade",
+      "port": "Porta",
+      "admin_username": "Admin Nome de usuário",
+      "admin_password": "Admin Senha",
+      "port_invalid_integer": "A porta deve ser um número inteiro.",
+      "port_invalid_range": "A porta deve estar entre 1 e 65535.",
+      "password_required": "A senha é obrigatória.",
+      "create_dir_prefix": "Criar",
+      "create_dir_suffix": "[S/n]",
+      "default_community_name": "Minha comunidade",
+      "default_admin_user": "Admin"
+    }
   }
 }

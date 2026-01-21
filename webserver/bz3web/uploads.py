@@ -13,7 +13,7 @@ except ImportError:  # Optional dependency
 def _uploads_dir():
     settings = config.get_config()
     community_dir = config.get_community_dir() or config.get_config_dir()
-    uploads_dir = config.require_setting(settings, "uploads_dir")
+    uploads_dir = config.require_setting(settings, "uploads.upload_directory")
     if os.path.isabs(uploads_dir):
         return uploads_dir
     return os.path.normpath(os.path.join(community_dir, uploads_dir))

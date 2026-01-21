@@ -1,3 +1,4 @@
+import logging
 import os
 import urllib.parse
 
@@ -68,11 +69,26 @@ def dispatch(request):
     language = None
     try:
         available = config.get_available_languages()
+    except (ValueError, FileNotFoundError):
+        logging.getLogger("bz3web").warning("Language detection: failed to load available languages; defaulting to en.")
+        available = ["en"]
+    try:
         user = auth.get_user_from_request(request)
-        if user:
-            preferred = config.normalize_language(user.get("language"))
-            if preferred in available:
-                language = preferred
+    except ValueError:
+        logging.getLogger("bz3web").warning("Language detection: failed to resolve user session.")
+        user = None
+    if user:
+        try:
+            user_language = user.get("language")
+        except AttributeError:
+            try:
+                user_language = user["language"]
+            except Exception:
+                user_language = None
+        preferred = config.normalize_language(user_language)
+        if preferred in available:
+            language = preferred
+    try:
         settings = config.get_config()
         disable_browser = bool(config.require_setting(settings, "debug.disable_browser_language_detection"))
         if not language and not disable_browser:
@@ -81,10 +97,13 @@ def dispatch(request):
         if not language:
             community = config.get_community_config()
             base = config.get_base_config()
-            fallback = config.normalize_language((community or {}).get("language") or base.get("language") or "en")
+            fallback = config.normalize_language(
+                (community or {}).get("server", {}).get("language") or (base.get("server") or {}).get("language") or "en"
+            )
             language = fallback if fallback in available else "en"
-    except Exception:
-        language = "en"
+    except (ValueError, FileNotFoundError):
+        logging.getLogger("bz3web").warning("Language detection: failed to load config defaults; defaulting to en.")
+        language = language or "en"
     config.set_request_language(language)
     path = request.path.rstrip("/") or "/"
     try:

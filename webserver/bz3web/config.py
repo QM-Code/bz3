@@ -12,6 +12,7 @@ _LANGUAGE_CONFIGS = {}
 _CONFIG_BY_LANGUAGE = {}
 _AVAILABLE_LANGUAGES = None
 _THREAD_LOCAL = threading.local()
+_PORT_OVERRIDE = None
 
 
 def _find_config_path():
@@ -52,6 +53,15 @@ def set_community_dir(path):
     _reset_language_cache()
 
 
+def set_port_override(port):
+    global _PORT_OVERRIDE
+    _PORT_OVERRIDE = port
+
+
+def get_port_override():
+    return _PORT_OVERRIDE
+
+
 def get_community_dir():
     return _COMMUNITY_DIR
 
@@ -77,7 +87,12 @@ def _load_community_config():
         return None
     except json.JSONDecodeError as exc:
         location = f"line {exc.lineno} column {exc.colno}" if exc.lineno and exc.colno else "unknown location"
-        raise ValueError(f"[bz3web] Error: corrupt community config.json file ({location}).") from exc
+        community_dir = get_community_dir()
+        if community_dir:
+            label = os.path.basename(community_dir.rstrip("/\\")) + "/config.json"
+        else:
+            label = "community config.json"
+        raise ValueError(f"[bz3web] Error: corrupt {label} file ({location}).") from exc
     _COMMUNITY_CONFIG = data
     _reset_language_cache()
     return data
@@ -173,7 +188,7 @@ def normalize_language(language):
 def get_default_language():
     base = get_base_config()
     community = _COMMUNITY_CONFIG or _load_community_config() or {}
-    language = community.get("language") or require_setting(base, "language")
+    language = (community.get("server") or {}).get("language") or require_setting(base, "server.language")
     return normalize_language(language)
 
 
@@ -211,12 +226,13 @@ def _load_strings_en():
 def validate_startup(settings):
     base = get_base_config()
     required_config_paths = [
-        "host",
-        "port",
-        "data_dir",
-        "uploads_dir",
-        "heartbeat_timeout_seconds",
-        "language",
+        "server.host",
+        "server.port",
+        "database.database_directory",
+        "database.database_file",
+        "uploads.upload_directory",
+        "heartbeat.timeout_seconds",
+        "server.language",
         "pages.servers.overview_max_chars",
         "pages.servers.auto_refresh",
         "pages.servers.auto_refresh_animate",
@@ -242,8 +258,30 @@ def validate_startup(settings):
         "security_headers.x_content_type_options",
         "cache_headers.static",
         "cache_headers.uploads",
+        "logging.enabled",
+        "logging.level",
+        "logging.rotation",
+        "logging.max_bytes",
+        "logging.backups",
+        "logging.utc",
+        "logging.dir",
+        "logging.server_file",
+        "logging.include_user",
+        "logging.paths",
     ]
     missing = _collect_missing(base, required_config_paths, "config.json")
+    community_required_paths = [
+        "server.community_name",
+        "server.admin_user",
+        "server.session_secret",
+    ]
+    community = _COMMUNITY_CONFIG or _load_community_config() or {}
+    community_dir = get_community_dir()
+    if community_dir:
+        label = os.path.basename(community_dir.rstrip("/\\")) + "/config.json"
+    else:
+        label = "community config.json"
+    missing.extend(_collect_missing(community, community_required_paths, label))
 
     strings_en = _load_strings_en()
     required_strings_paths = [
@@ -275,7 +313,7 @@ def validate_startup(settings):
         details = "\n".join(missing)
         raise ValueError(f"[bz3web] Error: missing required configuration keys:\n{details}")
 
-    language = normalize_language(base.get("language"))
+    language = normalize_language((base.get("server") or {}).get("language"))
     if language:
         strings = _load_strings_config(language)
         if not strings:
@@ -364,6 +402,8 @@ def get_config(language=None):
         merged = _deep_merge(merged, strings_config)
         if string_overrides:
             merged = _deep_merge(merged, string_overrides)
+        merged.setdefault("server", {})
+        merged["server"]["language"] = language
         merged["language"] = language
         _CONFIG_BY_LANGUAGE[language] = merged
     return _CONFIG_BY_LANGUAGE[language]

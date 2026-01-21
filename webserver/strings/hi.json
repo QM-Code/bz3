@@ -8,7 +8,6 @@
     "ru": "रूसी",
     "jp": "जापानी",
     "zh": "चीनी",
-    "sw": "स्वाहिली",
     "ko": "कोरियाई",
     "it": "इतालवी",
     "hi": "हिन्दी",
@@ -60,6 +59,10 @@
       "server_not_found": {
         "title": "सर्वर नहीं मिला",
         "message": "सर्वर नहीं मिला।"
+      },
+      "generic": {
+        "title": "Error",
+        "message": ""
       }
     },
     "messages": {
@@ -271,5 +274,30 @@
   },
   "meta": {
     "direction": "ltr"
+  },
+  "scripts": {
+    "initialize": {
+      "cancelled": "रद्द किया गया",
+      "init_complete": "{directory} प्रारंभ किया गया और {config_path} अपडेट किया गया।",
+      "dir_not_empty": "डायरेक्टरी खाली होनी चाहिए।",
+      "language_prompt": "भाषा [{default}]",
+      "language_tab_hint": "(? सूची के लिए):",
+      "language_list_header": "उपलब्ध भाषाएँ:",
+      "language_list_item": "  {code} - {label}",
+      "language_invalid": "अमान्य भाषा कोड।",
+      "language_codes_header": "मान्य भाषा कोड:",
+      "language_code_item": "  {code} - {label}",
+      "community_name": "समुदाय का नाम",
+      "port": "पोर्ट",
+      "admin_username": "एडमिन उपयोगकर्ता नाम",
+      "admin_password": "एडमिन पासवर्ड",
+      "port_invalid_integer": "पोर्ट एक पूर्णांक होना चाहिए।",
+      "port_invalid_range": "पोर्ट 1 और 65535 के बीच होना चाहिए।",
+      "password_required": "पासवर्ड आवश्यक है।",
+      "create_dir_prefix": "बनाएँ",
+      "create_dir_suffix": "[हाँ/न]",
+      "default_community_name": "मेरा समुदाय",
+      "default_admin_user": "प्रशासक"
+    }
   }
 }

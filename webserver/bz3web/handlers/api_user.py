@@ -11,7 +11,7 @@ def handle(request):
         return webhttp.json_error("missing_name", status="400 Bad Request")
 
     settings = config.get_config()
-    timeout = int(config.require_setting(settings, "heartbeat_timeout_seconds"))
+    timeout = int(config.require_setting(settings, "heartbeat.timeout_seconds"))
     overview_max = int(config.require_setting(settings, "pages.servers.overview_max_chars"))
 
     with db.connect_ctx() as conn:

@@ -63,10 +63,11 @@ def main():
 
     cli.bootstrap(directory, _usage())
     settings = config.get_config()
-    host = settings.get("host")
-    port = settings.get("port")
+    server_settings = settings.get("server", {})
+    host = server_settings.get("host")
+    port = server_settings.get("port")
     if port is None:
-        raise SystemExit("No port specified in config.json.")
+        raise SystemExit("No server.port specified in config.json.")
     port = int(port)
     endpoint = f"http://{host}:{port}/api/heartbeat"
 

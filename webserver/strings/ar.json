@@ -11,7 +11,6 @@
     "ru": "الروسية",
     "jp": "اليابانية",
     "zh": "الصينية",
-    "sw": "السواحيلية",
     "ko": "الكورية",
     "it": "الإيطالية",
     "hi": "الهندية",
@@ -63,6 +62,10 @@
       "server_not_found": {
         "title": "الخادم غير موجود",
         "message": "الخادم غير موجود."
+      },
+      "generic": {
+        "title": "Error",
+        "message": ""
       }
     },
     "messages": {
@@ -270,6 +273,31 @@
     "users": {
       "reset_password": "اتركه فارغًا للاحتفاظ بكلمة المرور الحالية",
       "new_password": "اتركه فارغًا للاحتفاظ بكلمة المرور الحالية"
+    }
+  },
+  "scripts": {
+    "initialize": {
+      "cancelled": "تم الإلغاء",
+      "init_complete": "تمت تهيئة {directory} وتحديث {config_path}.",
+      "dir_not_empty": "يجب أن يكون المجلد فارغًا.",
+      "language_prompt": "اللغة [{default}]",
+      "language_tab_hint": "(? لعرض القائمة):",
+      "language_list_header": "اللغات المتاحة:",
+      "language_list_item": "  {code} - {label}",
+      "language_invalid": "رمز اللغة غير صالح.",
+      "language_codes_header": "رموز اللغات الصحيحة:",
+      "language_code_item": "  {code} - {label}",
+      "community_name": "اسم المجتمع",
+      "port": "المنفذ",
+      "admin_username": "مشرف اسم المستخدم",
+      "admin_password": "مشرف كلمة المرور",
+      "port_invalid_integer": "يجب أن يكون المنفذ عددًا صحيحًا.",
+      "port_invalid_range": "يجب أن يكون المنفذ بين 1 و 65535.",
+      "password_required": "كلمة المرور مطلوبة.",
+      "create_dir_prefix": "إنشاء",
+      "create_dir_suffix": "[ن/ل]",
+      "default_community_name": "مجتمعي",
+      "default_admin_user": "المشرف"
     }
   }
 }
