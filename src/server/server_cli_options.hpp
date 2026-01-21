@@ -17,6 +17,8 @@ struct ServerCLIOptions {
     std::string logLevel;
     bool logLevelExplicit = false;
     bool timestampLogging = false;
+    std::string community;
+    bool communityExplicit = false;
 };
 
 ServerCLIOptions ParseServerCLIOptions(int argc, char *argv[]);

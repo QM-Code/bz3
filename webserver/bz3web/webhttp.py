@@ -3,6 +3,7 @@ import cgi
 import hashlib
 import hmac
 import html
+import io
 import json
 import time
 import urllib.parse
@@ -39,15 +40,7 @@ class Request:
                 body = self.body().decode("utf-8", errors="replace")
                 self._form = urllib.parse.parse_qs(body, keep_blank_values=True)
             elif "multipart/form-data" in content_type:
-                form = {}
-                files = {}
-                storage = cgi.FieldStorage(fp=self.environ["wsgi.input"], environ=self.environ, keep_blank_values=True)
-                if storage.list:
-                    for item in storage.list:
-                        if item.filename:
-                            files[item.name] = item
-                        else:
-                            form.setdefault(item.name, []).append(item.value)
+                form, files = self._parse_multipart()
                 self._form = form
                 self._multipart = (form, files)
             else:
@@ -56,19 +49,31 @@ class Request:
 
     def multipart(self):
         if self._multipart is None:
-            form = {}
-            files = {}
             content_type = self.environ.get("CONTENT_TYPE", "")
             if "multipart/form-data" in content_type:
-                storage = cgi.FieldStorage(fp=self.environ["wsgi.input"], environ=self.environ, keep_blank_values=True)
-                if storage.list:
-                    for item in storage.list:
-                        if item.filename:
-                            files[item.name] = item
-                        else:
-                            form.setdefault(item.name, []).append(item.value)
+                form, files = self._parse_multipart()
+            else:
+                form, files = {}, {}
             self._multipart = (form, files)
         return self._multipart
+
+    def _parse_multipart(self):
+        form = {}
+        files = {}
+        body = self.body()
+        environ = {
+            "REQUEST_METHOD": self.method,
+            "CONTENT_TYPE": self.environ.get("CONTENT_TYPE", ""),
+            "CONTENT_LENGTH": str(len(body)),
+        }
+        storage = cgi.FieldStorage(fp=io.BytesIO(body), environ=environ, keep_blank_values=True)
+        if storage.list:
+            for item in storage.list:
+                if item.filename:
+                    files[item.name] = item
+                else:
+                    form.setdefault(item.name, []).append(item.value)
+        return form, files
 
 
 def html_escape(value):
@@ -78,6 +83,23 @@ def html_escape(value):
 def html_response(body, status="200 OK", headers=None):
     headers = headers or []
     headers = [("Content-Type", "text/html; charset=utf-8")] + headers
+    try:
+        from bz3web import config
+
+        settings = config.get_config()
+        security = settings.get("security_headers", {})
+        csp = security.get("content_security_policy")
+        referrer = security.get("referrer_policy")
+        nosniff = security.get("x_content_type_options")
+        existing = {key.lower() for key, _ in headers}
+        if csp and "content-security-policy" not in existing:
+            headers.append(("Content-Security-Policy", csp))
+        if referrer and "referrer-policy" not in existing:
+            headers.append(("Referrer-Policy", referrer))
+        if nosniff and "x-content-type-options" not in existing:
+            headers.append(("X-Content-Type-Options", nosniff))
+    except Exception:
+        pass
     return status, headers, body.encode("utf-8")
 
 
@@ -86,6 +108,15 @@ def json_response(payload, status="200 OK", headers=None):
     headers = [("Content-Type", "application/json; charset=utf-8")] + headers
     body = json.dumps(payload, indent=2, sort_keys=False)
     return status, headers, body.encode("utf-8")
+
+
+def json_error(error, message=None, status="400 Bad Request", headers=None, extra=None):
+    payload = {"ok": False, "error": error}
+    if message:
+        payload["message"] = message
+    if extra:
+        payload.update(extra)
+    return json_response(payload, status=status, headers=headers)
 
 
 def redirect(location):
@@ -110,13 +141,19 @@ def parse_cookies(environ):
     return cookies
 
 
-def set_cookie(headers, name, value, path="/", max_age=None, http_only=True, same_site="Lax"):
+def set_cookie(headers, name, value, path="/", max_age=None, http_only=True, same_site="Lax", secure=False):
     parts = [f"{name}={value}", f"Path={path}", f"SameSite={same_site}"]
     if max_age is not None:
         parts.append(f"Max-Age={max_age}")
+    if secure:
+        parts.append("Secure")
     if http_only:
         parts.append("HttpOnly")
     headers.append(("Set-Cookie", "; ".join(parts)))
+
+
+def client_ip(environ):
+    return environ.get("REMOTE_ADDR", "")
 
 
 def sign_session(payload, secret, expires_in=3600):

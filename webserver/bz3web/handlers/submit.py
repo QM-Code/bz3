@@ -18,42 +18,90 @@ def _parse_int(value):
         return None
 
 
-def _render_form(message=None, user=None, form_data=None, csrf_token=""):
+def _format_template(template, **values):
+    result = str(template)
+    for key, value in values.items():
+        result = result.replace(f"{{{key}}}", str(value))
+    return result
+
+
+def _msg(key, **values):
+    template = config.ui_text(f"messages.submit.{key}", "config.json ui_text.messages.submit")
+    return config.format_text(template, **values)
+
+
+def _label(key):
+    return config.ui_text(f"labels.{key}", "config.json ui_text.labels")
+
+
+def _action(key):
+    return config.ui_text(f"actions.{key}", "config.json ui_text.actions")
+
+
+def _title(key):
+    return config.ui_text(f"titles.{key}", "config.json ui_text.titles")
+
+
+def _render_form(request, message=None, user=None, form_data=None):
     form_data = form_data or {}
+    settings = config.get_config()
+    ui_text = config.require_setting(settings, "ui_text")
+    overview_max = int(config.require_setting(settings, "pages.servers.overview_max_chars"))
+    counter_template = config.require_setting(ui_text, "counter.overview", "config.json ui_text.counter")
+    warning_template = config.require_setting(ui_text, "warnings.overview_over_limit", "config.json ui_text.warnings")
+    markdown_hint = config.require_setting(ui_text, "hints.markdown_supported", "config.json ui_text.hints")
+    placeholders = settings.get("placeholders", {}).get("add_server", {})
     host_value = webhttp.html_escape(form_data.get("host", ""))
     port_value = webhttp.html_escape(form_data.get("port", ""))
     name_value = webhttp.html_escape(form_data.get("name", ""))
+    overview_value = webhttp.html_escape(form_data.get("overview", ""))
     description_value = webhttp.html_escape(form_data.get("description", ""))
-    csrf_html = views.csrf_input(csrf_token)
+    def _ph(key):
+        value = placeholders.get(key, "")
+        if not value:
+            return ""
+        return f' placeholder="{webhttp.html_escape(value)}"'
+    csrf_html = views.csrf_input(auth.csrf_token(request))
     body = f"""<form method="post" action="/submit" enctype="multipart/form-data">
   {csrf_html}
   <div class="row">
     <div>
-      <label for="host">Host</label>
-      <input id="host" name="host" required placeholder="example.com or 10.0.0.5" value="{host_value}">
+      <label for="host">{webhttp.html_escape(_label("host"))}</label>
+      <input id="host" name="host" required{_ph("host")} value="{host_value}">
     </div>
     <div>
-      <label for="port">Port</label>
-      <input id="port" name="port" required placeholder="5154" value="{port_value}">
+      <label for="port">{webhttp.html_escape(_label("port"))}</label>
+      <input id="port" name="port" required{_ph("port")} value="{port_value}">
     </div>
   </div>
   <div>
-    <label for="name">Server Name</label>
-    <input id="name" name="name" required placeholder="Required unique name" value="{name_value}">
+    <label for="name">{webhttp.html_escape(_label("server_name"))}</label>
+    <input id="name" name="name" required{_ph("name")} value="{name_value}">
   </div>
   <div>
-    <label for="description">Description</label>
-    <textarea id="description" name="description" placeholder="Optional description">{description_value}</textarea>
+    <label for="overview">{webhttp.html_escape(_label("overview"))}</label>
+    <div class="field-group" data-char-field>
+      <textarea id="overview" name="overview"{_ph("overview")} data-char-limit="{overview_max}" data-counter-template="{webhttp.html_escape(counter_template)}" data-warning-template="{webhttp.html_escape(warning_template)}">{overview_value}</textarea>
+      <div class="field-meta">
+        <span class="char-counter"></span>
+        <span class="char-warning hidden"></span>
+      </div>
+    </div>
+  </div>
+  <div>
+    <label for="description">{webhttp.html_escape(_label("description"))}</label>
+    <textarea id="description" name="description"{_ph("description")}>{description_value}</textarea>
+    <p class="muted hint">{webhttp.html_escape(markdown_hint)}</p>
   </div>
 """
-    body += """
+    body += f"""
   <div>
-    <label for="screenshot">World screenshot (PNG/JPG)</label>
+    <label for="screenshot">{webhttp.html_escape(_label("screenshot_upload"))}</label>
     <input id="screenshot" name="screenshot" type="file" accept="image/*">
   </div>
   <div class="actions">
-    <button type="submit">Submit for Approval</button>
-    <a class="admin-link align-right" href="/servers">Cancel</a>
+    <button type="submit">{webhttp.html_escape(_action("submit_for_approval"))}</button>
+    <a class="admin-link align-right" href="/servers">{webhttp.html_escape(_action("cancel"))}</a>
   </div>
 </form>
 """
@@ -61,64 +109,62 @@ def _render_form(message=None, user=None, form_data=None, csrf_token=""):
     if user:
         profile_url = f"/users/{quote(user['username'], safe='')}"
     header_html = views.header_with_title(
-        config.get_config().get("community_name", "Server List"),
+        config.require_setting(config.get_config(), "server.community_name"),
         "/submit",
         logged_in=bool(user),
-        title="Add Server",
+        title=_title("submit_server"),
         error=message,
         user_name=auth.display_username(user),
         is_admin=auth.is_admin(user),
         profile_url=profile_url,
     )
-    body = f"""{header_html}
-{body}"""
-    return views.render_page("Submit Server", body)
+    return views.render_page_with_header(_title("submit_server"), header_html, body)
 
 
 def _render_success(user=None):
-    body = """<p class="muted">Thanks! Your server has been added. It will appear online after the next heartbeat.</p>
+    body = f"""<p class="muted">{webhttp.html_escape(_msg("success_notice"))}</p>
 <div class="actions">
-  <a class="admin-link" href="/servers">Return to servers</a>
-  <a class="admin-link" href="/submit">Submit another server</a>
+  <a class="admin-link" href="/servers">{webhttp.html_escape(_action("return_to_servers"))}</a>
+  <a class="admin-link" href="/submit">{webhttp.html_escape(_action("submit_another"))}</a>
 </div>
 """
     profile_url = None
     if user:
         profile_url = f"/users/{quote(user['username'], safe='')}"
     header_html = views.header_with_title(
-        config.get_config().get("community_name", "Server List"),
+        config.require_setting(config.get_config(), "server.community_name"),
         "/submit",
         logged_in=True,
-        title="Server added",
+        title=_title("server_added"),
         user_name=auth.display_username(user),
         is_admin=auth.is_admin(user),
         profile_url=profile_url,
     )
-    body = f"""{header_html}
-{body}"""
-    return views.render_page("Server added", body)
+    return views.render_page_with_header(_title("server_added"), header_html, body)
 
 def handle(request):
     if request.method == "GET":
         user = auth.get_user_from_request(request)
         if not user:
             return webhttp.redirect("/login")
-        return _render_form(user=user, csrf_token=auth.csrf_token(request))
+        return _render_form(request, user=user)
     if request.method != "POST":
-        return webhttp.html_response("<h1>Method Not Allowed</h1>", status="405 Method Not Allowed")
+        return views.error_page("405 Method Not Allowed", "method_not_allowed")
 
     settings = config.get_config()
     user = auth.get_user_from_request(request)
     if not user:
         return webhttp.redirect("/login")
     content_length = int(request.environ.get("CONTENT_LENGTH") or 0)
-    max_bytes = int(settings.get("upload_max_bytes", 3 * 1024 * 1024))
+    overview_max = int(config.require_setting(settings, "pages.servers.overview_max_chars"))
+    max_bytes = uploads._screenshot_settings(settings)["max_bytes"]
     form, files = request.multipart()
     if not auth.verify_csrf(request, form):
-        return webhttp.html_response("<h1>Forbidden</h1>", status="403 Forbidden")
+        return views.error_page("403 Forbidden", "forbidden")
     host = _first(form, "host")
     port_text = _first(form, "port")
     name = _first(form, "name")
+    overview = _first(form, "overview")
     description = _first(form, "description")
     max_players = None
     num_players = None
@@ -126,44 +172,57 @@ def handle(request):
         "host": host,
         "port": port_text,
         "name": name,
+        "overview": overview,
         "description": description,
     }
     if content_length > max_bytes + 1024 * 1024:
         return _render_form(
-            "Upload too large.",
+            request,
+            _msg("upload_too_large"),
             user=user,
             form_data=form_data,
-            csrf_token=auth.csrf_token(request),
         )
 
     if not host or not port_text or not name:
         return _render_form(
-            "Host, port, and server name are required.",
+            request,
+            _msg("missing_required"),
             user=user,
             form_data=form_data,
-            csrf_token=auth.csrf_token(request),
+        )
+
+    if overview and len(overview) > overview_max:
+        warning_template = config.require_setting(
+            config.require_setting(settings, "ui_text"),
+            "warnings.overview_over_limit",
+            "config.json ui_text.warnings",
+        )
+        return _render_form(
+            request,
+            _format_template(warning_template, max=overview_max),
+            user=user,
+            form_data=form_data,
         )
 
     try:
         port = int(port_text)
     except ValueError:
         return _render_form(
-            "Port must be a number.",
+            request,
+            _msg("port_number"),
             user=user,
             form_data=form_data,
-            csrf_token=auth.csrf_token(request),
         )
 
-    conn = db.connect(db.default_db_path())
-    existing = db.get_server_by_name(conn, name)
-    if existing:
-        conn.close()
-        return _render_form(
-            "Server name is already taken.",
-            user=user,
-            form_data=form_data,
-            csrf_token=auth.csrf_token(request),
-        )
+    with db.connect_ctx() as conn:
+        existing = db.get_server_by_name(conn, name)
+        if existing:
+            return _render_form(
+                request,
+                _msg("name_taken"),
+                user=user,
+                form_data=form_data,
+            )
 
     screenshot_id = None
     file_item = files.get("screenshot")
@@ -171,15 +230,16 @@ def handle(request):
         upload_info, error = uploads.handle_upload(file_item)
         if error:
             return _render_form(
+                request,
                 error,
                 user=user,
                 form_data=form_data,
-                csrf_token=auth.csrf_token(request),
             )
         screenshot_id = upload_info.get("id")
 
     record = {
         "name": name or None,
+        "overview": overview or None,
         "description": description or None,
         "host": host,
         "port": port,
@@ -190,7 +250,7 @@ def handle(request):
         "last_heartbeat": None,
     }
 
-    db.add_server(conn, record)
-    conn.close()
+    with db.connect_ctx() as conn:
+        db.add_server(conn, record)
 
     return _render_success(user=user)

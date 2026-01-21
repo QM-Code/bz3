@@ -5,6 +5,9 @@
 #include <cstdio>
 #include <imgui.h>
 #include <imgui_internal.h>
+#if defined(IMGUI_ENABLE_FREETYPE) && __has_include("imgui_freetype.h")
+#include <imgui_freetype.h>
+#endif
 #include <spdlog/spdlog.h>
 #include <string>
 #include <vector>
@@ -26,20 +29,6 @@ std::string trimCopy(const std::string &value) {
     }
 
     return std::string(begin, end);
-}
-
-uint16_t configuredServerPort() {
-    if (const auto configured = bz::data::ConfigValueUInt16("network.ServerPort")) {
-        return *configured;
-    }
-    return 0;
-}
-
-uint16_t applyPortFallback(uint16_t candidate) {
-    if (candidate != 0) {
-        return candidate;
-    }
-    return configuredServerPort();
 }
 
 ImVec4 readColorConfig(const char *path, const ImVec4 &fallback) {
@@ -71,13 +60,21 @@ ImVec4 readColorConfig(const char *path, const ImVec4 &fallback) {
 
 namespace gui {
 
+namespace {
+constexpr bool kEnableRichTextRenderer = false;
+}
+
 void MainMenuView::initializeFonts(ImGuiIO &io) {
     const ImVec4 defaultTextColor = ImGui::GetStyle().Colors[ImGuiCol_Text];
+#if defined(IMGUI_ENABLE_FREETYPE) && defined(ImGuiFreeTypeBuilderFlags_LoadColor)
+    io.Fonts->FontBuilderFlags |= ImGuiFreeTypeBuilderFlags_LoadColor;
+#endif
     const auto regularFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Regular.Font");
     const std::string regularFontPathStr = regularFontPath.string();
     const float regularFontSize = useThemeOverrides
         ? currentTheme.regular.size
         : bz::data::ReadFloatConfig({"assets.hud.fonts.console.Regular.Size"}, 20.0f);
+    this->regularFontSize = regularFontSize;
     regularFont = io.Fonts->AddFontFromFileTTF(
         regularFontPathStr.c_str(),
         regularFontSize
@@ -88,11 +85,45 @@ void MainMenuView::initializeFonts(ImGuiIO &io) {
         spdlog::warn("Failed to load console regular font for community browser ({}).", regularFontPathStr);
     }
 
+    const auto emojiFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Emoji.Font");
+    this->emojiFontSize = 0.0f;
+    if (!emojiFontPath.empty()) {
+        const std::string emojiFontPathStr = emojiFontPath.string();
+        const float emojiFontSize = useThemeOverrides
+            ? currentTheme.emoji.size
+            : bz::data::ReadFloatConfig({"assets.hud.fonts.console.Emoji.Size"}, regularFontSize);
+        this->emojiFontSize = emojiFontSize;
+        ImFontConfig emojiConfig;
+        emojiConfig.MergeMode = true;
+        emojiConfig.PixelSnapH = true;
+        emojiConfig.OversampleH = 1;
+        emojiConfig.OversampleV = 1;
+#if defined(IMGUI_ENABLE_FREETYPE) && defined(ImGuiFreeTypeBuilderFlags_LoadColor)
+        emojiConfig.FontBuilderFlags |= ImGuiFreeTypeBuilderFlags_LoadColor;
+#endif
+#ifdef IMGUI_USE_WCHAR32
+        static const ImWchar emojiRanges[] = { 0x1, 0x1FFFF, 0 };
+#else
+        static const ImWchar emojiRanges[] = { 0x1, 0xFFFF, 0 };
+        spdlog::warn("Emoji font loaded without IMGUI_USE_WCHAR32; codepoints above U+FFFF will not render.");
+#endif
+        emojiFont = io.Fonts->AddFontFromFileTTF(
+            emojiFontPathStr.c_str(),
+            emojiFontSize,
+            &emojiConfig,
+            emojiRanges
+        );
+        if (!emojiFont) {
+            spdlog::warn("Failed to load emoji font for community browser ({}).", emojiFontPathStr);
+        }
+    }
+
     const auto titleFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Title.Font");
     const std::string titleFontPathStr = titleFontPath.string();
     const float titleFontSize = useThemeOverrides
         ? currentTheme.title.size
         : bz::data::ReadFloatConfig({"assets.hud.fonts.console.Title.Size"}, 30.0f);
+    this->titleFontSize = titleFontSize;
     titleFont = io.Fonts->AddFontFromFileTTF(
         titleFontPathStr.c_str(),
         titleFontSize
@@ -108,6 +139,7 @@ void MainMenuView::initializeFonts(ImGuiIO &io) {
     const float headingFontSize = useThemeOverrides
         ? currentTheme.heading.size
         : bz::data::ReadFloatConfig({"assets.hud.fonts.console.Heading.Size"}, 28.0f);
+    this->headingFontSize = headingFontSize;
     headingFont = io.Fonts->AddFontFromFileTTF(
         headingFontPathStr.c_str(),
         headingFontSize
@@ -131,6 +163,22 @@ void MainMenuView::initializeFonts(ImGuiIO &io) {
 
     if (!buttonFont) {
         spdlog::warn("Failed to load console button font for community browser ({}).", buttonFontPathStr);
+    }
+
+    if (kEnableRichTextRenderer) {
+        RichTextRenderer::FontSpec regularSpec{regularFontPathStr, regularFontSize};
+        RichTextRenderer::FontSpec titleSpec{titleFontPathStr, titleFontSize};
+        RichTextRenderer::FontSpec headingSpec{headingFontPathStr, headingFontSize};
+        RichTextRenderer::FontSpec emojiSpec{};
+        if (!emojiFontPath.empty()) {
+            emojiSpec.path = emojiFontPath.string();
+            emojiSpec.size = emojiFontSize;
+        }
+        if (!richTextRenderer.initialize(regularSpec, titleSpec, headingSpec, emojiSpec)) {
+            spdlog::warn("RichTextRenderer: failed to initialize; falling back to ImGui text.");
+        }
+    } else {
+        richTextRenderer.shutdown();
     }
 }
 
@@ -209,6 +257,23 @@ void MainMenuView::draw(ImGuiIO &io) {
 
     ImGui::End();
 
+    if (kEnableRichTextRenderer && richTextRenderer.isInitialized()) {
+        ImDrawList *drawList = ImGui::GetForegroundDrawList();
+        ImGuiViewport *viewport = ImGui::GetMainViewport();
+        const char *emojiText = "\xF0\x9F\xA5\xB3";
+        float emojiSize = regularFontSize > 0.0f ? regularFontSize * 3.0f : 48.0f;
+        RichTextRenderer::TextStyle emojiStyle;
+        emojiStyle.role = RichTextRenderer::FontRole::Regular;
+        emojiStyle.size = emojiSize;
+        emojiStyle.color = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+        RichTextRenderer::InlineLayout layout;
+        ImVec2 center = viewport->GetCenter();
+        layout.start = ImVec2(center.x - emojiSize * 0.5f, center.y - emojiSize * 0.5f);
+        layout.cursor = layout.start;
+        layout.maxWidth = 0.0f;
+        richTextRenderer.drawInline(drawList, layout, emojiText, emojiStyle, nullptr);
+    }
+
     if (pushedRegularColor) {
         ImGui::PopStyleColor();
     }
@@ -220,6 +285,7 @@ void MainMenuView::draw(ImGuiIO &io) {
 void MainMenuView::setUserConfigPath(const std::string &path) {
     userConfigPath = path;
     themesLoaded = false;
+    settingsLoaded = false;
 }
 
 bool MainMenuView::consumeFontReloadRequest() {
@@ -250,24 +316,31 @@ void MainMenuView::drawPlaceholderPanel(const char *heading,
     ImGui::PopStyleColor();
 }
 
-void MainMenuView::show(const std::vector<CommunityBrowserEntry> &newEntries,
-              const std::string &defaultHost,
-              uint16_t defaultPort) {
+void MainMenuView::show(const std::vector<CommunityBrowserEntry> &newEntries) {
     visible = true;
     setEntries(newEntries);
     pendingSelection.reset();
-    statusText = "Select a server to connect or enter your own.";
+    statusText = "Select a server to connect.";
     statusIsError = false;
-    customStatusText.clear();
-    customStatusIsError = false;
     pendingListSelection.reset();
     pendingNewList.reset();
+    pendingDeleteListHost.reset();
     listStatusText.clear();
     listStatusIsError = false;
     communityStatusText.clear();
+    communityDetailsText.clear();
+    communityLinkStatusText.clear();
+    communityLinkStatusIsError = false;
+    serverLinkStatusText.clear();
+    serverLinkStatusIsError = false;
+    serverDescriptionLoadingKey.clear();
+    serverDescriptionLoading = false;
+    serverDescriptionErrorKey.clear();
+    serverDescriptionErrorText.clear();
     communityStatusTone = MessageTone::Notice;
     clearPassword();
-    resetBuffers(defaultHost, defaultPort);
+    showNewCommunityInput = false;
+    listUrlBuffer.fill(0);
 }
 
 MainMenuView::~MainMenuView() {
@@ -290,6 +363,8 @@ void MainMenuView::setListOptions(const std::vector<ServerListOption> &options, 
     listOptions = options;
     if (listOptions.empty()) {
         listSelectedIndex = -1;
+        serverCommunityIndex = -1;
+        lastCredentialsListIndex = -1;
         pendingListSelection.reset();
         return;
     }
@@ -301,24 +376,166 @@ void MainMenuView::setListOptions(const std::vector<ServerListOption> &options, 
     } else {
         listSelectedIndex = selectedIndexIn;
     }
+
+    if (serverCommunityIndex < 0 || serverCommunityIndex >= static_cast<int>(listOptions.size())) {
+        serverCommunityIndex = listSelectedIndex;
+    }
+}
+
+std::string MainMenuView::communityKeyForIndex(int index) const {
+    if (index < 0 || index >= static_cast<int>(listOptions.size())) {
+        return {};
+    }
+    const auto &option = listOptions[index];
+    if (option.name == "Local Area Network") {
+        return "LAN";
+    }
+    std::string host = option.host;
+    while (!host.empty() && host.back() == '/') {
+        host.pop_back();
+    }
+    return host;
+}
+
+void MainMenuView::refreshCommunityCredentials() {
+    if (listSelectedIndex == lastCredentialsListIndex) {
+        return;
+    }
+    lastCredentialsListIndex = listSelectedIndex;
+    usernameBuffer.fill(0);
+    passwordBuffer.fill(0);
+    storedPasswordHash.clear();
+
+    const std::string key = communityKeyForIndex(listSelectedIndex);
+    if (key.empty()) {
+        return;
+    }
+
+    nlohmann::json config;
+    if (!loadUserConfig(config)) {
+        return;
+    }
+
+    const auto guiIt = config.find("gui");
+    if (guiIt == config.end() || !guiIt->is_object()) {
+        return;
+    }
+    const auto credsIt = guiIt->find("communityCredentials");
+    if (credsIt == guiIt->end() || !credsIt->is_object()) {
+        return;
+    }
+    const auto entryIt = credsIt->find(key);
+    if (entryIt == credsIt->end() || !entryIt->is_object()) {
+        return;
+    }
+    const auto &entry = *entryIt;
+    if (auto userIt = entry.find("username"); userIt != entry.end() && userIt->is_string()) {
+        std::snprintf(usernameBuffer.data(), usernameBuffer.size(), "%s", userIt->get<std::string>().c_str());
+    }
+    if (key != "LAN") {
+        if (auto passIt = entry.find("passwordHash"); passIt != entry.end() && passIt->is_string()) {
+            const std::string passhash = passIt->get<std::string>();
+            if (!passhash.empty()) {
+                storedPasswordHash = passhash;
+            }
+        }
+    }
+}
+
+void MainMenuView::persistCommunityCredentials(bool passwordChanged) {
+    const std::string key = communityKeyForIndex(listSelectedIndex);
+    if (key.empty()) {
+        return;
+    }
+
+    nlohmann::json config;
+    if (!loadUserConfig(config)) {
+        return;
+    }
+
+    const std::string username = trimCopy(usernameBuffer.data());
+    if (username.empty()) {
+        eraseNestedConfig(config, {"gui", "communityCredentials", key.c_str()});
+    } else {
+        setNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "username"}, username);
+        if (key == "LAN") {
+            eraseNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "passwordHash"});
+            eraseNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "salt"});
+        } else if (!storedPasswordHash.empty()) {
+            setNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "passwordHash"}, storedPasswordHash);
+        } else if (passwordChanged) {
+            eraseNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "passwordHash"});
+        }
+    }
+
+    std::string error;
+    saveUserConfig(config, error);
+}
+
+void MainMenuView::storeCommunityAuth(const std::string &communityHost,
+                                      const std::string &username,
+                                      const std::string &passhash,
+                                      const std::string &salt) {
+    if (communityHost.empty() || username.empty()) {
+        return;
+    }
+
+    std::string key = communityHost;
+    while (!key.empty() && key.back() == '/') {
+        key.pop_back();
+    }
+
+    nlohmann::json config;
+    if (!loadUserConfig(config)) {
+        return;
+    }
+
+    setNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "username"}, username);
+    if (!passhash.empty()) {
+        setNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "passwordHash"}, passhash);
+    }
+    if (!salt.empty()) {
+        setNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "salt"}, salt);
+    }
+
+    std::string error;
+    saveUserConfig(config, error);
+
+    const std::string activeKey = communityKeyForIndex(listSelectedIndex);
+    if (activeKey == key) {
+        std::snprintf(usernameBuffer.data(), usernameBuffer.size(), "%s", username.c_str());
+        if (!passhash.empty()) {
+            storedPasswordHash = passhash;
+        }
+    }
 }
 
 void MainMenuView::hide() {
     visible = false;
     statusText.clear();
     statusIsError = false;
-    customStatusText.clear();
-    customStatusIsError = false;
     pendingSelection.reset();
     pendingListSelection.reset();
     pendingNewList.reset();
+    pendingDeleteListHost.reset();
     refreshRequested = false;
     scanning = false;
     listStatusText.clear();
     listStatusIsError = false;
     communityStatusText.clear();
+    communityDetailsText.clear();
+    communityLinkStatusText.clear();
+    communityLinkStatusIsError = false;
+    serverLinkStatusText.clear();
+    serverLinkStatusIsError = false;
+    serverDescriptionLoadingKey.clear();
+    serverDescriptionLoading = false;
+    serverDescriptionErrorKey.clear();
+    serverDescriptionErrorText.clear();
     communityStatusTone = MessageTone::Notice;
     clearPassword();
+    showNewCommunityInput = false;
+    richTextRenderer.shutdown();
     thumbnails.shutdown();
 }
 
@@ -331,9 +548,42 @@ void MainMenuView::setStatus(const std::string &text, bool isErrorMessage) {
     statusIsError = isErrorMessage;
 }
 
-void MainMenuView::setCustomStatus(const std::string &text, bool isErrorMessage) {
-    customStatusText = text;
-    customStatusIsError = isErrorMessage;
+void MainMenuView::setCommunityDetails(const std::string &detailsText) {
+    communityDetailsText = detailsText;
+}
+
+void MainMenuView::setServerDescriptionLoading(const std::string &key, bool loading) {
+    serverDescriptionLoadingKey = key;
+    serverDescriptionLoading = loading;
+}
+
+bool MainMenuView::isServerDescriptionLoading(const std::string &key) const {
+    if (!serverDescriptionLoading || key.empty()) {
+        return false;
+    }
+    return serverDescriptionLoadingKey == key;
+}
+
+void MainMenuView::setServerDescriptionError(const std::string &key, const std::string &message) {
+    serverDescriptionErrorKey = key;
+    serverDescriptionErrorText = message;
+}
+
+std::optional<std::string> MainMenuView::getServerDescriptionError(const std::string &key) const {
+    if (key.empty() || serverDescriptionErrorKey.empty()) {
+        return std::nullopt;
+    }
+    if (serverDescriptionErrorKey != key) {
+        return std::nullopt;
+    }
+    if (serverDescriptionErrorText.empty()) {
+        return std::nullopt;
+    }
+    return serverDescriptionErrorText;
+}
+
+RichTextRenderer *MainMenuView::getRichTextRenderer() {
+    return richTextRenderer.isInitialized() ? &richTextRenderer : nullptr;
 }
 
 std::optional<CommunityBrowserSelection> MainMenuView::consumeSelection() {
@@ -366,6 +616,16 @@ std::optional<ServerListOption> MainMenuView::consumeNewListRequest() {
     return request;
 }
 
+std::optional<std::string> MainMenuView::consumeDeleteListRequest() {
+    if (!pendingDeleteListHost.has_value()) {
+        return std::nullopt;
+    }
+
+    auto host = pendingDeleteListHost;
+    pendingDeleteListHost.reset();
+    return host;
+}
+
 void MainMenuView::setListStatus(const std::string &text, bool isErrorMessage) {
     listStatusText = text;
     listStatusIsError = isErrorMessage;
@@ -380,12 +640,23 @@ void MainMenuView::setCommunityStatus(const std::string &text, MessageTone tone)
     communityStatusTone = tone;
 }
 
+std::optional<CommunityBrowserEntry> MainMenuView::getSelectedEntry() const {
+    if (selectedIndex < 0 || selectedIndex >= static_cast<int>(entries.size())) {
+        return std::nullopt;
+    }
+    return entries[static_cast<std::size_t>(selectedIndex)];
+}
+
 std::string MainMenuView::getUsername() const {
     return trimCopy(usernameBuffer.data());
 }
 
 std::string MainMenuView::getPassword() const {
     return std::string(passwordBuffer.data());
+}
+
+std::string MainMenuView::getStoredPasswordHash() const {
+    return storedPasswordHash;
 }
 
 void MainMenuView::clearPassword() {
@@ -402,19 +673,6 @@ bool MainMenuView::consumeRefreshRequest() {
 
 void MainMenuView::setScanning(bool isScanning) {
     scanning = isScanning;
-}
-
-void MainMenuView::resetBuffers(const std::string &defaultHost, uint16_t defaultPort) {
-    std::string hostValue = defaultHost.empty() ? std::string("localhost") : defaultHost;
-    uint16_t portValue = applyPortFallback(defaultPort);
-
-    addressBuffer.fill(0);
-    std::snprintf(
-        addressBuffer.data(),
-        addressBuffer.size(),
-        "%s:%u",
-        hostValue.c_str(),
-        portValue);
 }
 
 ThumbnailTexture *MainMenuView::getOrLoadThumbnail(const std::string &url) {

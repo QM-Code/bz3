@@ -120,6 +120,7 @@ set(ENGINE_CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/engine/components/gui.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/components/gui/main_menu.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/components/gui/thumbnail_cache.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rich_text_renderer.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/community_browser_panel.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/settings_panel.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/documentation_panel.cpp
@@ -163,6 +164,14 @@ else()
     set(OPENGL_TARGET ${OPENGL_LIBRARIES})
 endif()
 
+find_package(Freetype REQUIRED)
+find_package(harfbuzz REQUIRED)
+if(UNIX AND NOT APPLE)
+    find_package(Fontconfig REQUIRED)
+endif()
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LIBRSVG REQUIRED IMPORTED_TARGET librsvg-2.0)
+
 add_executable(bz3-server ${SERVER_SOURCES} ${ENGINE_SERVER_SOURCES})
 
 # Include directories
@@ -199,7 +208,20 @@ target_link_libraries(bz3 PRIVATE
     OpenSSL::Crypto
     Effekseer
     EffekseerRendererGL
+    Freetype::Freetype
+    harfbuzz::harfbuzz
+    PkgConfig::LIBRSVG
 )
+target_compile_definitions(bz3 PRIVATE BZ3_HAS_LIBRSVG)
+if(UNIX AND NOT APPLE)
+    target_link_libraries(bz3 PRIVATE Fontconfig::Fontconfig)
+endif()
+
+# ImGui: enable full Unicode range (required for emoji codepoints > U+FFFF)
+if(TARGET imgui::imgui)
+    target_compile_definitions(imgui::imgui INTERFACE IMGUI_USE_WCHAR32)
+endif()
+target_compile_definitions(bz3 PRIVATE IMGUI_USE_WCHAR32)
 
 target_link_libraries(bz3-server PRIVATE
     glm::glm

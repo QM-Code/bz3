@@ -6,13 +6,13 @@ from bz3web import db
 
 
 def export_data():
-    conn = db.connect(db.default_db_path())
-    try:
+    with db.connect_ctx() as conn:
         users = conn.execute(
             """
             SELECT id,
                    username,
                    email,
+                   language,
                    password_hash,
                    password_salt,
                    is_admin,
@@ -49,6 +49,7 @@ def export_data():
             entry = {
                 "username": user["username"],
                 "email": user["email"],
+                "language": user["language"],
                 "password_hash": user["password_hash"],
                 "password_salt": user["password_salt"],
                 "is_admin": bool(user["is_admin"]),
@@ -65,6 +66,7 @@ def export_data():
         servers = conn.execute(
             """
             SELECT servers.name,
+                   servers.overview,
                    servers.description,
                    servers.host,
                    servers.port,
@@ -79,6 +81,7 @@ def export_data():
         for server in servers:
             entry = {
                 "name": server["name"],
+                "overview": server["overview"],
                 "description": server["description"],
                 "host": server["host"],
                 "port": server["port"],
@@ -88,8 +91,6 @@ def export_data():
             server_payload.append(entry)
 
         return {"users": user_payload, "servers": server_payload}
-    finally:
-        conn.close()
 
 
 def main():

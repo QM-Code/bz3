@@ -19,6 +19,7 @@ struct ImFont;
 #include <nlohmann/json.hpp>
 
 #include "engine/components/gui/thumbnail_cache.hpp"
+#include "engine/components/gui/rich_text_renderer.hpp"
 
 namespace gui {
 
@@ -67,34 +68,45 @@ public:
 
     struct ThemeConfig {
         std::string name;
-        ThemeFontConfig regular;
-        ThemeFontConfig title;
-        ThemeFontConfig heading;
-        ThemeFontConfig button;
+    ThemeFontConfig regular;
+    ThemeFontConfig emoji;
+    ThemeFontConfig title;
+    ThemeFontConfig heading;
+    ThemeFontConfig button;
     };
 
     ~MainMenuView();
     void initializeFonts(ImGuiIO &io);
     void draw(ImGuiIO &io);
 
-    void show(const std::vector<CommunityBrowserEntry> &entries,
-              const std::string &defaultHost,
-              uint16_t defaultPort);
+    void show(const std::vector<CommunityBrowserEntry> &entries);
     void setEntries(const std::vector<CommunityBrowserEntry> &entries);
     void setListOptions(const std::vector<ServerListOption> &options, int selectedIndex);
     void hide();
     bool isVisible() const;
     void setStatus(const std::string &statusText, bool isErrorMessage);
-    void setCustomStatus(const std::string &statusText, bool isErrorMessage);
+    void setCommunityDetails(const std::string &detailsText);
+    void setServerDescriptionLoading(const std::string &key, bool loading);
+    bool isServerDescriptionLoading(const std::string &key) const;
+    void setServerDescriptionError(const std::string &key, const std::string &message);
+    std::optional<std::string> getServerDescriptionError(const std::string &key) const;
+    RichTextRenderer *getRichTextRenderer();
     std::optional<CommunityBrowserSelection> consumeSelection();
     std::optional<int> consumeListSelection();
     std::optional<ServerListOption> consumeNewListRequest();
+    std::optional<std::string> consumeDeleteListRequest();
     void setListStatus(const std::string &statusText, bool isErrorMessage);
     void clearNewListInputs();
     std::string getUsername() const;
     std::string getPassword() const;
+    std::string getStoredPasswordHash() const;
     void clearPassword();
+    void storeCommunityAuth(const std::string &communityHost,
+                            const std::string &username,
+                            const std::string &passhash,
+                            const std::string &salt);
     void setCommunityStatus(const std::string &text, MessageTone tone);
+    std::optional<CommunityBrowserEntry> getSelectedEntry() const;
     bool consumeRefreshRequest();
     void setScanning(bool scanning);
     void setUserConfigPath(const std::string &path);
@@ -110,10 +122,9 @@ private:
 
     struct LocalServerProcess;
 
-    void resetBuffers(const std::string &defaultHost, uint16_t defaultPort);
     ThumbnailTexture *getOrLoadThumbnail(const std::string &url);
     MessageColors getMessageColors() const;
-    void drawSettingsPanel(const MessageColors &colors) const;
+    void drawSettingsPanel(const MessageColors &colors);
     void drawDocumentationPanel(const MessageColors &colors) const;
     void drawStartServerPanel(const MessageColors &colors);
     void drawPlaceholderPanel(const char *heading, const char *body, const MessageColors &colors) const;
@@ -126,6 +137,9 @@ private:
     void setNestedConfig(nlohmann::json &root, std::initializer_list<const char*> path, nlohmann::json value) const;
     void setNestedConfig(nlohmann::json &root, const std::vector<std::string> &path, nlohmann::json value) const;
     void eraseNestedConfig(nlohmann::json &root, std::initializer_list<const char*> path) const;
+    std::string communityKeyForIndex(int index) const;
+    void refreshCommunityCredentials();
+    void persistCommunityCredentials(bool passwordChanged);
     nlohmann::json themeToJson(const ThemeConfig &theme) const;
     ThemeConfig themeFromJson(const nlohmann::json &themeJson, const ThemeConfig &fallback) const;
     void applyThemeSelection(const std::string &name);
@@ -136,8 +150,9 @@ private:
     bool startLocalServer(uint16_t port,
                           const std::string &worldDir,
                           bool useDefaultWorld,
-                          const std::string &dataDir,
                           const std::string &advertiseHost,
+                          const std::string &communityUrl,
+                          const std::string &communityLabel,
                           const std::string &logLevel,
                           std::string &error);
     bool launchLocalServer(LocalServerProcess &server, std::string &error);
@@ -145,6 +160,7 @@ private:
 
     bool visible = false;
     ImFont *regularFont = nullptr;
+    ImFont *emojiFont = nullptr;
     ImFont *titleFont = nullptr;
     ImFont *headingFont = nullptr;
     ImFont *buttonFont = nullptr;
@@ -152,32 +168,47 @@ private:
     ImVec4 titleColor{};
     ImVec4 headingColor{};
     ImVec4 buttonColor{};
+    float regularFontSize = 0.0f;
+    float emojiFontSize = 0.0f;
+    float titleFontSize = 0.0f;
+    float headingFontSize = 0.0f;
     bool fontReloadRequested = false;
 
     std::vector<CommunityBrowserEntry> entries;
     int selectedIndex = -1;
-    std::array<char, 256> addressBuffer{};
     std::array<char, 64> usernameBuffer{};
     std::array<char, 128> passwordBuffer{};
     std::string statusText;
     bool statusIsError = false;
-    std::string customStatusText;
-    bool customStatusIsError = false;
     std::optional<CommunityBrowserSelection> pendingSelection;
 
     std::vector<ServerListOption> listOptions;
     int listSelectedIndex = -1;
     std::optional<int> pendingListSelection;
     std::optional<ServerListOption> pendingNewList;
+    std::optional<std::string> pendingDeleteListHost;
     bool refreshRequested = false;
     bool scanning = false;
+    bool showNewCommunityInput = false;
     std::array<char, 512> listUrlBuffer{};
     std::string listStatusText;
     bool listStatusIsError = false;
     std::string communityStatusText;
+    std::string communityDetailsText;
+    std::string communityLinkStatusText;
+    bool communityLinkStatusIsError = false;
+    std::string serverLinkStatusText;
+    bool serverLinkStatusIsError = false;
+    std::string serverDescriptionLoadingKey;
+    bool serverDescriptionLoading = false;
+    std::string serverDescriptionErrorKey;
+    std::string serverDescriptionErrorText;
     MessageTone communityStatusTone = MessageTone::Notice;
+    int lastCredentialsListIndex = -1;
+    std::string storedPasswordHash;
 
     ThumbnailCache thumbnails;
+    RichTextRenderer richTextRenderer;
 
     std::string userConfigPath;
     bool themesLoaded = false;
@@ -192,6 +223,20 @@ private:
     std::string themeStatusText;
     bool themeStatusIsError = false;
     bool useThemeOverrides = false;
+    enum class BindingColumn {
+        Keyboard,
+        Mouse,
+        Controller
+    };
+    static constexpr std::size_t kKeybindingCount = 11;
+    std::array<std::array<char, 128>, kKeybindingCount> keybindingKeyboardBuffers{};
+    std::array<std::array<char, 128>, kKeybindingCount> keybindingMouseBuffers{};
+    std::array<std::array<char, 128>, kKeybindingCount> keybindingControllerBuffers{};
+    int selectedBindingIndex = -1;
+    BindingColumn selectedBindingColumn = BindingColumn::Keyboard;
+    bool settingsLoaded = false;
+    std::string settingsStatusText;
+    bool settingsStatusIsError = false;
 
     struct LocalServerProcess {
         int id = 0;
@@ -200,6 +245,8 @@ private:
         bool useDefaultWorld = false;
         std::string logLevel;
         std::string advertiseHost;
+        std::string communityUrl;
+        std::string communityLabel;
         std::string dataDir;
         std::string configPath;
         int pid = -1;
@@ -220,9 +267,9 @@ private:
     bool serverStatusIsError = false;
     std::array<char, 64> serverAdvertiseHostBuffer{};
     std::array<char, 128> serverWorldBuffer{};
-    std::array<char, 256> serverDataDirBuffer{};
     int serverPortInput = 11899;
     int serverLogLevelIndex = 2;
+    int serverCommunityIndex = -1;
 };
 
 } // namespace gui

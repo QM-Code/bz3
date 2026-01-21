@@ -1,20 +1,31 @@
+import contextlib
 import os
 import sqlite3
 
 
 def default_db_path():
     data_dir = _resolve_data_dir()
-    return os.path.join(data_dir, "bz3web.db")
+    db_file = _resolve_db_file()
+    return os.path.join(data_dir, db_file)
 
 
 def _resolve_data_dir():
     from bz3web import config
 
-    data_dir = config.get_config().get("data_dir", "data")
-    base_dir = config.get_config_dir()
+    settings = config.get_config()
+    community_dir = config.get_community_dir() or config.get_config_dir()
+    data_dir = config.require_setting(settings, "database.database_directory")
     if os.path.isabs(data_dir):
         return data_dir
-    return os.path.normpath(os.path.join(base_dir, data_dir))
+    return os.path.normpath(os.path.join(community_dir, data_dir))
+
+
+def _resolve_db_file():
+    from bz3web import config
+
+    settings = config.get_config()
+    db_file = config.require_setting(settings, "database.database_file")
+    return str(db_file)
 
 
 def init_db(db_path):
@@ -27,6 +38,7 @@ def init_db(db_path):
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL COLLATE NOCASE UNIQUE,
             email TEXT NOT NULL COLLATE NOCASE UNIQUE,
+            language TEXT,
             password_hash TEXT NOT NULL,
             password_salt TEXT NOT NULL,
             is_admin INTEGER NOT NULL DEFAULT 0,
@@ -45,17 +57,19 @@ def init_db(db_path):
         CREATE TABLE IF NOT EXISTS servers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+            overview TEXT,
             description TEXT,
             host TEXT NOT NULL,
-            port INTEGER NOT NULL,
-            max_players INTEGER,
-            num_players INTEGER,
+            port INTEGER NOT NULL CHECK(port >= 1 AND port <= 65535),
+            max_players INTEGER CHECK(max_players IS NULL OR max_players >= 0),
+            num_players INTEGER CHECK(num_players IS NULL OR num_players >= 0),
             owner_user_id INTEGER NOT NULL,
             last_heartbeat INTEGER,
             screenshot_id TEXT,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(owner_user_id) REFERENCES users(id) ON DELETE CASCADE
+            FOREIGN KEY(owner_user_id) REFERENCES users(id) ON DELETE CASCADE,
+            CHECK (max_players IS NULL OR num_players IS NULL OR num_players <= max_players)
         )
         """
     )
@@ -99,6 +113,23 @@ def init_db(db_path):
         )
         """
     )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS rate_limits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            bucket_key TEXT NOT NULL,
+            created_at REAL NOT NULL
+        )
+        """
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS servers_owner_user_id_idx ON servers(owner_user_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS servers_last_heartbeat_idx ON servers(last_heartbeat)")
+    conn.execute("CREATE INDEX IF NOT EXISTS user_admins_owner_idx ON user_admins(owner_user_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS user_admins_admin_idx ON user_admins(admin_user_id)")
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS password_resets_token_unique ON password_resets(token)")
+    conn.execute("CREATE INDEX IF NOT EXISTS password_resets_user_idx ON password_resets(user_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS rate_limits_key_idx ON rate_limits(bucket_key)")
+    conn.execute("CREATE INDEX IF NOT EXISTS rate_limits_created_at_idx ON rate_limits(created_at)")
     conn.close()
 
 
@@ -109,17 +140,28 @@ def connect(db_path):
     return conn
 
 
+@contextlib.contextmanager
+def connect_ctx(db_path=None):
+    db_path = db_path or default_db_path()
+    conn = connect(db_path)
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
 def add_server(conn, record):
     conn.execute(
         """
         INSERT INTO servers
-            (name, description, host, port, max_players, num_players, owner_user_id,
+            (name, overview, description, host, port, max_players, num_players, owner_user_id,
              screenshot_id, last_heartbeat)
         VALUES
-            (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             record.get("name"),
+            record.get("overview"),
             record.get("description"),
             record["host"],
             record["port"],
@@ -138,6 +180,7 @@ def update_server(conn, server_id, record):
         """
         UPDATE servers
         SET name = ?,
+            overview = ?,
             description = ?,
             host = ?,
             port = ?,
@@ -150,6 +193,7 @@ def update_server(conn, server_id, record):
         """,
         (
             record.get("name"),
+            record.get("overview"),
             record.get("description"),
             record["host"],
             record["port"],
@@ -271,15 +315,16 @@ def list_user_servers(conn, user_id):
     ).fetchall()
 
 
-def add_user(conn, username, email, password_hash, password_salt, is_admin=False, is_admin_manual=False):
+def add_user(conn, username, email, password_hash, password_salt, is_admin=False, is_admin_manual=False, language=None):
     conn.execute(
         """
-        INSERT INTO users (username, email, password_hash, password_salt, is_admin, is_admin_manual)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO users (username, email, language, password_hash, password_salt, is_admin, is_admin_manual)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
         (
             username,
             email,
+            language,
             password_hash,
             password_salt,
             1 if is_admin else 0,
@@ -301,6 +346,14 @@ def update_user_username(conn, user_id, username):
     conn.execute(
         "UPDATE users SET username = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
         (username, user_id),
+    )
+    conn.commit()
+
+
+def update_user_language(conn, user_id, language):
+    conn.execute(
+        "UPDATE users SET language = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        (language, user_id),
     )
     conn.commit()
 
@@ -531,4 +584,9 @@ def get_password_reset(conn, token):
 
 def delete_password_reset(conn, token):
     conn.execute("DELETE FROM password_resets WHERE token = ?", (token,))
+    conn.commit()
+
+
+def delete_expired_password_resets(conn, now_timestamp):
+    conn.execute("DELETE FROM password_resets WHERE expires_at < ?", (int(now_timestamp),))
     conn.commit()

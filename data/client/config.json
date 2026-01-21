@@ -38,6 +38,10 @@
         "hud" : {
             "fonts" : {
                 "console" : {
+                    "Emoji": {
+                        "Font": "fonts/NotoColorEmoji-Regular.ttf",
+                        "Size": 20
+                    },
                     "Regular": {
                         "Font": "fonts/GoogleSans.ttf",
                         "Size": 20,

@@ -7,6 +7,13 @@
     "joltphysics",
     "assimp",
     "opengl",
+    "freetype",
+    "harfbuzz",
+    {
+      "name": "fontconfig",
+      "platform": "linux"
+    },
+    "librsvg",
     "miniaudio",
     "miniz",
     "cxxopts",
@@ -14,6 +21,8 @@
       "name": "imgui",
       "version>=": "1.90.7",
       "features": [
+        "freetype",
+        "wchar32",
         "glfw-binding",
         "opengl3-binding"
       ]

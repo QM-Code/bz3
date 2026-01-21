@@ -1,11 +1,13 @@
-from bz3web import webhttp
+from bz3web import config, webhttp
 
 
 def render_lightbox():
-    return """<div class="lightbox" id="lightbox" hidden>
+    preview_alt = webhttp.html_escape(config.ui_text("labels.screenshot_preview_alt"))
+    close_label = webhttp.html_escape(config.ui_text("labels.lightbox_close"))
+    return f"""<div class="lightbox" id="lightbox" hidden>
   <div class="lightbox-content">
-    <button class="lightbox-close" type="button" aria-label="Close">×</button>
-    <img id="lightbox-image" src="" alt="Screenshot preview">
+    <button class="lightbox-close" type="button" aria-label="{close_label}">×</button>
+    <img id="lightbox-image" src="" alt="{preview_alt}">
   </div>
 </div>"""
 

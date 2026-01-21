@@ -55,6 +55,7 @@ ServerCLIOptions ParseServerCLIOptions(int argc, char *argv[]) {
         ("p,port", "Server listen port", cxxopts::value<uint16_t>()->default_value(ConfiguredPortDefault()))
         ("d,data-dir", "Data directory (overrides BZ3_DATA_DIR)", cxxopts::value<std::string>())
         ("c,config", "User config file path", cxxopts::value<std::string>())
+        ("C,community", "Community server (http://host:port or host:port)", cxxopts::value<std::string>())
         ("v,verbose", "Enable verbose logging (alias for --log-level trace)")
         ("L,log-level", "Logging level (trace, debug, info, warn, err, critical, off)", cxxopts::value<std::string>())
         ("T,timestamp-logging", "Enable timestamped logging output")
@@ -113,6 +114,8 @@ ServerCLIOptions ParseServerCLIOptions(int argc, char *argv[]) {
     parsed.logLevel = result.count("log-level") ? result["log-level"].as<std::string>() : std::string();
     parsed.logLevelExplicit = result.count("log-level") > 0;
     parsed.timestampLogging = result.count("timestamp-logging") > 0;
+    parsed.community = result.count("community") ? result["community"].as<std::string>() : std::string();
+    parsed.communityExplicit = result.count("community") > 0;
     if (parsed.logLevelExplicit && !IsValidLogLevel(parsed.logLevel)) {
         std::cerr << "Error: invalid --log-level value '" << parsed.logLevel << "'.\n";
         std::cerr << options.help() << std::endl;

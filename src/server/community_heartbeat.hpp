@@ -15,7 +15,8 @@ public:
     CommunityHeartbeat();
     ~CommunityHeartbeat();
     void configureFromConfig(const nlohmann::json &mergedConfig,
-                             uint16_t listenPort);
+                             uint16_t listenPort,
+                             const std::string &communityOverride);
     void update(const Game &game);
 
 private:

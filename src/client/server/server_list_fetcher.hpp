@@ -13,6 +13,7 @@ public:
     struct SourceStatus {
         std::string sourceHost;
         std::string communityName;
+        std::string communityDetails;
         int activeCount = -1;
         int inactiveCount = -1;
         bool ok = false;
@@ -29,7 +30,8 @@ public:
         int maxPlayers = -1;
         int activePlayers = -1;
         std::string gameMode;
-        std::string description;
+        std::string overview;
+        std::string detailDescription;
         std::vector<std::string> flags;
         std::string screenshotId;
         std::string communityName;

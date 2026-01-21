@@ -11,11 +11,31 @@ except ImportError:  # Optional dependency
 
 
 def _uploads_dir():
-    uploads_dir = config.get_config().get("uploads_dir", "uploads")
-    base_dir = config.get_config_dir()
+    settings = config.get_config()
+    community_dir = config.get_community_dir() or config.get_config_dir()
+    uploads_dir = config.require_setting(settings, "uploads.upload_directory")
     if os.path.isabs(uploads_dir):
         return uploads_dir
-    return os.path.normpath(os.path.join(base_dir, uploads_dir))
+    return os.path.normpath(os.path.join(community_dir, uploads_dir))
+
+
+def _screenshot_settings(settings):
+    screenshots = config.require_setting(settings, "uploads.screenshots")
+    limits = config.require_setting(settings, "uploads.screenshots.limits")
+    thumb = config.require_setting(settings, "uploads.screenshots.thumbnail")
+    full = config.require_setting(settings, "uploads.screenshots.full")
+    return {
+        "min_bytes": int(config.require_setting(limits, "min_bytes", "config.json uploads.screenshots.limits")),
+        "max_bytes": int(config.require_setting(limits, "max_bytes", "config.json uploads.screenshots.limits")),
+        "min_width": int(config.require_setting(limits, "min_width", "config.json uploads.screenshots.limits")),
+        "min_height": int(config.require_setting(limits, "min_height", "config.json uploads.screenshots.limits")),
+        "max_width": int(config.require_setting(limits, "max_width", "config.json uploads.screenshots.limits")),
+        "max_height": int(config.require_setting(limits, "max_height", "config.json uploads.screenshots.limits")),
+        "thumb_width": int(config.require_setting(thumb, "width", "config.json uploads.screenshots.thumbnail")),
+        "thumb_height": int(config.require_setting(thumb, "height", "config.json uploads.screenshots.thumbnail")),
+        "full_width": int(config.require_setting(full, "width", "config.json uploads.screenshots.full")),
+        "full_height": int(config.require_setting(full, "height", "config.json uploads.screenshots.full")),
+    }
 
 
 def ensure_upload_dir():
@@ -50,38 +70,47 @@ def _scale_image(image, max_width, max_height):
     return scaled
 
 
+def _msg(key, **values):
+    template = config.ui_text(f"messages.uploads.{key}", "config.json ui_text.messages.uploads")
+    return config.format_text(template, **values)
+
+
 def handle_upload(file_item):
     settings = config.get_config()
-    max_bytes = int(settings.get("upload_max_bytes", 3 * 1024 * 1024))
-    min_width = int(settings.get("upload_min_width", 640))
-    min_height = int(settings.get("upload_min_height", 360))
-    max_width = int(settings.get("upload_max_width", 3840))
-    max_height = int(settings.get("upload_max_height", 2160))
-    thumb_width = int(settings.get("thumbnail_width", 480))
-    thumb_height = int(settings.get("thumbnail_height", 270))
-    full_width = int(settings.get("fullsize_width", 1600))
-    full_height = int(settings.get("fullsize_height", 900))
+    limits = _screenshot_settings(settings)
+    min_bytes = limits["min_bytes"]
+    max_bytes = limits["max_bytes"]
+    min_width = limits["min_width"]
+    min_height = limits["min_height"]
+    max_width = limits["max_width"]
+    max_height = limits["max_height"]
+    thumb_width = limits["thumb_width"]
+    thumb_height = limits["thumb_height"]
+    full_width = limits["full_width"]
+    full_height = limits["full_height"]
 
     if Image is None:
-        return None, "Image processing library (Pillow) is not installed."
+        return None, _msg("missing_pillow")
 
     data = file_item.file.read()
     if not data:
-        return None, "Uploaded file was empty."
+        return None, _msg("empty_file")
+    if len(data) < min_bytes:
+        return None, _msg("file_too_small", min_bytes=min_bytes)
     if len(data) > max_bytes:
-        return None, f"File too large (max {max_bytes} bytes)."
+        return None, _msg("file_too_large", max_bytes=max_bytes)
 
     try:
         image = Image.open(io.BytesIO(data))
         image.load()
     except Exception:
-        return None, "Uploaded file is not a valid image."
+        return None, _msg("invalid_image")
 
     width, height = image.size
     if width < min_width or height < min_height:
-        return None, "Image resolution too small."
+        return None, _msg("resolution_too_small")
     if width > max_width or height > max_height:
-        return None, "Image resolution too large."
+        return None, _msg("resolution_too_large")
 
     ensure_upload_dir()
     token = secrets.token_hex(12)

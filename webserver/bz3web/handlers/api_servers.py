@@ -2,37 +2,34 @@ from bz3web import config, db, webhttp
 from bz3web.server_status import is_active
 
 
-def handle(request):
+def handle(request, status="all"):
     if request.method != "GET":
-        return webhttp.html_response("<h1>Method Not Allowed</h1>", status="405 Method Not Allowed")
+        return webhttp.json_error("method_not_allowed", status="405 Method Not Allowed")
 
     settings = config.get_config()
-    community_name = settings.get("community_name", "Server List")
+    community_name = config.require_setting(settings, "server.community_name")
+    overview_max = int(config.require_setting(settings, "pages.servers.overview_max_chars"))
 
     owner = request.query.get("owner", [""])[0].strip()
-    show_inactive = request.query.get("show_inactive", [""])[0] == "1"
+    status = (status or "all").lower()
+    if status not in ("all", "active", "inactive"):
+        return webhttp.json_error("invalid_status", status="400 Bad Request")
 
-    conn = db.connect(db.default_db_path())
-    try:
+    with db.connect_ctx() as conn:
         if owner:
             user = db.get_user_by_username(conn, owner)
             if not user or user["deleted"]:
-                return webhttp.json_response(
-                    {
-                        "ok": False,
-                        "error": "user_not_found",
-                        "message": f"No user named {owner}.",
-                    },
+                return webhttp.json_error(
+                    "user_not_found",
+                    f"No user named {owner}.",
                     status="404 Not Found",
                 )
             rows = db.list_user_servers(conn, user["id"])
         else:
             rows = db.list_servers(conn)
-    finally:
-        conn.close()
 
     servers = []
-    timeout = int(settings.get("heartbeat_timeout_seconds", 120))
+    timeout = int(config.require_setting(settings, "heartbeat.timeout_seconds"))
     active_count = 0
     inactive_count = 0
     for row in rows:
@@ -41,12 +38,10 @@ def handle(request):
             active_count += 1
         else:
             inactive_count += 1
-        if show_inactive:
-            if active:
-                continue
-        else:
-            if not active:
-                continue
+        if status == "active" and not active:
+            continue
+        if status == "inactive" and active:
+            continue
         entry = {
             "id": row["id"],
             "name": row["name"],
@@ -55,8 +50,11 @@ def handle(request):
             "port": str(row["port"]),
             "active": active,
         }
-        if row["description"]:
-            entry["description"] = row["description"]
+        overview = row["overview"] or ""
+        if overview and len(overview) > overview_max:
+            overview = overview[:overview_max]
+        if overview:
+            entry["overview"] = overview
         if row["max_players"] is not None:
             entry["max_players"] = row["max_players"]
         if row["num_players"] is not None:
