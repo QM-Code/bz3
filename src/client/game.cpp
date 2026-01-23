@@ -1,7 +1,7 @@
 #include "game.hpp"
 #include "spdlog/spdlog.h"
 #include <algorithm>
-#include "engine/components/gui.hpp"
+#include "ui/system.hpp"
 
 Game::Game(ClientEngine &engine,
            std::string playerName,
@@ -175,7 +175,7 @@ void Game::lateUpdate(TimeUtils::duration deltaTime) {
             s.localAdmin
         });
     }
-    engine.gui->setScoreboardEntries(scoreboard);
+    engine.ui->setScoreboardEntries(scoreboard);
 }
 
 Actor *Game::getActorById(client_id id) {

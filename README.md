@@ -75,7 +75,6 @@ Rendering and windowing
 - **Assimp** (model loading)
 
 UI
-- **Dear ImGui** (HUD + server browser)
 
 Networking
 - **ENet** (reliable UDP transport)
@@ -103,7 +102,7 @@ Other
 
 ## Agent prompts
 
-Repo-level guidance lives in `AGENTS.md`. Task-specific prompts live under `docs/agent-prompts/` (e.g., Webserver, GUI/HUD). In a new session, ask to use a prompt by its title.
+Repo-level guidance lives in `AGENTS.md`. Task-specific prompts live under `docs/agent-prompts/` (e.g., Webserver, UiSystem/HUD). In a new session, ask to use a prompt by its title.
 
 ## TODO
 * Teams

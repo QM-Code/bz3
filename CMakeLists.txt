@@ -133,7 +133,8 @@ set(ENGINE_CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/network/proto_codec.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/components/render.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/components/input.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/components/gui.cpp
+    ${PROJECT_SOURCE_DIR}/src/ui/system.cpp
+    ${PROJECT_SOURCE_DIR}/src/ui/third_party/stb_image_impl.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/physics/physics_world.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/physics/rigid_body.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/physics/static_body.cpp
@@ -144,36 +145,41 @@ set(ENGINE_CLIENT_SOURCES
 
 if(BZ3_UI_BACKEND STREQUAL "imgui")
     list(APPEND ENGINE_CLIENT_SOURCES
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/backends/imgui_backend.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/main_menu.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/thumbnail_cache.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rich_text_renderer.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/emoji_utils.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/community_browser_panel.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/settings_panel.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/documentation_panel.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/start_server_panel.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/themes_panel.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/backend.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/console/console.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/console/thumbnail_cache.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/console/panels/panel_community.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/console/panels/panel_settings.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/console/panels/panel_documentation.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/console/panels/panel_start_server.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/console/panels/panel_themes.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/hud/hud.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/hud/chat.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/hud/crosshair.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/hud/fps.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/hud/radar.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/hud/scoreboard.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/hud/spawn_hint.cpp
     )
 elseif(BZ3_UI_BACKEND STREQUAL "rmlui")
     list(APPEND ENGINE_CLIENT_SOURCES
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/backends/rmlui_backend.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_backend/RmlUi_Platform_GLFW.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_backend/RmlUi_Renderer_GL3.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/emoji_utils.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_main_menu.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_hud.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_hud_chat.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_hud_dialog.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_hud_radar.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_hud_scoreboard.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_panels/rmlui_panel.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_modal_dialog.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_panels/rmlui_panel_community.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_panels/rmlui_panel_settings.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_panels/rmlui_panel_documentation.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_panels/rmlui_panel_start_server.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_panels/rmlui_panel_themes.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/backend.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/platform/RmlUi_Platform_GLFW.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/platform/RmlUi_Renderer_GL3.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/console/emoji_utils.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/console/console.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/console/modal_dialog.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/hud/hud.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/hud/chat.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/hud/dialog.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/hud/radar.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/hud/scoreboard.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/console/panels/panel.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/console/panels/panel_community.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/console/panels/panel_settings.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/console/panels/panel_documentation.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/console/panels/panel_start_server.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/console/panels/panel_themes.cpp
     )
 endif()
 set(ENGINE_SERVER_SOURCES

@@ -18,9 +18,9 @@ ClientEngine::ClientEngine(GLFWwindow *window) {
     spdlog::trace("ClientEngine: Physics initialized successfully");
     input = new Input(window);
     spdlog::trace("ClientEngine: Input initialized successfully");
-    gui = new GUI(window);
-    spdlog::trace("ClientEngine: GUI initialized successfully");
-    gui->setSpawnHint(input->spawnHintText());
+    ui = new UiSystem(window);
+    spdlog::trace("ClientEngine: UiSystem initialized successfully");
+    ui->setSpawnHint(input->spawnHintText());
     audio = new Audio();
     spdlog::trace("ClientEngine: Audio initialized successfully");
     particles = new ParticleEngine();
@@ -32,7 +32,7 @@ ClientEngine::~ClientEngine() {
     delete render;
     delete physics;
     delete input;
-    delete gui;
+    delete ui;
     delete audio;
     delete particles;
 }
@@ -54,12 +54,12 @@ void ClientEngine::lateUpdate(TimeUtils::duration deltaTime) {
     
     render->update();
 
-    gui->setRadarTextureId(render->getRadarTextureId());
+    ui->setRadarTextureId(render->getRadarTextureId());
 
     const float deltaSeconds = std::chrono::duration<float>(deltaTime).count();
     particles->update(deltaSeconds);
     particles->render(render->getViewMatrix(), render->getProjectionMatrix(), render->getCameraPosition(), render->getCameraForward());
 
-    gui->update();
+    ui->update();
     network->flushPeekedMessages();
 }

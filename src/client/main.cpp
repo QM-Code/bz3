@@ -222,23 +222,23 @@ int main(int argc, char *argv[]) {
         const bool graveDown = glfwGetKey(window, GLFW_KEY_GRAVE_ACCENT) == GLFW_PRESS;
         if (graveDown && !prevGraveDown) {
             if (game) {
-                auto &menu = engine.gui->mainMenu();
-                if (menu.isVisible()) {
-                    menu.hide();
+                auto &console = engine.ui->console();
+                if (console.isVisible()) {
+                    console.hide();
                 } else {
-                    menu.show({});
+                    console.show({});
                 }
             }
         }
         prevGraveDown = graveDown;
 
-        if (engine.gui->mainMenu().consumeQuitRequest()) {
+        if (engine.ui->console().consumeQuitRequest()) {
             if (game) {
                 engine.network->disconnect("Disconnected from server.");
             }
         }
 
-        if (engine.gui->mainMenu().isVisible()) {
+        if (engine.ui->console().isVisible()) {
             engine.input->clearState();
         }
 
@@ -253,7 +253,7 @@ int main(int argc, char *argv[]) {
             communityBrowser.handleDisconnected(disconnectEvent->reason);
         }
 
-        if (!game || engine.gui->mainMenu().isVisible()) {
+        if (!game || engine.ui->console().isVisible()) {
             communityBrowser.update();
         }
 

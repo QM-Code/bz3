@@ -4,7 +4,7 @@
 #include "engine/components/render.hpp"
 #include "engine/physics/physics_world.hpp"
 #include "engine/components/input.hpp"
-#include "engine/components/gui.hpp"
+#include "ui/system.hpp"
 #include "engine/components/audio.hpp"
 #include "engine/components/particle_effect_system.hpp"
 #include "engine/user_pointer.hpp"
@@ -20,7 +20,7 @@ public:
     Render *render;
     PhysicsWorld *physics;
     Input *input;
-    GUI *gui;
+    UiSystem *ui;
     Audio *audio;
     ParticleEngine *particles;
 

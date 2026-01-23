@@ -19,7 +19,7 @@ src/
         world.{hpp,cpp}                # Receives world from server, merges config/assets, builds render+physics
         player.{hpp,cpp}               # Local player input -> physics + sends network updates
         shot.{hpp,cpp}                 # Local + replicated shots (visual + raycast ricochet)
-        console.{hpp,cpp}              # Chat/console glue to GUI
+        console.{hpp,cpp}              # Chat/console glue to UiSystem
         server/
             community_browser_controller.*  # Orchestrates LAN scan + remote server lists + connect requests
             server_connector.*           # Connects, constructs Game on success
@@ -48,8 +48,6 @@ src/
             client_network.*             # ENet client + protobuf decode + message queue (peek/flush)
             server_network.*             # ENet server + protobuf decode + send helpers
             render.*                     # threepp scene/camera/renderer; loads models via Assimp
-            gui.*                        # Dear ImGui + HUD/console + server browser view integration
-            gui/main_menu.*              # Main menu UI wrapper
             input.*                      # GLFW key handling + per-frame InputState
             audio.*                      # miniaudio engine + pooled clip instances
 
@@ -59,6 +57,11 @@ src/
             compound_body.*              # Compound wrapper for multi-mesh static collisions
 
         mesh_loader.*                  # Loads GLB meshes for physics/render helpers
+
+    ui/
+        system.*                      # UI entry point + backend selection
+        console/                      # Console interface + types
+        backends/                     # RmlUi + ImGui implementations
 
     common/
         data_path_resolver.*           # BZ3_DATA_DIR resolution + config layering + asset lookup
@@ -113,7 +116,7 @@ Relevant helpers live in `src/common/data_path_resolver.*`:
 
 ### Engine vs gameplay
 
-- **Engine** classes (`src/engine/...`) wrap subsystems: rendering, physics, networking, input, audio, GUI.
+- **Engine** classes (`src/engine/...`) wrap subsystems: rendering, physics, networking, input, audio, UiSystem.
 - **Gameplay** classes (`src/client/...`, `src/server/...`) define the game rules and state: players, shots, world loading, chat.
 
 The engine exposes direct pointers (e.g. `engine.render`, `engine.physics`, `engine.network`) and the gameplay layer calls into these systems.
@@ -143,7 +146,7 @@ High-level per-frame ordering:
      - Update scoreboard names.
 6. `engine.lateUpdate(dt)`
      - `Render::update()` draws the scene.
-     - `GUI::update()` draws ImGui (HUD or server browser).
+     - `UiSystem::update()` draws the active UI backend (HUD or console).
      - `ClientNetwork::flushPeekedMessages()` frees/destroys any messages that were peeked.
 
 The important pattern is **peek + flush**: gameplay “peeks” messages it wants to handle during the frame, and the network system destroys them during the engine’s late update.
@@ -247,7 +250,7 @@ If you see “connected but nothing happens”, follow this exact chain and veri
 
 #### Chat
 
-- Client submits chat via the GUI console panel.
+- Client submits chat via the UiSystem console panel.
 - Client sends `ClientMsg_Chat`.
 - Server `Chat::update()` receives it, offers plugins a chance to handle it, then forwards `ServerMsg_Chat` to the target (or broadcasts).
 
@@ -263,9 +266,9 @@ If you see “connected but nothing happens”, follow this exact chain and veri
 
 Models are loaded via `threepp::AssimpLoader` (GLB/Assimp formats). Gameplay stores a `render_id` per object and updates transforms each frame.
 
-### GUI (client)
+### UiSystem (client)
 
-`src/engine/components/gui.*` owns Dear ImGui setup and two major views:
+`src/ui.*` owns Dear ImGui setup and two major views:
 
 - **Community browser** view (when not connected)
 - **HUD/console** view (when in game)
@@ -327,7 +330,7 @@ There are two server discovery sources:
 2. **Remote server lists (HTTP JSON)**
      - Fetch: `src/client/server/server_list_fetcher.*` (libcurl)
      - Orchestration: `src/client/server/community_browser_controller.*`
-     - UI: `src/engine/components/gui/main_menu.*`
+     - UI: `src/ui/backends/*/console/console.*`
 
 The server browser controller merges results from LAN + remote lists into a single list of UI entries and delegates connection to `ServerConnector`.
 
@@ -354,8 +357,8 @@ Plugin callbacks are keyed by `ClientMsg_Type` and currently invoked from gamepl
 - **New networked feature**: `src/protos/messages.proto` + `src/engine/components/*_network.*` + gameplay handler in `src/client/*` and/or `src/server/*`
 - **World loading / packaging**: `src/server/world.*` and `src/client/world.*`
 - **Physics issues**: `src/engine/physics/physics_world.*` (and GLB meshes used by world assets)
-- **UI/HUD**: `src/engine/components/gui.*`
-- **Community browser**: `src/client/server/*` (control) + `src/engine/components/gui/main_menu.*` (view)
+- **UI/HUD**: `src/ui/` (backend entry + backends/*/hud)
+- **Community browser**: `src/client/server/*` (control) + `src/ui/backends/*/console/console.*` (view)
 - **Plugins / moderation / commands**: `src/server/plugin.*` and `data/plugins/*`
 
 ## Common gotchas
