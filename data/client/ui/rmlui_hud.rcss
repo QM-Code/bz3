@@ -117,10 +117,19 @@ body#hud-body
 .hud-scoreboard
 {
     position: absolute;
-    left: 12px;
-    top: 12px;
+    left: 10px;
+    top: 10px;
+    width: 300px;
+    height: 400px;
+    padding: 10px 12px;
     color: #ffffff;
-    font-size: 16px;
+    font-size: 18px;
+    background-color: #0b0f1499;
+    border-width: 1px;
+    border-color: #223040;
+    border-radius: 6px;
+    overflow: hidden;
+    box-sizing: border-box;
 }
 
 .hud-scoreboard-line
