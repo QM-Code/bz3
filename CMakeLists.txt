@@ -11,6 +11,17 @@ project(bz3)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+set(BZ3_UI_BACKEND "imgui" CACHE STRING "UI backend (imgui or rmlui)")
+set_property(CACHE BZ3_UI_BACKEND PROPERTY STRINGS imgui rmlui)
+if(BZ3_UI_BACKEND STREQUAL "imgui")
+    add_compile_definitions(BZ3_UI_BACKEND_IMGUI)
+elseif(BZ3_UI_BACKEND STREQUAL "rmlui")
+    add_compile_definitions(BZ3_UI_BACKEND_RMLUI)
+else()
+    message(FATAL_ERROR "Unknown BZ3_UI_BACKEND value: ${BZ3_UI_BACKEND}")
+endif()
+
 set(CMAKE_BUILD_TYPE Release)
 set(BUILD_SHARED_LIBS OFF)
 
@@ -67,7 +78,12 @@ find_package(Jolt REQUIRED)
 find_package(assimp REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(cxxopts REQUIRED)
-find_package(imgui REQUIRED)
+if(BZ3_UI_BACKEND STREQUAL "imgui")
+    find_package(imgui REQUIRED)
+elseif(BZ3_UI_BACKEND STREQUAL "rmlui")
+    find_package(RmlUi CONFIG REQUIRED)
+    find_package(md4c REQUIRED)
+endif()
 find_package(spdlog REQUIRED)
 find_package(miniz REQUIRED)
 find_package(nlohmann_json REQUIRED)
@@ -118,14 +134,6 @@ set(ENGINE_CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/engine/components/render.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/components/input.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/components/gui.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/components/gui/main_menu.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/components/gui/thumbnail_cache.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rich_text_renderer.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/community_browser_panel.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/settings_panel.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/documentation_panel.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/start_server_panel.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/themes_panel.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/physics/physics_world.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/physics/rigid_body.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/physics/static_body.cpp
@@ -133,6 +141,41 @@ set(ENGINE_CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/engine/components/audio.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/components/particle_effect_system.cpp
 )
+
+if(BZ3_UI_BACKEND STREQUAL "imgui")
+    list(APPEND ENGINE_CLIENT_SOURCES
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/backends/imgui_backend.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/main_menu.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/thumbnail_cache.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rich_text_renderer.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/emoji_utils.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/community_browser_panel.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/settings_panel.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/documentation_panel.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/start_server_panel.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/themes_panel.cpp
+    )
+elseif(BZ3_UI_BACKEND STREQUAL "rmlui")
+    list(APPEND ENGINE_CLIENT_SOURCES
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/backends/rmlui_backend.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_backend/RmlUi_Platform_GLFW.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_backend/RmlUi_Renderer_GL3.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/emoji_utils.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_main_menu.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_hud.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_hud_chat.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_hud_dialog.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_hud_radar.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_hud_scoreboard.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_panels/rmlui_panel.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_modal_dialog.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_panels/rmlui_panel_community.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_panels/rmlui_panel_settings.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_panels/rmlui_panel_documentation.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_panels/rmlui_panel_start_server.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_panels/rmlui_panel_themes.cpp
+    )
+endif()
 set(ENGINE_SERVER_SOURCES
     ${PROJECT_SOURCE_DIR}/src/engine/server_engine.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/mesh_loader.cpp
@@ -164,13 +207,17 @@ else()
     set(OPENGL_TARGET ${OPENGL_LIBRARIES})
 endif()
 
-find_package(Freetype REQUIRED)
-find_package(harfbuzz REQUIRED)
+if(BZ3_UI_BACKEND STREQUAL "imgui")
+    find_package(Freetype REQUIRED)
+    find_package(harfbuzz REQUIRED)
+endif()
 if(UNIX AND NOT APPLE)
     find_package(Fontconfig REQUIRED)
 endif()
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(LIBRSVG REQUIRED IMPORTED_TARGET librsvg-2.0)
+if(BZ3_UI_BACKEND STREQUAL "imgui")
+    pkg_check_modules(LIBRSVG REQUIRED IMPORTED_TARGET librsvg-2.0)
+endif()
 
 add_executable(bz3-server ${SERVER_SOURCES} ${ENGINE_SERVER_SOURCES})
 
@@ -199,7 +246,6 @@ target_link_libraries(bz3 PRIVATE
     ${OPENGL_TARGET}
     threepp::threepp
     cxxopts::cxxopts
-    imgui::imgui
     spdlog::spdlog
     miniz::miniz
     nlohmann_json::nlohmann_json
@@ -208,20 +254,31 @@ target_link_libraries(bz3 PRIVATE
     OpenSSL::Crypto
     Effekseer
     EffekseerRendererGL
-    Freetype::Freetype
-    harfbuzz::harfbuzz
-    PkgConfig::LIBRSVG
 )
-target_compile_definitions(bz3 PRIVATE BZ3_HAS_LIBRSVG)
-if(UNIX AND NOT APPLE)
-    target_link_libraries(bz3 PRIVATE Fontconfig::Fontconfig)
+if(BZ3_UI_BACKEND STREQUAL "imgui")
+    target_link_libraries(bz3 PRIVATE
+        imgui::imgui
+        Freetype::Freetype
+        harfbuzz::harfbuzz
+        PkgConfig::LIBRSVG
+    )
+    target_compile_definitions(bz3 PRIVATE BZ3_HAS_LIBRSVG IMGUI_USE_WCHAR32)
+    if(UNIX AND NOT APPLE)
+        target_link_libraries(bz3 PRIVATE Fontconfig::Fontconfig)
+    endif()
+    # ImGui: enable full Unicode range (required for emoji codepoints > U+FFFF)
+    if(TARGET imgui::imgui)
+        target_compile_definitions(imgui::imgui INTERFACE IMGUI_USE_WCHAR32)
+    endif()
 endif()
 
-# ImGui: enable full Unicode range (required for emoji codepoints > U+FFFF)
-if(TARGET imgui::imgui)
-    target_compile_definitions(imgui::imgui INTERFACE IMGUI_USE_WCHAR32)
+if(BZ3_UI_BACKEND STREQUAL "rmlui")
+    target_link_libraries(bz3 PRIVATE RmlUi::RmlUi md4c::md4c)
+    target_compile_definitions(bz3 PRIVATE RMLUI_GL3_CUSTOM_LOADER)
+    if(DEFINED threepp_SOURCE_DIR)
+        target_include_directories(bz3 PRIVATE ${threepp_SOURCE_DIR}/src/external/glad)
+    endif()
 endif()
-target_compile_definitions(bz3 PRIVATE IMGUI_USE_WCHAR32)
 
 target_link_libraries(bz3-server PRIVATE
     glm::glm

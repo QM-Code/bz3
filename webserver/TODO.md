@@ -40,7 +40,7 @@
 
 ## Streams
 
-- Look into having a link for a Twitch stream of a game in progress.
+- Look into having a link for a Twitch stream of a game in progress, streamed from the server using a camera.
 
 ## Localization
 

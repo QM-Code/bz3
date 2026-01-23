@@ -46,7 +46,6 @@ def _render_profile(
     current_user,
     servers,
     admins,
-    show_inactive,
     can_manage,
     message=None,
     admin_notice="",
@@ -60,6 +59,7 @@ def _render_profile(
     def _entry_builder(server, active):
         entry = {
             "id": server["id"],
+            "code": server["code"],
             "host": server["host"],
             "port": str(server["port"]),
             "name": server["name"],
@@ -67,16 +67,15 @@ def _render_profile(
             "max_players": server["max_players"],
             "num_players": server["num_players"],
             "owner": server["owner_username"],
+            "owner_code": server["owner_code"],
             "screenshot_id": server["screenshot_id"],
         }
         if can_manage:
             server_id = entry.get("id")
+            server_token = entry.get("code") or entry.get("name") or f"{entry['host']}:{entry['port']}"
             csrf_html = views.csrf_input(auth.csrf_token(request))
             confirm_delete = webhttp.html_escape(config.ui_text("confirmations.delete_server"))
-            entry["actions_html"] = f"""<form method="get" action="/server/edit">
-  <input type="hidden" name="id" value="{server_id}">
-  <button type="submit" class="secondary small">{webhttp.html_escape(_action("edit"))}</button>
-</form>
+            entry["actions_html"] = f"""<a class="button-link secondary small" href="/server/{quote(str(server_token), safe='')}/edit">{webhttp.html_escape(_action("edit"))}</a>
 <form method="post" action="/server/delete" data-confirm="{confirm_delete}">
   {csrf_html}
   <input type="hidden" name="id" value="{server_id}">
@@ -87,27 +86,39 @@ def _render_profile(
             entry["overview"] = overview[:overview_max]
         return entry
 
-    encoded_user = quote(target_user["username"])
+    user_token = auth.user_token(target_user)
+    encoded_user = quote(user_token)
     server_page = config.require_setting(settings, "pages.servers")
     refresh_interval = int(config.require_setting(server_page, "auto_refresh", "config.json pages.servers") or 0)
     refresh_animate = bool(config.require_setting(server_page, "auto_refresh_animate", "config.json pages.servers"))
     refresh_url = None
     if refresh_interval > 0:
-        refresh_url = f"/api/servers/active?owner={encoded_user}"
-        if show_inactive:
-            refresh_url = f"/api/servers/inactive?owner={encoded_user}"
+        refresh_url = f"/api/servers?owner={quote(target_user['username'], safe='')}"
+    status = "all"
+    header_actions_html = ""
+    if can_manage:
+        header_actions_html = """<div class="actions">
+  <a class="admin-link" href="/servers/add?owner={username}">{add_server}</a>
+  <a class="admin-link secondary" href="/users/{username}/edit">{profile}</a>
+</div>"""
+        header_actions_html = header_actions_html.format(
+            username=encoded_user,
+            add_server=webhttp.html_escape(_action("add_server")),
+            profile=webhttp.html_escape(_action("personal_settings")),
+        )
     cards_html = views.render_server_section(
         servers,
         timeout,
-        show_inactive,
+        status,
         _entry_builder,
         header_title_html=header_title_html,
-        toggle_on_url=f"/users/{encoded_user}?show_inactive=1",
-        toggle_off_url=f"/users/{encoded_user}",
+        header_actions_html=header_actions_html or None,
+        csrf_token=auth.csrf_token(request),
         refresh_url=refresh_url,
         refresh_interval=refresh_interval,
         allow_actions=can_manage,
         refresh_animate=refresh_animate,
+        sort_entries=False,
     )
 
     admins_header_html = f'<span class="server-owner">{safe_username}:</span> {webhttp.html_escape(_section("admins"))}'
@@ -121,21 +132,10 @@ def _render_profile(
         csrf_token=auth.csrf_token(request),
     )
 
-    submit_html = ""
-    if can_manage:
-        submit_html = """<div class="actions section-actions">
-  <a class="admin-link" href="/submit">{add_server}</a>
-  <a class="admin-link secondary" href="/users/{username}/edit">{personal_settings}</a>
-</div>"""
-        submit_html = submit_html.format(
-            username=encoded_user,
-            add_server=webhttp.html_escape(_action("add_server")),
-            personal_settings=webhttp.html_escape(_action("personal_settings")),
-        )
-
     profile_url = None
     if current_user:
-        profile_url = _profile_url(current_user["username"])
+        current_token = auth.user_token(current_user)
+        profile_url = _profile_url(current_token)
     header_html = views.header(
         config.require_setting(settings, "server.community_name"),
         f"/users/{encoded_user}",
@@ -146,7 +146,6 @@ def _render_profile(
         error=message,
     )
     body = f"""{cards_html}
-{submit_html}
 <hr class="section-divider">
 {admins_section}
 """
@@ -162,13 +161,22 @@ def handle(request):
     if request.method not in ("GET", "POST"):
         return views.error_page("405 Method Not Allowed", "method_not_allowed")
 
+    token = request.query.get("token", [""])[0].strip()
     username = request.query.get("name", [""])[0].strip()
-    if not username:
+    code = request.query.get("code", [""])[0].strip()
+    if not (token or username or code):
         return views.error_page("400 Bad Request", "missing_user")
 
     settings = config.get_config()
     with db.connect_ctx() as conn:
-        target_user = db.get_user_by_username(conn, username)
+        target_user = None
+        lookup_token = code or token
+        if lookup_token:
+            target_user = db.get_user_by_code(conn, lookup_token)
+        if not target_user:
+            lookup_name = username or token
+            if lookup_name:
+                target_user = db.get_user_by_username(conn, lookup_name)
         if not target_user:
             return views.error_page("404 Not Found", "user_not_found")
 
@@ -179,8 +187,6 @@ def handle(request):
         if current_user:
             account._sync_root_admin_privileges(conn, settings)
         can_manage = _can_manage_profile(current_user, target_user, conn, settings)
-        show_inactive = request.query.get("show_inactive", [""])[0] == "1"
-
         path = request.path.rstrip("/")
         if request.method == "POST":
             if not can_manage:
@@ -207,7 +213,8 @@ def handle(request):
                     else:
                         db.add_user_admin(conn, target_user["id"], admin_user["id"])
                         account._recompute_root_admins(conn, target_user, settings)
-                        return webhttp.redirect(_profile_url(target_user["username"]))
+                        target_token = auth.user_token(target_user)
+                        return webhttp.redirect(_profile_url(target_token))
             elif action == "trust":
                 username_input = form.get("username", [""])[0].strip()
                 trust = form.get("trust_admins", [""])[0] == "1"
@@ -217,7 +224,8 @@ def handle(request):
                 else:
                     db.set_user_admin_trust(conn, target_user["id"], admin_user["id"], trust)
                     account._recompute_root_admins(conn, target_user, settings)
-                    return webhttp.redirect(_profile_url(target_user["username"]))
+                    target_token = auth.user_token(target_user)
+                    return webhttp.redirect(_profile_url(target_token))
             elif action == "remove":
                 username_input = form.get("username", [""])[0].strip()
                 if username_input:
@@ -225,7 +233,8 @@ def handle(request):
                     if admin_user:
                         db.remove_user_admin(conn, target_user["id"], admin_user["id"])
                         account._recompute_root_admins(conn, target_user, settings)
-                        return webhttp.redirect(_profile_url(target_user["username"]))
+                        target_token = auth.user_token(target_user)
+                        return webhttp.redirect(_profile_url(target_token))
             servers = []
             if not target_user["deleted"]:
                 servers = db.list_user_servers(conn, target_user["id"])
@@ -239,7 +248,6 @@ def handle(request):
                 current_user,
                 servers,
                 admins,
-                show_inactive,
                 can_manage,
                 message=message,
                 admin_notice=notice_html,
@@ -258,7 +266,6 @@ def handle(request):
             current_user,
             servers,
             admins,
-            show_inactive,
             can_manage,
             admin_notice=notice_html,
         )

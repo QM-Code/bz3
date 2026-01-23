@@ -8,6 +8,23 @@ def _first(form, key):
     return value[0].strip()
 
 
+def _row_value(row, key, default=""):
+    try:
+        value = row[key]
+    except Exception:
+        return default
+    return value if value is not None else default
+
+
+def _get_user_by_token(conn, token):
+    if not token:
+        return None
+    user = db.get_user_by_code(conn, token)
+    if user:
+        return user
+    return db.get_user_by_username(conn, token)
+
+
 def _normalize_key(value):
     return value.strip().lower()
 
@@ -115,10 +132,11 @@ def _render_users_list(
     </form>"""
             edit_html = ""
             if can_edit:
-                edit_html = f"""<a class="admin-link secondary" href="/users/{urllib.parse.quote(user["username"], safe='')}/edit">{webhttp.html_escape(_action("edit"))}</a>"""
+                token = auth.user_token(user)
+                edit_html = f"""<a class="admin-link secondary" href="/users/{urllib.parse.quote(token, safe='')}/edit">{webhttp.html_escape(_action("edit"))}</a>"""
             rows.append(
                 f"""<tr>
-  <td><a class="plain-link bold-link" href="/users/{urllib.parse.quote(user["username"], safe='')}">{webhttp.html_escape(user["username"])}</a></td>
+  <td><a class="plain-link bold-link" href="/users/{urllib.parse.quote(auth.user_token(user), safe='')}">{webhttp.html_escape(user["username"])}</a></td>
   <td class="center-cell"><span class="status-{admin_flag.lower()}">{admin_flag}</span></td>
   <td class="center-cell">
     {lock_html or f'<span class="status-{locked.lower()}">{locked}</span>'}
@@ -183,7 +201,7 @@ def _render_users_list(
     else:
         rows = "".join(
             f"""<tr>
-  <td><a class="plain-link bold-link" href="/users/{urllib.parse.quote(user["username"], safe='')}">{webhttp.html_escape(user["username"])}</a></td>
+  <td><a class="plain-link bold-link" href="/users/{urllib.parse.quote(auth.user_token(user), safe='')}">{webhttp.html_escape(user["username"])}</a></td>
 </tr>"""
             for user in users
         )
@@ -201,7 +219,7 @@ def _render_users_list(
 </table>
 """
 
-    profile_url = f"/users/{urllib.parse.quote(current_user['username'], safe='')}"
+    profile_url = f"/users/{urllib.parse.quote(auth.user_token(current_user), safe='')}"
     header_html = views.header_with_title(
         list_name,
         "/users",
@@ -233,8 +251,8 @@ def _render_user_edit(
     placeholders = config.get_config().get("placeholders", {}).get("users", {})
     username_value = form_data.get("username", user["username"])
     email_value = form_data.get("email", user["email"])
-    action_url = f"/users/{urllib.parse.quote(user['username'], safe='')}/edit"
-    cancel_url = f"/users/{urllib.parse.quote(user['username'], safe='')}"
+    action_url = f"/users/{urllib.parse.quote(auth.user_token(user), safe='')}/edit"
+    cancel_url = f"/users/{urllib.parse.quote(auth.user_token(user), safe='')}"
     csrf_html = views.csrf_input(auth.csrf_token(request))
     body = f"""<form method="post" action="{action_url}">
   {csrf_html}
@@ -279,7 +297,7 @@ def _render_user_edit(
   </div>
 </form>
 """
-    profile_url = f"/users/{urllib.parse.quote(current_user['username'], safe='')}"
+    profile_url = f"/users/{urllib.parse.quote(auth.user_token(current_user), safe='')}"
     header_html = views.header_with_title(
         config.require_setting(config.get_config(), "server.community_name"),
         "/users/edit",
@@ -302,7 +320,7 @@ def _render_user_settings(request, user, message=None, form_data=None, current_u
     form_data = form_data or {}
     placeholders = config.get_config().get("placeholders", {}).get("users", {})
     email_value = form_data.get("email", user["email"])
-    language_value = form_data.get("language", user.get("language") or "")
+    language_value = form_data.get("language", _row_value(user, "language"))
     language_options = []
     languages = config.get_available_languages()
     language_labels = config.get_config().get("languages", {})
@@ -318,7 +336,7 @@ def _render_user_settings(request, user, message=None, form_data=None, current_u
         language_options_html.append(
             f'<option value="{webhttp.html_escape(code)}"{selected}>{webhttp.html_escape(label)}</option>'
         )
-    body = f"""<form method="post" action="/users/{urllib.parse.quote(user["username"], safe='')}/edit">
+    body = f"""<form method="post" action="/users/{urllib.parse.quote(auth.user_token(user), safe='')}/edit">
   {csrf_html}
   <div class="row">
     <div>
@@ -338,14 +356,14 @@ def _render_user_settings(request, user, message=None, form_data=None, current_u
   </div>
   <div class="actions">
     <button type="submit">{webhttp.html_escape(_action("save_changes"))}</button>
-    <a class="admin-link align-right" href="/users/{urllib.parse.quote(user["username"], safe='')}">{webhttp.html_escape(_action("cancel"))}</a>
+    <a class="admin-link align-right" href="/users/{urllib.parse.quote(auth.user_token(user), safe='')}">{webhttp.html_escape(_action("cancel"))}</a>
   </div>
 </form>
 """
-    profile_url = f"/users/{urllib.parse.quote(current_user['username'], safe='')}"
+    profile_url = f"/users/{urllib.parse.quote(auth.user_token(current_user), safe='')}"
     header_html = views.header_with_title(
         config.require_setting(config.get_config(), "server.community_name"),
-        f"/users/{urllib.parse.quote(user['username'], safe='')}/edit",
+        f"/users/{urllib.parse.quote(auth.user_token(user), safe='')}/edit",
         logged_in=True,
         title=_title("personal_settings"),
         error=message,
@@ -481,10 +499,12 @@ def handle(request):
     with db.connect_ctx() as conn:
         admin_levels, root_id = _admin_levels(conn, settings)
         if path.startswith("/users/") and path.endswith("/edit"):
+            token = request.query.get("token", [""])[0].strip()
             username = request.query.get("name", [""])[0].strip()
-            if not username:
+            lookup = token or username
+            if not lookup:
                 return views.error_page("400 Bad Request", "missing_user")
-            target_user = db.get_user_by_username(conn, username)
+            target_user = _get_user_by_token(conn, lookup)
             if request.method == "POST" and not target_user:
                 form = request.form()
                 user_id = _first(form, "id")
@@ -537,7 +557,7 @@ def handle(request):
                     if password:
                         digest, salt = auth.new_password(password)
                         db.set_user_password(conn, target_user["id"], digest, salt)
-                    return webhttp.redirect(f"/users/{urllib.parse.quote(target_user['username'], safe='')}")
+                    return webhttp.redirect(f"/users/{urllib.parse.quote(auth.user_token(target_user), safe='')}")
                 return views.error_page("405 Method Not Allowed", "method_not_allowed")
             if not is_admin:
                 return views.error_page("403 Forbidden", "forbidden")
@@ -562,7 +582,7 @@ def handle(request):
                     admin_levels,
                     root_id,
                     is_root_admin,
-                    redirect_url=f"/users/{urllib.parse.quote(target_user['username'], safe='')}",
+                    redirect_url=f"/users/{urllib.parse.quote(auth.user_token(target_user), safe='')}",
                 )
             return views.error_page("405 Method Not Allowed", "method_not_allowed")
         if path in ("/users", "/users/"):

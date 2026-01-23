@@ -116,6 +116,7 @@ Repo-level guidance lives in `AGENTS.md`. Task-specific prompts live under `docs
 * API Event handler
 * Better sounds
 * Switch to Ogre rendering engine
+* RmlUi: add select dropdown open/close events (e.g., selectboxshown/selectboxhidden) so UI can react to select popup visibility; maintain a small patch/fork and upstream a PR once validated.
 
 ## Events
 * Tick

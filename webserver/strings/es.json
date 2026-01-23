@@ -1,17 +1,17 @@
 {
   "languages": {
     "en": "Inglés",
-    "es": "Español",
+    "es": "Castellano",
     "fr": "Francés",
     "de": "Alemán",
     "pt": "Portugués",
     "ru": "Ruso",
     "jp": "Japonés",
     "zh": "Chino",
-    "ko": "Korean",
-    "it": "Italian",
-    "hi": "Hindi",
-    "ar": "Arabic"
+    "ko": "Coreano",
+    "it": "Italiano",
+    "hi": "हिन्दी",
+    "ar": "Árabe"
   },
   "ui_text": {
     "hints": {
@@ -61,8 +61,8 @@
         "message": "Servidor no encontrado."
       },
       "generic": {
-        "title": "Error",
-        "message": ""
+        "title": "Error general",
+        "message": "Se produjo un error."
       }
     },
     "messages": {
@@ -130,7 +130,7 @@
       }
     },
     "nav": {
-      "info": "Info",
+      "info": "Información",
       "servers": "Servidores",
       "account": "Cuenta",
       "users": "Usuarios",
@@ -156,7 +156,7 @@
       "online_prefix": "En línea:",
       "offline": "Fuera de línea",
       "yes": "Sí",
-      "no": "No"
+      "no": "Negativo"
     },
     "labels": {
       "owner_by": "por",
@@ -169,7 +169,7 @@
       "reset_password_optional": "Restablecer contraseña (opcional)",
       "language": "Idioma",
       "language_auto": "Automático (preferencia del navegador)",
-      "host": "Host",
+      "host": "Servidor",
       "port": "Puerto",
       "server_name": "Nombre del servidor",
       "overview": "Resumen",
@@ -201,7 +201,7 @@
       "update_password": "Actualizar contraseña",
       "save": "Guardar",
       "cancel": "Cancelar",
-      "submit_for_approval": "Enviar para aprobación",
+      "submit_for_approval": "Enviar",
       "return_to_servers": "Volver a servidores",
       "submit_another": "Enviar otro servidor",
       "save_changes": "Guardar cambios",
@@ -214,7 +214,7 @@
       "add_admin": "Agregar admin",
       "add_server": "Agregar servidor",
       "create_user": "Crear usuario",
-      "personal_settings": "Configuración personal",
+      "personal_settings": "Perfil",
       "edit_info": "Editar info",
       "register_here": "Regístrate aquí",
       "already_have_account": "¿Ya tienes una cuenta?",
@@ -235,7 +235,7 @@
       "edit_server": "Editar servidor",
       "users": "Usuarios",
       "edit_user": "Editar usuario",
-      "personal_settings": "Configuración personal",
+      "personal_settings": "Perfil",
       "community_info": "Información de la comunidad",
       "admin_docs": "Documentación de administradores",
       "server_profile": "Perfil del servidor",
@@ -283,10 +283,10 @@
       "language_prompt": "Idioma [{default}]",
       "language_tab_hint": "(? para la lista):",
       "language_list_header": "Idiomas disponibles:",
-      "language_list_item": "  {code} - {label}",
+      "language_list_item": "  {code}: {label}",
       "language_invalid": "Código de idioma no válido.",
       "language_codes_header": "Códigos de idioma válidos:",
-      "language_code_item": "  {code} - {label}",
+      "language_code_item": "  {code}: {label}",
       "community_name": "Nombre de la comunidad",
       "port": "Puerto",
       "admin_username": "Administrador Nombre de usuario",
@@ -298,6 +298,29 @@
       "create_dir_suffix": "[S/n]",
       "default_community_name": "Mi comunidad",
       "default_admin_user": "Administrador"
+    },
+    "start": {
+      "usage": "uso: start.py <directorio-comunidad> [-p <puerto>]",
+      "port_invalid_integer": "El puerto debe ser un número entero.",
+      "stopped": "Servidor detenido."
+    },
+    "db_restore": {
+      "usage": "uso: db-restore.py <directorio-comunidad> -f <archivo-json>",
+      "json_required": "-f <archivo-json> es obligatorio",
+      "db_exists": "La base de datos ya existe.",
+      "imported_users": "Se importaron {count} usuarios; se omitieron {skipped}.",
+      "imported_servers": "Se importaron {count} servidores; se omitieron {skipped}."
+    },
+    "db_merge": {
+      "usage": "uso: db-merge.py <directorio-comunidad> -f <archivo-json>",
+      "json_required": "-f <archivo-json> es obligatorio",
+      "imported_users": "Se importaron {count} usuarios; se omitieron {skipped}.",
+      "imported_servers": "Se importaron {count} servidores; se omitieron {skipped}."
+    },
+    "db_snapshot": {
+      "usage": "uso: db-snapshot.py <directorio-comunidad> [output.json|-] [-z]",
+      "exporting": "Exportando instantánea a {path}",
+      "wrote_zip": "Se escribió {path}"
     }
   }
 }

@@ -10,7 +10,7 @@
     "zh": "Cinese",
     "ko": "Coreano",
     "it": "Italiano",
-    "hi": "Hindi",
+    "hi": "हिन्दी",
     "ar": "Arabo"
   },
   "ui_text": {
@@ -61,8 +61,8 @@
         "message": "Server non trovato."
       },
       "generic": {
-        "title": "Error",
-        "message": ""
+        "title": "Errore",
+        "message": "Si è verificato un errore."
       }
     },
     "messages": {
@@ -130,9 +130,9 @@
       }
     },
     "nav": {
-      "info": "Info",
+      "info": "Informazioni",
       "servers": "Server",
-      "account": "Account",
+      "account": "Profilo",
       "users": "Utenti",
       "login": "Accedi",
       "logout": "Esci"
@@ -152,24 +152,24 @@
       "reinstate_user": "Ripristinare questo utente?"
     },
     "status": {
-      "online": "Online",
-      "online_prefix": "Online:",
-      "offline": "Offline",
+      "online": "In linea",
+      "online_prefix": "In linea:",
+      "offline": "Non in linea",
       "yes": "Sì",
-      "no": "No"
+      "no": "Nò"
     },
     "labels": {
       "owner_by": "da",
       "username": "Nome utente",
-      "email": "Email",
+      "email": "E-mail",
       "email_or_username": "Email o Nome utente",
-      "password": "Password",
+      "password": "Parola d’ordine",
       "new_password": "Nuova password",
       "new_password_optional": "Nuova password (opzionale)",
       "reset_password_optional": "Reimposta password (opzionale)",
       "language": "Lingua",
       "language_auto": "Automatico (preferenze del browser)",
-      "host": "Host",
+      "host": "Server",
       "port": "Porta",
       "server_name": "Nome server",
       "overview": "Riepilogo",
@@ -177,13 +177,13 @@
       "owner_username_optional": "Nome utente proprietario (opzionale)",
       "screenshot_upload": "Screenshot del mondo (PNG/JPG)",
       "screenshot_replace": "Sostituisci screenshot (PNG/JPG)",
-      "screenshot_alt": "Screenshot",
+      "screenshot_alt": "Schermata",
       "screenshot_preview_alt": "Anteprima screenshot",
       "lightbox_close": "Chiudi",
-      "community_name": "Nome della community",
+      "community_name": "Nome della comunità",
       "community_description": "Descrizione della community",
       "add_admin_by_username": "Aggiungi admin per nome utente",
-      "admin": "Admin",
+      "admin": "Amministratore",
       "lock": "Blocca",
       "deleted": "Eliminato",
       "status": "Stato",
@@ -201,7 +201,7 @@
       "update_password": "Aggiorna password",
       "save": "Salva",
       "cancel": "Annulla",
-      "submit_for_approval": "Invia per approvazione",
+      "submit_for_approval": "Invia",
       "return_to_servers": "Torna ai server",
       "submit_another": "Invia un altro server",
       "save_changes": "Salva modifiche",
@@ -214,7 +214,7 @@
       "add_admin": "Aggiungi admin",
       "add_server": "Aggiungi server",
       "create_user": "Crea utente",
-      "personal_settings": "Impostazioni personali",
+      "personal_settings": "Profilo",
       "edit_info": "Modifica info",
       "register_here": "Registrati qui",
       "already_have_account": "Hai già un account?",
@@ -227,7 +227,7 @@
     },
     "titles": {
       "create_account": "Crea account",
-      "login": "Login",
+      "login": "Accesso",
       "reset_password": "Reimposta password",
       "set_new_password": "Imposta una nuova password",
       "submit_server": "Invia server",
@@ -235,7 +235,7 @@
       "edit_server": "Modifica server",
       "users": "Utenti",
       "edit_user": "Modifica utente",
-      "personal_settings": "Impostazioni personali",
+      "personal_settings": "Profilo",
       "community_info": "Info community",
       "admin_docs": "Documentazione admin",
       "server_profile": "Profilo server",
@@ -248,7 +248,7 @@
       "add_user": "Aggiungi utente"
     },
     "templates": {
-      "server_summary": "<strong>{active} online</strong> / {inactive} offline"
+      "server_summary": "<strong>{active} in linea</strong> / {inactive} offline"
     },
     "admin_docs": {
       "html": "<p>Sei un <strong>Admin della community</strong>.</p><p>Gli admin della community possono:</p><ol><li>Amministrare il sito web della community (questo sito).</li><li>Agire come admin in tutti i mondi di gioco.</li></ol><p>La propagazione degli admin è di un livello. L'admin root assegna gli admin primari. Se un admin primario è contrassegnato come fidato, i suoi admin diretti diventano admin secondari.</p><p>Le capacità da admin come modificare utenti, bloccare account e modificare mondi dovrebbero applicarsi solo agli admin sotto di te nella gerarchia. Questa applicazione è ancora in espansione.</p>",
@@ -283,21 +283,44 @@
       "language_prompt": "Lingua [{default}]",
       "language_tab_hint": "(? per elenco):",
       "language_list_header": "Lingue disponibili:",
-      "language_list_item": "  {code} - {label}",
+      "language_list_item": "  {code}: {label}",
       "language_invalid": "Codice lingua non valido.",
       "language_codes_header": "Codici lingua validi:",
-      "language_code_item": "  {code} - {label}",
+      "language_code_item": "  {code}: {label}",
       "community_name": "Nome della community",
       "port": "Porta",
-      "admin_username": "Admin Nome utente",
-      "admin_password": "Admin Password",
+      "admin_username": "Nome utente admin",
+      "admin_password": "Password admin",
       "port_invalid_integer": "La porta deve essere un numero intero.",
       "port_invalid_range": "La porta deve essere tra 1 e 65535.",
       "password_required": "La password è obbligatoria.",
       "create_dir_prefix": "Crea",
       "create_dir_suffix": "[S/n]",
       "default_community_name": "La mia comunità",
-      "default_admin_user": "Admin"
+      "default_admin_user": "Amministratore"
+    },
+    "start": {
+      "usage": "uso: start.py <directory-comunità> [-p <porta>]",
+      "port_invalid_integer": "La porta deve essere un numero intero.",
+      "stopped": "Server arrestato."
+    },
+    "db_restore": {
+      "usage": "uso: db-restore.py <directory-comunità> -f <file-json>",
+      "json_required": "-f <file-json> è obbligatorio",
+      "db_exists": "Il database esiste già.",
+      "imported_users": "Importati {count} utenti; {skipped} ignorati.",
+      "imported_servers": "Importati {count} server; {skipped} ignorati."
+    },
+    "db_merge": {
+      "usage": "uso: db-merge.py <directory-comunità> -f <file-json>",
+      "json_required": "-f <file-json> è obbligatorio",
+      "imported_users": "Importati {count} utenti; {skipped} ignorati.",
+      "imported_servers": "Importati {count} server; {skipped} ignorati."
+    },
+    "db_snapshot": {
+      "usage": "uso: db-snapshot.py <directory-comunità> [output.json|-] [-z]",
+      "exporting": "Esportazione dello snapshot in {path}",
+      "wrote_zip": "Scritto {path}"
     }
   }
 }

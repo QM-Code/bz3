@@ -11,6 +11,7 @@ ClientEngine::ClientEngine(GLFWwindow *window) {
 
     network = new ClientNetwork();
     spdlog::trace("ClientEngine: ClientNetwork initialized successfully");
+    spdlog::trace("ClientEngine: Render initializing");
     render = new Render(window);
     spdlog::trace("ClientEngine: Render initialized successfully");
     physics = new PhysicsWorld();

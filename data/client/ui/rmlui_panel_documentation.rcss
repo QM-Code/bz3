@@ -1,0 +1,4 @@
+/* Documentation panel styles placeholder. */
+#panel-documentation {
+    height: 100%;
+}

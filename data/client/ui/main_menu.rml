@@ -1,0 +1,30 @@
+<rml>
+<head>
+    <link type="text/rcss" href="main_menu.rcss" />
+    <link type="text/rcss" href="rmlui_scrollbars.rcss" />
+    <link type="text/rcss" href="rmlui_panel_community.rcss" />
+    <link type="text/rcss" href="rmlui_panel_settings.rcss" />
+    <link type="text/rcss" href="rmlui_panel_documentation.rcss" />
+    <link type="text/rcss" href="rmlui_panel_start_server.rcss" />
+    <link type="text/rcss" href="rmlui_panel_themes.rcss" />
+</head>
+<body id="main-body">
+    <div id="main-window">
+        <div id="title">BZ3 - BZFlag Revisited</div>
+        <div id="tab-bar">
+            <span id="tab-community" class="tab default">Community</span>
+            <span id="tab-settings" class="tab">Settings</span>
+            <span id="tab-documentation" class="tab">Documentation</span>
+            <span id="tab-start-server" class="tab">Start Server</span>
+            <span id="tab-themes" class="tab">Themes</span>
+        </div>
+        <div id="tab-content">
+            <div id="panel-community" class="tab-panel"></div>
+            <div id="panel-settings" class="tab-panel"></div>
+            <div id="panel-documentation" class="tab-panel"></div>
+            <div id="panel-start-server" class="tab-panel"></div>
+            <div id="panel-themes" class="tab-panel"></div>
+        </div>
+    </div>
+</body>
+</rml>

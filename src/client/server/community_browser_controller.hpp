@@ -16,7 +16,7 @@
 #include "client/server/server_discovery.hpp"
 #include "client/server/server_list_fetcher.hpp"
 #include "engine/client_engine.hpp"
-#include "engine/components/gui/main_menu.hpp"
+#include "engine/components/gui/main_menu_interface.hpp"
 
 class ServerConnector;
 
@@ -41,6 +41,7 @@ private:
     std::vector<ClientServerListSource> resolveActiveServerLists() const;
     void handleServerListSelection(int selectedIndex);
     void handleServerListAddition(const gui::ServerListOption &option);
+    void commitServerListAddition(const std::string &baseUrl);
     void handleServerListDeletion(const std::string &host);
     void updateServerListDisplayNamesFromCache();
     void updateCommunityDetails();
@@ -60,7 +61,7 @@ private:
     std::string makeAuthCacheKey(const std::string &host, const std::string &username) const;
 
     ClientEngine &engine;
-    gui::MainMenuView &browser;
+    gui::MainMenuInterface &browser;
     ClientConfig &clientConfig;
     std::string clientConfigPath;
     ServerConnector &connector;
@@ -79,12 +80,21 @@ private:
         std::string key;
         std::string sourceHost;
         std::string serverName;
+        std::string detailName;
         std::string description;
         std::atomic<bool> done{false};
         bool ok = false;
         std::thread worker;
     };
     std::unique_ptr<ServerDetailsRequest> serverDetailsRequest;
+    struct PendingAddRequest {
+        std::string baseUrl;
+        std::string displayHost;
+        std::atomic<bool> done{false};
+        bool ok = false;
+        std::thread worker;
+    };
+    std::unique_ptr<PendingAddRequest> pendingAddRequest;
     bool curlReady = false;
     CommunityAuthClient authClient;
     std::unordered_map<std::string, std::string> passwordSaltCache;

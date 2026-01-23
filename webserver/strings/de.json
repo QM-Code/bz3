@@ -8,10 +8,10 @@
     "ru": "Russisch",
     "jp": "Japanisch",
     "zh": "Chinesisch",
-    "ko": "Korean",
-    "it": "Italian",
-    "hi": "Hindi",
-    "ar": "Arabic"
+    "ko": "Koreanisch",
+    "it": "Italienisch",
+    "hi": "हिन्दी",
+    "ar": "Arabisch"
   },
   "ui_text": {
     "hints": {
@@ -61,8 +61,8 @@
         "message": "Server nicht gefunden."
       },
       "generic": {
-        "title": "Error",
-        "message": ""
+        "title": "Fehler",
+        "message": "Ein Fehler ist aufgetreten."
       }
     },
     "messages": {
@@ -130,7 +130,7 @@
       }
     },
     "nav": {
-      "info": "Info",
+      "info": "Informationen",
       "servers": "Server",
       "account": "Konto",
       "users": "Benutzer",
@@ -152,9 +152,9 @@
       "reinstate_user": "Diesen Benutzer wiederherstellen?"
     },
     "status": {
-      "online": "Online",
-      "online_prefix": "Online:",
-      "offline": "Offline",
+      "online": "Verbunden",
+      "online_prefix": "Verbunden:",
+      "offline": "Getrennt",
       "yes": "Ja",
       "no": "Nein"
     },
@@ -169,28 +169,28 @@
       "reset_password_optional": "Passwort zurücksetzen (optional)",
       "language": "Sprache",
       "language_auto": "Auto (Browserpräferenz)",
-      "host": "Host",
-      "port": "Port",
+      "host": "Server",
+      "port": "Portnummer",
       "server_name": "Servername",
       "overview": "Übersicht",
       "description": "Beschreibung",
       "owner_username_optional": "Besitzer-Benutzername (optional)",
       "screenshot_upload": "Welt-Screenshot (PNG/JPG)",
       "screenshot_replace": "Screenshot ersetzen (PNG/JPG)",
-      "screenshot_alt": "Screenshot",
+      "screenshot_alt": "Bildschirmfoto",
       "screenshot_preview_alt": "Screenshot-Vorschau",
       "lightbox_close": "Schließen",
       "community_name": "Community-Name",
       "community_description": "Community-Beschreibung",
       "add_admin_by_username": "Admin nach Benutzernamen hinzufügen",
-      "admin": "Admin",
+      "admin": "Administrator",
       "lock": "Sperren",
       "deleted": "Gelöscht",
-      "status": "Status",
+      "status": "Zustand",
       "owner": "Besitzer",
       "players": "Spieler",
       "last_heartbeat": "Letzter Heartbeat",
-      "admins": "Admins",
+      "admins": "Administratoren",
       "trust_admins": "Admins des Benutzers vertrauen",
       "actions": "Aktionen"
     },
@@ -214,7 +214,7 @@
       "add_admin": "Admin hinzufügen",
       "add_server": "Server hinzufügen",
       "create_user": "Benutzer erstellen",
-      "personal_settings": "Persönliche Einstellungen",
+      "personal_settings": "Profil",
       "edit_info": "Info bearbeiten",
       "register_here": "Hier registrieren",
       "already_have_account": "Schon ein Konto?",
@@ -235,7 +235,7 @@
       "edit_server": "Server bearbeiten",
       "users": "Benutzer",
       "edit_user": "Benutzer bearbeiten",
-      "personal_settings": "Persönliche Einstellungen",
+      "personal_settings": "Profil",
       "community_info": "Community-Info",
       "admin_docs": "Admin-Dokumentation",
       "server_profile": "Serverprofil",
@@ -244,11 +244,11 @@
     },
     "sections": {
       "servers": "Server",
-      "admins": "Admins",
+      "admins": "Administratoren",
       "add_user": "Benutzer hinzufügen"
     },
     "templates": {
-      "server_summary": "<strong>{active} online</strong> / {inactive} offline"
+      "server_summary": "<strong>{active} verbunden</strong> / {inactive} getrennt"
     },
     "admin_docs": {
       "html": "<p>Du bist ein <strong>Community-Admin</strong>.</p><p>Community-Admins können:</p><ol><li>Die Community-Website verwalten (diese Seite).</li><li>Als Admins in allen Spielwelten agieren.</li></ol><p>Admin-Weitergabe ist eine Ebene tief. Der Root-Admin weist Primär-Admins zu. Wenn ein Primär-Admin als vertrauenswürdig markiert ist, werden dessen direkte Admins zu Sekundär-Admins.</p><p>Admin-Fähigkeiten wie Benutzer ändern, Konten sperren und Welten bearbeiten sollten nur auf Admins unter dir in der Hierarchie angewendet werden. Diese Durchsetzung wird noch erweitert.</p>",
@@ -283,12 +283,12 @@
       "language_prompt": "Sprache [{default}]",
       "language_tab_hint": "(? für Liste):",
       "language_list_header": "Verfügbare Sprachen:",
-      "language_list_item": "  {code} - {label}",
+      "language_list_item": "  {code}: {label}",
       "language_invalid": "Ungültiger Sprachcode.",
       "language_codes_header": "Gültige Sprachcodes:",
-      "language_code_item": "  {code} - {label}",
+      "language_code_item": "  {code}: {label}",
       "community_name": "Community-Name",
-      "port": "Port",
+      "port": "Portnummer",
       "admin_username": "Admin Benutzername",
       "admin_password": "Admin Passwort",
       "port_invalid_integer": "Der Port muss eine ganze Zahl sein.",
@@ -297,7 +297,30 @@
       "create_dir_prefix": "Erstellen",
       "create_dir_suffix": "[J/n]",
       "default_community_name": "Meine Community",
-      "default_admin_user": "Admin"
+      "default_admin_user": "Administrator"
+    },
+    "start": {
+      "usage": "Verwendung: start.py <community-verzeichnis> [-p <port>]",
+      "port_invalid_integer": "Der Port muss eine ganze Zahl sein.",
+      "stopped": "Server gestoppt."
+    },
+    "db_restore": {
+      "usage": "Verwendung: db-restore.py <community-verzeichnis> -f <json-datei>",
+      "json_required": "-f <json-datei> ist erforderlich",
+      "db_exists": "Datenbank existiert bereits.",
+      "imported_users": "Importiert {count} Benutzer; übersprungen {skipped}.",
+      "imported_servers": "Importiert {count} Server; übersprungen {skipped}."
+    },
+    "db_merge": {
+      "usage": "Verwendung: db-merge.py <community-verzeichnis> -f <json-datei>",
+      "json_required": "-f <json-datei> ist erforderlich",
+      "imported_users": "Importiert {count} Benutzer; übersprungen {skipped}.",
+      "imported_servers": "Importiert {count} Server; übersprungen {skipped}."
+    },
+    "db_snapshot": {
+      "usage": "Verwendung: db-snapshot.py <community-verzeichnis> [output.json|-] [-z]",
+      "exporting": "Schnappschuss wird nach {path} exportiert",
+      "wrote_zip": "Geschrieben: {path}"
     }
   }
 }

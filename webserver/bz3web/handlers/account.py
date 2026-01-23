@@ -312,7 +312,8 @@ def handle(request):
                 )
                 profile_url = "/servers"
                 if user and "username" in user:
-                    profile_url = f"/users/{quote(user['username'], safe='')}"
+                    user_token = auth.user_token(user)
+                    profile_url = f"/users/{quote(user_token, safe='')}"
                 status, redirect_headers, body = webhttp.redirect(profile_url)
                 return status, headers + redirect_headers, body
             return views.error_page("405 Method Not Allowed", "method_not_allowed")
@@ -377,7 +378,8 @@ def handle(request):
                 )
                 profile_url = "/servers"
                 if user and "username" in user:
-                    profile_url = f"/users/{quote(user['username'], safe='')}"
+                    user_token = auth.user_token(user)
+                    profile_url = f"/users/{quote(user_token, safe='')}"
                 status, redirect_headers, body = webhttp.redirect(profile_url)
                 return status, headers + redirect_headers, body
             return views.error_page("405 Method Not Allowed", "method_not_allowed")

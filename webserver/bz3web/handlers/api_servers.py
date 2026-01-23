@@ -44,8 +44,10 @@ def handle(request, status="all"):
             continue
         entry = {
             "id": row["id"],
+            "code": row["code"],
             "name": row["name"],
             "owner": row["owner_username"],
+            "owner_code": row["owner_code"],
             "host": row["host"],
             "port": str(row["port"]),
             "active": active,
@@ -63,7 +65,8 @@ def handle(request, status="all"):
             entry["screenshot_id"] = row["screenshot_id"]
         servers.append(entry)
 
-    servers.sort(key=lambda item: item.get("num_players", -1), reverse=True)
+    if not owner:
+        servers.sort(key=lambda item: item.get("num_players", -1), reverse=True)
 
     payload = {
         "community_name": community_name,

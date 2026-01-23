@@ -77,7 +77,10 @@
         "variant": "cpp",
         "shared_mutex": "cpp",
         "text_encoding": "cpp",
-        "typeindex": "cpp"
+        "typeindex": "cpp",
+        "*.rml": "html",
+        "*.rcss": "css"
     },
-    "C_Cpp.errorSquiggles": "disabled"
+    "C_Cpp.errorSquiggles": "disabled",
+    "editor.hover.enabled": "off"
 }

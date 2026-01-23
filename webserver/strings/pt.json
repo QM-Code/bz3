@@ -8,10 +8,10 @@
     "ru": "Russo",
     "jp": "Japonês",
     "zh": "Chinês",
-    "ko": "Korean",
-    "it": "Italian",
-    "hi": "Hindi",
-    "ar": "Arabic"
+    "ko": "Coreano",
+    "it": "Italiano",
+    "hi": "हिन्दी",
+    "ar": "Árabe"
   },
   "ui_text": {
     "hints": {
@@ -61,8 +61,8 @@
         "message": "Servidor não encontrado."
       },
       "generic": {
-        "title": "Error",
-        "message": ""
+        "title": "Erro",
+        "message": "Ocorreu um erro."
       }
     },
     "messages": {
@@ -130,7 +130,7 @@
       }
     },
     "nav": {
-      "info": "Info",
+      "info": "Informações",
       "servers": "Servidores",
       "account": "Conta",
       "users": "Usuários",
@@ -152,9 +152,9 @@
       "reinstate_user": "Reativar este usuário?"
     },
     "status": {
-      "online": "Online",
-      "online_prefix": "Online:",
-      "offline": "Offline",
+      "online": "Em linha",
+      "online_prefix": "Em linha:",
+      "offline": "Fora de linha",
       "yes": "Sim",
       "no": "Não"
     },
@@ -169,7 +169,7 @@
       "reset_password_optional": "Redefinir senha (opcional)",
       "language": "Idioma",
       "language_auto": "Auto (preferência do navegador)",
-      "host": "Host",
+      "host": "Servidor",
       "port": "Porta",
       "server_name": "Nome do servidor",
       "overview": "Resumo",
@@ -183,14 +183,14 @@
       "community_name": "Nome da comunidade",
       "community_description": "Descrição da comunidade",
       "add_admin_by_username": "Adicionar admin por nome de usuário",
-      "admin": "Admin",
+      "admin": "Administrador",
       "lock": "Bloquear",
       "deleted": "Excluído",
-      "status": "Status",
+      "status": "Estado",
       "owner": "Proprietário",
       "players": "Jogadores",
       "last_heartbeat": "Último heartbeat",
-      "admins": "Admins",
+      "admins": "Administradores",
       "trust_admins": "Confiar nos admins do usuário",
       "actions": "Ações"
     },
@@ -201,7 +201,7 @@
       "update_password": "Atualizar senha",
       "save": "Salvar",
       "cancel": "Cancelar",
-      "submit_for_approval": "Enviar para aprovação",
+      "submit_for_approval": "Enviar",
       "return_to_servers": "Voltar aos servidores",
       "submit_another": "Enviar outro servidor",
       "save_changes": "Salvar alterações",
@@ -214,7 +214,7 @@
       "add_admin": "Adicionar admin",
       "add_server": "Adicionar servidor",
       "create_user": "Criar usuário",
-      "personal_settings": "Configurações pessoais",
+      "personal_settings": "Perfil",
       "edit_info": "Editar info",
       "register_here": "Registre-se aqui",
       "already_have_account": "Já tem uma conta?",
@@ -235,7 +235,7 @@
       "edit_server": "Editar servidor",
       "users": "Usuários",
       "edit_user": "Editar usuário",
-      "personal_settings": "Configurações pessoais",
+      "personal_settings": "Perfil",
       "community_info": "Informações da comunidade",
       "admin_docs": "Documentação de admins",
       "server_profile": "Perfil do servidor",
@@ -244,11 +244,11 @@
     },
     "sections": {
       "servers": "Servidores",
-      "admins": "Admins",
+      "admins": "Administradores",
       "add_user": "Adicionar usuário"
     },
     "templates": {
-      "server_summary": "<strong>{active} online</strong> / {inactive} offline"
+      "server_summary": "<strong>{active} em linha</strong> / {inactive} offline"
     },
     "admin_docs": {
       "html": "<p>Você é um <strong>Admin da Comunidade</strong>.</p><p>Admins da comunidade podem:</p><ol><li>Administrar o site da comunidade (este site).</li><li>Atuar como admins em todos os mundos do jogo.</li></ol><p>A propagação de admins é de um nível. O admin raiz atribui admins primários. Se um admin primário for marcado como confiável, seus admins diretos se tornam admins secundários.</p><p>Habilidades de admin como modificar usuários, bloquear contas e editar mundos devem se aplicar apenas a admins abaixo de você na hierarquia. Essa aplicação ainda está sendo expandida.</p>",
@@ -283,10 +283,10 @@
       "language_prompt": "Idioma [{default}]",
       "language_tab_hint": "(? para listar):",
       "language_list_header": "Idiomas disponíveis:",
-      "language_list_item": "  {code} - {label}",
+      "language_list_item": "  {code}: {label}",
       "language_invalid": "Código de idioma inválido.",
       "language_codes_header": "Códigos de idioma válidos:",
-      "language_code_item": "  {code} - {label}",
+      "language_code_item": "  {code}: {label}",
       "community_name": "Nome da comunidade",
       "port": "Porta",
       "admin_username": "Admin Nome de usuário",
@@ -297,7 +297,30 @@
       "create_dir_prefix": "Criar",
       "create_dir_suffix": "[S/n]",
       "default_community_name": "Minha comunidade",
-      "default_admin_user": "Admin"
+      "default_admin_user": "Administrador"
+    },
+    "start": {
+      "usage": "uso: start.py <diretório-comunidade> [-p <porta>]",
+      "port_invalid_integer": "A porta deve ser um número inteiro.",
+      "stopped": "Servidor parado."
+    },
+    "db_restore": {
+      "usage": "uso: db-restore.py <diretório-comunidade> -f <arquivo-json>",
+      "json_required": "-f <arquivo-json> é obrigatório",
+      "db_exists": "O banco de dados já existe.",
+      "imported_users": "Importados {count} usuários; {skipped} ignorados.",
+      "imported_servers": "Importados {count} servidores; {skipped} ignorados."
+    },
+    "db_merge": {
+      "usage": "uso: db-merge.py <diretório-comunidade> -f <arquivo-json>",
+      "json_required": "-f <arquivo-json> é obrigatório",
+      "imported_users": "Importados {count} usuários; {skipped} ignorados.",
+      "imported_servers": "Importados {count} servidores; {skipped} ignorados."
+    },
+    "db_snapshot": {
+      "usage": "uso: db-snapshot.py <diretório-comunidade> [output.json|-] [-z]",
+      "exporting": "Exportando snapshot para {path}",
+      "wrote_zip": "Gravado {path}"
     }
   }
 }

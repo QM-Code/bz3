@@ -33,6 +33,7 @@ bool ServerConnector::connect(const std::string &targetHost,
         spdlog::info("Connected to server at {}:{}", targetHost, targetPort);
         spdlog::info("Join mode: {} user", registeredUser ? "registered" : "anonymous");
         spdlog::info("Join flags: community_admin={}, local_admin={}", communityAdmin, localAdmin);
+        browser.setConnectionState({true, targetHost, targetPort});
         game = std::make_unique<Game>(engine, resolvedName, worldDir, registeredUser, communityAdmin, localAdmin);
         spdlog::trace("Game initialized successfully");
 
@@ -53,5 +54,6 @@ bool ServerConnector::connect(const std::string &targetHost,
     spdlog::error("Failed to connect to server at {}:{}", targetHost, targetPort);
     std::string errorMsg = "Unable to reach " + targetHost + ":" + std::to_string(targetPort) + ".";
     browser.setStatus(errorMsg, true);
+    browser.setConnectionState({});
     return false;
 }

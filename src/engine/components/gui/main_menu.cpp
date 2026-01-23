@@ -294,6 +294,26 @@ bool MainMenuView::consumeFontReloadRequest() {
     return requested;
 }
 
+void MainMenuView::setConnectionState(const ConnectionState &state) {
+    connectionState = state;
+}
+
+MainMenuInterface::ConnectionState MainMenuView::getConnectionState() const {
+    return connectionState;
+}
+
+bool MainMenuView::consumeQuitRequest() {
+    if (!pendingQuitRequest) {
+        return false;
+    }
+    pendingQuitRequest = false;
+    return true;
+}
+
+void MainMenuView::showErrorDialog(const std::string &message) {
+    errorDialogMessage = message;
+}
+
 void MainMenuView::drawPlaceholderPanel(const char *heading,
                                                 const char *body,
                                                 const MessageColors &colors) const {

@@ -25,7 +25,13 @@ def handle(request):
     with db.connect_ctx() as conn:
         rows = db.list_servers(conn)
 
-    show_inactive = request.query.get("show_inactive", [""])[0] == "1"
+    path = request.path.rstrip("/") or "/servers"
+    if path == "/servers/active":
+        status = "active"
+    elif path == "/servers/inactive":
+        status = "inactive"
+    else:
+        status = "all"
     overview_max = int(config.require_setting(settings, "pages.servers.overview_max_chars"))
     timeout = int(config.require_setting(settings, "heartbeat.timeout_seconds"))
     user = auth.get_user_from_request(request)
@@ -33,7 +39,8 @@ def handle(request):
     csrf_token = auth.csrf_token(request)
     profile_url = None
     if user:
-        profile_url = f"/users/{quote(user['username'], safe='')}"
+        user_token = auth.user_token(user)
+        profile_url = f"/users/{quote(user_token, safe='')}"
     header_html = views.header(
         list_name,
         request.path,
@@ -43,7 +50,7 @@ def handle(request):
         profile_url=profile_url,
     )
     def _entry_builder(row, active):
-        entry = {"id": row["id"], "host": row["host"], "port": str(row["port"])}
+        entry = {"id": row["id"], "code": row["code"], "host": row["host"], "port": str(row["port"])}
         if row["name"]:
             entry["name"] = row["name"]
         overview = row["overview"] or ""
@@ -56,15 +63,14 @@ def handle(request):
         if row["num_players"] is not None:
             entry["num_players"] = row["num_players"]
         entry["owner"] = row["owner_username"]
+        entry["owner_code"] = row["owner_code"]
         entry["screenshot_id"] = row["screenshot_id"]
         if is_admin:
             server_id = entry.get("id")
+            server_token = entry.get("code") or entry.get("name") or f"{entry['host']}:{entry['port']}"
             csrf_html = views.csrf_input(csrf_token)
             confirm_delete = webhttp.html_escape(config.ui_text("confirmations.delete_server"))
-            entry["actions_html"] = f"""<form method="get" action="/server/edit">
-  <input type="hidden" name="id" value="{server_id}">
-  <button type="submit" class="secondary small">{webhttp.html_escape(_action("edit"))}</button>
-</form>
+            entry["actions_html"] = f"""<a class="button-link secondary small" href="/server/{quote(str(server_token), safe='')}/edit">{webhttp.html_escape(_action("edit"))}</a>
 <form method="post" action="/server/delete" data-confirm="{confirm_delete}">
   {csrf_html}
   <input type="hidden" name="id" value="{server_id}">
@@ -77,17 +83,20 @@ def handle(request):
     refresh_animate = bool(config.require_setting(server_page, "auto_refresh_animate", "config.json pages.servers"))
     refresh_url = None
     if refresh_interval > 0:
-        refresh_url = "/api/servers/active"
-        if show_inactive:
+        refresh_url = "/api/servers"
+        if status == "active":
+            refresh_url = "/api/servers/active"
+        elif status == "inactive":
             refresh_url = "/api/servers/inactive"
     cards_html = views.render_server_section(
         rows,
         timeout,
-        show_inactive,
+        status,
         _entry_builder,
         header_title=_section("servers"),
-        toggle_on_url="/servers?show_inactive=1",
-        toggle_off_url="/servers",
+        toggle_on_url="/servers/inactive",
+        toggle_off_url="/servers/active",
+        csrf_token=auth.csrf_token(request),
         refresh_url=refresh_url,
         refresh_interval=refresh_interval,
         allow_actions=is_admin,

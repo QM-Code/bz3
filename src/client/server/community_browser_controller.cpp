@@ -143,15 +143,70 @@ std::string normalizedCommunityHost(const std::string &host) {
     return "http://" + normalized;
 }
 
-std::string buildServerDetailsUrl(const std::string &host, const std::string &serverName) {
-    if (host.empty() || serverName.empty()) {
+std::string buildServerDetailsUrl(const std::string &host, const std::string &serverCode) {
+    if (host.empty() || serverCode.empty()) {
         return {};
     }
     const std::string base = normalizedCommunityHost(host);
     if (base.empty()) {
         return {};
     }
-    return base + "/api/server/" + urlEncode(serverName);
+    return base + "/api/server/" + urlEncode(serverCode);
+}
+
+struct ParsedCommunityHost {
+    std::string baseUrl;
+    std::string displayHost;
+};
+
+bool parseCommunityUrl(std::string_view input, ParsedCommunityHost &out) {
+    std::string text = trimCopy(std::string(input));
+    if (text.rfind("http://", 0) != 0 && text.rfind("https://", 0) != 0) {
+        return false;
+    }
+    std::string scheme = text.rfind("https://", 0) == 0 ? "https://" : "http://";
+    std::string rest = text.substr(scheme.size());
+    if (rest.empty()) {
+        return false;
+    }
+    const std::size_t slash = rest.find('/');
+    std::string authority = slash == std::string::npos ? rest : rest.substr(0, slash);
+    if (authority.empty()) {
+        return false;
+    }
+    std::string host = authority;
+    std::string port;
+    const std::size_t colon = authority.rfind(':');
+    if (colon != std::string::npos) {
+        host = authority.substr(0, colon);
+        port = authority.substr(colon + 1);
+        if (port.empty() || port.find_first_not_of("0123456789") != std::string::npos) {
+            return false;
+        }
+    }
+    if (host.empty()) {
+        return false;
+    }
+    if (host != "localhost" && host.find('.') == std::string::npos) {
+        return false;
+    }
+    out.displayHost = authority;
+    out.baseUrl = scheme + authority;
+    return true;
+}
+
+bool fetchCommunityInfoOk(const std::string &baseUrl) {
+    std::string body;
+    long status = 0;
+    if (!fetchUrl(baseUrl + "/api/info", body, &status)) {
+        return false;
+    }
+    try {
+        auto json = nlohmann::json::parse(body);
+        return json.is_object();
+    } catch (...) {
+        return false;
+    }
 }
 }
 
@@ -212,13 +267,13 @@ void CommunityBrowserController::triggerFullRefresh() {
 
     if (lanActive && serverListFetcher) {
         browser.setCommunityStatus("Searching local network and fetching the selected server list...",
-                                   gui::MainMenuView::MessageTone::Pending);
+                                   gui::MessageTone::Pending);
     } else if (lanActive) {
         browser.setCommunityStatus("Searching local network for servers...",
-                                   gui::MainMenuView::MessageTone::Pending);
+                                   gui::MessageTone::Pending);
     } else {
         browser.setCommunityStatus("Fetching " + selectionLabel + "...",
-                                   gui::MainMenuView::MessageTone::Pending);
+                                   gui::MessageTone::Pending);
     }
 
     browser.setScanning(issuedRequest);
@@ -311,6 +366,7 @@ void CommunityBrowserController::rebuildEntries() {
             entry.description = record.overview;
         }
         entry.longDescription = record.detailDescription;
+        entry.code = record.code;
         entry.flags = record.flags;
         entry.activePlayers = record.activePlayers;
         entry.maxPlayers = record.maxPlayers;
@@ -375,16 +431,43 @@ void CommunityBrowserController::update() {
         rebuildEntries();
     }
 
+    if (pendingAddRequest && pendingAddRequest->done.load()) {
+        if (pendingAddRequest->worker.joinable()) {
+            pendingAddRequest->worker.join();
+        }
+        if (pendingAddRequest->ok) {
+            commitServerListAddition(pendingAddRequest->baseUrl);
+        } else {
+            browser.showErrorDialog("Failed to connect to " + pendingAddRequest->displayHost);
+        }
+        pendingAddRequest.reset();
+    }
+
     if (remoteFetchingActive && serverListFetcher && !isLanSelected()) {
         std::string selectionLabel = "selected server list";
-        if (const auto *source = getSelectedRemoteSource()) {
+        const ClientServerListSource *source = getSelectedRemoteSource();
+        if (source) {
             selectionLabel = resolveDisplayNameForSource(*source);
         }
-        browser.setCommunityStatus("Fetching " + selectionLabel + "...",
-                                   gui::MainMenuView::MessageTone::Pending);
+        bool hasStatus = false;
+        if (source && !source->host.empty()) {
+            for (const auto &status : cachedSourceStatuses) {
+                if (status.sourceHost == source->host) {
+                    hasStatus = true;
+                    break;
+                }
+            }
+        }
+        if (source && !source->host.empty() && !hasStatus) {
+            browser.setCommunityStatus("Connecting to " + selectionLabel + " at " + source->host + "...",
+                                       gui::MessageTone::Pending);
+        } else {
+            browser.setCommunityStatus("Fetching " + selectionLabel + "...",
+                                       gui::MessageTone::Pending);
+        }
     } else if (serverListFetcher && !isLanSelected()) {
         std::string statusText;
-        gui::MainMenuView::MessageTone tone = gui::MainMenuView::MessageTone::Notice;
+        gui::MessageTone tone = gui::MessageTone::Notice;
         const auto *source = getSelectedRemoteSource();
         if (source && !source->host.empty()) {
             for (const auto &status : cachedSourceStatuses) {
@@ -396,7 +479,7 @@ void CommunityBrowserController::update() {
                     if (!source->host.empty()) {
                         statusText += " (" + source->host + ")";
                     }
-                    tone = gui::MainMenuView::MessageTone::Error;
+                    tone = gui::MessageTone::Error;
                 } else if (status.activeCount == 0) {
                     statusText = "Community currently has no active servers";
                     if (status.inactiveCount >= 0) {
@@ -409,9 +492,9 @@ void CommunityBrowserController::update() {
         browser.setCommunityStatus(statusText, tone);
     } else if (isLanSelected() && discovery.isScanning()) {
         browser.setCommunityStatus("Searching local network for servers...",
-                                   gui::MainMenuView::MessageTone::Pending);
+                                   gui::MessageTone::Pending);
     } else {
-        browser.setCommunityStatus(std::string{}, gui::MainMenuView::MessageTone::Notice);
+        browser.setCommunityStatus(std::string{}, gui::MessageTone::Notice);
     }
 
     const auto &servers = discovery.getServers();
@@ -428,14 +511,14 @@ void CommunityBrowserController::update() {
     if (lanEmpty && remoteEmpty) {
         if (discovery.isScanning() && isLanSelected()) {
             browser.setStatus(std::string{}, false);
-            browser.setCommunityStatus("Searching local network for servers...",
-                                       gui::MainMenuView::MessageTone::Pending);
+        browser.setCommunityStatus("Searching local network for servers...",
+                                       gui::MessageTone::Pending);
         } else if (remoteFetchingActive && serverListFetcher) {
             browser.setStatus(std::string{}, false);
         } else if (isLanSelected()) {
             browser.setStatus(std::string{}, false);
-            browser.setCommunityStatus("No LAN servers found. Start one locally or refresh.",
-                                       gui::MainMenuView::MessageTone::Notice);
+        browser.setCommunityStatus("No LAN servers found. Start one locally or refresh.",
+                                       gui::MessageTone::Notice);
         } else if (serverListFetcher) {
             browser.setStatus(std::string{}, false);
         } else {
@@ -455,6 +538,9 @@ void CommunityBrowserController::update() {
             for (auto &record : cachedRemoteServers) {
                 if (makeServerDetailsKey(record) == serverDetailsRequest->key) {
                     record.detailDescription = serverDetailsRequest->description;
+                    if (!serverDetailsRequest->detailName.empty()) {
+                        record.name = serverDetailsRequest->detailName;
+                    }
                 }
             }
             rebuildEntries();
@@ -508,6 +594,7 @@ void CommunityBrowserController::handleDisconnected(const std::string &reason) {
         : reason;
 
     browser.show(lastGuiEntries);
+    browser.setConnectionState({});
     browser.setStatus(status, true);
     triggerFullRefresh();
 }
@@ -600,18 +687,50 @@ void CommunityBrowserController::handleServerListAddition(const gui::ServerListO
     std::string trimmedHost = trimCopy(option.host);
 
     if (trimmedHost.empty()) {
-        browser.setListStatus("Enter a host before saving.", true);
+        browser.showErrorDialog("Enter a community host before saving.");
+        return;
+    }
+    ParsedCommunityHost parsed;
+    if (!parseCommunityUrl(trimmedHost, parsed)) {
+        browser.showErrorDialog(trimmedHost + " is not a valid Community site.");
+        return;
+    }
+    if (pendingAddRequest && !pendingAddRequest->done.load()) {
+        browser.showErrorDialog("Already checking a community. Please wait.");
         return;
     }
 
     auto existing = std::find_if(clientConfig.serverLists.begin(), clientConfig.serverLists.end(),
         [&](const ClientServerListSource &source) {
-            return source.host == trimmedHost;
+            return source.host == parsed.baseUrl;
         });
     if (existing != clientConfig.serverLists.end()) {
-        browser.setListStatus("A server list with that host already exists.", true);
+        std::string displayName = parsed.displayHost;
+        if (!existing->name.empty()) {
+            displayName = existing->name;
+        } else {
+            auto nameIt = serverListDisplayNames.find(parsed.baseUrl);
+            if (nameIt != serverListDisplayNames.end() && !nameIt->second.empty()) {
+                displayName = nameIt->second;
+            }
+        }
+        browser.showErrorDialog("You already added \"" + displayName + "\".");
         return;
     }
+
+    auto request = std::make_unique<PendingAddRequest>();
+    request->baseUrl = parsed.baseUrl;
+    request->displayHost = parsed.displayHost;
+    request->worker = std::thread([req = request.get()]() {
+        req->ok = fetchCommunityInfoOk(req->baseUrl);
+        req->done.store(true);
+    });
+    pendingAddRequest = std::move(request);
+    browser.setListStatus("Checking community...", false);
+}
+
+void CommunityBrowserController::commitServerListAddition(const std::string &baseUrl) {
+    std::string trimmedHost = trimCopy(baseUrl);
 
     ClientServerListSource source;
     source.host = trimmedHost;
@@ -974,38 +1093,34 @@ std::string CommunityBrowserController::makeServerDetailsKey(const gui::Communit
     if (entry.sourceHost.empty()) {
         return {};
     }
-    std::string name = entry.worldName;
-    if (name.empty()) {
-        name = entry.label.empty() ? entry.host : entry.label;
-    }
-    if (name.empty()) {
+    if (entry.code.empty()) {
         return {};
     }
-    return entry.sourceHost + "|" + name + "|" + entry.host + ":" + std::to_string(entry.port);
+    return entry.sourceHost + "|" + entry.code;
 }
 
 std::string CommunityBrowserController::makeServerDetailsKey(const ServerListFetcher::ServerRecord &record) const {
     if (record.sourceHost.empty()) {
         return {};
     }
-    if (record.name.empty()) {
+    if (record.code.empty()) {
         return {};
     }
-    return record.sourceHost + "|" + record.name + "|" + record.host + ":" + std::to_string(record.port);
+    return record.sourceHost + "|" + record.code;
 }
 
 void CommunityBrowserController::startServerDetailsRequest(const gui::CommunityBrowserEntry &entry) {
     if (!curlReady) {
         return;
     }
-    if (entry.sourceHost.empty() || entry.worldName.empty()) {
+    if (entry.sourceHost.empty() || entry.code.empty()) {
         return;
     }
 
     auto request = std::make_unique<ServerDetailsRequest>();
     request->key = makeServerDetailsKey(entry);
     request->sourceHost = entry.sourceHost;
-    request->serverName = entry.worldName;
+    request->serverName = entry.code;
 
     request->worker = std::thread([req = request.get()]() {
         std::string url = buildServerDetailsUrl(req->sourceHost, req->serverName);
@@ -1033,6 +1148,10 @@ void CommunityBrowserController::startServerDetailsRequest(const gui::CommunityB
             nlohmann::json jsonData = nlohmann::json::parse(body);
             const auto *serverNode = jsonData.contains("server") ? &jsonData["server"] : nullptr;
             if (serverNode && serverNode->is_object()) {
+                if (auto nameIt = serverNode->find("name");
+                    nameIt != serverNode->end() && nameIt->is_string()) {
+                    req->detailName = nameIt->get<std::string>();
+                }
                 if (auto descIt = serverNode->find("description");
                     descIt != serverNode->end() && descIt->is_string()) {
                     req->description = descIt->get<std::string>();

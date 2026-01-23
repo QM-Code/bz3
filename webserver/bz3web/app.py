@@ -48,7 +48,10 @@ def application(environ, start_response):
         status_code = int(status.split()[0])
     except (ValueError, IndexError):
         status_code = 0
-    body_len = len(body) if body is not None else 0
+    if isinstance(body, (bytes, bytearray)):
+        body_len = len(body)
+    else:
+        body_len = 0
     message = '%s "%s %s" %s %s %.2fms' % (
         webhttp.client_ip(environ),
         request.method,
@@ -67,7 +70,9 @@ def application(environ, start_response):
             user_label = auth.display_username(user)
         message = f"{message} user={user_label}"
     logging_utils.log_access(request.path, message)
-    return [body]
+    if isinstance(body, (bytes, bytearray)):
+        return [body]
+    return body
 
 
 def main():
@@ -91,7 +96,7 @@ def main():
         print("[bz3web] Error: No port specified in config.json. Use -p <port> to specify a port.")
         return
     port = int(port)
-    print(f"Server list server listening on http://{host}:{port}")
+    print(f"Community server listening on http://{host}:{port}")
     try:
         if serve_app is not None:
             threads = int(config.require_setting(settings, "httpserver.threads"))

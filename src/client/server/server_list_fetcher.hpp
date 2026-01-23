@@ -25,6 +25,7 @@ public:
         std::string sourceName;
         std::string sourceHost;
         std::string name;
+        std::string code;
         std::string host;
         uint16_t port = 0;
         int maxPlayers = -1;

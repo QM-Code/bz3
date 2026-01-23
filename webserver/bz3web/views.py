@@ -199,12 +199,14 @@ def render_page(title, body_html, message=None, header_links_html=None, headers=
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&#39;");
         };
-        const buildCardElement = (server, allowActions) => {
+        const buildCardElement = (server, allowActions, csrfToken) => {
           const rawName = server.name || `${server.host}:${server.port}`;
           const name = escapeHtml(rawName);
-          const serverUrl = `/servers/${encodeURIComponent(rawName)}`;
+          const serverToken = server.code || rawName;
+          const serverUrl = `/server/${encodeURIComponent(serverToken)}`;
           const owner = escapeHtml(server.owner || "");
-          const ownerUrl = `/users/${encodeURIComponent(server.owner || "")}`;
+          const ownerToken = server.owner_code || server.owner || "";
+          const ownerUrl = `/users/${encodeURIComponent(ownerToken)}`;
           const overviewText = server.overview || "";
           const description = overviewText
             ? `<p>${escapeHtml(overviewText)}</p>`
@@ -231,12 +233,12 @@ def render_page(title, body_html, message=None, header_links_html=None, headers=
             : "";
           let actionsBlock = "";
           if (allowActions && server.id !== undefined && server.id !== null) {
+            const editToken = server.code || rawName;
+            const csrf = csrfToken ? `<input type="hidden" name="csrf_token" value="${escapeHtml(csrfToken)}">` : "";
             actionsBlock = `<div class="card-actions">
-  <form method="get" action="/server/edit">
-    <input type="hidden" name="id" value="${escapeHtml(server.id)}">
-    <button type="submit" class="secondary small">__ACTION_EDIT__</button>
-  </form>
+  <a class="button-link secondary small" href="/server/${encodeURIComponent(editToken)}/edit">__ACTION_EDIT__</a>
   <form method="post" action="/server/delete" data-confirm="__CONFIRM_DELETE_SERVER__">
+    ${csrf}
     <input type="hidden" name="id" value="${escapeHtml(server.id)}">
     <button type="submit" class="secondary small">__ACTION_DELETE__</button>
   </form>
@@ -269,6 +271,7 @@ def render_page(title, body_html, message=None, header_links_html=None, headers=
           const container = section.querySelector('[data-role="server-cards"]');
           if (!container) return;
           const animate = section.dataset.animate === "1";
+          const csrfToken = section.dataset.csrfToken || "";
           if (!servers.length) {
             container.innerHTML = __SERVERS_EMPTY__;
             return;
@@ -290,7 +293,7 @@ def render_page(title, body_html, message=None, header_links_html=None, headers=
           servers.forEach((server) => {
             const key = String(server.id ?? (server.name || `${server.host}:${server.port}`));
             let card = existingCards[key];
-            const nextCard = buildCardElement(server, allowActions);
+            const nextCard = buildCardElement(server, allowActions, csrfToken);
             nextCard.dataset.serverId = key;
             if (card) {
               card.dataset.serverId = key;
@@ -475,13 +478,17 @@ def header(
     if logged_in and user_name:
         safe_name = webhttp.html_escape(user_name)
         signed_in_as = webhttp.html_escape(_header_text("signed_in_as"))
-        user_html = f'<div class="header-user">{signed_in_as} <span class="header-username">{safe_name}</span></div>'
+        if profile_url:
+            user_html = (
+                f'<div class="header-user">{signed_in_as} '
+                f'<a class="header-username" href="{profile_url}">{safe_name}</a></div>'
+            )
+        else:
+            user_html = f'<div class="header-user">{signed_in_as} <span class="header-username">{safe_name}</span></div>'
     if current_path != "/info":
         links.append(f'<a class="admin-link" href="/info">{webhttp.html_escape(_nav("info"))}</a>')
-    if current_path != "/servers":
-        links.append(f'<a class="admin-link" href="/servers">{webhttp.html_escape(_nav("servers"))}</a>')
-    if logged_in and profile_url and current_path != profile_url:
-        links.append(f'<a class="admin-link" href="{profile_url}">{webhttp.html_escape(_nav("account"))}</a>')
+    if current_path != "/servers/active" and not current_path.startswith("/servers/"):
+        links.append(f'<a class="admin-link" href="/servers/active">{webhttp.html_escape(_nav("servers"))}</a>')
     if logged_in and is_admin and current_path != "/users":
         links.append(f'<a class="admin-link" href="/users">{webhttp.html_escape(_nav("users"))}</a>')
     if logged_in:
@@ -547,6 +554,7 @@ def render_server_cards(
     toggle_url=None,
     toggle_label=None,
     header_title_html=None,
+    header_actions_html=None,
 ):
     from bz3web import lightbox, uploads
 
@@ -561,10 +569,11 @@ def render_server_cards(
             else ""
         )
         toggle_html = f'<a class="admin-link secondary" href="{toggle_url}">{toggle_label}</a>' if toggle_url else ""
+        actions_html = header_actions_html if header_actions_html else toggle_html
         header_html = f"""<div class="section-header">
   <h2>{title_html}</h2>
   {summary_html}
-  {toggle_html}
+  {actions_html}
 </div>
 """
 
@@ -581,7 +590,8 @@ def render_server_cards(
         active = entry.get("active", False)
         owner_name = entry["owner"]
         owner = webhttp.html_escape(owner_name)
-        owner_url = f"/users/{urllib.parse.quote(owner_name, safe='')}"
+        owner_token = entry.get("owner_code") or owner_name
+        owner_url = f"/users/{urllib.parse.quote(owner_token, safe='')}"
         screenshot_id = entry.get("screenshot_id")
         screenshot = None
         full_image = None
@@ -626,7 +636,12 @@ def render_server_cards(
         online_class = "online active" if active else "online inactive"
         endpoint_html = f"<div class=\"endpoint\">{host}:{port}</div>" if active else ""
 
-        name_link = f'<a class="server-link" href="/servers/{urllib.parse.quote(raw_name, safe="")}">{name}</a>'
+        code = entry.get("code")
+        if code:
+            link_target = urllib.parse.quote(str(code), safe="")
+        else:
+            link_target = urllib.parse.quote(raw_name, safe="")
+        name_link = f'<a class="server-link" href="/server/{link_target}">{name}</a>'
         card_id = entry.get("id")
         if card_id is None:
             card_id = raw_name
@@ -666,19 +681,25 @@ def render_server_cards(
 def render_server_section(
     rows,
     timeout,
-    show_inactive,
+    status,
     entry_builder,
     header_title=None,
     header_title_html=None,
     toggle_on_url=None,
     toggle_off_url=None,
+    header_actions_html=None,
+    csrf_token="",
     refresh_url=None,
     refresh_interval=10,
     allow_actions=False,
     refresh_animate=False,
+    sort_entries=True,
 ):
     from bz3web.server_status import is_active
 
+    status = (status or "all").lower()
+    if status not in ("all", "active", "inactive"):
+        status = "all"
     active_count = 0
     inactive_count = 0
     entries = []
@@ -688,12 +709,10 @@ def render_server_section(
             active_count += 1
         else:
             inactive_count += 1
-        if show_inactive:
-            if active:
-                continue
-        else:
-            if not active:
-                continue
+        if status == "active" and not active:
+            continue
+        if status == "inactive" and active:
+            continue
         entry = entry_builder(row, active)
         if entry is None:
             continue
@@ -701,10 +720,18 @@ def render_server_section(
             entry["active"] = active
         entries.append(entry)
 
-    entries.sort(key=lambda item: item.get("num_players") if item.get("num_players") is not None else -1, reverse=True)
+    if sort_entries:
+        entries.sort(key=lambda item: item.get("num_players") if item.get("num_players") is not None else -1, reverse=True)
     summary_text = config.format_text(_template("server_summary"), active=active_count, inactive=inactive_count)
-    toggle_url = toggle_on_url if not show_inactive else toggle_off_url
-    toggle_label = _action("toggle_show_offline") if not show_inactive else _action("toggle_show_online")
+    if status == "inactive":
+        toggle_url = toggle_off_url
+        toggle_label = _action("toggle_show_online")
+    elif status == "active":
+        toggle_url = toggle_on_url
+        toggle_label = _action("toggle_show_offline")
+    else:
+        toggle_url = toggle_off_url
+        toggle_label = _action("toggle_show_online")
     section_html = render_server_cards(
         entries,
         header_title=header_title,
@@ -712,16 +739,19 @@ def render_server_section(
         summary_text=summary_text,
         toggle_url=toggle_url,
         toggle_label=toggle_label,
+        header_actions_html=header_actions_html,
     )
     if refresh_url:
         refresh_attr = webhttp.html_escape(refresh_url)
         allow_value = "1" if allow_actions else "0"
-        inactive_value = "1" if show_inactive else "0"
+        inactive_value = "1" if status == "inactive" else "0"
         animate_value = "1" if refresh_animate else "0"
+        csrf_attr = webhttp.html_escape(csrf_token or "")
         return (
             f'<section class="server-section" data-refresh-url="{refresh_attr}" '
             f'data-refresh-interval="{refresh_interval}" data-allow-actions="{allow_value}" '
-            f'data-show-inactive="{inactive_value}" data-animate="{animate_value}">{section_html}</section>'
+            f'data-show-inactive="{inactive_value}" data-animate="{animate_value}" '
+            f'data-csrf-token="{csrf_attr}">{section_html}</section>'
         )
     return section_html
 
@@ -748,7 +778,7 @@ def render_admins_section(
         remove_label = webhttp.html_escape(_action("remove"))
         admin_rows = "".join(
             f"""<tr>
-  <td><a class="admin-user-link" href="/users/{urllib.parse.quote(admin["username"], safe='')}">{webhttp.html_escape(admin["username"])}</a></td>
+  <td><a class="admin-user-link" href="/users/{urllib.parse.quote(admin.get("code") or admin["username"], safe='')}">{webhttp.html_escape(admin["username"])}</a></td>
   <td class="center-cell">
     <form method="post" action="{form_prefix}/admins/trust" class="js-toggle-form admin-toggle">
       {csrf_html}
@@ -779,7 +809,7 @@ def render_admins_section(
     else:
         admin_rows = "".join(
             f"""<tr>
-  <td><a class="admin-user-link" href="/users/{urllib.parse.quote(admin["username"], safe='')}">{webhttp.html_escape(admin["username"])}</a></td>
+  <td><a class="admin-user-link" href="/users/{urllib.parse.quote(admin.get("code") or admin["username"], safe='')}">{webhttp.html_escape(admin["username"])}</a></td>
   <td>{yes_label if admin["trust_admins"] else no_label}</td>
 </tr>"""
             for admin in admins

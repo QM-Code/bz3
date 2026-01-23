@@ -32,6 +32,7 @@ std::string readFileToString(const std::filesystem::path& path) {
 Render::Render(GLFWwindow *window) :
     window(window),
     renderer({1, 1}) {
+    spdlog::trace("Render: init start");
 
     scene = threepp::Scene::create();
     radarScene = threepp::Scene::create();
@@ -77,13 +78,20 @@ Render::Render(GLFWwindow *window) :
 
     // Setup resize callback
     auto* userPointer = static_cast<GLFWUserPointer*>(glfwGetWindowUserPointer(window));
-    userPointer->resizeCallback = [this](int width, int height) {
-        this->resizeCallback(width, height);
-    };
-    glfwSetFramebufferSizeCallback(window, [](GLFWwindow* w, int width, int height) {
-        auto* userPointer = static_cast<GLFWUserPointer*>(glfwGetWindowUserPointer(w));
-        userPointer->resizeCallback(width, height);
-    });
+    if (!userPointer) {
+        spdlog::error("Render: GLFW user pointer missing; resize callbacks disabled.");
+    } else {
+        userPointer->resizeCallback = [this](int width, int height) {
+            this->resizeCallback(width, height);
+        };
+        glfwSetFramebufferSizeCallback(window, [](GLFWwindow* w, int width, int height) {
+            auto* userPointer = static_cast<GLFWUserPointer*>(glfwGetWindowUserPointer(w));
+            if (!userPointer) {
+                return;
+            }
+            userPointer->resizeCallback(width, height);
+        });
+    }
     
     renderer.setClearColor(threepp::Color(0x3399ff));
     renderer.shadowMap().enabled = true;

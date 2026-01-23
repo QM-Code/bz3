@@ -218,6 +218,30 @@ int main(int argc, char *argv[]) {
 
         engine.earlyUpdate(deltaTime);
 
+        static bool prevGraveDown = false;
+        const bool graveDown = glfwGetKey(window, GLFW_KEY_GRAVE_ACCENT) == GLFW_PRESS;
+        if (graveDown && !prevGraveDown) {
+            if (game) {
+                auto &menu = engine.gui->mainMenu();
+                if (menu.isVisible()) {
+                    menu.hide();
+                } else {
+                    menu.show({});
+                }
+            }
+        }
+        prevGraveDown = graveDown;
+
+        if (engine.gui->mainMenu().consumeQuitRequest()) {
+            if (game) {
+                engine.network->disconnect("Disconnected from server.");
+            }
+        }
+
+        if (engine.gui->mainMenu().isVisible()) {
+            engine.input->clearState();
+        }
+
         if (engine.input->getInputState().toggleFullscreen) {
             ToggleFullscreen(window, fullscreenState, vsyncEnabled);
         }
@@ -229,7 +253,7 @@ int main(int argc, char *argv[]) {
             communityBrowser.handleDisconnected(disconnectEvent->reason);
         }
 
-        if (!game) {
+        if (!game || engine.gui->mainMenu().isVisible()) {
             communityBrowser.update();
         }
 

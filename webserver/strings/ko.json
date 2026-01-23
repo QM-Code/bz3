@@ -9,9 +9,9 @@
     "jp": "일본어",
     "zh": "중국어",
     "ko": "한국어",
-    "it": "Italian",
-    "hi": "Hindi",
-    "ar": "Arabic"
+    "it": "이탈리아어",
+    "hi": "힌디어",
+    "ar": "아랍어"
   },
   "ui_text": {
     "hints": {
@@ -61,8 +61,8 @@
         "message": "서버를 찾을 수 없습니다."
       },
       "generic": {
-        "title": "Error",
-        "message": ""
+        "title": "오류",
+        "message": "오류가 발생했습니다."
       }
     },
     "messages": {
@@ -214,7 +214,7 @@
       "add_admin": "관리자 추가",
       "add_server": "서버 추가",
       "create_user": "사용자 생성",
-      "personal_settings": "개인 설정",
+      "personal_settings": "프로필",
       "edit_info": "정보 편집",
       "register_here": "여기에서 등록",
       "already_have_account": "이미 계정이 있나요?",
@@ -235,7 +235,7 @@
       "edit_server": "서버 편집",
       "users": "사용자",
       "edit_user": "사용자 편집",
-      "personal_settings": "개인 설정",
+      "personal_settings": "프로필",
       "community_info": "커뮤니티 정보",
       "admin_docs": "관리자 문서",
       "server_profile": "서버 프로필",
@@ -283,10 +283,10 @@
       "language_prompt": "언어 [{default}]",
       "language_tab_hint": "(? 목록):",
       "language_list_header": "사용 가능한 언어:",
-      "language_list_item": "  {code} - {label}",
+      "language_list_item": "  {code}: {label}",
       "language_invalid": "잘못된 언어 코드입니다.",
       "language_codes_header": "유효한 언어 코드:",
-      "language_code_item": "  {code} - {label}",
+      "language_code_item": "  {code}: {label}",
       "community_name": "커뮤니티 이름",
       "port": "포트",
       "admin_username": "관리자 사용자 이름",
@@ -298,6 +298,29 @@
       "create_dir_suffix": "[예/아니오]",
       "default_community_name": "내 커뮤니티",
       "default_admin_user": "관리자"
+    },
+    "start": {
+      "usage": "사용법: start.py <커뮤니티-디렉터리> [-p <포트>]",
+      "port_invalid_integer": "포트는 정수여야 합니다.",
+      "stopped": "서버가 중지되었습니다."
+    },
+    "db_restore": {
+      "usage": "사용법: db-restore.py <커뮤니티-디렉터리> -f <json-파일>",
+      "json_required": "-f <json-파일>은 필수입니다",
+      "db_exists": "데이터베이스가 이미 존재합니다.",
+      "imported_users": "사용자 {count}명 가져옴; {skipped}명 건너뜀.",
+      "imported_servers": "서버 {count}개 가져옴; {skipped}개 건너뜀."
+    },
+    "db_merge": {
+      "usage": "사용법: db-merge.py <커뮤니티-디렉터리> -f <json-파일>",
+      "json_required": "-f <json-파일>은 필수입니다",
+      "imported_users": "사용자 {count}명 가져옴; {skipped}명 건너뜀.",
+      "imported_servers": "서버 {count}개 가져옴; {skipped}개 건너뜀."
+    },
+    "db_snapshot": {
+      "usage": "사용법: db-snapshot.py <커뮤니티-디렉터리> [output.json|-] [-z]",
+      "exporting": "{path}(으)로 스냅샷을 내보내는 중",
+      "wrote_zip": "{path}에 작성했습니다"
     }
   }
 }

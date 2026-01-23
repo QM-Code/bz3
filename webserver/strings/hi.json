@@ -61,8 +61,8 @@
         "message": "सर्वर नहीं मिला।"
       },
       "generic": {
-        "title": "Error",
-        "message": ""
+        "title": "त्रुटि",
+        "message": "एक त्रुटि हुई।"
       }
     },
     "messages": {
@@ -214,7 +214,7 @@
       "add_admin": "एडमिन जोड़ें",
       "add_server": "सर्वर जोड़ें",
       "create_user": "उपयोगकर्ता बनाएं",
-      "personal_settings": "व्यक्तिगत सेटिंग्स",
+      "personal_settings": "प्रोफ़ाइल",
       "edit_info": "जानकारी संपादित करें",
       "register_here": "यहाँ पंजीकरण करें",
       "already_have_account": "पहले से खाता है?",
@@ -235,7 +235,7 @@
       "edit_server": "सर्वर संपादित करें",
       "users": "उपयोगकर्ता",
       "edit_user": "उपयोगकर्ता संपादित करें",
-      "personal_settings": "व्यक्तिगत सेटिंग्स",
+      "personal_settings": "प्रोफ़ाइल",
       "community_info": "समुदाय की जानकारी",
       "admin_docs": "एडमिन दस्तावेज़",
       "server_profile": "सर्वर प्रोफ़ाइल",
@@ -283,10 +283,10 @@
       "language_prompt": "भाषा [{default}]",
       "language_tab_hint": "(? सूची के लिए):",
       "language_list_header": "उपलब्ध भाषाएँ:",
-      "language_list_item": "  {code} - {label}",
+      "language_list_item": "  {code} : {label}",
       "language_invalid": "अमान्य भाषा कोड।",
       "language_codes_header": "मान्य भाषा कोड:",
-      "language_code_item": "  {code} - {label}",
+      "language_code_item": "  {code} : {label}",
       "community_name": "समुदाय का नाम",
       "port": "पोर्ट",
       "admin_username": "एडमिन उपयोगकर्ता नाम",
@@ -298,6 +298,29 @@
       "create_dir_suffix": "[हाँ/न]",
       "default_community_name": "मेरा समुदाय",
       "default_admin_user": "प्रशासक"
+    },
+    "start": {
+      "usage": "उपयोग: start.py <समुदाय-निर्देशिका> [-p <पोर्ट>]",
+      "port_invalid_integer": "पोर्ट एक पूर्णांक होना चाहिए।",
+      "stopped": "सर्वर बंद किया गया।"
+    },
+    "db_restore": {
+      "usage": "उपयोग: db-restore.py <समुदाय-निर्देशिका> -f <json-फ़ाइल>",
+      "json_required": "-f <json-फ़ाइल> अनिवार्य है",
+      "db_exists": "डेटाबेस पहले से मौजूद है।",
+      "imported_users": "{count} उपयोगकर्ता आयात किए गए; {skipped} छोड़े गए।",
+      "imported_servers": "{count} सर्वर आयात किए गए; {skipped} छोड़े गए।"
+    },
+    "db_merge": {
+      "usage": "उपयोग: db-merge.py <समुदाय-निर्देशिका> -f <json-फ़ाइल>",
+      "json_required": "-f <json-फ़ाइल> अनिवार्य है",
+      "imported_users": "{count} उपयोगकर्ता आयात किए गए; {skipped} छोड़े गए।",
+      "imported_servers": "{count} सर्वर आयात किए गए; {skipped} छोड़े गए।"
+    },
+    "db_snapshot": {
+      "usage": "उपयोग: db-snapshot.py <समुदाय-निर्देशिका> [output.json|-] [-z]",
+      "exporting": "स्नैपशॉट {path} पर निर्यात किया जा रहा है",
+      "wrote_zip": "{path} लिखा गया"
     }
   }
 }

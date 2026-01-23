@@ -31,12 +31,21 @@ def handle(request):
     if request.method != "GET":
         return views.error_page("405 Method Not Allowed", "method_not_allowed")
 
+    token = request.query.get("token", [""])[0].strip()
     name = request.query.get("name", [""])[0].strip()
-    if not name:
+    code = request.query.get("code", [""])[0].strip()
+    if not (token or name or code):
         return views.error_page("400 Bad Request", "missing_server")
 
     with db.connect_ctx() as conn:
-        server = db.get_server_by_name(conn, name)
+        server = None
+        lookup_token = code or token
+        if lookup_token:
+            server = db.get_server_by_code(conn, lookup_token)
+        if not server:
+            lookup_name = name or token
+            if lookup_name:
+                server = db.get_server_by_name(conn, lookup_name)
         if not server:
             return views.error_page("404 Not Found", "server_not_found")
 
@@ -55,6 +64,7 @@ def handle(request):
 
         entry = {
             "id": server["id"],
+            "code": server["code"],
             "host": server["host"],
             "port": str(server["port"]),
             "name": server["name"],
@@ -62,19 +72,18 @@ def handle(request):
             "max_players": server["max_players"],
             "num_players": server["num_players"],
             "owner": server["owner_username"],
+            "owner_code": server["owner_code"],
             "screenshot_id": server["screenshot_id"],
             "active": active,
         }
         if is_owner or can_manage:
             server_id = server["id"]
+            server_token = server["code"] or server["name"]
             csrf_html = views.csrf_input(auth.csrf_token(request))
             edit_label = webhttp.html_escape(_action("edit"))
             delete_label = webhttp.html_escape(_action("delete"))
             confirm_delete = webhttp.html_escape(config.ui_text("confirmations.delete_server"))
-            entry["actions_html"] = f"""<form method="get" action="/server/edit">
-  <input type="hidden" name="id" value="{server_id}">
-  <button type="submit" class="secondary small">{edit_label}</button>
-</form>
+            entry["actions_html"] = f"""<a class="button-link secondary small" href="/server/{urllib.parse.quote(str(server_token), safe='')}/edit">{edit_label}</a>
 <form method="post" action="/server/delete" data-confirm="{confirm_delete}">
   {csrf_html}
   <input type="hidden" name="id" value="{server_id}">
@@ -83,7 +92,8 @@ def handle(request):
 
         profile_url = None
         if user:
-            profile_url = f"/users/{urllib.parse.quote(user['username'], safe='')}"
+            user_token = auth.user_token(user)
+            profile_url = f"/users/{urllib.parse.quote(user_token, safe='')}"
         header_html = views.header(
             config.require_setting(settings, "server.community_name"),
             request.path,
@@ -98,32 +108,12 @@ def handle(request):
             header_title_html=header_title_html,
         )
 
-        owner_url = f"/users/{urllib.parse.quote(server['owner_username'], safe='')}"
-        owner_html = f'<a href="{owner_url}">{webhttp.html_escape(server["owner_username"])}</a>'
-        players_html = "—"
-        if server["num_players"] is not None and server["max_players"] is not None:
-            players_html = f"{server['num_players']} / {server['max_players']}"
-        elif server["num_players"] is not None:
-            players_html = f"{server['num_players']}"
-        elif server["max_players"] is not None:
-            players_html = f"— / {server['max_players']}"
-
         description_html = markdown_utils.render_markdown(server["description"])
         if not description_html:
             empty_desc = config.require_setting(settings, "ui_text.empty_states.description")
             description_html = f'<p class="muted">{webhttp.html_escape(empty_desc)}</p>'
-        status_label = webhttp.html_escape(_label("status"))
-        owner_label = webhttp.html_escape(_label("owner"))
-        host_label = webhttp.html_escape(_label("host"))
-        players_label = webhttp.html_escape(_label("players"))
         heartbeat_label = webhttp.html_escape(_label("last_heartbeat"))
-        online_text = config.ui_text("status.online")
-        offline_text = config.ui_text("status.offline")
         info_html = f"""<div class="info-panel">
-  <div><strong>{status_label}:</strong> {webhttp.html_escape(online_text if active else offline_text)}</div>
-  <div><strong>{owner_label}:</strong> {owner_html}</div>
-  <div><strong>{host_label}:</strong> {webhttp.html_escape(server["host"])}:{server["port"]}</div>
-  <div><strong>{players_label}:</strong> {players_html}</div>
   <div><strong>{heartbeat_label}:</strong> {_format_heartbeat(server["last_heartbeat"])}</div>
 </div>"""
 
@@ -133,7 +123,7 @@ def handle(request):
 </div>"""
 
         body = f"""{cards_html}
-{info_html}
 {description_section}
+{info_html}
 """
         return views.render_page_with_header(_title("server_profile"), header_html, body)

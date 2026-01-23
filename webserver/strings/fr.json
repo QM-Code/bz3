@@ -8,10 +8,10 @@
     "ru": "Russe",
     "jp": "Japonais",
     "zh": "Chinois",
-    "ko": "Korean",
-    "it": "Italian",
-    "hi": "Hindi",
-    "ar": "Arabic"
+    "ko": "Coréen",
+    "it": "Italien",
+    "hi": "हिन्दी",
+    "ar": "Arabe"
   },
   "ui_text": {
     "hints": {
@@ -61,8 +61,8 @@
         "message": "Serveur introuvable."
       },
       "generic": {
-        "title": "Error",
-        "message": ""
+        "title": "Erreur",
+        "message": "Une erreur est survenue."
       }
     },
     "messages": {
@@ -130,7 +130,7 @@
       }
     },
     "nav": {
-      "info": "Info",
+      "info": "Informations",
       "servers": "Serveurs",
       "account": "Compte",
       "users": "Utilisateurs",
@@ -170,10 +170,10 @@
       "language": "Langue",
       "language_auto": "Auto (préférence du navigateur)",
       "host": "Hôte",
-      "port": "Port",
+      "port": "Port (réseau)",
       "server_name": "Nom du serveur",
       "overview": "Résumé",
-      "description": "Description",
+      "description": "Descriptif",
       "owner_username_optional": "Nom d'utilisateur du propriétaire (optionnel)",
       "screenshot_upload": "Capture du monde (PNG/JPG)",
       "screenshot_replace": "Remplacer la capture (PNG/JPG)",
@@ -183,16 +183,16 @@
       "community_name": "Nom de la communauté",
       "community_description": "Description de la communauté",
       "add_admin_by_username": "Ajouter un admin par nom d'utilisateur",
-      "admin": "Admin",
+      "admin": "Administrateur",
       "lock": "Verrouiller",
       "deleted": "Supprimé",
       "status": "Statut",
       "owner": "Propriétaire",
       "players": "Joueurs",
       "last_heartbeat": "Dernier heartbeat",
-      "admins": "Admins",
+      "admins": "Administrateurs",
       "trust_admins": "Faire confiance aux admins de l'utilisateur",
-      "actions": "Actions"
+      "actions": "Opérations"
     },
     "actions": {
       "create_account": "Créer un compte",
@@ -201,7 +201,7 @@
       "update_password": "Mettre à jour le mot de passe",
       "save": "Enregistrer",
       "cancel": "Annuler",
-      "submit_for_approval": "Soumettre pour approbation",
+      "submit_for_approval": "Soumettre",
       "return_to_servers": "Retour aux serveurs",
       "submit_another": "Soumettre un autre serveur",
       "save_changes": "Enregistrer les modifications",
@@ -214,7 +214,7 @@
       "add_admin": "Ajouter un admin",
       "add_server": "Ajouter un serveur",
       "create_user": "Créer un utilisateur",
-      "personal_settings": "Paramètres personnels",
+      "personal_settings": "Profil",
       "edit_info": "Modifier les infos",
       "register_here": "Inscrivez-vous ici",
       "already_have_account": "Vous avez déjà un compte ?",
@@ -235,7 +235,7 @@
       "edit_server": "Modifier le serveur",
       "users": "Utilisateurs",
       "edit_user": "Modifier l'utilisateur",
-      "personal_settings": "Paramètres personnels",
+      "personal_settings": "Profil",
       "community_info": "Informations de la communauté",
       "admin_docs": "Documentation des admins",
       "server_profile": "Profil du serveur",
@@ -244,7 +244,7 @@
     },
     "sections": {
       "servers": "Serveurs",
-      "admins": "Admins",
+      "admins": "Administrateurs",
       "add_user": "Ajouter un utilisateur"
     },
     "templates": {
@@ -283,12 +283,12 @@
       "language_prompt": "Langue [{default}]",
       "language_tab_hint": "(? pour la liste) :",
       "language_list_header": "Langues disponibles :",
-      "language_list_item": "  {code} - {label}",
+      "language_list_item": "  {code} : {label}",
       "language_invalid": "Code de langue invalide.",
       "language_codes_header": "Codes de langue valides :",
-      "language_code_item": "  {code} - {label}",
+      "language_code_item": "  {code} : {label}",
       "community_name": "Nom de la communauté",
-      "port": "Port",
+      "port": "Port (réseau)",
       "admin_username": "Admin Nom d'utilisateur",
       "admin_password": "Admin Mot de passe",
       "port_invalid_integer": "Le port doit être un nombre entier.",
@@ -298,6 +298,29 @@
       "create_dir_suffix": "[O/n]",
       "default_community_name": "Ma communauté",
       "default_admin_user": "Administrateur"
+    },
+    "start": {
+      "usage": "utilisation : start.py <répertoire-communauté> [-p <port>]",
+      "port_invalid_integer": "Le port doit être un entier.",
+      "stopped": "Serveur arrêté."
+    },
+    "db_restore": {
+      "usage": "utilisation : db-restore.py <répertoire-communauté> -f <fichier-json>",
+      "json_required": "-f <fichier-json> est obligatoire",
+      "db_exists": "La base de données existe déjà.",
+      "imported_users": "Importé {count} utilisateurs ; {skipped} ignorés.",
+      "imported_servers": "Importé {count} serveurs ; {skipped} ignorés."
+    },
+    "db_merge": {
+      "usage": "utilisation : db-merge.py <répertoire-communauté> -f <fichier-json>",
+      "json_required": "-f <fichier-json> est obligatoire",
+      "imported_users": "Importé {count} utilisateurs ; {skipped} ignorés.",
+      "imported_servers": "Importé {count} serveurs ; {skipped} ignorés."
+    },
+    "db_snapshot": {
+      "usage": "utilisation : db-snapshot.py <répertoire-communauté> [output.json|-] [-z]",
+      "exporting": "Exportation de l’instantané vers {path}",
+      "wrote_zip": "Écrit {path}"
     }
   }
 }

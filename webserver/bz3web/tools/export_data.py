@@ -13,6 +13,7 @@ def export_data():
                    username,
                    email,
                    language,
+                   code,
                    password_hash,
                    password_salt,
                    is_admin,
@@ -50,6 +51,7 @@ def export_data():
                 "username": user["username"],
                 "email": user["email"],
                 "language": user["language"],
+                "code": user["code"],
                 "password_hash": user["password_hash"],
                 "password_salt": user["password_salt"],
                 "is_admin": bool(user["is_admin"]),
@@ -66,11 +68,13 @@ def export_data():
         servers = conn.execute(
             """
             SELECT servers.name,
+                   servers.code,
                    servers.overview,
                    servers.description,
                    servers.host,
                    servers.port,
                    users.username AS owner_username,
+                   users.code AS owner_code,
                    servers.screenshot_id
               FROM servers
               JOIN users ON users.id = servers.owner_user_id
@@ -81,11 +85,13 @@ def export_data():
         for server in servers:
             entry = {
                 "name": server["name"],
+                "code": server["code"],
                 "overview": server["overview"],
                 "description": server["description"],
                 "host": server["host"],
                 "port": server["port"],
                 "owner": server["owner_username"],
+                "owner_code": server["owner_code"],
                 "screenshot_id": server["screenshot_id"],
             }
             server_payload.append(entry)

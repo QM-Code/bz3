@@ -42,7 +42,7 @@ def _title(key):
     return config.ui_text(f"titles.{key}", "config.json ui_text.titles")
 
 
-def _render_form(request, message=None, user=None, form_data=None):
+def _render_form(request, message=None, user=None, form_data=None, owner_token=""):
     form_data = form_data or {}
     settings = config.get_config()
     ui_text = config.require_setting(settings, "ui_text")
@@ -62,8 +62,12 @@ def _render_form(request, message=None, user=None, form_data=None):
             return ""
         return f' placeholder="{webhttp.html_escape(value)}"'
     csrf_html = views.csrf_input(auth.csrf_token(request))
-    body = f"""<form method="post" action="/submit" enctype="multipart/form-data">
+    owner_html = ""
+    if owner_token:
+        owner_html = f'<input type="hidden" name="owner" value="{webhttp.html_escape(owner_token)}">'
+    body = f"""<form method="post" action="/servers/add" enctype="multipart/form-data">
   {csrf_html}
+  {owner_html}
   <div class="row">
     <div>
       <label for="host">{webhttp.html_escape(_label("host"))}</label>
@@ -107,10 +111,11 @@ def _render_form(request, message=None, user=None, form_data=None):
 """
     profile_url = None
     if user:
-        profile_url = f"/users/{quote(user['username'], safe='')}"
+        user_token = auth.user_token(user)
+        profile_url = f"/users/{quote(user_token, safe='')}"
     header_html = views.header_with_title(
         config.require_setting(config.get_config(), "server.community_name"),
-        "/submit",
+        "/servers/add",
         logged_in=bool(user),
         title=_title("submit_server"),
         error=message,
@@ -121,25 +126,28 @@ def _render_form(request, message=None, user=None, form_data=None):
     return views.render_page_with_header(_title("submit_server"), header_html, body)
 
 
-def _render_success(user=None):
+def _render_success(user=None, owner_token=""):
     body = f"""<p class="muted">{webhttp.html_escape(_msg("success_notice"))}</p>
 <div class="actions">
   <a class="admin-link" href="/servers">{webhttp.html_escape(_action("return_to_servers"))}</a>
-  <a class="admin-link" href="/submit">{webhttp.html_escape(_action("submit_another"))}</a>
+  <a class="admin-link" href="/servers/add">{webhttp.html_escape(_action("submit_another"))}</a>
 </div>
 """
     profile_url = None
     if user:
-        profile_url = f"/users/{quote(user['username'], safe='')}"
+        user_token = auth.user_token(user)
+        profile_url = f"/users/{quote(user_token, safe='')}"
     header_html = views.header_with_title(
         config.require_setting(config.get_config(), "server.community_name"),
-        "/submit",
+        "/servers/add",
         logged_in=True,
         title=_title("server_added"),
         user_name=auth.display_username(user),
         is_admin=auth.is_admin(user),
         profile_url=profile_url,
     )
+    if owner_token:
+        return webhttp.redirect(f"/users/{quote(owner_token, safe='')}")
     return views.render_page_with_header(_title("server_added"), header_html, body)
 
 def handle(request):
@@ -147,7 +155,18 @@ def handle(request):
         user = auth.get_user_from_request(request)
         if not user:
             return webhttp.redirect("/login")
-        return _render_form(request, user=user)
+        owner_token = request.query.get("owner", [""])[0].strip()
+        if owner_token and auth.is_admin(user):
+            with db.connect_ctx() as conn:
+                owner_user = db.get_user_by_code(conn, owner_token)
+                if not owner_user:
+                    owner_user = db.get_user_by_username(conn, owner_token)
+                if not owner_user or owner_user["deleted"]:
+                    message = config.ui_text("messages.users.user_not_found")
+                    return _render_form(request, message, user=user)
+        else:
+            owner_token = ""
+        return _render_form(request, user=user, owner_token=owner_token)
     if request.method != "POST":
         return views.error_page("405 Method Not Allowed", "method_not_allowed")
 
@@ -155,12 +174,31 @@ def handle(request):
     user = auth.get_user_from_request(request)
     if not user:
         return webhttp.redirect("/login")
-    content_length = int(request.environ.get("CONTENT_LENGTH") or 0)
     overview_max = int(config.require_setting(settings, "pages.servers.overview_max_chars"))
-    max_bytes = uploads._screenshot_settings(settings)["max_bytes"]
-    form, files = request.multipart()
+    max_bytes = int(config.require_setting(settings, "uploads.max_request_bytes"))
+    try:
+        content_length = int(request.environ.get("CONTENT_LENGTH") or 0)
+    except ValueError:
+        content_length = 0
+    if content_length > max_bytes:
+        return _render_form(
+            request,
+            _msg("upload_too_large"),
+            user=user,
+        )
+    try:
+        form, files = request.multipart()
+    except ValueError as exc:
+        if str(exc) == "request_too_large":
+            return _render_form(
+                request,
+                _msg("upload_too_large"),
+                user=user,
+            )
+        raise
     if not auth.verify_csrf(request, form):
         return views.error_page("403 Forbidden", "forbidden")
+    owner_token = _first(form, "owner")
     host = _first(form, "host")
     port_text = _first(form, "port")
     name = _first(form, "name")
@@ -175,14 +213,6 @@ def handle(request):
         "overview": overview,
         "description": description,
     }
-    if content_length > max_bytes + 1024 * 1024:
-        return _render_form(
-            request,
-            _msg("upload_too_large"),
-            user=user,
-            form_data=form_data,
-        )
-
     if not host or not port_text or not name:
         return _render_form(
             request,
@@ -237,6 +267,17 @@ def handle(request):
             )
         screenshot_id = upload_info.get("id")
 
+    owner_user_id = user["id"]
+    if owner_token and auth.is_admin(user):
+        with db.connect_ctx() as conn:
+            owner_user = db.get_user_by_code(conn, owner_token)
+            if not owner_user:
+                owner_user = db.get_user_by_username(conn, owner_token)
+            if not owner_user or owner_user["deleted"]:
+                message = config.ui_text("messages.users.user_not_found")
+                return _render_form(request, message, user=user, form_data=form_data, owner_token=owner_token)
+            owner_user_id = owner_user["id"]
+
     record = {
         "name": name or None,
         "overview": overview or None,
@@ -245,7 +286,7 @@ def handle(request):
         "port": port,
         "max_players": max_players,
         "num_players": num_players,
-        "owner_user_id": user["id"],
+        "owner_user_id": owner_user_id,
         "screenshot_id": screenshot_id,
         "last_heartbeat": None,
     }
@@ -253,4 +294,4 @@ def handle(request):
     with db.connect_ctx() as conn:
         db.add_server(conn, record)
 
-    return _render_success(user=user)
+        return _render_success(user=user, owner_token=owner_token if owner_user_id != user["id"] else "")
