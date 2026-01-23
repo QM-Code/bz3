@@ -36,6 +36,61 @@ body#hud-body
     color: #ffffff;
 }
 
+.hud-crosshair
+{
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 50px;
+    height: 50px;
+    margin-left: -25px;
+    margin-top: -25px;
+    pointer-events: none;
+}
+
+.hud-crosshair-box
+{
+    position: absolute;
+    left: 0px;
+    top: 0px;
+    width: 50px;
+    height: 50px;
+    border-width: 1px;
+    border-color: #c8c8c8b4;
+}
+
+.hud-crosshair-plus
+{
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    margin-left: -4px;
+    margin-top: -8px;
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 16px;
+}
+
+.hud-fps
+{
+    position: absolute;
+    right: 16px;
+    top: 12px;
+    padding: 4px 8px;
+    background-color: #0b0f1499;
+    border-width: 1px;
+    border-color: #223040;
+    border-radius: 6px;
+    color: #ffffff;
+    font-size: 14px;
+}
+
+.hud-fps.hidden
+{
+    display: none;
+}
+
 .scroll-frame
 {
     overflow-y: auto;

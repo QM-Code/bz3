@@ -105,6 +105,20 @@ void RmlUiHud::setScoreboardEntries(const std::vector<ScoreboardEntry> &entries)
     scoreboard.setEntries(entries);
 }
 
+void RmlUiHud::setFpsVisible(bool visible) {
+    if (fpsElement) {
+        fpsElement->SetClass("hidden", !visible);
+    }
+}
+
+void RmlUiHud::setFpsValue(float fps) {
+    lastFps = fps;
+    if (fpsElement) {
+        const int fpsInt = static_cast<int>(fps + 0.5f);
+        fpsElement->SetInnerRML("FPS: " + std::to_string(fpsInt));
+    }
+}
+
 void RmlUiHud::bindElements() {
     if (!document) {
         return;
@@ -113,6 +127,8 @@ void RmlUiHud::bindElements() {
     chat.bind(document, emojiMarkup);
     radar.bind(document);
     scoreboard.bind(document, emojiMarkup);
+    fpsElement = document->GetElementById("hud-fps");
+    setFpsValue(lastFps);
 }
 
 } // namespace gui

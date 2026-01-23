@@ -15,6 +15,7 @@
 #include "engine/components/gui/rmlui_backend/RmlUi_Platform_GLFW.h"
 #include "engine/components/gui/rmlui_backend/RmlUi_Renderer_GL3.h"
 #include "engine/components/gui/emoji_utils.hpp"
+#include "common/config_helpers.hpp"
 #include "engine/components/gui/rmlui_hud.hpp"
 #include "engine/components/gui/rmlui_main_menu.hpp"
 #include "engine/components/gui/rmlui_panels/rmlui_panel_community.hpp"
@@ -313,6 +314,10 @@ struct RmlUiBackend::RmlUiState {
     std::string regularFontPath;
     std::string emojiFontPath;
     std::unique_ptr<RmlUiHud> hud;
+    bool showFps = false;
+    double fpsLastTime = 0.0;
+    double fpsValue = 0.0;
+    int fpsFrames = 0;
 };
 
 RmlUiBackend::RmlUiBackend(GLFWwindow *window) : window(window) {
@@ -396,6 +401,8 @@ RmlUiBackend::RmlUiBackend(GLFWwindow *window) : window(window) {
     state->menuPath = bz::data::Resolve("client/ui/main_menu.rml").string();
     state->hudPath = bz::data::Resolve("client/ui/rmlui_hud.rml").string();
     state->hud = std::make_unique<RmlUiHud>();
+    state->showFps = bz::data::ReadBoolConfig({"debug.ShowFPS"}, false);
+    state->fpsLastTime = glfwGetTime();
     auto communityPanel = std::make_unique<RmlUiPanelCommunity>();
     auto *communityPanelPtr = communityPanel.get();
     state->panels.emplace_back(std::move(communityPanel));
@@ -639,6 +646,20 @@ void RmlUiBackend::update() {
             }
         } else if (state->hud) {
             state->hud->update();
+            if (state->showFps) {
+                state->fpsFrames += 1;
+                const double now = glfwGetTime();
+                const double elapsed = now - state->fpsLastTime;
+                if (elapsed >= 0.25) {
+                    state->fpsValue = state->fpsFrames / elapsed;
+                    state->fpsFrames = 0;
+                    state->fpsLastTime = now;
+                }
+                state->hud->setFpsVisible(true);
+                state->hud->setFpsValue(static_cast<float>(state->fpsValue));
+            } else {
+                state->hud->setFpsVisible(false);
+            }
         }
         state->context->Update();
         state->renderInterface.BeginFrame();

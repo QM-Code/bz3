@@ -8,6 +8,11 @@
         <div id="hud-dialog-overlay" class="hud-dialog hidden">
             <div id="hud-dialog-text" class="hud-dialog-text">Press U to spawn</div>
         </div>
+        <div id="hud-crosshair" class="hud-crosshair">
+            <div class="hud-crosshair-box"></div>
+            <div class="hud-crosshair-plus">+</div>
+        </div>
+        <div id="hud-fps" class="hud-fps hidden">FPS: 0.0</div>
         <div id="hud-scoreboard" class="hud-scoreboard"></div>
         <div id="hud-chat-panel" class="hud-chat-panel">
             <div id="hud-chat-log" class="hud-chat-log scroll-frame scrollable">

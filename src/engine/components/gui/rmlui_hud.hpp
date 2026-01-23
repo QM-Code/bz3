@@ -47,6 +47,8 @@ public:
 
     void setRadarTextureId(unsigned int textureId);
     void setScoreboardEntries(const std::vector<ScoreboardEntry> &entries);
+    void setFpsVisible(bool visible);
+    void setFpsValue(float fps);
 
 private:
     Rml::Context *context = nullptr;
@@ -58,6 +60,8 @@ private:
     RmlUiHudChat chat;
     RmlUiHudRadar radar;
     RmlUiHudScoreboard scoreboard;
+    Rml::Element *fpsElement = nullptr;
+    float lastFps = 0.0f;
 
     void bindElements();
 };
