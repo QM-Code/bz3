@@ -1,8 +1,14 @@
 <rml>
 <head>
     <link type="text/rcss" href="main_menu.rcss" />
+    <link type="text/rcss" href="rmlui_scrollbars.rcss" />
+    <link type="text/rcss" href="rmlui_panel_community.rcss" />
+    <link type="text/rcss" href="rmlui_panel_settings.rcss" />
+    <link type="text/rcss" href="rmlui_panel_documentation.rcss" />
+    <link type="text/rcss" href="rmlui_panel_start_server.rcss" />
+    <link type="text/rcss" href="rmlui_panel_themes.rcss" />
 </head>
-<body>
+<body id="main-body">
     <div id="main-window">
         <div id="title">BZ3 - BZFlag Revisited</div>
         <div id="tab-bar">
@@ -12,71 +18,12 @@
             <span id="tab-start-server" class="tab">Start Server</span>
             <span id="tab-themes" class="tab">Themes</span>
         </div>
-        <div id="tab-divider"></div>
         <div id="tab-content">
-            <div id="panel-community" class="tab-panel">
-                <div class="community-layout">
-                    <div class="community-left">
-                        <div class="row">
-                            <label>Community</label>
-                            <select>
-                                <option>Example Community</option>
-                            </select>
-                            <button>New Community</button>
-                        </div>
-                        <div class="row">
-                            <label>Username</label>
-                            <input type="text" value="user" />
-                            <label style="margin-left: 12px;">Password</label>
-                            <input type="password" value="stored" />
-                            <button>Join</button>
-                        </div>
-                        <div class="panel">
-                            <div class="panel-header">
-                                Servers
-                                <button>Refresh</button>
-                            </div>
-                            <div class="server-list">
-                                <div class="server-item">Example Server A</div>
-                                <div class="server-item">Example Server B</div>
-                                <div class="server-item">Example Server C</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="community-right">
-                        <div class="panel">
-                            <div class="panel-header">
-                                Server Details
-                                <button>Community Info</button>
-                            </div>
-                            <div class="details-section">
-                                <span class="label">Server</span>
-                                Example Server A
-                            </div>
-                            <div class="details-section">
-                                <span class="label">Website</span>
-                                http://example.com
-                            </div>
-                            <div class="details-section">
-                                <span class="label">Description</span>
-                                A short description of the server goes here.
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div id="panel-settings" class="tab-panel">
-                Settings panel
-            </div>
-            <div id="panel-documentation" class="tab-panel">
-                Documentation panel
-            </div>
-            <div id="panel-start-server" class="tab-panel">
-                Start Server panel
-            </div>
-            <div id="panel-themes" class="tab-panel">
-                Themes panel
-            </div>
+            <div id="panel-community" class="tab-panel"></div>
+            <div id="panel-settings" class="tab-panel"></div>
+            <div id="panel-documentation" class="tab-panel"></div>
+            <div id="panel-start-server" class="tab-panel"></div>
+            <div id="panel-themes" class="tab-panel"></div>
         </div>
     </div>
 </body>

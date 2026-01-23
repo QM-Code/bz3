@@ -6,8 +6,10 @@ def handle(request):
     if request.method != "GET":
         return webhttp.json_error("method_not_allowed", status="405 Method Not Allowed")
 
+    token = request.query.get("token", [""])[0].strip()
     username = request.query.get("name", [""])[0].strip()
-    if not username:
+    code = request.query.get("code", [""])[0].strip()
+    if not (token or username or code):
         return webhttp.json_error("missing_name", status="400 Bad Request")
 
     settings = config.get_config()
@@ -15,7 +17,14 @@ def handle(request):
     overview_max = int(config.require_setting(settings, "pages.servers.overview_max_chars"))
 
     with db.connect_ctx() as conn:
-        user = db.get_user_by_username(conn, username)
+        user = None
+        lookup_token = code or token
+        if lookup_token:
+            user = db.get_user_by_code(conn, lookup_token)
+        if not user:
+            lookup_name = username or token
+            if lookup_name:
+                user = db.get_user_by_username(conn, lookup_name)
         if not user or user["deleted"]:
             return webhttp.json_error("not_found", status="404 Not Found")
         rows = db.list_user_servers(conn, user["id"])
@@ -34,8 +43,10 @@ def handle(request):
             overview = overview[:overview_max]
         entry = {
             "id": row["id"],
+            "code": row["code"],
             "name": row["name"],
             "owner": row["owner_username"],
+            "owner_code": row["owner_code"],
             "host": row["host"],
             "port": str(row["port"]),
             "overview": overview,
@@ -54,7 +65,7 @@ def handle(request):
     return webhttp.json_response(
         {
             "ok": True,
-            "user": {"id": user["id"], "username": user["username"]},
+            "user": {"id": user["id"], "code": user["code"], "username": user["username"]},
             "active_count": active_count,
             "inactive_count": inactive_count,
             "servers": servers,

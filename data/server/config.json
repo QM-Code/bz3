@@ -1,7 +1,7 @@
 {
     "defaultWorld" : "server/worlds/Default",
     "network" : {
-        "ServerAdvertiseHost": "192.168.1.14"
+        "ServerAdvertiseHost": "192.168.1.6"
     },
     "community": {
         "server" : "http://192.168.1.6:8080/",

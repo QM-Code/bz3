@@ -113,7 +113,20 @@ def import_data(path, allow_merge=False, overwrite=False):
                 salt = password_salt
             else:
                 digest, salt = auth.new_password(password)
-            db.add_user(conn, username, email, digest, salt, is_admin=False, is_admin_manual=False, language=language)
+            code = entry.get("code")
+            if code is not None:
+                code = str(code).strip() or None
+            db.add_user(
+                conn,
+                username,
+                email,
+                digest,
+                salt,
+                is_admin=False,
+                is_admin_manual=False,
+                language=language,
+                code=code,
+            )
             user_row = db.get_user_by_username(conn, username)
             if user_row:
                 db.set_user_locked(conn, user_row["id"], is_locked, locked_at=locked_at)
@@ -122,11 +135,16 @@ def import_data(path, allow_merge=False, overwrite=False):
                 admin_names.add(username.lower())
             inserted_users += 1
 
-        user_rows = conn.execute("SELECT id, username, deleted FROM users").fetchall()
+        user_rows = conn.execute("SELECT id, username, code, deleted FROM users").fetchall()
         user_ids = {
             row["username"].lower(): row["id"]
             for row in user_rows
             if not row["deleted"]
+        }
+        user_codes = {
+            (row["code"] or "").lower(): row["id"]
+            for row in user_rows
+            if row["code"] and not row["deleted"]
         }
 
         for entry in users:
@@ -164,7 +182,11 @@ def import_data(path, allow_merge=False, overwrite=False):
                 continue
             owner = _normalize(entry.get("owner"))
             owner_key = owner.lower() if owner else ""
-            owner_id = user_ids.get(owner_key) if owner else None
+            owner_code = _normalize(entry.get("owner_code"))
+            owner_code_key = owner_code.lower() if owner_code else ""
+            owner_id = user_codes.get(owner_code_key) if owner_code else None
+            if owner_id is None:
+                owner_id = user_ids.get(owner_key) if owner else None
             if owner_id is None:
                 owner_id = user_ids.get(admin_username.lower())
             if owner_id is None:
@@ -173,8 +195,12 @@ def import_data(path, allow_merge=False, overwrite=False):
             if db.get_server_by_name(conn, name):
                 skipped_servers += 1
                 continue
+            code = entry.get("code")
+            if code is not None:
+                code = str(code).strip() or None
             record = {
                 "name": name,
+                "code": code,
                 "overview": entry.get("overview") or None,
                 "description": entry.get("description") or None,
                 "host": host,

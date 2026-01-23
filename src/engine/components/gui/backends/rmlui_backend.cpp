@@ -6,14 +6,22 @@
 #include <RmlUi/Core/Factory.h>
 
 #include <filesystem>
+#include <fstream>
 #include <functional>
-#include <iomanip>
-#include <sstream>
 #include <unordered_map>
+#include <unordered_set>
 #include <unordered_map>
 
 #include "engine/components/gui/rmlui_backend/RmlUi_Platform_GLFW.h"
 #include "engine/components/gui/rmlui_backend/RmlUi_Renderer_GL3.h"
+#include "engine/components/gui/emoji_utils.hpp"
+#include "engine/components/gui/rmlui_hud.hpp"
+#include "engine/components/gui/rmlui_main_menu.hpp"
+#include "engine/components/gui/rmlui_panels/rmlui_panel_community.hpp"
+#include "engine/components/gui/rmlui_panels/rmlui_panel_documentation.hpp"
+#include "engine/components/gui/rmlui_panels/rmlui_panel_settings.hpp"
+#include "engine/components/gui/rmlui_panels/rmlui_panel_start_server.hpp"
+#include "engine/components/gui/rmlui_panels/rmlui_panel_themes.hpp"
 #include "engine/user_pointer.hpp"
 #include "common/data_path_resolver.hpp"
 #include "spdlog/spdlog.h"
@@ -154,6 +162,20 @@ public:
         return consumeOptional(fontReloadRequested);
     }
 
+    void setConnectionState(const ConnectionState &state) override {
+        connectionState = state;
+    }
+
+    ConnectionState getConnectionState() const override {
+        return connectionState;
+    }
+
+    bool consumeQuitRequest() override {
+        return consumeOptional(quitRequested);
+    }
+
+    void showErrorDialog(const std::string &) override {}
+
 private:
     template <typename T>
     std::optional<T> consumeOptional(std::optional<T> &value) {
@@ -200,9 +222,10 @@ private:
     std::string userConfigPath;
     bool fontReloadRequested = false;
     bool refreshRequested = false;
+    bool quitRequested = false;
+    ConnectionState connectionState{};
 };
 
-NullMainMenu g_null_menu;
 RmlUiBackend *g_backend_instance = nullptr;
 
 int getModifierFlags(GLFWwindow *window) {
@@ -242,6 +265,7 @@ private:
     std::string tabKey;
 };
 
+
 } // namespace
 
 std::string escapeRmlText(const std::string &text) {
@@ -260,169 +284,13 @@ std::string escapeRmlText(const std::string &text) {
     return out;
 }
 
-bool decodeNextUtf8(const std::string &utf8, std::size_t &offset, uint32_t &codepoint) {
-    if (offset >= utf8.size()) {
-        return false;
-    }
-    unsigned char c = static_cast<unsigned char>(utf8[offset]);
-    if ((c & 0x80) == 0) {
-        codepoint = c;
-        offset += 1;
-        return true;
-    }
-    int length = 0;
-    if ((c & 0xE0) == 0xC0) {
-        length = 2;
-        codepoint = c & 0x1F;
-    } else if ((c & 0xF0) == 0xE0) {
-        length = 3;
-        codepoint = c & 0x0F;
-    } else if ((c & 0xF8) == 0xF0) {
-        length = 4;
-        codepoint = c & 0x07;
-    } else {
-        offset += 1;
-        return false;
-    }
-    if (offset + length > utf8.size()) {
-        offset += 1;
-        return false;
-    }
-    for (int i = 1; i < length; ++i) {
-        unsigned char cc = static_cast<unsigned char>(utf8[offset + i]);
-        if ((cc & 0xC0) != 0x80) {
-            offset += 1;
-            return false;
-        }
-        codepoint = (codepoint << 6) | (cc & 0x3F);
-    }
-    offset += static_cast<std::size_t>(length);
-    return true;
-}
-
-bool isEmojiCandidate(uint32_t cp) {
-    if ((cp >= 0x1F000 && cp <= 0x1FAFF) ||
-        (cp >= 0x2600 && cp <= 0x26FF) ||
-        (cp >= 0x2700 && cp <= 0x27BF) ||
-        (cp >= 0x2300 && cp <= 0x23FF) ||
-        (cp >= 0x2B00 && cp <= 0x2BFF)) {
-        return true;
-    }
-    switch (cp) {
-        case 0x00A9:
-        case 0x00AE:
-        case 0x203C:
-        case 0x2049:
-        case 0x2122:
-        case 0x2139:
-        case 0x3030:
-        case 0x200D:
-        case 0xFE0F:
-            return true;
-        default:
-            return false;
-    }
-}
-
-bool isRegionalIndicator(uint32_t cp) {
-    return cp >= 0x1F1E6 && cp <= 0x1F1FF;
-}
-
-bool isEmojiBase(uint32_t cp) {
-    return isEmojiCandidate(cp) && cp != 0x200D && cp != 0xFE0F;
-}
-
-std::string codepointToHex(uint32_t cp) {
-    std::ostringstream out;
-    out << std::hex << std::nouppercase << cp;
-    return out.str();
-}
-
-std::string buildTwemojiFilename(const std::vector<uint32_t> &sequence) {
-    std::ostringstream out;
-    for (std::size_t i = 0; i < sequence.size(); ++i) {
-        if (i != 0) {
-            out << '-';
-        }
-        out << codepointToHex(sequence[i]);
-    }
-    return out.str();
-}
-
-std::string renderTextWithTwemoji(const std::string &text) {
-    std::string out;
-    std::size_t offset = 0;
-    while (offset < text.size()) {
-        const std::size_t start = offset;
-        uint32_t cp = 0;
-        if (!decodeNextUtf8(text, offset, cp)) {
-            out.append(escapeRmlText(text.substr(start, 1)));
-            continue;
-        }
-
-        if (!isEmojiCandidate(cp) && !isRegionalIndicator(cp)) {
-            out.append(escapeRmlText(text.substr(start, offset - start)));
-            continue;
-        }
-
-        std::vector<uint32_t> sequence;
-        sequence.push_back(cp);
-        bool hasEmoji = isEmojiBase(cp) || isRegionalIndicator(cp);
-        std::size_t seqOffset = offset;
-
-        if (isRegionalIndicator(cp)) {
-            uint32_t nextCp = 0;
-            std::size_t lookahead = seqOffset;
-            if (decodeNextUtf8(text, lookahead, nextCp) && isRegionalIndicator(nextCp)) {
-                sequence.push_back(nextCp);
-                seqOffset = lookahead;
-                hasEmoji = true;
-            }
-        } else {
-            while (seqOffset < text.size()) {
-                uint32_t nextCp = 0;
-                std::size_t lookahead = seqOffset;
-                if (!decodeNextUtf8(text, lookahead, nextCp)) {
-                    break;
-                }
-                if (nextCp == 0x200D || nextCp == 0xFE0F || isEmojiCandidate(nextCp) || isRegionalIndicator(nextCp)) {
-                    sequence.push_back(nextCp);
-                    if (isEmojiBase(nextCp) || isRegionalIndicator(nextCp)) {
-                        hasEmoji = true;
-                    }
-                    seqOffset = lookahead;
-                    continue;
-                }
-                break;
-            }
-        }
-
-        if (!hasEmoji) {
-            out.append(escapeRmlText(text.substr(start, offset - start)));
-            continue;
-        }
-
-        const std::string fileName = buildTwemojiFilename(sequence);
-        const std::filesystem::path imagePath = bz::data::Resolve("client/ui/emoji/twemoji/" + fileName + ".png");
-        if (std::filesystem::exists(imagePath)) {
-            const std::string srcPath = "emoji/twemoji/" + fileName + ".png";
-            out.append("<img src=\"");
-            out.append(srcPath);
-            out.append("\" class=\"emoji\" />");
-        } else {
-            out.append(escapeRmlText(text.substr(start, seqOffset - start)));
-        }
-
-        offset = seqOffset;
-    }
-    return out;
-}
 
 struct RmlUiBackend::RmlUiState {
     SystemInterface_GLFW systemInterface;
     RenderInterface_GL3 renderInterface;
     Rml::Context *context = nullptr;
     Rml::ElementDocument *document = nullptr;
+    Rml::Element *bodyElement = nullptr;
     std::function<void(GLFWwindow*, int, int, int, int)> previousKeyCallback;
     std::function<void(GLFWwindow*, int, int, int)> previousMouseCallback;
     int lastWidth = 0;
@@ -435,17 +303,22 @@ struct RmlUiBackend::RmlUiState {
     Rml::Element *contentElement = nullptr;
     std::vector<std::unique_ptr<Rml::EventListener>> tabListeners;
     std::unordered_map<std::string, std::string> emojiMarkupCache;
+    std::vector<std::unique_ptr<RmlUiPanel>> panels;
+    std::unordered_set<std::string> loadedFontFiles;
     std::string menuPath;
+    std::string hudPath;
     bool reloadRequested = false;
     bool reloadArmed = false;
     bool hardReloadRequested = false;
     std::string regularFontPath;
     std::string emojiFontPath;
+    std::unique_ptr<RmlUiHud> hud;
 };
 
 RmlUiBackend::RmlUiBackend(GLFWwindow *window) : window(window) {
     g_backend_instance = this;
     state = std::make_unique<RmlUiState>();
+    menu = std::make_unique<RmlUiMainMenu>();
     state->systemInterface.SetWindow(window);
 
     Rml::SetSystemInterface(&state->systemInterface);
@@ -495,6 +368,12 @@ RmlUiBackend::RmlUiBackend(GLFWwindow *window) : window(window) {
             spdlog::warn("RmlUi: failed to load emoji font '{}'.", state->emojiFontPath);
         }
     }
+    const auto robotoFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Button.Font");
+    if (!robotoFontPath.empty()) {
+        if (!Rml::LoadFontFace(robotoFontPath.string())) {
+            spdlog::warn("RmlUi: failed to load Roboto font '{}'.", robotoFontPath.string());
+        }
+    }
 
     const std::vector<std::string> fallbackKeys = {
         "hud.fonts.console.FallbackLatin.Font",
@@ -515,13 +394,68 @@ RmlUiBackend::RmlUiBackend(GLFWwindow *window) : window(window) {
     }
 
     state->menuPath = bz::data::Resolve("client/ui/main_menu.rml").string();
+    state->hudPath = bz::data::Resolve("client/ui/rmlui_hud.rml").string();
+    state->hud = std::make_unique<RmlUiHud>();
+    auto communityPanel = std::make_unique<RmlUiPanelCommunity>();
+    auto *communityPanelPtr = communityPanel.get();
+    state->panels.emplace_back(std::move(communityPanel));
+    auto settingsPanel = std::make_unique<RmlUiPanelSettings>();
+    auto *settingsPanelPtr = settingsPanel.get();
+    state->panels.emplace_back(std::move(settingsPanel));
+    state->panels.emplace_back(std::make_unique<RmlUiPanelDocumentation>());
+    auto startServerPanel = std::make_unique<RmlUiPanelStartServer>();
+    auto *startServerPanelPtr = startServerPanel.get();
+    state->panels.emplace_back(std::move(startServerPanel));
+    state->panels.emplace_back(std::make_unique<RmlUiPanelThemes>());
+    menu->attachCommunityPanel(communityPanelPtr);
+    menu->attachSettingsPanel(settingsPanelPtr);
+    menu->attachStartServerPanel(startServerPanelPtr);
+    communityPanelPtr->bindCallbacks(
+        [this](int index) {
+            if (menu) {
+                menu->onCommunitySelection(index);
+            }
+        },
+        [this](const std::string &host) {
+            if (menu) {
+                menu->onCommunityAddRequested(host);
+            }
+        },
+        [this]() {
+            if (menu) {
+                menu->onRefreshRequested();
+            }
+        },
+        [this](int index) {
+            if (menu) {
+                menu->onServerSelection(index);
+            }
+        },
+        [this](int index) {
+            if (menu) {
+                menu->onJoinRequested(index);
+            }
+        },
+        [this]() {
+            if (menu) {
+                menu->hide();
+            }
+        },
+        [this]() {
+            if (menu) {
+                menu->onQuitRequested();
+            }
+        }
+    );
     loadMenuDocument();
+    loadHudDocument();
 
     auto *userPointer = static_cast<GLFWUserPointer *>(glfwGetWindowUserPointer(window));
     if (userPointer) {
         state->previousKeyCallback = userPointer->keyCallback;
         userPointer->keyCallback = [this](GLFWwindow *w, int key, int scancode, int action, int mods) {
-            if (state && state->previousKeyCallback) {
+            const bool captureKeys = isUiInputEnabled();
+            if (!captureKeys && state && state->previousKeyCallback) {
                 state->previousKeyCallback(w, key, scancode, action, mods);
             }
             if (action == GLFW_PRESS && key == GLFW_KEY_R && (mods & GLFW_MOD_CONTROL)) {
@@ -532,7 +466,7 @@ RmlUiBackend::RmlUiBackend(GLFWwindow *window) : window(window) {
                 }
                 return;
             }
-            if (state && state->context) {
+            if (state && state->context && captureKeys) {
                 RmlGLFW::ProcessKeyCallback(state->context, key, action, mods);
             }
         };
@@ -542,7 +476,9 @@ RmlUiBackend::RmlUiBackend(GLFWwindow *window) : window(window) {
             if (state && state->previousMouseCallback) {
                 state->previousMouseCallback(w, button, action, mods);
             }
-            if (state && state->context) {
+            const bool captureMouse = menu && menu->isVisible();
+            const bool hudVisible = state && state->hud && state->hud->isVisible();
+            if (state && state->context && (captureMouse || hudVisible)) {
                 RmlGLFW::ProcessMouseButtonCallback(state->context, button, action, mods);
             }
         };
@@ -552,11 +488,22 @@ RmlUiBackend::RmlUiBackend(GLFWwindow *window) : window(window) {
         if (!g_backend_instance || !g_backend_instance->state || !g_backend_instance->state->context) {
             return;
         }
+        if (!g_backend_instance->isUiInputEnabled()) {
+            return;
+        }
+        if (g_backend_instance->state && g_backend_instance->state->hud &&
+            g_backend_instance->state->hud->consumeSuppressNextChatChar()) {
+            return;
+        }
         RmlGLFW::ProcessCharCallback(g_backend_instance->state->context, codepoint);
     });
 
     glfwSetCursorEnterCallback(window, [](GLFWwindow *w, int entered) {
         if (!g_backend_instance || !g_backend_instance->state || !g_backend_instance->state->context) {
+            return;
+        }
+        const bool hudVisible = g_backend_instance->state->hud && g_backend_instance->state->hud->isVisible();
+        if (!g_backend_instance->isUiInputEnabled() && !hudVisible) {
             return;
         }
         RmlGLFW::ProcessCursorEnterCallback(g_backend_instance->state->context, entered);
@@ -566,12 +513,20 @@ RmlUiBackend::RmlUiBackend(GLFWwindow *window) : window(window) {
         if (!g_backend_instance || !g_backend_instance->state || !g_backend_instance->state->context) {
             return;
         }
+        const bool hudVisible = g_backend_instance->state->hud && g_backend_instance->state->hud->isVisible();
+        if (!g_backend_instance->isUiInputEnabled() && !hudVisible) {
+            return;
+        }
         const int mods = getModifierFlags(w);
         RmlGLFW::ProcessCursorPosCallback(g_backend_instance->state->context, w, xpos, ypos, mods);
     });
 
     glfwSetScrollCallback(window, [](GLFWwindow *w, double, double yoffset) {
         if (!g_backend_instance || !g_backend_instance->state || !g_backend_instance->state->context) {
+            return;
+        }
+        const bool hudVisible = g_backend_instance->state->hud && g_backend_instance->state->hud->isVisible();
+        if (!g_backend_instance->isUiInputEnabled() && !hudVisible) {
             return;
         }
         const int mods = getModifierFlags(w);
@@ -610,6 +565,9 @@ RmlUiBackend::~RmlUiBackend() {
         state->document->Close();
         state->document = nullptr;
     }
+    if (state->hud) {
+        state->hud->unload();
+    }
     if (state->context) {
         Rml::RemoveContext(state->context->GetName());
         state->context = nullptr;
@@ -619,11 +577,18 @@ RmlUiBackend::~RmlUiBackend() {
 }
 
 MainMenuInterface &RmlUiBackend::mainMenu() {
-    return g_null_menu;
+    return *menu;
 }
 
 const MainMenuInterface &RmlUiBackend::mainMenu() const {
-    return g_null_menu;
+    return *menu;
+}
+
+bool RmlUiBackend::isUiInputEnabled() const {
+    if (menu && menu->isVisible()) {
+        return true;
+    }
+    return state && state->hud && state->hud->isChatFocused();
 }
 
 void RmlUiBackend::update() {
@@ -641,18 +606,44 @@ void RmlUiBackend::update() {
         state->context->SetDimensions(Rml::Vector2i(fbWidth, fbHeight));
     }
 
-    if (g_null_menu.isVisible()) {
+    const bool menuVisible = menu && menu->isVisible();
+    if (menuVisible) {
         if (state->document && !state->document->IsVisible()) {
             state->document->Show();
         }
-        if (!state->reloadRequested && !state->reloadArmed) {
-            state->context->Update();
-            state->renderInterface.BeginFrame();
-            state->context->Render();
-            state->renderInterface.EndFrame();
+        if (state->hud) {
+            state->hud->hide();
         }
-    } else if (state->document && state->document->IsVisible()) {
-        state->document->Hide();
+        if (!state->bodyElement && state->document) {
+            state->bodyElement = state->document->GetElementById("main-body");
+        }
+        if (state->bodyElement) {
+            const bool inGame = menu->getConnectionState().connected;
+            state->bodyElement->SetClass("in-game", inGame);
+        }
+    } else {
+        if (state->document && state->document->IsVisible()) {
+            state->document->Hide();
+        }
+        if (state->hud) {
+            state->hud->show();
+        }
+    }
+
+    const bool anyVisible = (state->document && state->document->IsVisible())
+        || (state->hud && state->hud->isVisible());
+    if (anyVisible && !state->reloadRequested && !state->reloadArmed) {
+        if (menuVisible) {
+            for (const auto &panel : state->panels) {
+                panel->update();
+            }
+        } else if (state->hud) {
+            state->hud->update();
+        }
+        state->context->Update();
+        state->renderInterface.BeginFrame();
+        state->context->Render();
+        state->renderInterface.EndFrame();
     }
 
     if (state->reloadArmed) {
@@ -663,32 +654,79 @@ void RmlUiBackend::update() {
     if (state->reloadRequested) {
         state->reloadRequested = false;
         loadMenuDocument();
+        loadHudDocument();
     }
 }
 
 void RmlUiBackend::reloadFonts() {}
 
-void RmlUiBackend::setScoreboardEntries(const std::vector<ScoreboardEntry> &) {}
+void RmlUiBackend::setScoreboardEntries(const std::vector<ScoreboardEntry> &entries) {
+    if (!state || !state->hud) {
+        return;
+    }
+    state->hud->setScoreboardEntries(entries);
+}
 
-void RmlUiBackend::setSpawnHint(const std::string &) {}
+void RmlUiBackend::setSpawnHint(const std::string &hint) {
+    if (!state || !state->hud) {
+        return;
+    }
+    state->hud->setDialogText(hint);
+}
 
-void RmlUiBackend::setRadarTextureId(unsigned int) {}
+void RmlUiBackend::setRadarTextureId(unsigned int textureId) {
+    if (!state || !state->hud) {
+        return;
+    }
+    state->hud->setRadarTextureId(textureId);
+}
 
-void RmlUiBackend::addConsoleLine(const std::string &, const std::string &) {}
+void RmlUiBackend::addConsoleLine(const std::string &playerName, const std::string &line) {
+    if (!state || !state->hud) {
+        return;
+    }
+    std::string displayName = playerName;
+    if (!displayName.empty() && displayName.front() != '[') {
+        displayName = "[" + displayName + "]";
+    }
+    const std::string fullLine = displayName.empty() ? line : (displayName + " " + line);
+    state->hud->addChatLine(fullLine);
+}
 
 std::string RmlUiBackend::getChatInputBuffer() const {
-    return {};
+    if (!state || !state->hud) {
+        return {};
+    }
+    return state->hud->getSubmittedChatInput();
 }
 
-void RmlUiBackend::clearChatInputBuffer() {}
+void RmlUiBackend::clearChatInputBuffer() {
+    if (!state || !state->hud) {
+        return;
+    }
+    state->hud->clearSubmittedChatInput();
+}
 
-void RmlUiBackend::focusChatInput() {}
+void RmlUiBackend::focusChatInput() {
+    if (!state || !state->hud) {
+        return;
+    }
+    state->hud->focusChatInput();
+}
 
 bool RmlUiBackend::getChatInputFocus() const {
-    return false;
+    if (!state || !state->hud) {
+        return false;
+    }
+    return state->hud->isChatFocused();
 }
 
-void RmlUiBackend::displayDeathScreen(bool) {}
+void RmlUiBackend::displayDeathScreen(bool show) {
+    if (!state || !state->hud) {
+        return;
+    }
+    state->hud->showDialog(show);
+}
 
 void RmlUiBackend::setActiveTab(const std::string &tabKey) {
     if (!state) {
@@ -738,7 +776,27 @@ void RmlUiBackend::loadMenuDocument() {
     state->tabListeners.clear();
     state->tabPanels.clear();
     state->contentElement = nullptr;
+    state->bodyElement = nullptr;
     state->emojiMarkupCache.clear();
+
+    const auto fontsDir = bz::data::Resolve("client/fonts");
+    if (!fontsDir.empty() && std::filesystem::exists(fontsDir)) {
+        for (const auto &entry : std::filesystem::directory_iterator(fontsDir)) {
+            if (!entry.is_regular_file()) {
+                continue;
+            }
+            const auto ext = entry.path().extension().string();
+            if (ext != ".ttf" && ext != ".otf") {
+                continue;
+            }
+            const std::string path = entry.path().string();
+            if (state->loadedFontFiles.insert(path).second) {
+                if (!Rml::LoadFontFace(path, true)) {
+                    spdlog::warn("RmlUi: failed to load font '{}'.", path);
+                }
+            }
+        }
+    }
 
     Rml::Factory::ClearStyleSheetCache();
     Rml::Factory::ClearTemplateCache();
@@ -758,7 +816,11 @@ void RmlUiBackend::loadMenuDocument() {
     }
 
     state->document->Show();
+    state->bodyElement = state->document->GetElementById("main-body");
     state->contentElement = state->document->GetElementById("tab-content");
+    for (const auto &panel : state->panels) {
+        panel->load(state->document);
+    }
     Rml::ElementList tabElements;
     std::string defaultTabKey;
     state->document->GetElementsByClassName(tabElements, "tab");
@@ -794,6 +856,19 @@ void RmlUiBackend::loadMenuDocument() {
     }
     if (!state->tabs.empty()) {
         setActiveTab(defaultTabKey.empty() ? state->tabs.begin()->first : defaultTabKey);
+    }
+}
+
+void RmlUiBackend::loadHudDocument() {
+    if (!state || !state->context) {
+        return;
+    }
+
+    if (state->hud) {
+        state->hud->load(state->context, state->hudPath,
+            [this](const std::string &text) -> const std::string & {
+                return cachedTwemojiMarkup(text);
+            });
     }
 }
 

@@ -38,6 +38,7 @@
 #include "engine/components/gui/stb_image.h"
 #include <cctype>
 #include <algorithm>
+#include <cstdlib>
 #include <string.h>
 
 namespace {
@@ -1226,6 +1227,30 @@ struct TGAHeader {
 
 Rml::TextureHandle RenderInterface_GL3::LoadTexture(Rml::Vector2i& texture_dimensions, const Rml::String& source)
 {
+    const Rml::String tex_prefix = "texid:";
+    if (source.rfind(tex_prefix, 0) == 0)
+    {
+        const char* id_str = source.c_str() + tex_prefix.size();
+        char* end_ptr = nullptr;
+        const unsigned long tex_id = std::strtoul(id_str, &end_ptr, 10);
+        if (tex_id == 0)
+            return {};
+        GLint width = 0;
+        GLint height = 0;
+        glBindTexture(GL_TEXTURE_2D, (GLuint)tex_id);
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &width);
+        glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &height);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        if (width <= 0 || height <= 0) {
+            width = 1;
+            height = 1;
+        }
+        texture_dimensions.x = width;
+        texture_dimensions.y = height;
+        external_textures.insert(static_cast<unsigned int>(tex_id));
+        return (Rml::TextureHandle)tex_id;
+    }
+
 	Rml::FileInterface* file_interface = Rml::GetFileInterface();
 	Rml::FileHandle file_handle = file_interface->Open(source);
 	if (!file_handle)
@@ -1548,6 +1573,12 @@ void RenderInterface_GL3::RenderBlur(float sigma, const Gfx::FramebufferData& so
 
 void RenderInterface_GL3::ReleaseTexture(Rml::TextureHandle texture_handle)
 {
+    const unsigned int tex_id = static_cast<unsigned int>(texture_handle);
+    auto it = external_textures.find(tex_id);
+    if (it != external_textures.end()) {
+        external_textures.erase(it);
+        return;
+    }
 	glDeleteTextures(1, (GLuint*)&texture_handle);
 }
 

@@ -139,3 +139,27 @@ def display_username(user):
     if str(name).lower() == str(admin_user).lower():
         return admin_user
     return name
+
+
+def user_token(user):
+    if not user:
+        return None
+    code = None
+    try:
+        code = user.get("code")
+    except AttributeError:
+        try:
+            code = user["code"] if "code" in user.keys() else None
+        except Exception:
+            code = None
+    if code:
+        return str(code)
+    name = None
+    try:
+        name = user.get("username")
+    except AttributeError:
+        try:
+            name = user["username"]
+        except Exception:
+            name = None
+    return str(name) if name else None

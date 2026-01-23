@@ -112,40 +112,52 @@ def dispatch(request):
         if path.startswith("/api/server/"):
             token = urllib.parse.unquote(path[len("/api/server/") :])
             if token:
-                if token.isdigit():
-                    request.query.setdefault("id", [token])
-                else:
-                    request.query.setdefault("name", [token])
+                request.query.setdefault("token", [token])
                 return api_server.handle(request)
         if path.startswith("/api/users/"):
             name = urllib.parse.unquote(path[len("/api/users/") :])
             if name:
-                request.query.setdefault("name", [name])
+                request.query.setdefault("token", [name])
                 return api_user.handle(request)
         if path == "/":
-            return webhttp.redirect("/servers")
-        if path == "/servers":
+            return webhttp.redirect("/servers/active")
+        if path in ("/servers", "/servers/active", "/servers/inactive"):
             return servers.handle(request)
         if path == "/info":
             return info.handle(request)
-        if path.startswith("/servers/"):
-            name = urllib.parse.unquote(path[len("/servers/") :])
-            if name:
-                request.query.setdefault("name", [name])
-                return server_profile.handle(request)
         if path in ("/server/edit", "/server/delete"):
             return server_edit.handle(request)
+        if path == "/servers/add":
+            return submit.handle(request)
+        if path.startswith("/servers/"):
+            token = urllib.parse.unquote(path[len("/servers/") :])
+            if token:
+                return webhttp.redirect(f"/server/{urllib.parse.quote(token, safe='')}")
+        if path.startswith("/server/"):
+            rel = path[len("/server/") :].strip("/")
+            if not rel:
+                return None
+            if rel.endswith("/edit"):
+                token = urllib.parse.unquote(rel[: -len("/edit")].strip("/"))
+                if token:
+                    request.query.setdefault("token", [token])
+                    return server_edit.handle(request)
+            else:
+                token = urllib.parse.unquote(rel)
+                if token:
+                    request.query.setdefault("token", [token])
+                    return server_profile.handle(request)
         if path.startswith("/users/") and path.endswith("/edit"):
             rel = path[len("/users/") :]
             username = urllib.parse.unquote(rel.rsplit("/edit", 1)[0].rstrip("/"))
             if username:
-                request.query.setdefault("name", [username])
+                request.query.setdefault("token", [username])
                 return users.handle(request)
         if path.startswith("/users/") and "/admins/" in path:
             rel = path[len("/users/") :]
             username = urllib.parse.unquote(rel.split("/admins/", 1)[0])
             if username:
-                request.query.setdefault("name", [username])
+                request.query.setdefault("token", [username])
                 return user_profile.handle(request)
         if path in ("/users", "/users/create", "/users/edit", "/users/delete", "/users/reinstate", "/users/lock"):
             user = auth.get_user_from_request(request)
@@ -157,7 +169,7 @@ def dispatch(request):
         if path.startswith("/users/"):
             username = urllib.parse.unquote(path[len("/users/") :])
             if username:
-                request.query.setdefault("name", [username])
+                request.query.setdefault("token", [username])
                 return user_profile.handle(request)
         if path in (
             "/register",
@@ -167,8 +179,6 @@ def dispatch(request):
             "/reset",
         ):
             return account.handle(request)
-        if path == "/submit":
-            return submit.handle(request)
         if path == "/admin-docs":
             return admin_docs.handle(request)
         if path.startswith("/static/"):

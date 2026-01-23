@@ -13,6 +13,7 @@ struct CommunityBrowserEntry {
     std::string description;
     std::string displayHost;
     std::string longDescription;
+    std::string code;
     std::vector<std::string> flags;
     int activePlayers = -1;
     int maxPlayers = -1;

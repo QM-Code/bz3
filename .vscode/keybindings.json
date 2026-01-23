@@ -1,0 +1,12 @@
+[
+  {
+    "key": "alt+y",
+    "command": "scrollPageUp",
+    "when": "editorTextFocus"
+  },
+  {
+    "key": "alt+n",
+    "command": "scrollPageDown",
+    "when": "editorTextFocus"
+  }
+]

@@ -7,8 +7,13 @@
 #include "engine/components/gui/ui_backend.hpp"
 
 struct GLFWwindow;
+namespace Rml {
+class Event;
+}
 
 namespace gui {
+
+class RmlUiHud;
 
 class RmlUiBackend final : public UiBackend {
 public:
@@ -30,12 +35,15 @@ public:
     bool getChatInputFocus() const override;
     void displayDeathScreen(bool show) override;
     void setActiveTab(const std::string &tabKey);
+    bool isUiInputEnabled() const;
 
 private:
     GLFWwindow *window = nullptr;
     struct RmlUiState;
     std::unique_ptr<RmlUiState> state;
+    std::unique_ptr<class RmlUiMainMenu> menu;
     void loadMenuDocument();
+    void loadHudDocument();
     const std::string &cachedTwemojiMarkup(const std::string &text);
 };
 

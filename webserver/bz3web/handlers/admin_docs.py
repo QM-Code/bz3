@@ -9,7 +9,8 @@ def handle(request):
     user = auth.get_user_from_request(request)
     if not user:
         return webhttp.redirect("/login")
-    profile_url = f"/users/{quote(user['username'], safe='')}"
+    user_token = auth.user_token(user)
+    profile_url = f"/users/{quote(user_token, safe='')}"
     header_html = views.header_with_title(
         config.require_setting(config.get_config(), "server.community_name"),
         "/admin-docs",

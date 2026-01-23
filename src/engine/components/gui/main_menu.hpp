@@ -79,6 +79,10 @@ public:
     void setScanning(bool scanning) override;
     void setUserConfigPath(const std::string &path) override;
     bool consumeFontReloadRequest() override;
+    void setConnectionState(const ConnectionState &state) override;
+    ConnectionState getConnectionState() const override;
+    bool consumeQuitRequest() override;
+    void showErrorDialog(const std::string &message) override;
 
 private:
     struct MessageColors {
@@ -174,6 +178,9 @@ private:
     MessageTone communityStatusTone = MessageTone::Notice;
     int lastCredentialsListIndex = -1;
     std::string storedPasswordHash;
+    ConnectionState connectionState{};
+    bool pendingQuitRequest = false;
+    std::string errorDialogMessage;
 
     ThumbnailCache thumbnails;
     RichTextRenderer richTextRenderer;

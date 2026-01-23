@@ -45,6 +45,7 @@ private:
 
 public:
     const InputState &getInputState() const;
+    void clearState();
     std::string spawnHintText() const;
     std::string bindingListDisplay(const std::vector<Binding> &bindings) const;
 };

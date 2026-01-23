@@ -1,5 +1,6 @@
 import contextlib
 import os
+import secrets
 import sqlite3
 
 
@@ -39,6 +40,7 @@ def init_db(db_path):
             username TEXT NOT NULL COLLATE NOCASE UNIQUE,
             email TEXT NOT NULL COLLATE NOCASE UNIQUE,
             language TEXT,
+            code TEXT,
             password_hash TEXT NOT NULL,
             password_salt TEXT NOT NULL,
             is_admin INTEGER NOT NULL DEFAULT 0,
@@ -52,11 +54,15 @@ def init_db(db_path):
         )
         """
     )
+    user_columns = [row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()]
+    if "code" not in user_columns:
+        conn.execute("ALTER TABLE users ADD COLUMN code TEXT")
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS servers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+            code TEXT,
             overview TEXT,
             description TEXT,
             host TEXT NOT NULL,
@@ -73,7 +79,12 @@ def init_db(db_path):
         )
         """
     )
+    columns = [row[1] for row in conn.execute("PRAGMA table_info(servers)").fetchall()]
+    if "code" not in columns:
+        conn.execute("ALTER TABLE servers ADD COLUMN code TEXT")
     conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS servers_host_port_unique ON servers(host, port)")
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS servers_code_unique ON servers(code)")
+    _ensure_server_codes(conn)
     duplicates = conn.execute(
         """
         SELECT host, port, COUNT(*) AS total
@@ -130,7 +141,53 @@ def init_db(db_path):
     conn.execute("CREATE INDEX IF NOT EXISTS password_resets_user_idx ON password_resets(user_id)")
     conn.execute("CREATE INDEX IF NOT EXISTS rate_limits_key_idx ON rate_limits(bucket_key)")
     conn.execute("CREATE INDEX IF NOT EXISTS rate_limits_created_at_idx ON rate_limits(created_at)")
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS users_code_unique ON users(code)")
+    _ensure_user_codes(conn)
     conn.close()
+
+
+def _generate_server_code(length=6):
+    alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+def _unique_server_code(conn):
+    while True:
+        code = _generate_server_code()
+        existing = conn.execute("SELECT 1 FROM servers WHERE code = ? LIMIT 1", (code,)).fetchone()
+        if not existing:
+            return code
+
+
+def _ensure_server_codes(conn):
+    rows = conn.execute("SELECT id FROM servers WHERE code IS NULL OR code = ''").fetchall()
+    for row in rows:
+        code = _unique_server_code(conn)
+        conn.execute("UPDATE servers SET code = ? WHERE id = ?", (code, row[0]))
+    if rows:
+        conn.commit()
+
+
+def _generate_user_code(length=6):
+    alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+def _unique_user_code(conn):
+    while True:
+        code = _generate_user_code()
+        existing = conn.execute("SELECT 1 FROM users WHERE code = ? LIMIT 1", (code,)).fetchone()
+        if not existing:
+            return code
+
+
+def _ensure_user_codes(conn):
+    rows = conn.execute("SELECT id FROM users WHERE code IS NULL OR code = ''").fetchall()
+    for row in rows:
+        code = _unique_user_code(conn)
+        conn.execute("UPDATE users SET code = ? WHERE id = ?", (code, row[0]))
+    if rows:
+        conn.commit()
 
 
 def connect(db_path):
@@ -151,28 +208,40 @@ def connect_ctx(db_path=None):
 
 
 def add_server(conn, record):
-    conn.execute(
-        """
-        INSERT INTO servers
-            (name, overview, description, host, port, max_players, num_players, owner_user_id,
-             screenshot_id, last_heartbeat)
-        VALUES
-            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            record.get("name"),
-            record.get("overview"),
-            record.get("description"),
-            record["host"],
-            record["port"],
-            record.get("max_players"),
-            record.get("num_players"),
-            record.get("owner_user_id"),
-            record.get("screenshot_id"),
-            record.get("last_heartbeat"),
-        ),
-    )
-    conn.commit()
+    while True:
+        code = record.get("code") or _unique_server_code(conn)
+        try:
+            conn.execute(
+                """
+                INSERT INTO servers
+                    (name, code, overview, description, host, port, max_players, num_players, owner_user_id,
+                     screenshot_id, last_heartbeat)
+                VALUES
+                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record.get("name"),
+                    code,
+                    record.get("overview"),
+                    record.get("description"),
+                    record["host"],
+                    record["port"],
+                    record.get("max_players"),
+                    record.get("num_players"),
+                    record.get("owner_user_id"),
+                    record.get("screenshot_id"),
+                    record.get("last_heartbeat"),
+                ),
+            )
+            conn.commit()
+            return
+        except sqlite3.IntegrityError as exc:
+            message = str(exc).lower()
+            if "servers_code_unique" in message or "servers.code" in message:
+                if record.get("code"):
+                    raise
+                continue
+            raise
 
 
 def update_server(conn, server_id, record):
@@ -245,11 +314,12 @@ def list_servers(conn):
     return conn.execute(
         """
         SELECT servers.*,
-               users.username AS owner_username
+               users.username AS owner_username,
+               users.code AS owner_code
           FROM servers
           JOIN users ON users.id = servers.owner_user_id
          WHERE users.deleted = 0
-         ORDER BY servers.created_at DESC
+         ORDER BY servers.created_at ASC
         """
     ).fetchall()
 
@@ -258,7 +328,8 @@ def get_server(conn, server_id):
     return conn.execute(
         """
         SELECT servers.*,
-               users.username AS owner_username
+               users.username AS owner_username,
+               users.code AS owner_code
           FROM servers
           JOIN users ON users.id = servers.owner_user_id
          WHERE servers.id = ?
@@ -271,7 +342,8 @@ def get_server_by_name(conn, name):
     return conn.execute(
         """
         SELECT servers.*,
-               users.username AS owner_username
+               users.username AS owner_username,
+               users.code AS owner_code
           FROM servers
           JOIN users ON users.id = servers.owner_user_id
          WHERE servers.name = ?
@@ -281,11 +353,27 @@ def get_server_by_name(conn, name):
     ).fetchone()
 
 
+def get_server_by_code(conn, code):
+    return conn.execute(
+        """
+        SELECT servers.*,
+               users.username AS owner_username,
+               users.code AS owner_code
+          FROM servers
+          JOIN users ON users.id = servers.owner_user_id
+         WHERE servers.code = ?
+           AND users.deleted = 0
+        """,
+        (code,),
+    ).fetchone()
+
+
 def get_server_by_host_port(conn, host, port):
     return conn.execute(
         """
         SELECT servers.*,
-               users.username AS owner_username
+               users.username AS owner_username,
+               users.code AS owner_code
           FROM servers
           JOIN users ON users.id = servers.owner_user_id
          WHERE servers.host = ?
@@ -304,7 +392,8 @@ def list_user_servers(conn, user_id):
     return conn.execute(
         """
         SELECT servers.*,
-               users.username AS owner_username
+               users.username AS owner_username,
+               users.code AS owner_code
           FROM servers
           JOIN users ON users.id = servers.owner_user_id
          WHERE servers.owner_user_id = ?
@@ -315,23 +404,35 @@ def list_user_servers(conn, user_id):
     ).fetchall()
 
 
-def add_user(conn, username, email, password_hash, password_salt, is_admin=False, is_admin_manual=False, language=None):
-    conn.execute(
-        """
-        INSERT INTO users (username, email, language, password_hash, password_salt, is_admin, is_admin_manual)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            username,
-            email,
-            language,
-            password_hash,
-            password_salt,
-            1 if is_admin else 0,
-            1 if is_admin_manual else 0,
-        ),
-    )
-    conn.commit()
+def add_user(conn, username, email, password_hash, password_salt, is_admin=False, is_admin_manual=False, language=None, code=None):
+    while True:
+        user_code = code or _unique_user_code(conn)
+        try:
+            conn.execute(
+                """
+                INSERT INTO users (username, email, language, code, password_hash, password_salt, is_admin, is_admin_manual)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    username,
+                    email,
+                    language,
+                    user_code,
+                    password_hash,
+                    password_salt,
+                    1 if is_admin else 0,
+                    1 if is_admin_manual else 0,
+                ),
+            )
+            conn.commit()
+            return
+        except sqlite3.IntegrityError as exc:
+            message = str(exc).lower()
+            if "users_code_unique" in message or "users.code" in message:
+                if code:
+                    raise
+                continue
+            raise
 
 
 def update_user_email(conn, user_id, email):
@@ -507,6 +608,10 @@ def get_user_by_username(conn, username):
     return conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
 
 
+def get_user_by_code(conn, code):
+    return conn.execute("SELECT * FROM users WHERE code = ?", (code,)).fetchone()
+
+
 def list_users(conn):
     return conn.execute("SELECT * FROM users ORDER BY created_at DESC").fetchall()
 
@@ -515,6 +620,7 @@ def list_user_admins(conn, owner_user_id):
     rows = conn.execute(
         """
         SELECT users.username,
+               users.code,
                users.id AS admin_user_id,
                user_admins.trust_admins
         FROM user_admins
@@ -529,6 +635,7 @@ def list_user_admins(conn, owner_user_id):
     return [
         {
             "username": row["username"],
+            "code": row["code"],
             "admin_user_id": row["admin_user_id"],
             "trust_admins": bool(row["trust_admins"]),
         }

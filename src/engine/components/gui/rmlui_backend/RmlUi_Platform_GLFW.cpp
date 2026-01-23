@@ -106,8 +106,16 @@ void SystemInterface_GLFW::SetClipboardText(const Rml::String& text_utf8)
 
 void SystemInterface_GLFW::GetClipboardText(Rml::String& text)
 {
-	if (window)
-		text = Rml::String(glfwGetClipboardString(window));
+	if (!window) {
+		text.clear();
+		return;
+	}
+	const char* clipboard = glfwGetClipboardString(window);
+	if (clipboard) {
+		text = Rml::String(clipboard);
+	} else {
+		text.clear();
+	}
 }
 
 bool RmlGLFW::ProcessKeyCallback(Rml::Context* context, int key, int action, int mods)

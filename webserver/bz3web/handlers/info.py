@@ -24,7 +24,8 @@ def _render_info_page(request, message=None, error=None, edit_mode=False):
     is_admin = auth.is_admin(user)
     profile_url = None
     if user:
-        profile_url = f"/users/{quote(user['username'], safe='')}"
+        user_token = auth.user_token(user)
+        profile_url = f"/users/{quote(user_token, safe='')}"
 
     header_html = views.header_with_title(
         community_name,

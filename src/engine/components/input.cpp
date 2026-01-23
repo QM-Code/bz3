@@ -433,6 +433,10 @@ const InputState &Input::getInputState() const {
     return inputState;
 }
 
+void Input::clearState() {
+    inputState = { 0 };
+}
+
 std::string Input::bindingListDisplay(const std::vector<Binding> &bindings) const {
     if (bindings.empty()) {
         return "U";

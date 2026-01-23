@@ -1,0 +1,158 @@
+body#hud-body
+{
+    margin: 0px;
+    padding: 0px;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    font-family: Google Sans;
+}
+
+#hud-root
+{
+    width: 100%;
+    height: 100%;
+}
+
+.hud-dialog
+{
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    pointer-events: none;
+}
+
+.hud-dialog.hidden
+{
+    display: none;
+}
+
+.hud-dialog-text
+{
+    font-size: 36px;
+    font-weight: 500;
+    color: #ffffff;
+}
+
+.scroll-frame
+{
+    overflow-y: auto;
+    overflow-x: hidden;
+    box-sizing: border-box;
+}
+
+.scroll-content
+{
+    width: 100%;
+    padding-right: 6px;
+    box-sizing: border-box;
+}
+
+.hud-chat-panel
+{
+    position: absolute;
+    right: 5%;
+    width: 65%;
+    bottom: 10px;
+    height: 22.5%;
+    min-height: 160px;
+    display: flex;
+    flex-direction: column;
+    background-color: #0b0f14b0;
+    border-width: 1px;
+    border-color: #223040;
+    border-radius: 6px;
+}
+
+.hud-chat-log
+{
+    flex: 1 1 auto;
+    min-height: 0px;
+    padding: 8px 10px;
+}
+
+.hud-chat-line
+{
+    display: block;
+    margin: 2px 0px;
+    color: #d5e3f0;
+    font-size: 15px;
+}
+
+.hud-chat-footer
+{
+    padding: 6px 10px 10px 10px;
+    border-width: 1px;
+    border-color: #223040;
+}
+
+.hud-chat-footer input
+{
+    width: 100%;
+    height: 28px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background-color: #0b141d;
+    border-width: 1px;
+    border-color: #1d2a36;
+    color: #e7f0fa;
+    box-sizing: border-box;
+    font-family: Google Sans;
+}
+
+.hud-chat-footer input:focus
+{
+    border-width: 1px;
+    border-color: #2f89c4;
+}
+
+.emoji {
+    width: 1em;
+    height: 1em;
+    vertical-align: -0.1em;
+}
+
+.hud-scoreboard
+{
+    position: absolute;
+    left: 12px;
+    top: 12px;
+    color: #ffffff;
+    font-size: 16px;
+}
+
+.hud-scoreboard-line
+{
+    margin: 2px 0px;
+    color: #ffffff;
+    text-shadow: 1px 1px 2px #00000080;
+}
+
+.hud-radar-panel
+{
+    position: absolute;
+    left: 5%;
+    bottom: 10px;
+    width: 22.5%;
+    height: 22.5%;
+    min-width: 240px;
+    min-height: 240px;
+    max-width: 460px;
+    max-height: 460px;
+    background-color: #0b0f14b0;
+    border-width: 1px;
+    border-color: #223040;
+    border-radius: 6px;
+    display: flex;
+    align-items: stretch;
+    justify-content: stretch;
+}
+
+.hud-radar-image
+{
+    width: 100%;
+    height: 100%;
+    transform: scale(1, -1);
+}

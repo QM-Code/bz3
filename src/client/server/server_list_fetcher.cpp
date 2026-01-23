@@ -329,6 +329,9 @@ std::vector<ServerListFetcher::ServerRecord> ServerListFetcher::parseResponse(
             record.activeCount = activeCount;
             record.inactiveCount = inactiveCount;
             record.host = server.value("host", "");
+            if (server.contains("code") && server["code"].is_string()) {
+                record.code = server["code"].get<std::string>();
+            }
             std::string portString = server.value("port", configuredServerPortString());
 
             try {

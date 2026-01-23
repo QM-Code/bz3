@@ -157,10 +157,6 @@ def file_response(body, content_type, status="200 OK", headers=None):
 def stream_file_response(path, content_type, headers=None, environ=None, chunk_size=8192):
     headers = headers or []
     headers = [("Content-Type", content_type)] + headers
-    wrapper = environ.get("wsgi.file_wrapper") if environ else None
-    if wrapper:
-        handle = open(path, "rb")
-        return "200 OK", headers, wrapper(handle, chunk_size)
 
     def iterator():
         with open(path, "rb") as handle:

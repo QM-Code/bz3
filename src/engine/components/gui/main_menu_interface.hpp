@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <vector>
@@ -11,6 +12,11 @@ namespace gui {
 class MainMenuInterface {
 public:
     using MessageTone = gui::MessageTone;
+    struct ConnectionState {
+        bool connected = false;
+        std::string host;
+        uint16_t port = 0;
+    };
 
     virtual ~MainMenuInterface() = default;
 
@@ -45,6 +51,10 @@ public:
     virtual void setScanning(bool scanning) = 0;
     virtual void setUserConfigPath(const std::string &path) = 0;
     virtual bool consumeFontReloadRequest() = 0;
+    virtual void setConnectionState(const ConnectionState &state) = 0;
+    virtual ConnectionState getConnectionState() const = 0;
+    virtual bool consumeQuitRequest() = 0;
+    virtual void showErrorDialog(const std::string &message) = 0;
 };
 
 } // namespace gui

@@ -52,8 +52,8 @@ std::string urlEncode(const std::string &value) {
     return encoded.str();
 }
 
-std::string buildServerPageUrl(const std::string &communityHost, const std::string &serverName) {
-    if (communityHost.empty() || serverName.empty()) {
+std::string buildServerPageUrl(const std::string &communityHost, const std::string &serverCode) {
+    if (communityHost.empty() || serverCode.empty()) {
         return {};
     }
     std::string base = normalizedCommunityUrl(communityHost);
@@ -63,7 +63,7 @@ std::string buildServerPageUrl(const std::string &communityHost, const std::stri
     while (!base.empty() && base.back() == '/') {
         base.pop_back();
     }
-    return base + "/servers/" + urlEncode(serverName);
+    return base + "/servers/" + urlEncode(serverCode);
 }
 
 std::string sanitizeTextForImGui(const std::string &text) {
@@ -129,6 +129,9 @@ std::string sanitizeTextForImGui(const std::string &text) {
 std::string makeServerDetailsKey(const gui::CommunityBrowserEntry &entry) {
     if (entry.sourceHost.empty()) {
         return {};
+    }
+    if (!entry.code.empty()) {
+        return entry.sourceHost + "|" + entry.code;
     }
     std::string name = entry.worldName;
     if (name.empty()) {
@@ -717,6 +720,23 @@ void MainMenuView::drawCommunityPanel(const MessageColors &messageColors) {
         ImGui::TextColored(color, "%s", statusText.c_str());
     }
 
+    if (!errorDialogMessage.empty()) {
+        ImGui::OpenPopup("Community Error");
+    }
+    if (ImGui::BeginPopupModal("Community Error", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextWrapped("%s", errorDialogMessage.c_str());
+        ImGui::Spacing();
+        if (ImGui::Button("Ok")) {
+            errorDialogMessage.clear();
+            ImGui::CloseCurrentPopup();
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            errorDialogMessage.clear();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
     ImGui::Spacing();
     ImGui::Spacing();
     ImGui::Separator();
@@ -1089,7 +1109,7 @@ void MainMenuView::drawCommunityPanel(const MessageColors &messageColors) {
         const std::string serverCommunityHost = selectedEntry->sourceHost.empty()
             ? activeCommunityHost
             : selectedEntry->sourceHost;
-        const std::string serverPageUrl = buildServerPageUrl(serverCommunityHost, serverName);
+        const std::string serverPageUrl = buildServerPageUrl(serverCommunityHost, selectedEntry->code);
 
         if (hasHeadingFont) {
             ImGui::PushFont(headingFont);

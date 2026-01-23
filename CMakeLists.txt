@@ -82,6 +82,7 @@ if(BZ3_UI_BACKEND STREQUAL "imgui")
     find_package(imgui REQUIRED)
 elseif(BZ3_UI_BACKEND STREQUAL "rmlui")
     find_package(RmlUi CONFIG REQUIRED)
+    find_package(md4c REQUIRED)
 endif()
 find_package(spdlog REQUIRED)
 find_package(miniz REQUIRED)
@@ -147,6 +148,7 @@ if(BZ3_UI_BACKEND STREQUAL "imgui")
         ${PROJECT_SOURCE_DIR}/src/engine/components/gui/main_menu.cpp
         ${PROJECT_SOURCE_DIR}/src/engine/components/gui/thumbnail_cache.cpp
         ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rich_text_renderer.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/emoji_utils.cpp
         ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/community_browser_panel.cpp
         ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/settings_panel.cpp
         ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/documentation_panel.cpp
@@ -158,6 +160,20 @@ elseif(BZ3_UI_BACKEND STREQUAL "rmlui")
         ${PROJECT_SOURCE_DIR}/src/engine/components/gui/backends/rmlui_backend.cpp
         ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_backend/RmlUi_Platform_GLFW.cpp
         ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_backend/RmlUi_Renderer_GL3.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/emoji_utils.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_main_menu.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_hud.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_hud_chat.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_hud_dialog.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_hud_radar.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_hud_scoreboard.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_panels/rmlui_panel.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_modal_dialog.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_panels/rmlui_panel_community.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_panels/rmlui_panel_settings.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_panels/rmlui_panel_documentation.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_panels/rmlui_panel_start_server.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_panels/rmlui_panel_themes.cpp
     )
 endif()
 set(ENGINE_SERVER_SOURCES
@@ -257,7 +273,7 @@ if(BZ3_UI_BACKEND STREQUAL "imgui")
 endif()
 
 if(BZ3_UI_BACKEND STREQUAL "rmlui")
-    target_link_libraries(bz3 PRIVATE RmlUi::RmlUi)
+    target_link_libraries(bz3 PRIVATE RmlUi::RmlUi md4c::md4c)
     target_compile_definitions(bz3 PRIVATE RMLUI_GL3_CUSTOM_LOADER)
     if(DEFINED threepp_SOURCE_DIR)
         target_include_directories(bz3 PRIVATE ${threepp_SOURCE_DIR}/src/external/glad)

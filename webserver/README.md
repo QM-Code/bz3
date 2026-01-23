@@ -594,13 +594,13 @@ If no output path is provided, `db-snapshot.py` writes to:
 Import/export JSON matches `communities/*/<database.database_directory>/test-data.json` and includes:
 
 - Users:
-  - `username`, `email`
+  - `username`, `code`, `email`
   - `password` (plaintext, import only) **or** `password_hash` + `password_salt`
   - `is_admin`
   - `is_locked`, `locked_at`, `deleted`, `deleted_at`
   - `admin_list` (array of usernames or `{ "username", "trust_admins" }`)
 - Servers:
-  - `name`, `overview`, `description`, `host`, `port`, `owner`
+  - `name`, `code`, `overview`, `description`, `host`, `port`, `owner`, `owner_code`
   - `screenshot_id`
   - `max_players`, `num_players`, `last_heartbeat` omitted (heartbeat populates them)
 
@@ -625,18 +625,20 @@ Import/export JSON matches `communities/*/<database.database_directory>/test-dat
 ## URLs
 
 - `/` → `/servers`
-- `/servers` HTML list
-- `/servers/<server>` server profile
+- `/servers` HTML list (active + inactive)
+- `/servers/active` HTML list (active only)
+- `/servers/inactive` HTML list (inactive only)
+- `/server/<server>` server profile (accepts server code or server name)
 - `/api/servers` JSON list (overview only; includes active + inactive)
 - `/api/servers/active` JSON list (overview only; active servers)
 - `/api/servers/inactive` JSON list (overview only; inactive servers)
-- `/api/server/<name|id>` JSON for a single server (overview + full description)
-- `/api/users/<name>` JSON for user + server list
-- `/submit` submit a server (login required)
-- `/server/edit?id=<id>` edit server (owner/admin)
+- `/api/server/<code|name|id>` JSON for a single server (overview + full description)
+- `/api/users/<code|name>` JSON for user + server list
+- `/servers/add` submit a server (login required)
+- `/server/<server>/edit` edit server (owner/admin)
 - `/server/delete?id=<id>` delete server (owner/admin)
 - `/users` list users (admin only)
-- `/users/<username>` user profile
+- `/users/<code|username>` user profile
 - `/users/<username>/edit` personal settings
 - `/register`, `/login`, `/logout`, `/forgot`, `/reset` auth
 - `/api/admins` admin list for a host+port
@@ -648,6 +650,6 @@ Import/export JSON matches `communities/*/<database.database_directory>/test-dat
 
 ## Notes
 
-- Markdown is rendered on `/servers/<server>` (description) and `/info` (community description) with sanitization.
+- Markdown is rendered on `/server/<server>` (description) and `/info` (community description) with sanitization.
 - Placeholders are configurable under `placeholders.*` in `webserver/config.json`.
 - `server.host` may be `0.0.0.0` for binding, but clients should use a reachable address.

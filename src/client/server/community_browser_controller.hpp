@@ -41,6 +41,7 @@ private:
     std::vector<ClientServerListSource> resolveActiveServerLists() const;
     void handleServerListSelection(int selectedIndex);
     void handleServerListAddition(const gui::ServerListOption &option);
+    void commitServerListAddition(const std::string &baseUrl);
     void handleServerListDeletion(const std::string &host);
     void updateServerListDisplayNamesFromCache();
     void updateCommunityDetails();
@@ -79,12 +80,21 @@ private:
         std::string key;
         std::string sourceHost;
         std::string serverName;
+        std::string detailName;
         std::string description;
         std::atomic<bool> done{false};
         bool ok = false;
         std::thread worker;
     };
     std::unique_ptr<ServerDetailsRequest> serverDetailsRequest;
+    struct PendingAddRequest {
+        std::string baseUrl;
+        std::string displayHost;
+        std::atomic<bool> done{false};
+        bool ok = false;
+        std::thread worker;
+    };
+    std::unique_ptr<PendingAddRequest> pendingAddRequest;
     bool curlReady = false;
     CommunityAuthClient authClient;
     std::unordered_map<std::string, std::string> passwordSaltCache;

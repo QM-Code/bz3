@@ -32,6 +32,7 @@
 #include <RmlUi/Core/RenderInterface.h>
 #include <RmlUi/Core/Types.h>
 #include <bitset>
+#include <unordered_set>
 
 enum class ProgramId;
 enum class UniformId;
@@ -137,6 +138,7 @@ private:
 	Rml::CompiledGeometryHandle fullscreen_quad_geometry = {};
 
 	Rml::UniquePtr<const Gfx::ProgramData> program_data;
+	std::unordered_set<unsigned int> external_textures;
 
 	/*
 	    Manages render targets, including the layer stack and postprocessing framebuffers.
