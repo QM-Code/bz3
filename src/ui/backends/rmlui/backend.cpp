@@ -165,6 +165,10 @@ public:
         return consumeOptional(fontReloadRequested);
     }
 
+    bool consumeKeybindingsReloadRequest() override {
+        return false;
+    }
+
     void setConnectionState(const ConnectionState &state) override {
         connectionState = state;
     }
@@ -773,6 +777,10 @@ void RmlUiBackend::update() {
         return;
     }
 
+    if (renderBridge && state->hud) {
+        state->hud->setRadarTextureId(renderBridge->getRadarTextureId());
+    }
+
     int fbWidth = 0;
     int fbHeight = 0;
     if (windowRef) { windowRef->getFramebufferSize(fbWidth, fbHeight); }
@@ -874,13 +882,6 @@ void RmlUiBackend::setSpawnHint(const std::string &hint) {
     state->hud->setDialogText(hint);
 }
 
-void RmlUiBackend::setRadarTextureId(unsigned int textureId) {
-    if (!state || !state->hud) {
-        return;
-    }
-    state->hud->setRadarTextureId(textureId);
-}
-
 void RmlUiBackend::addConsoleLine(const std::string &playerName, const std::string &line) {
     if (!state || !state->hud) {
         return;
@@ -926,6 +927,14 @@ void RmlUiBackend::displayDeathScreen(bool show) {
         return;
     }
     state->hud->showDialog(show);
+}
+
+bool RmlUiBackend::consumeKeybindingsReloadRequest() {
+    return consoleView && consoleView->consumeKeybindingsReloadRequest();
+}
+
+void RmlUiBackend::setRenderBridge(const ui::RenderBridge *bridge) {
+    renderBridge = bridge;
 }
 
 void RmlUiBackend::setActiveTab(const std::string &tabKey) {

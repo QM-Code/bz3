@@ -7,13 +7,13 @@
 #include <string>
 #include <vector>
 
-#include <nlohmann/json.hpp>
+#include "common/json.hpp"
 
 #include "common/data_path_resolver.hpp"
 
 namespace {
 
-ImVec4 readColorArray(const nlohmann::json &value, const ImVec4 &fallback) {
+ImVec4 readColorArray(const bz::json::Value &value, const ImVec4 &fallback) {
     if (!value.is_array()) {
         return fallback;
     }
@@ -152,23 +152,23 @@ void ConsoleView::applyThemeToView(const ThemeConfig &theme) {
     buttonColor = theme.button.color;
 }
 
-bool ConsoleView::loadUserConfig(nlohmann::json &out) const {
+bool ConsoleView::loadUserConfig(bz::json::Value &out) const {
     const std::filesystem::path path = userConfigPath.empty()
         ? bz::data::EnsureUserConfigFile("config.json")
         : std::filesystem::path(userConfigPath);
     if (auto user = bz::data::LoadJsonFile(path, "user config", spdlog::level::debug)) {
         if (!user->is_object()) {
-            out = nlohmann::json::object();
+            out = bz::json::Object();
             return false;
         }
         out = *user;
         return true;
     }
-    out = nlohmann::json::object();
+    out = bz::json::Object();
     return true;
 }
 
-bool ConsoleView::saveUserConfig(const nlohmann::json &userConfig, std::string &error) const {
+bool ConsoleView::saveUserConfig(const bz::json::Value &userConfig, std::string &error) const {
     const std::filesystem::path path = userConfigPath.empty()
         ? bz::data::EnsureUserConfigFile("config.json")
         : std::filesystem::path(userConfigPath);
@@ -197,10 +197,10 @@ bool ConsoleView::saveUserConfig(const nlohmann::json &userConfig, std::string &
     return true;
 }
 
-void ConsoleView::setNestedConfig(nlohmann::json &root,
+void ConsoleView::setNestedConfig(bz::json::Value &root,
                                            std::initializer_list<const char*> path,
-                                           nlohmann::json value) const {
-    nlohmann::json *node = &root;
+                                           bz::json::Value value) const {
+    bz::json::Value *node = &root;
     for (auto it = path.begin(); it != path.end(); ++it) {
         const bool isLast = std::next(it) == path.end();
         const std::string key(*it);
@@ -208,17 +208,17 @@ void ConsoleView::setNestedConfig(nlohmann::json &root,
             (*node)[key] = std::move(value);
         } else {
             if (!node->contains(key) || !(*node)[key].is_object()) {
-                (*node)[key] = nlohmann::json::object();
+                (*node)[key] = bz::json::Object();
             }
             node = &(*node)[key];
         }
     }
 }
 
-void ConsoleView::setNestedConfig(nlohmann::json &root,
+void ConsoleView::setNestedConfig(bz::json::Value &root,
                                            const std::vector<std::string> &path,
-                                           nlohmann::json value) const {
-    nlohmann::json *node = &root;
+                                           bz::json::Value value) const {
+    bz::json::Value *node = &root;
     for (std::size_t i = 0; i < path.size(); ++i) {
         const std::string &key = path[i];
         const bool isLast = (i + 1 == path.size());
@@ -226,17 +226,17 @@ void ConsoleView::setNestedConfig(nlohmann::json &root,
             (*node)[key] = std::move(value);
         } else {
             if (!node->contains(key) || !(*node)[key].is_object()) {
-                (*node)[key] = nlohmann::json::object();
+                (*node)[key] = bz::json::Object();
             }
             node = &(*node)[key];
         }
     }
 }
 
-void ConsoleView::eraseNestedConfig(nlohmann::json &root,
+void ConsoleView::eraseNestedConfig(bz::json::Value &root,
                                              std::initializer_list<const char*> path) const {
-    std::vector<std::pair<nlohmann::json*, std::string>> chain;
-    nlohmann::json *node = &root;
+    std::vector<std::pair<bz::json::Value*, std::string>> chain;
+    bz::json::Value *node = &root;
     for (const char *segment : path) {
         if (!node->is_object()) {
             return;
@@ -263,15 +263,15 @@ void ConsoleView::eraseNestedConfig(nlohmann::json &root,
     }
 }
 
-nlohmann::json ConsoleView::themeToJson(const ThemeConfig &theme) const {
+bz::json::Value ConsoleView::themeToJson(const ThemeConfig &theme) const {
     auto encodeFont = [](const ThemeFontConfig &font) {
-        return nlohmann::json{
+        return bz::json::Value{
             {"Font", font.font},
             {"Size", font.size},
-            {"Color", nlohmann::json::array({font.color.x, font.color.y, font.color.z, font.color.w})}
+            {"Color", bz::json::Array({font.color.x, font.color.y, font.color.z, font.color.w})}
         };
     };
-    nlohmann::json console = nlohmann::json::object();
+    bz::json::Value console = bz::json::Object();
     console["Regular"] = encodeFont(theme.regular);
     console["Emoji"] = encodeFont(theme.emoji);
     console["Title"] = encodeFont(theme.title);
@@ -280,9 +280,9 @@ nlohmann::json ConsoleView::themeToJson(const ThemeConfig &theme) const {
     return console;
 }
 
-ConsoleView::ThemeConfig ConsoleView::themeFromJson(const nlohmann::json &themeJson,
+ConsoleView::ThemeConfig ConsoleView::themeFromJson(const bz::json::Value &themeJson,
                                                                       const ThemeConfig &fallback) const {
-    const nlohmann::json *consoleNode = nullptr;
+    const bz::json::Value *consoleNode = nullptr;
     if (themeJson.is_object()) {
         if (auto assetsIt = themeJson.find("assets"); assetsIt != themeJson.end() && assetsIt->is_object()) {
             const auto &assetsObj = *assetsIt;
@@ -367,14 +367,14 @@ void ConsoleView::applyThemeSelection(const std::string &name) {
         }
     }
 
-    nlohmann::json userConfig;
+    bz::json::Value userConfig;
     if (!loadUserConfig(userConfig)) {
         themeStatusText = "Failed to load user config.";
         themeStatusIsError = true;
         return;
     }
 
-    nlohmann::json consoleJson = themeToJson(selected);
+    bz::json::Value consoleJson = themeToJson(selected);
     setNestedConfig(userConfig, {"assets", "hud", "fonts", "console"}, consoleJson);
 
     if (!name.empty()) {
@@ -384,7 +384,7 @@ void ConsoleView::applyThemeSelection(const std::string &name) {
         setNestedConfig(
             userConfig,
             std::vector<std::string>{"gui", "themes", "presets", name},
-            nlohmann::json{{"fonts", {{"console", consoleJson}}}});
+            bz::json::Value{{"fonts", {{"console", consoleJson}}}});
     }
 
     std::string error;
@@ -410,7 +410,7 @@ void ConsoleView::applyThemeSelection(const std::string &name) {
 }
 
 void ConsoleView::resetToDefaultTheme() {
-    nlohmann::json userConfig;
+    bz::json::Value userConfig;
     if (!loadUserConfig(userConfig)) {
         themeStatusText = "Failed to load user config.";
         themeStatusIsError = true;
@@ -466,7 +466,7 @@ void ConsoleView::ensureThemesLoaded() {
     }
     defaultTheme.name = "Default";
 
-    nlohmann::json userConfig;
+    bz::json::Value userConfig;
     if (loadUserConfig(userConfig)) {
         if (auto guiIt = userConfig.find("gui"); guiIt != userConfig.end() && guiIt->is_object()) {
             auto &guiObj = *guiIt;
@@ -485,7 +485,7 @@ void ConsoleView::ensureThemesLoaded() {
             }
         }
 
-        const nlohmann::json *consoleNode = nullptr;
+        const bz::json::Value *consoleNode = nullptr;
         if (auto assetsIt = userConfig.find("assets"); assetsIt != userConfig.end() && assetsIt->is_object()) {
             const auto &assetsObj = *assetsIt;
             if (auto hudIt = assetsObj.find("hud"); hudIt != assetsObj.end() && hudIt->is_object()) {

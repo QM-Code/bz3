@@ -45,7 +45,7 @@ std::string processTerminalInput(const std::string &input) {
 
     if (cmd == "config" || cmd == "manifest") {
         try {
-            return g_game->world->getConfig().dump(4);
+            return g_game->world->config().dump(4);
         } catch (const std::exception &e) {
             return std::string("Error retrieving config: ") + e.what();
         }
@@ -56,7 +56,7 @@ std::string processTerminalInput(const std::string &input) {
             return "Usage: getAssetPath <assetName>";
         }
         try {
-            return g_game->world->getAssetPath(args[1]);
+            return g_game->world->resolveAssetPath(args[1]).string();
         } catch (const std::exception &e) {
             return std::string("Error: ") + e.what();
         }
@@ -64,7 +64,7 @@ std::string processTerminalInput(const std::string &input) {
 
     if (cmd == "defaultPlayerParameters") {
         std::string response = "Default Player Parameters:";
-        for (const auto &[key, val] : g_game->world->getDefaultPlayerParameters()) {
+        for (const auto &[key, val] : g_game->world->defaultPlayerParameters()) {
             response += "\n - " + key + ": " + std::to_string(val);
         }
         return response;

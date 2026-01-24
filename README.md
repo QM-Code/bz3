@@ -108,8 +108,10 @@ Entry points (public interfaces)
 - Audio: `Audio` in `src/audio/audio.hpp`
 - Windowing: `Window` in `src/platform/window.hpp`
 - UI: `UiSystem` in `src/ui/system.hpp`
+- UI render bridge: `ui::RenderBridge` in `src/ui/render_bridge.hpp`
 - Physics: `PhysicsWorld` in `src/physics/physics_world.hpp`
 - Networking: `ClientNetwork` and `ServerNetwork` in `src/network/`
+- World runtime: `ClientWorldSession` and `ServerWorldSession` in `src/client/` and `src/server/`
 
 Backend factories (compile-time selection)
 - Audio: `src/audio/backend_factory.cpp`
@@ -117,6 +119,7 @@ Backend factories (compile-time selection)
 - UI: `src/ui/backend_factory.cpp`
 - Physics: `src/physics/backend_factory.cpp`
 - Networking: `src/network/backend_factory.cpp`
+- World: `src/world/backend_factory.cpp`
 
 Backend layouts (examples)
 - `src/audio/backends/miniaudio/` and `src/audio/backends/sdl/`
@@ -125,6 +128,8 @@ Backend layouts (examples)
 - `src/physics/backends/jolt/` and `src/physics/backends/bullet/`
 - `src/renderer/backends/threepp/` (future: ogre, wicked, etc.)
 - `src/network/backends/enet/` (future: steam, webrtc, etc.)
+- `src/world/backends/fs/` (future: zip, remote, etc.)
+- `src/input/mapping/` (action mappings: bindings, maps, mapper)
 
 ## Build options (backend selection)
 
@@ -136,19 +141,38 @@ These CMake cache variables select backends at build time:
 - `BZ3_AUDIO_BACKEND=miniaudio|sdlaudio`
 - `BZ3_RENDER_BACKEND=threepp`
 - `BZ3_NETWORK_BACKEND=enet`
+- `BZ3_WORLD_BACKEND=fs`
 
 Example:
 
 ```bash
-cmake -S . -B build-sdl-rmlui-bullet-sdlaudio-threepp-enet \
+cmake -S . -B build-sdl-rmlui-bullet-sdlaudio-threepp-enet-fs \
   -DBZ3_WINDOW_BACKEND=sdl \
   -DBZ3_UI_BACKEND=rmlui \
   -DBZ3_PHYSICS_BACKEND=bullet \
   -DBZ3_AUDIO_BACKEND=sdlaudio \
   -DBZ3_RENDER_BACKEND=threepp \
-  -DBZ3_NETWORK_BACKEND=enet
-cmake --build build-sdl-rmlui-bullet-sdlaudio-threepp-enet
+  -DBZ3_NETWORK_BACKEND=enet \
+  -DBZ3_WORLD_BACKEND=fs
+cmake --build build-sdl-rmlui-bullet-sdlaudio-threepp-enet-fs
 ```
+
+## Input bindings
+
+Input actions are mapped via the `keybindings` config object (merged from the usual config layers). Keys are specified as strings like `"W"`, `"SPACE"`, `"LEFT_MOUSE"`, `"F1"`, or `"MOUSE_BUTTON_4"`. If a binding is missing or invalid, defaults are used.
+
+Actions:
+- `fire` (default: `["F", "E", "LEFT_MOUSE"]`)
+- `spawn` (default: `["U"]`)
+- `jump` (default: `["SPACE"]`)
+- `quickQuit` (default: `["F12"]`)
+- `chat` (default: `["T"]`)
+- `escape` (default: `["ESCAPE"]`)
+- `toggleFullscreen` (default: `["RIGHT_BRACKET"]`)
+- `moveLeft` (default: `["LEFT", "J"]`)
+- `moveRight` (default: `["RIGHT", "L"]`)
+- `moveForward` (default: `["UP", "I"]`)
+- `moveBackward` (default: `["DOWN", "K"]`)
 
 ## Agent prompts
 

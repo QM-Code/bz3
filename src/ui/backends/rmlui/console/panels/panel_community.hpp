@@ -4,7 +4,7 @@
 #include <memory>
 #include <optional>
 #include <vector>
-#include <nlohmann/json.hpp>
+#include "common/json.hpp"
 
 namespace Rml {
 class Element;
@@ -84,10 +84,10 @@ private:
     bool hasActiveConnection() const;
     bool isLanSelected() const;
 
-    bool loadUserConfig(nlohmann::json &out) const;
-    bool saveUserConfig(const nlohmann::json &userConfig, std::string &error) const;
-    void setNestedConfig(nlohmann::json &root, std::initializer_list<const char*> path, nlohmann::json value) const;
-    void eraseNestedConfig(nlohmann::json &root, std::initializer_list<const char*> path) const;
+    bool loadUserConfig(bz::json::Value &out) const;
+    bool saveUserConfig(const bz::json::Value &userConfig, std::string &error) const;
+    void setNestedConfig(bz::json::Value &root, std::initializer_list<const char*> path, bz::json::Value value) const;
+    void eraseNestedConfig(bz::json::Value &root, std::initializer_list<const char*> path) const;
     std::string communityKeyForIndex(int index) const;
 
     Rml::ElementDocument *document = nullptr;

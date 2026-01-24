@@ -698,7 +698,7 @@ void RmlUiPanelCommunity::refreshCommunityCredentials() {
         return;
     }
 
-    nlohmann::json config;
+    bz::json::Value config;
     if (!loadUserConfig(config)) {
         return;
     }
@@ -1068,23 +1068,23 @@ void RmlUiPanelCommunity::showDeleteDialog() {
     deleteDialog.show("Delete \"" + escapeRmlText(label) + "\"?");
 }
 
-bool RmlUiPanelCommunity::loadUserConfig(nlohmann::json &out) const {
+bool RmlUiPanelCommunity::loadUserConfig(bz::json::Value &out) const {
     const std::filesystem::path path = userConfigPath.empty()
         ? bz::data::EnsureUserConfigFile("config.json")
         : std::filesystem::path(userConfigPath);
     if (auto user = bz::data::LoadJsonFile(path, "user config", spdlog::level::debug)) {
         if (!user->is_object()) {
-            out = nlohmann::json::object();
+            out = bz::json::Object();
             return false;
         }
         out = *user;
         return true;
     }
-    out = nlohmann::json::object();
+    out = bz::json::Object();
     return true;
 }
 
-bool RmlUiPanelCommunity::saveUserConfig(const nlohmann::json &userConfig, std::string &error) const {
+bool RmlUiPanelCommunity::saveUserConfig(const bz::json::Value &userConfig, std::string &error) const {
     const std::filesystem::path path = userConfigPath.empty()
         ? bz::data::EnsureUserConfigFile("config.json")
         : std::filesystem::path(userConfigPath);
@@ -1113,10 +1113,10 @@ bool RmlUiPanelCommunity::saveUserConfig(const nlohmann::json &userConfig, std::
     return true;
 }
 
-void RmlUiPanelCommunity::setNestedConfig(nlohmann::json &root,
+void RmlUiPanelCommunity::setNestedConfig(bz::json::Value &root,
                                           std::initializer_list<const char*> path,
-                                          nlohmann::json value) const {
-    nlohmann::json *cursor = &root;
+                                          bz::json::Value value) const {
+    bz::json::Value *cursor = &root;
     std::vector<std::string> keys;
     keys.reserve(path.size());
     for (const char *entry : path) {
@@ -1128,16 +1128,16 @@ void RmlUiPanelCommunity::setNestedConfig(nlohmann::json &root,
     for (std::size_t i = 0; i + 1 < keys.size(); ++i) {
         const std::string &key = keys[i];
         if (!cursor->contains(key) || !(*cursor)[key].is_object()) {
-            (*cursor)[key] = nlohmann::json::object();
+            (*cursor)[key] = bz::json::Object();
         }
         cursor = &(*cursor)[key];
     }
     (*cursor)[keys.back()] = std::move(value);
 }
 
-void RmlUiPanelCommunity::eraseNestedConfig(nlohmann::json &root,
+void RmlUiPanelCommunity::eraseNestedConfig(bz::json::Value &root,
                                             std::initializer_list<const char*> path) const {
-    nlohmann::json *cursor = &root;
+    bz::json::Value *cursor = &root;
     std::vector<std::string> keys;
     keys.reserve(path.size());
     for (const char *entry : path) {
@@ -1178,7 +1178,7 @@ void RmlUiPanelCommunity::persistCommunityCredentials(bool passwordChanged) {
         return;
     }
 
-    nlohmann::json config;
+    bz::json::Value config;
     if (!loadUserConfig(config)) {
         return;
     }

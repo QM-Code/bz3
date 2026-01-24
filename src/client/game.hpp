@@ -3,7 +3,7 @@
 #include <vector>
 #include "core/types.hpp"
 #include "engine/client_engine.hpp"
-#include "world.hpp"
+#include "world_session.hpp"
 #include "shot.hpp"
 #include "console.hpp"
 
@@ -30,7 +30,7 @@ public:
     ClientEngine &engine;
 
     Player *player = nullptr;
-    std::unique_ptr<World> world;
+    std::unique_ptr<ClientWorldSession> world;
     std::unique_ptr<Console> console;
     std::vector<std::unique_ptr<Shot>> shots;
 

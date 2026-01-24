@@ -1,7 +1,7 @@
 #include "client/server/server_list_fetcher.hpp"
 
 #include <curl/curl.h>
-#include <nlohmann/json.hpp>
+#include "common/json.hpp"
 #include "common/curl_global.hpp"
 #include "common/data_path_resolver.hpp"
 #include "spdlog/spdlog.h"
@@ -16,7 +16,7 @@ size_t CurlWriteCallback(char *ptr, size_t size, size_t nmemb, void *userdata) {
     return total;
 }
 
-int parseIntegerField(const nlohmann::json &object, const char *key) {
+int parseIntegerField(const bz::json::Value &object, const char *key) {
     if (!object.contains(key)) {
         return -1;
     }
@@ -91,7 +91,7 @@ bool parseInfoResponse(const std::string &body,
                        std::string &communityName,
                        std::string &communityDetails) {
     try {
-        nlohmann::json jsonData = nlohmann::json::parse(body);
+        bz::json::Value jsonData = bz::json::Parse(body);
         if (auto nameIt = jsonData.find("community_name");
             nameIt != jsonData.end() && nameIt->is_string()) {
             communityName = nameIt->get<std::string>();
@@ -266,7 +266,7 @@ std::vector<ServerListFetcher::ServerRecord> ServerListFetcher::parseResponse(
     std::vector<ServerRecord> records;
 
     try {
-        nlohmann::json jsonData = nlohmann::json::parse(body);
+        bz::json::Value jsonData = bz::json::Parse(body);
         std::string listName;
         if (auto nameIt = jsonData.find("name"); nameIt != jsonData.end() && nameIt->is_string()) {
             listName = nameIt->get<std::string>();

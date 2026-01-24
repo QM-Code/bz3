@@ -67,6 +67,14 @@ else()
     message(FATAL_ERROR "Unknown BZ3_NETWORK_BACKEND value: ${BZ3_NETWORK_BACKEND}")
 endif()
 
+set(BZ3_WORLD_BACKEND "fs" CACHE STRING "World backend (fs)")
+set_property(CACHE BZ3_WORLD_BACKEND PROPERTY STRINGS fs)
+if(BZ3_WORLD_BACKEND STREQUAL "fs")
+    add_compile_definitions(BZ3_WORLD_BACKEND_FS)
+else()
+    message(FATAL_ERROR "Unknown BZ3_WORLD_BACKEND value: ${BZ3_WORLD_BACKEND}")
+endif()
+
 set(BZ3_RENDER_BACKEND "threepp" CACHE STRING "Render backend (threepp)")
 set_property(CACHE BZ3_RENDER_BACKEND PROPERTY STRINGS threepp)
 if(BZ3_RENDER_BACKEND STREQUAL "threepp")
@@ -186,6 +194,9 @@ list(APPEND SERVER_SOURCES
 set(ENGINE_CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/engine/client_engine.cpp
     ${PROJECT_SOURCE_DIR}/src/renderer/mesh_loader.cpp
+    ${PROJECT_SOURCE_DIR}/src/world/content.cpp
+    ${PROJECT_SOURCE_DIR}/src/world/backend_factory.cpp
+    ${PROJECT_SOURCE_DIR}/src/world/backends/fs/backend.cpp
     ${PROJECT_SOURCE_DIR}/src/network/client_network.cpp
     ${PROJECT_SOURCE_DIR}/src/network/backend_factory.cpp
     ${PROJECT_SOURCE_DIR}/src/network/backends/enet/client_backend.cpp
@@ -196,6 +207,9 @@ set(ENGINE_CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/renderer/render.cpp
     ${PROJECT_SOURCE_DIR}/src/renderer/backend_factory.cpp
     ${PROJECT_SOURCE_DIR}/src/input/input.cpp
+    ${PROJECT_SOURCE_DIR}/src/input/mapping/binding.cpp
+    ${PROJECT_SOURCE_DIR}/src/input/mapping/map.cpp
+    ${PROJECT_SOURCE_DIR}/src/input/mapping/mapper.cpp
     ${PROJECT_SOURCE_DIR}/src/platform/window_factory.cpp
     ${PROJECT_SOURCE_DIR}/src/ui/system.cpp
     ${PROJECT_SOURCE_DIR}/src/ui/backend_factory.cpp
@@ -252,6 +266,9 @@ endif()
 set(ENGINE_SERVER_SOURCES
     ${PROJECT_SOURCE_DIR}/src/engine/server_engine.cpp
     ${PROJECT_SOURCE_DIR}/src/renderer/mesh_loader.cpp
+    ${PROJECT_SOURCE_DIR}/src/world/content.cpp
+    ${PROJECT_SOURCE_DIR}/src/world/backend_factory.cpp
+    ${PROJECT_SOURCE_DIR}/src/world/backends/fs/backend.cpp
     ${PROJECT_SOURCE_DIR}/src/network/server_network.cpp
     ${PROJECT_SOURCE_DIR}/src/network/backend_factory.cpp
     ${PROJECT_SOURCE_DIR}/src/network/backends/enet/client_backend.cpp

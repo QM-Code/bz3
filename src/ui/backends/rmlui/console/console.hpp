@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include <nlohmann/json.hpp>
+#include "common/json.hpp"
 
 #include "ui/console/console_interface.hpp"
 
@@ -53,6 +53,7 @@ public:
     void setScanning(bool scanning) override;
     void setUserConfigPath(const std::string &path) override;
     bool consumeFontReloadRequest() override;
+    bool consumeKeybindingsReloadRequest() override;
     void setConnectionState(const ConnectionState &state) override;
     ConnectionState getConnectionState() const override;
     bool consumeQuitRequest() override;
@@ -68,7 +69,7 @@ public:
 
 private:
     void applyListOptionsToPanel();
-    bool loadUserConfig(nlohmann::json &out) const;
+    bool loadUserConfig(bz::json::Value &out) const;
     std::string communityKeyForIndex(int index) const;
     void refreshCommunityCredentials();
 

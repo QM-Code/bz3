@@ -1,7 +1,7 @@
 #pragma once
 #include "core/types.hpp"
 #include "spdlog/spdlog.h"
-#include <nlohmann/json.hpp>
+#include "common/json.hpp"
 #include <vector>
 #include <memory>
 #include <map>
@@ -107,7 +107,7 @@ namespace py = pybind11;
 
 namespace PluginAPI {
     void registerCallback(EventType type, pybind11::function func);
-    void loadPythonPlugins(const nlohmann::json &configJson);
+    void loadPythonPlugins(const bz::json::Value &configJson);
     const std::vector<std::string>& getLoadedPluginScripts();
     
     void sendChatMessage(client_id fromId, client_id toId, const std::string &text);

@@ -258,6 +258,19 @@ bool ConsoleView::consumeFontReloadRequest() {
     return requested;
 }
 
+bool ConsoleView::consumeKeybindingsReloadRequest() {
+    const bool requested = keybindingsReloadRequested;
+    keybindingsReloadRequested = false;
+    return requested;
+}
+
+void ConsoleView::requestKeybindingsReload() {
+    if (!userConfigPath.empty()) {
+        bz::data::MergeExternalConfigLayer(userConfigPath, "user config", spdlog::level::debug);
+    }
+    keybindingsReloadRequested = true;
+}
+
 void ConsoleView::setConnectionState(const ConnectionState &state) {
     connectionState = state;
 }
@@ -395,7 +408,7 @@ void ConsoleView::refreshCommunityCredentials() {
         return;
     }
 
-    nlohmann::json config;
+    bz::json::Value config;
     if (!loadUserConfig(config)) {
         return;
     }
@@ -432,7 +445,7 @@ void ConsoleView::persistCommunityCredentials(bool passwordChanged) {
         return;
     }
 
-    nlohmann::json config;
+    bz::json::Value config;
     if (!loadUserConfig(config)) {
         return;
     }
@@ -469,7 +482,7 @@ void ConsoleView::storeCommunityAuth(const std::string &communityHost,
         key.pop_back();
     }
 
-    nlohmann::json config;
+    bz::json::Value config;
     if (!loadUserConfig(config)) {
         return;
     }

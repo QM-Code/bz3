@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include <nlohmann/json.hpp>
+#include "common/json.hpp"
 
 namespace Rml {
 class Element;
@@ -20,6 +20,7 @@ class RmlUiPanelSettings final : public RmlUiPanel {
 public:
     RmlUiPanelSettings();
     void setUserConfigPath(const std::string &path);
+    bool consumeKeybindingsReloadRequest();
 
 protected:
     void onLoaded(Rml::ElementDocument *document) override;
@@ -53,16 +54,17 @@ private:
     void saveBindings();
     void resetBindings();
     void showStatus(const std::string &message, bool isError);
+    void requestKeybindingsReload();
     void captureKey(int keyIdentifier);
     void captureMouse(int button);
     std::string keyIdentifierToName(int keyIdentifier) const;
 
-    bool loadUserConfig(nlohmann::json &out) const;
-    bool saveUserConfig(const nlohmann::json &userConfig, std::string &error) const;
-    void setNestedConfig(nlohmann::json &root,
+    bool loadUserConfig(bz::json::Value &out) const;
+    bool saveUserConfig(const bz::json::Value &userConfig, std::string &error) const;
+    void setNestedConfig(bz::json::Value &root,
                          std::initializer_list<const char*> path,
-                         nlohmann::json value) const;
-    void eraseNestedConfig(nlohmann::json &root,
+                         bz::json::Value value) const;
+    void eraseNestedConfig(bz::json::Value &root,
                            std::initializer_list<const char*> path) const;
 
     Rml::ElementDocument *document = nullptr;
@@ -82,6 +84,7 @@ private:
     bool selectionJustChanged = false;
     bool loaded = false;
     bool statusIsError = false;
+    bool keybindingsReloadRequested = false;
     std::string statusText;
     std::string userConfigPath;
     std::vector<std::unique_ptr<Rml::EventListener>> listeners;

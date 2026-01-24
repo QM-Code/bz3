@@ -9,6 +9,7 @@
 #include "platform/events.hpp"
 #include "ui/types.hpp"
 #include "ui/console/console_interface.hpp"
+#include "ui/render_bridge.hpp"
 
 namespace platform {
 class Window;
@@ -38,11 +39,12 @@ public:
     void handleEvents(const std::vector<platform::Event> &events);
     void setScoreboardEntries(const std::vector<ScoreboardEntry> &entries);
     void setSpawnHint(const std::string &hint);
-    void setRadarTextureId(unsigned int textureId);
     void addConsoleLine(const std::string &playerName, const std::string &line);
     std::string getChatInputBuffer() const;
     void clearChatInputBuffer();
     void focusChatInput();
     bool getChatInputFocus() const;
     void displayDeathScreen(bool show);
+    bool consumeKeybindingsReloadRequest();
+    void setRenderBridge(const ui::RenderBridge *bridge);
 };

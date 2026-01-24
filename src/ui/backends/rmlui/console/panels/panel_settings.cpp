@@ -11,7 +11,7 @@
 #include <fstream>
 #include <sstream>
 
-#include <nlohmann/json.hpp>
+#include "common/json.hpp"
 
 #include "common/data_path_resolver.hpp"
 #include "spdlog/spdlog.h"
@@ -265,17 +265,17 @@ void RmlUiPanelSettings::loadBindings() {
     mouseBindings.assign(std::size(kKeybindings), std::string());
     controllerBindings.assign(std::size(kKeybindings), std::string());
 
-    nlohmann::json userConfig;
+    bz::json::Value userConfig;
     bool loadedConfig = loadUserConfig(userConfig);
     if (!loadedConfig) {
         showStatus("Failed to load user config; showing defaults.", true);
     }
 
-    const nlohmann::json *bindingsNode = nullptr;
+    const bz::json::Value *bindingsNode = nullptr;
     if (auto it = userConfig.find("keybindings"); it != userConfig.end() && it->is_object()) {
         bindingsNode = &(*it);
     }
-    const nlohmann::json *controllerNode = nullptr;
+    const bz::json::Value *controllerNode = nullptr;
     if (auto guiIt = userConfig.find("gui"); guiIt != userConfig.end() && guiIt->is_object()) {
         if (auto keyIt = guiIt->find("keybindings"); keyIt != guiIt->end() && keyIt->is_object()) {
             if (auto controllerIt = keyIt->find("controller"); controllerIt != keyIt->end() && controllerIt->is_object()) {
@@ -447,14 +447,14 @@ void RmlUiPanelSettings::clearSelected() {
 }
 
 void RmlUiPanelSettings::saveBindings() {
-    nlohmann::json userConfig;
+    bz::json::Value userConfig;
     if (!loadUserConfig(userConfig)) {
         showStatus("Failed to load user config.", true);
         return;
     }
 
-    nlohmann::json keybindings = nlohmann::json::object();
-    nlohmann::json controllerJson = nlohmann::json::object();
+    bz::json::Value keybindings = bz::json::Object();
+    bz::json::Value controllerJson = bz::json::Object();
     bool hasBindings = false;
     bool hasController = false;
 
@@ -503,7 +503,8 @@ void RmlUiPanelSettings::saveBindings() {
     if (!saveUserConfig(userConfig, error)) {
         showStatus(error.empty() ? "Failed to save bindings." : error, true);
     } else {
-        showStatus("Bindings saved. Restart to apply.", false);
+        requestKeybindingsReload();
+        showStatus("Bindings saved.", false);
     }
 }
 
@@ -524,7 +525,7 @@ void RmlUiPanelSettings::resetBindings() {
         controllerBindings[i].clear();
     }
 
-    nlohmann::json userConfig;
+    bz::json::Value userConfig;
     if (!loadUserConfig(userConfig)) {
         showStatus("Failed to load user config.", true);
     } else {
@@ -534,11 +535,25 @@ void RmlUiPanelSettings::resetBindings() {
         if (!saveUserConfig(userConfig, error)) {
             showStatus(error.empty() ? "Failed to reset bindings." : error, true);
         } else {
-            showStatus("Bindings reset to defaults. Restart to apply.", false);
+            requestKeybindingsReload();
+            showStatus("Bindings reset to defaults.", false);
         }
     }
 
     rebuildBindings();
+}
+
+void RmlUiPanelSettings::requestKeybindingsReload() {
+    if (!userConfigPath.empty()) {
+        bz::data::MergeExternalConfigLayer(userConfigPath, "user config", spdlog::level::debug);
+    }
+    keybindingsReloadRequested = true;
+}
+
+bool RmlUiPanelSettings::consumeKeybindingsReloadRequest() {
+    const bool requested = keybindingsReloadRequested;
+    keybindingsReloadRequested = false;
+    return requested;
 }
 
 void RmlUiPanelSettings::showStatus(const std::string &message, bool isError) {
@@ -655,23 +670,23 @@ std::string RmlUiPanelSettings::keyIdentifierToName(int keyIdentifier) const {
     return {};
 }
 
-bool RmlUiPanelSettings::loadUserConfig(nlohmann::json &out) const {
+bool RmlUiPanelSettings::loadUserConfig(bz::json::Value &out) const {
     const std::filesystem::path path = userConfigPath.empty()
         ? bz::data::EnsureUserConfigFile("config.json")
         : std::filesystem::path(userConfigPath);
     if (auto user = bz::data::LoadJsonFile(path, "user config", spdlog::level::debug)) {
         if (!user->is_object()) {
-            out = nlohmann::json::object();
+            out = bz::json::Object();
             return false;
         }
         out = *user;
         return true;
     }
-    out = nlohmann::json::object();
+    out = bz::json::Object();
     return true;
 }
 
-bool RmlUiPanelSettings::saveUserConfig(const nlohmann::json &userConfig, std::string &error) const {
+bool RmlUiPanelSettings::saveUserConfig(const bz::json::Value &userConfig, std::string &error) const {
     const std::filesystem::path path = userConfigPath.empty()
         ? bz::data::EnsureUserConfigFile("config.json")
         : std::filesystem::path(userConfigPath);
@@ -700,10 +715,10 @@ bool RmlUiPanelSettings::saveUserConfig(const nlohmann::json &userConfig, std::s
     return true;
 }
 
-void RmlUiPanelSettings::setNestedConfig(nlohmann::json &root,
+void RmlUiPanelSettings::setNestedConfig(bz::json::Value &root,
                                          std::initializer_list<const char*> path,
-                                         nlohmann::json value) const {
-    nlohmann::json *cursor = &root;
+                                         bz::json::Value value) const {
+    bz::json::Value *cursor = &root;
     std::vector<std::string> keys;
     keys.reserve(path.size());
     for (const char *entry : path) {
@@ -715,16 +730,16 @@ void RmlUiPanelSettings::setNestedConfig(nlohmann::json &root,
     for (std::size_t i = 0; i + 1 < keys.size(); ++i) {
         const std::string &key = keys[i];
         if (!cursor->contains(key) || !(*cursor)[key].is_object()) {
-            (*cursor)[key] = nlohmann::json::object();
+            (*cursor)[key] = bz::json::Object();
         }
         cursor = &(*cursor)[key];
     }
     (*cursor)[keys.back()] = std::move(value);
 }
 
-void RmlUiPanelSettings::eraseNestedConfig(nlohmann::json &root,
+void RmlUiPanelSettings::eraseNestedConfig(bz::json::Value &root,
                                            std::initializer_list<const char*> path) const {
-    nlohmann::json *cursor = &root;
+    bz::json::Value *cursor = &root;
     std::vector<std::string> keys;
     keys.reserve(path.size());
     for (const char *entry : path) {

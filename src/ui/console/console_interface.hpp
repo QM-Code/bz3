@@ -51,6 +51,7 @@ public:
     virtual void setScanning(bool scanning) = 0;
     virtual void setUserConfigPath(const std::string &path) = 0;
     virtual bool consumeFontReloadRequest() = 0;
+    virtual bool consumeKeybindingsReloadRequest() = 0;
     virtual void setConnectionState(const ConnectionState &state) = 0;
     virtual ConnectionState getConnectionState() const = 0;
     virtual bool consumeQuitRequest() = 0;

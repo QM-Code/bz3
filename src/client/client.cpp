@@ -12,8 +12,8 @@ void Client::syncRenderFromState() {
 
 Client::Client(Game &game, client_id id, const PlayerState &initialState)
     : Actor(game, id),
-      dieAudio(game.engine.audio->loadClip(game.world->getAssetPath("audio.player.Die"), 10)) {
-    renderId = game.engine.render->create(game.world->getAssetPath("playerModel").string(), false);
+      dieAudio(game.engine.audio->loadClip(game.world->resolveAssetPath("audio.player.Die").string(), 10)) {
+    renderId = game.engine.render->create(game.world->resolveAssetPath("playerModel").string(), false);
     game.engine.render->setRadarCircleGraphic(renderId, 1.2f);
 
     setState(initialState);

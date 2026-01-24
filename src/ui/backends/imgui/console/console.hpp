@@ -16,7 +16,7 @@ struct ImGuiIO;
 struct ImFont;
 
 #include <imgui.h>
-#include <nlohmann/json.hpp>
+#include "common/json.hpp"
 
 #include "ui/console/console_interface.hpp"
 #include "ui/backends/imgui/console/thumbnail_cache.hpp"
@@ -77,6 +77,8 @@ public:
     void setScanning(bool scanning) override;
     void setUserConfigPath(const std::string &path) override;
     bool consumeFontReloadRequest() override;
+    bool consumeKeybindingsReloadRequest() override;
+    void requestKeybindingsReload();
     void setConnectionState(const ConnectionState &state) override;
     ConnectionState getConnectionState() const override;
     bool consumeQuitRequest() override;
@@ -102,16 +104,16 @@ private:
     void drawThemesPanel(const MessageColors &colors);
     void ensureThemesLoaded();
     void applyThemeToView(const ThemeConfig &theme);
-    bool loadUserConfig(nlohmann::json &out) const;
-    bool saveUserConfig(const nlohmann::json &userConfig, std::string &error) const;
-    void setNestedConfig(nlohmann::json &root, std::initializer_list<const char*> path, nlohmann::json value) const;
-    void setNestedConfig(nlohmann::json &root, const std::vector<std::string> &path, nlohmann::json value) const;
-    void eraseNestedConfig(nlohmann::json &root, std::initializer_list<const char*> path) const;
+    bool loadUserConfig(bz::json::Value &out) const;
+    bool saveUserConfig(const bz::json::Value &userConfig, std::string &error) const;
+    void setNestedConfig(bz::json::Value &root, std::initializer_list<const char*> path, bz::json::Value value) const;
+    void setNestedConfig(bz::json::Value &root, const std::vector<std::string> &path, bz::json::Value value) const;
+    void eraseNestedConfig(bz::json::Value &root, std::initializer_list<const char*> path) const;
     std::string communityKeyForIndex(int index) const;
     void refreshCommunityCredentials();
     void persistCommunityCredentials(bool passwordChanged);
-    nlohmann::json themeToJson(const ThemeConfig &theme) const;
-    ThemeConfig themeFromJson(const nlohmann::json &themeJson, const ThemeConfig &fallback) const;
+    bz::json::Value themeToJson(const ThemeConfig &theme) const;
+    ThemeConfig themeFromJson(const bz::json::Value &themeJson, const ThemeConfig &fallback) const;
     void applyThemeSelection(const std::string &name);
     void resetToDefaultTheme();
     void stopAllLocalServers();
@@ -143,6 +145,7 @@ private:
     float titleFontSize = 0.0f;
     float headingFontSize = 0.0f;
     bool fontReloadRequested = false;
+    bool keybindingsReloadRequested = false;
 
     std::vector<CommunityBrowserEntry> entries;
     int selectedIndex = -1;

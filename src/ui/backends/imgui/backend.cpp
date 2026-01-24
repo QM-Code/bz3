@@ -240,6 +240,9 @@ void ImGuiBackend::update() {
     if (consoleView.consumeFontReloadRequest()) {
         reloadFonts();
     }
+    if (renderBridge) {
+        hud.setRadarTextureId(renderBridge->getRadarTextureId());
+    }
 
     ImGuiIO &io = ImGui::GetIO();
 
@@ -310,10 +313,6 @@ void ImGuiBackend::setSpawnHint(const std::string &hint) {
     hud.setSpawnHint(hint);
 }
 
-void ImGuiBackend::setRadarTextureId(unsigned int textureId) {
-    hud.setRadarTextureId(textureId);
-}
-
 void ImGuiBackend::addConsoleLine(const std::string &playerName, const std::string &line) {
     hud.addConsoleLine(playerName, line);
 }
@@ -338,6 +337,14 @@ void ImGuiBackend::displayDeathScreen(bool show) {
     hud.displayDeathScreen(show);
 }
 
+bool ImGuiBackend::consumeKeybindingsReloadRequest() {
+    return consoleView.consumeKeybindingsReloadRequest();
+}
+
+void ImGuiBackend::setRenderBridge(const ui::RenderBridge *bridge) {
+    renderBridge = bridge;
+}
+
 ui::ConsoleInterface &ImGuiBackend::console() {
     return consoleView;
 }
@@ -346,4 +353,4 @@ const ui::ConsoleInterface &ImGuiBackend::console() const {
     return consoleView;
 }
 
-} // namespace ui
+} // namespace ui_backend

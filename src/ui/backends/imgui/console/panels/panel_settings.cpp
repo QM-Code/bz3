@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-#include <nlohmann/json.hpp>
+#include "common/json.hpp"
 
 namespace {
 
@@ -235,18 +235,18 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
         settingsStatusIsError = false;
         selectedBindingIndex = -1;
 
-        nlohmann::json userConfig;
+        bz::json::Value userConfig;
         bool loadedConfig = loadUserConfig(userConfig);
         if (!loadedConfig) {
             settingsStatusText = "Failed to load user config; showing defaults.";
             settingsStatusIsError = true;
         }
 
-        const nlohmann::json *bindingsNode = nullptr;
+        const bz::json::Value *bindingsNode = nullptr;
         if (auto it = userConfig.find("keybindings"); it != userConfig.end() && it->is_object()) {
             bindingsNode = &(*it);
         }
-        const nlohmann::json *controllerNode = nullptr;
+        const bz::json::Value *controllerNode = nullptr;
         if (auto guiIt = userConfig.find("gui"); guiIt != userConfig.end() && guiIt->is_object()) {
             if (auto keyIt = guiIt->find("keybindings"); keyIt != guiIt->end() && keyIt->is_object()) {
                 if (auto controllerIt = keyIt->find("controller"); controllerIt != keyIt->end() && controllerIt->is_object()) {
@@ -416,13 +416,13 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
     }
 
     if (saveClicked) {
-        nlohmann::json userConfig;
+        bz::json::Value userConfig;
         if (!loadUserConfig(userConfig)) {
             settingsStatusText = "Failed to load user config.";
             settingsStatusIsError = true;
         } else {
-            nlohmann::json keybindings = nlohmann::json::object();
-            nlohmann::json controllerBindings = nlohmann::json::object();
+            bz::json::Value keybindings = bz::json::Object();
+            bz::json::Value controllerBindings = bz::json::Object();
             bool hasBindings = false;
             bool hasControllerBindings = false;
             for (std::size_t i = 0; i < kKeybindingCount; ++i) {
@@ -471,7 +471,8 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
                 settingsStatusText = error.empty() ? "Failed to save bindings." : error;
                 settingsStatusIsError = true;
             } else {
-                settingsStatusText = "Bindings saved. Restart to apply.";
+                requestKeybindingsReload();
+                settingsStatusText = "Bindings saved.";
                 settingsStatusIsError = false;
             }
         }
@@ -494,7 +495,7 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
             keybindingControllerBuffers[i][0] = '\0';
         }
 
-        nlohmann::json userConfig;
+        bz::json::Value userConfig;
         if (!loadUserConfig(userConfig)) {
             settingsStatusText = "Failed to load user config.";
             settingsStatusIsError = true;
@@ -506,7 +507,8 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
                 settingsStatusText = error.empty() ? "Failed to reset bindings." : error;
                 settingsStatusIsError = true;
             } else {
-                settingsStatusText = "Bindings reset to defaults. Restart to apply.";
+                requestKeybindingsReload();
+                settingsStatusText = "Bindings reset to defaults.";
                 settingsStatusIsError = false;
             }
         }

@@ -14,14 +14,14 @@ Game::Game(ClientEngine &engine,
       communityAdmin(communityAdmin),
       localAdmin(localAdmin),
       engine(engine) {
-    world = std::make_unique<World>(*this, worldDir);
-    spdlog::trace("Game: World created successfully");
+    world = std::make_unique<ClientWorldSession>(*this, worldDir);
+    spdlog::trace("Game: World session created successfully");
     console = std::make_unique<Console>(*this);
     spdlog::trace("Game: Console created successfully");
 
     engine.render->setRadarShaderPath(
-        world->getAssetPath("shaders.radar.vertex"),
-        world->getAssetPath("shaders.radar.fragment")
+        world->resolveAssetPath("shaders.radar.vertex"),
+        world->resolveAssetPath("shaders.radar.fragment")
     );
 
     focusState = FOCUS_STATE_GAME;
@@ -30,7 +30,7 @@ Game::Game(ClientEngine &engine,
 Game::~Game() {
 
     world.reset();
-    spdlog::trace("Game: World destroyed successfully");
+    spdlog::trace("Game: World session destroyed successfully");
     console.reset();
     spdlog::trace("Game: Console destroyed successfully");
     actors.clear();
@@ -49,7 +49,7 @@ void Game::earlyUpdate(TimeUtils::duration deltaTime) {
         auto playerActor = std::make_unique<Player>(
             *this,
             world->playerId,
-            world->getDefaultPlayerParameters(),
+            world->defaultPlayerParameters(),
             playerName,
             registeredUser,
             communityAdmin,

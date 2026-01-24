@@ -9,7 +9,7 @@ CommunityHeartbeat::CommunityHeartbeat() : client(std::make_unique<HeartbeatClie
 
 CommunityHeartbeat::~CommunityHeartbeat() = default;
 
-void CommunityHeartbeat::configureFromConfig(const nlohmann::json &mergedConfig,
+void CommunityHeartbeat::configureFromConfig(const bz::json::Value &mergedConfig,
                                              uint16_t listenPort,
                                              const std::string &communityOverride) {
     std::string advertiseHost = bz::data::ReadStringConfig("network.ServerAdvertiseHost", "");

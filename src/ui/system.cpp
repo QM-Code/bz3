@@ -37,10 +37,6 @@ void UiSystem::setSpawnHint(const std::string &hint) {
     backend->setSpawnHint(hint);
 }
 
-void UiSystem::setRadarTextureId(unsigned int textureId) {
-    backend->setRadarTextureId(textureId);
-}
-
 void UiSystem::addConsoleLine(const std::string &playerName, const std::string &line) {
     backend->addConsoleLine(playerName, line);
 }
@@ -63,4 +59,12 @@ bool UiSystem::getChatInputFocus() const {
 
 void UiSystem::displayDeathScreen(bool show) {
     backend->displayDeathScreen(show);
+}
+
+bool UiSystem::consumeKeybindingsReloadRequest() {
+    return backend->consumeKeybindingsReloadRequest();
+}
+
+void UiSystem::setRenderBridge(const ui::RenderBridge *bridge) {
+    backend->setRenderBridge(bridge);
 }

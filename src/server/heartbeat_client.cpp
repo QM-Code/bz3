@@ -1,7 +1,7 @@
 #include "server/heartbeat_client.hpp"
 
 #include <curl/curl.h>
-#include <nlohmann/json.hpp>
+#include "common/json.hpp"
 #include <spdlog/spdlog.h>
 
 #include "common/curl_global.hpp"
@@ -66,7 +66,7 @@ bool performGet(const std::string &url, long &statusOut, std::string &errorOut, 
     if (status < 200 || status >= 300) {
         if (!bodyOut.empty()) {
             try {
-                auto jsonData = nlohmann::json::parse(bodyOut);
+                auto jsonData = bz::json::Parse(bodyOut);
                 if (jsonData.contains("message") && jsonData["message"].is_string()) {
                     errorOut = jsonData["message"].get<std::string>();
                 }

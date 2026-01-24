@@ -249,6 +249,13 @@ bool RmlUiConsole::consumeFontReloadRequest() {
     return false;
 }
 
+bool RmlUiConsole::consumeKeybindingsReloadRequest() {
+    if (!settingsPanel) {
+        return false;
+    }
+    return settingsPanel->consumeKeybindingsReloadRequest();
+}
+
 void RmlUiConsole::setConnectionState(const ConnectionState &state) {
     connectionState = state;
     if (communityPanel) {
@@ -310,19 +317,19 @@ void RmlUiConsole::onServerSelection(int index) {
     selectedServerIndex = index;
 }
 
-bool RmlUiConsole::loadUserConfig(nlohmann::json &out) const {
+bool RmlUiConsole::loadUserConfig(bz::json::Value &out) const {
     const std::filesystem::path path = userConfigPath.empty()
         ? bz::data::EnsureUserConfigFile("config.json")
         : std::filesystem::path(userConfigPath);
     if (auto user = bz::data::LoadJsonFile(path, "user config", spdlog::level::debug)) {
         if (!user->is_object()) {
-            out = nlohmann::json::object();
+            out = bz::json::Object();
             return false;
         }
         out = *user;
         return true;
     }
-    out = nlohmann::json::object();
+    out = bz::json::Object();
     return true;
 }
 

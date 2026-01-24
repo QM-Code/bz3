@@ -10,7 +10,7 @@
 #include <vector>
 
 #include <imgui.h>
-#include <nlohmann/json.hpp>
+#include "common/json.hpp"
 #include <spdlog/spdlog.h>
 #include <optional>
 
@@ -320,7 +320,7 @@ bool ConsoleView::launchLocalServer(LocalServerProcess &server, std::string &err
         name << "local_server_" << server.port << "_" << server.id << ".json";
         const auto configFile = configDir / name.str();
 
-        nlohmann::json configJson;
+        bz::json::Value configJson;
         configJson["network"]["ServerAdvertiseHost"] = server.advertiseHost;
         std::ofstream out(configFile);
         if (!out) {

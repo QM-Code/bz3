@@ -5,7 +5,7 @@
 #include <string>
 
 #include <cstdint>
-#include <nlohmann/json.hpp>
+#include "common/json.hpp"
 
 class Game;
 class HeartbeatClient;
@@ -14,7 +14,7 @@ class CommunityHeartbeat {
 public:
     CommunityHeartbeat();
     ~CommunityHeartbeat();
-    void configureFromConfig(const nlohmann::json &mergedConfig,
+    void configureFromConfig(const bz::json::Value &mergedConfig,
                              uint16_t listenPort,
                              const std::string &communityOverride);
     void update(const Game &game);

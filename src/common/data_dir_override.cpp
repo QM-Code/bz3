@@ -1,7 +1,7 @@
 #include "common/data_dir_override.hpp"
 
 #include "common/data_path_resolver.hpp"
-#include <nlohmann/json.hpp>
+#include "common/json.hpp"
 #include <spdlog/spdlog.h>
 
 #include <cstdlib>
@@ -135,7 +135,7 @@ std::optional<std::filesystem::path> ExtractDataDirFromConfig(const std::filesys
     }
 
     try {
-        nlohmann::json configJson;
+        bz::json::Value configJson;
         stream >> configJson;
 
         if (!configJson.is_object()) {

@@ -46,11 +46,11 @@ Client *Game::getClientByName(const std::string &name) {
 Game::Game(ServerEngine &engine,
            std::string serverName,
            std::string worldName,
-           nlohmann::json worldConfig,
+           bz::json::Value worldConfig,
            std::string worldDir,
            bool enableWorldZipping)
     : engine(engine) {
-    world = new World(*this,
+    world = new ServerWorldSession(*this,
                       std::move(serverName),
                       std::move(worldName),
                       std::move(worldConfig),
@@ -87,7 +87,7 @@ void Game::update(TimeUtils::duration deltaTime) {
             continue;
         }
 
-        world->sendInitToClient(connMsg.clientId);
+        world->sendWorldInit(connMsg.clientId);
         auto newClient = std::make_unique<Client>(
             *this,
             connMsg.clientId,
@@ -163,7 +163,7 @@ void Game::update(TimeUtils::duration deltaTime) {
             continue;
         }
 
-        client->trySpawn(world->getSpawnLocation());
+        client->trySpawn(world->pickSpawnLocation());
     }
 
     for (const auto &shotMsg : engine.network->consumeMessages<ClientMsg_CreateShot>()) {

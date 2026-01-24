@@ -9,10 +9,16 @@
 #include "renderer/particle_effect_system.hpp"
 #include "platform/window.hpp"
 #include <string>
+#include <memory>
+
+namespace ui {
+class RenderBridge;
+}
 
 class ClientEngine {
 private:
     platform::Window *window;
+    std::unique_ptr<ui::RenderBridge> uiRenderBridge;
 
 public:
     ClientNetwork *network;

@@ -1,16 +1,16 @@
 #include "client/config_client.hpp"
 #include <filesystem>
 #include <fstream>
-#include <nlohmann/json.hpp>
+#include "common/json.hpp"
 #include "spdlog/spdlog.h"
 #include "common/data_path_resolver.hpp"
 
 namespace {
 
-ClientConfig ParseClientConfig(const nlohmann::json &root) {
+ClientConfig ParseClientConfig(const bz::json::Value &root) {
     ClientConfig config;
 
-    auto parsePositiveInt = [](const nlohmann::json &object, const char *key) {
+    auto parsePositiveInt = [](const bz::json::Value &object, const char *key) {
         int value = 0;
         auto it = object.find(key);
         if (it == object.end()) {
@@ -56,7 +56,7 @@ ClientConfig ParseClientConfig(const nlohmann::json &root) {
                 config.defaultServerList = defaultIt->get<std::string>();
             }
 
-            auto parseCommunities = [&](const nlohmann::json &array) {
+            auto parseCommunities = [&](const bz::json::Value &array) {
                 for (const auto &entry : array) {
                     if (!entry.is_object()) {
                         continue;
@@ -120,7 +120,7 @@ ClientConfig ParseClientConfig(const nlohmann::json &root) {
 
 ClientConfig LoadClientConfigFromFiles(const std::filesystem::path &defaultConfigPath,
                                        const std::filesystem::path &userConfigPath) {
-    nlohmann::json merged = nlohmann::json::object();
+    bz::json::Value merged = bz::json::Object();
 
     if (auto defaults = bz::data::LoadJsonFile(defaultConfigPath, "client defaults", spdlog::level::warn)) {
         if (!defaults->is_object()) {
@@ -169,7 +169,7 @@ ClientConfig ClientConfig::Load(const std::string &path) {
 bool ClientConfig::Save(const std::string &path) const {
     const std::filesystem::path filePath(path);
 
-    nlohmann::json userConfig = nlohmann::json::object();
+    bz::json::Value userConfig = bz::json::Object();
 
     {
         std::ifstream file(filePath);
@@ -178,11 +178,11 @@ bool ClientConfig::Save(const std::string &path) const {
                 file >> userConfig;
                 if (!userConfig.is_object()) {
                     spdlog::warn("ClientConfig::Save: Existing {} is not a JSON object; overwriting", path);
-                    userConfig = nlohmann::json::object();
+                    userConfig = bz::json::Object();
                 }
             } catch (const std::exception &ex) {
                 spdlog::warn("ClientConfig::Save: Failed to parse existing {}: {}", path, ex.what());
-                userConfig = nlohmann::json::object();
+                userConfig = bz::json::Object();
             }
         }
     }
@@ -193,7 +193,7 @@ bool ClientConfig::Save(const std::string &path) const {
         userConfig.erase("tankPath");
     }
 
-    nlohmann::json serverListsObject = nlohmann::json::object();
+    bz::json::Value serverListsObject = bz::json::Object();
     serverListsObject["showLAN"] = showLanServers;
     if (!defaultServerList.empty()) {
         serverListsObject["default"] = defaultServerList;
@@ -201,13 +201,13 @@ bool ClientConfig::Save(const std::string &path) const {
         serverListsObject.erase("default");
     }
 
-    nlohmann::json communitiesArray = nlohmann::json::array();
+    bz::json::Value communitiesArray = bz::json::Array();
     for (const auto &source : serverLists) {
         if (source.host.empty()) {
             continue;
         }
 
-        nlohmann::json entry;
+        bz::json::Value entry;
         entry["host"] = source.host;
         if (!source.name.empty()) {
             entry["name"] = source.name;

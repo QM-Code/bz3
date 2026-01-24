@@ -7,7 +7,7 @@ import subprocess
 
 def usage() -> None:
     prog = os.path.basename(sys.argv[0])
-    print(f"Usage: {prog} [-c] [build-<window>-<ui>-<physics>-<audio>-<renderer>-<network>]", file=sys.stderr)
+    print(f"Usage: {prog} [-c] [build-<window>-<ui>-<physics>-<audio>-<renderer>-<network>-<world>]", file=sys.stderr)
     print("  -c   run cmake -S configure step before building", file=sys.stderr)
     raise SystemExit(1)
 
@@ -54,6 +54,7 @@ physics = ""
 audio = ""
 render = ""
 network = ""
+world = ""
 build_dir = ""
 
 if not args:
@@ -63,7 +64,8 @@ if not args:
     audio = prompt_choice("Audio (miniaudio/sdlaudio)", "sdlaudio", ["miniaudio", "sdlaudio"])
     render = prompt_choice("Renderer (threepp)", "threepp", ["threepp"])
     network = prompt_choice("Network (enet)", "enet", ["enet"])
-    build_dir = f"build-{window}-{ui}-{physics}-{audio}-{render}-{network}"
+    world = prompt_choice("World (fs)", "fs", ["fs"])
+    build_dir = f"build-{window}-{ui}-{physics}-{audio}-{render}-{network}-{world}"
 else:
     build_dir = args[0]
     if not build_dir.startswith("build-"):
@@ -87,9 +89,11 @@ else:
             render = part
         elif part == "enet":
             network = part
+        elif part == "fs":
+            world = part
 
-    if not (window and ui and physics and audio and render and network):
-        print("Error: build dir must include window, ui, physics, audio, renderer, and network tokens.", file=sys.stderr)
+    if not (window and ui and physics and audio and render and network and world):
+        print("Error: build dir must include window, ui, physics, audio, renderer, network, and world tokens.", file=sys.stderr)
         usage()
 
 cmake_args = [
@@ -99,6 +103,7 @@ cmake_args = [
     f"-DBZ3_AUDIO_BACKEND={audio}",
     f"-DBZ3_RENDER_BACKEND={render}",
     f"-DBZ3_NETWORK_BACKEND={network}",
+    f"-DBZ3_WORLD_BACKEND={world}",
 ]
 
 if not os.path.isdir(build_dir):

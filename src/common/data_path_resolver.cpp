@@ -17,7 +17,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include <nlohmann/json.hpp>
+#include "common/json.hpp"
 #include <spdlog/spdlog.h>
 
 #if defined(_WIN32)
@@ -132,19 +132,19 @@ struct ConfigCacheState {
     std::mutex mutex;
     bool initialized = false;
     std::vector<bz::data::ConfigLayer> layers;
-    nlohmann::json merged = nlohmann::json::object();
+    bz::json::Value merged = bz::json::Object();
     std::unordered_map<std::string, std::size_t> labelIndex;
     std::unordered_map<std::string, std::filesystem::path> assetLookup;
 };
 
 ConfigCacheState g_configCache;
 
-const nlohmann::json *ResolveConfigPath(const nlohmann::json &root, const std::string &path) {
+const bz::json::Value *ResolveConfigPath(const bz::json::Value &root, const std::string &path) {
     if (path.empty()) {
         return &root;
     }
 
-    const nlohmann::json *current = &root;
+    const bz::json::Value *current = &root;
     std::size_t position = 0;
 
     while (position < path.size()) {
@@ -368,7 +368,7 @@ std::unordered_map<std::string, std::filesystem::path> BuildAssetLookupFromLayer
 }
 
 bool MergeConfigLayer(const std::string &label,
-                      const nlohmann::json &layerJson,
+                      const bz::json::Value &layerJson,
                       const std::filesystem::path &baseDir) {
     std::filesystem::path canonicalBase = TryCanonical(baseDir);
     const std::string resolvedLabel = label.empty() ? canonicalBase.string() : label;
@@ -394,7 +394,7 @@ bool MergeConfigLayer(const std::string &label,
         g_configCache.layers.push_back(newLayer);
     }
 
-    g_configCache.merged = nlohmann::json::object();
+    g_configCache.merged = bz::json::Object();
     for (const auto &layer : g_configCache.layers) {
         MergeJsonObjects(g_configCache.merged, layer.json);
     }
@@ -419,7 +419,7 @@ bool MergeExternalConfigLayer(const std::filesystem::path &configPath,
     return MergeConfigLayer(label, *jsonOpt, canonicalPath.parent_path());
 }
 
-std::optional<nlohmann::json> LoadJsonFile(const std::filesystem::path &path,
+std::optional<bz::json::Value> LoadJsonFile(const std::filesystem::path &path,
                                            const std::string &label,
                                            spdlog::level::level_enum missingLevel) {
     if (!std::filesystem::exists(path)) {
@@ -434,7 +434,7 @@ std::optional<nlohmann::json> LoadJsonFile(const std::filesystem::path &path,
     }
 
     try {
-        nlohmann::json json;
+        bz::json::Value json;
         stream >> json;
         return json;
     } catch (const std::exception &e) {
@@ -469,7 +469,7 @@ std::vector<ConfigLayer> LoadConfigLayers(const std::vector<ConfigLayerSpec> &sp
     return layers;
 }
 
-void MergeJsonObjects(nlohmann::json &destination, const nlohmann::json &source) {
+void MergeJsonObjects(bz::json::Value &destination, const bz::json::Value &source) {
     if (!destination.is_object() || !source.is_object()) {
         destination = source;
         return;
@@ -487,7 +487,7 @@ void MergeJsonObjects(nlohmann::json &destination, const nlohmann::json &source)
     }
 }
 
-void CollectAssetEntries(const nlohmann::json &node,
+void CollectAssetEntries(const bz::json::Value &node,
                          const std::filesystem::path &baseDir,
                          std::map<std::string, std::filesystem::path> &assetMap,
                          const std::string &prefix) {
@@ -591,7 +591,7 @@ std::filesystem::path ResolveConfiguredAsset(const std::string &assetKey,
 void InitializeConfigCache(const std::vector<ConfigLayerSpec> &specs) {
     std::vector<ConfigLayer> layers = LoadConfigLayers(specs);
 
-    nlohmann::json merged = nlohmann::json::object();
+    bz::json::Value merged = bz::json::Object();
     for (const auto &layer : layers) {
         MergeJsonObjects(merged, layer.json);
     }
@@ -619,17 +619,17 @@ bool ConfigCacheInitialized() {
     return g_configCache.initialized;
 }
 
-const nlohmann::json &ConfigCacheRoot() {
+const bz::json::Value &ConfigCacheRoot() {
     std::lock_guard<std::mutex> lock(g_configCache.mutex);
     if (!g_configCache.initialized) {
-        static const nlohmann::json empty = nlohmann::json::object();
+        static const bz::json::Value empty = bz::json::Object();
         return empty;
     }
 
     return g_configCache.merged;
 }
 
-const nlohmann::json *ConfigLayerByLabel(const std::string &label) {
+const bz::json::Value *ConfigLayerByLabel(const std::string &label) {
     std::lock_guard<std::mutex> lock(g_configCache.mutex);
     if (!g_configCache.initialized) {
         return nullptr;
@@ -643,7 +643,7 @@ const nlohmann::json *ConfigLayerByLabel(const std::string &label) {
     return &g_configCache.layers[it->second].json;
 }
 
-const nlohmann::json *ConfigValue(const std::string &path) {
+const bz::json::Value *ConfigValue(const std::string &path) {
     std::lock_guard<std::mutex> lock(g_configCache.mutex);
     if (!g_configCache.initialized) {
         return nullptr;
@@ -652,9 +652,9 @@ const nlohmann::json *ConfigValue(const std::string &path) {
     return ResolveConfigPath(g_configCache.merged, path);
 }
 
-std::optional<nlohmann::json> ConfigValueCopy(const std::string &path) {
+std::optional<bz::json::Value> ConfigValueCopy(const std::string &path) {
     if (const auto *value = ConfigValue(path)) {
-        return std::optional<nlohmann::json>(std::in_place, *value);
+        return std::optional<bz::json::Value>(std::in_place, *value);
     }
     return std::nullopt;
 }

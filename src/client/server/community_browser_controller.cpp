@@ -14,7 +14,7 @@
 #include "common/data_path_resolver.hpp"
 #include "spdlog/spdlog.h"
 #include <curl/curl.h>
-#include <nlohmann/json.hpp>
+#include "common/json.hpp"
 
 namespace {
 std::string trimCopy(const std::string &value) {
@@ -202,7 +202,7 @@ bool fetchCommunityInfoOk(const std::string &baseUrl) {
         return false;
     }
     try {
-        auto json = nlohmann::json::parse(body);
+        auto json = bz::json::Parse(body);
         return json.is_object();
     } catch (...) {
         return false;
@@ -1145,7 +1145,7 @@ void CommunityBrowserController::startServerDetailsRequest(const ui::CommunityBr
         }
 
         try {
-            nlohmann::json jsonData = nlohmann::json::parse(body);
+            bz::json::Value jsonData = bz::json::Parse(body);
             const auto *serverNode = jsonData.contains("server") ? &jsonData["server"] : nullptr;
             if (serverNode && serverNode->is_object()) {
                 if (auto nameIt = serverNode->find("name");

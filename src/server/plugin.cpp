@@ -16,7 +16,7 @@ namespace {
 std::vector<std::string> g_loadedPlugins;
 }
 
-void PluginAPI::loadPythonPlugins(const nlohmann::json &configJson) {
+void PluginAPI::loadPythonPlugins(const bz::json::Value &configJson) {
     namespace py = pybind11;
     namespace fs = std::filesystem;
 

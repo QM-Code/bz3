@@ -37,7 +37,7 @@ void Actor::setParameters(PlayerParameters &&params) {
 }
 
 void Actor::die() {
-    auto fx = game.engine.particles->createEffect(game.world->getAssetPath("effects.explosion").string(), 1.0f);
+    auto fx = game.engine.particles->createEffect(game.world->resolveAssetPath("effects.explosion").string(), 1.0f);
     fx.setPosition(state.position);
 }
 
