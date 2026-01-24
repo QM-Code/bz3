@@ -7,15 +7,15 @@ Console::Console(Game &game) : game(game) {
 }
 
 void Console::focusChatInput() {
-    game.engine.gui->focusChatInput();
+    game.engine.ui->focusChatInput();
     chatInFocus = true;
 }
 
 void Console::update() {
     if (chatInFocus) {
-        if (game.engine.gui->getChatInputBuffer().length() > 0) {
+        if (game.engine.ui->getChatInputBuffer().length() > 0) {
             spdlog::trace("Console::update: Processing submitted chat input");
-            std::string message = game.engine.gui->getChatInputBuffer();
+            std::string message = game.engine.ui->getChatInputBuffer();
             std::string consoleMessage = message;
             bool includePlayerName = true;
 
@@ -31,16 +31,16 @@ void Console::update() {
                 }
             }
 
-            game.engine.gui->addConsoleLine((includePlayerName && game.player) ? game.player->getName() : std::string(), consoleMessage);
+            game.engine.ui->addConsoleLine((includePlayerName && game.player) ? game.player->getName() : std::string(), consoleMessage);
 
             ClientMsg_Chat chatMsg;
             chatMsg.toId = BROADCAST_CLIENT_ID;
             chatMsg.text = message;
             game.engine.network->send<ClientMsg_Chat>(chatMsg);
-            game.engine.gui->clearChatInputBuffer();
+            game.engine.ui->clearChatInputBuffer();
         }
 
-        if (!game.engine.gui->getChatInputFocus()) {
+        if (!game.engine.ui->getChatInputFocus()) {
             chatInFocus = false;
         }
     }
@@ -59,6 +59,6 @@ void Console::update() {
             name = "[" + name + " ->]";
         }
 
-        game.engine.gui->addConsoleLine(name, msg.text);
+        game.engine.ui->addConsoleLine(name, msg.text);
     }
 }

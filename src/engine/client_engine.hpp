@@ -1,30 +1,35 @@
 #pragma once
-#include "engine/types.hpp"
-#include "engine/components/client_network.hpp"
-#include "engine/components/render.hpp"
-#include "engine/physics/physics_world.hpp"
-#include "engine/components/input.hpp"
-#include "engine/components/gui.hpp"
-#include "engine/components/audio.hpp"
-#include "engine/components/particle_effect_system.hpp"
-#include "engine/user_pointer.hpp"
+#include "core/types.hpp"
+#include "network/client_network.hpp"
+#include "renderer/render.hpp"
+#include "physics/physics_world.hpp"
+#include "input/input.hpp"
+#include "ui/system.hpp"
+#include "audio/audio.hpp"
+#include "renderer/particle_effect_system.hpp"
+#include "platform/window.hpp"
 #include <string>
+#include <memory>
+
+namespace ui {
+class RenderBridge;
+}
 
 class ClientEngine {
 private:
-    GLFWwindow *window;
-    GLFWUserPointer *userPointer;
+    platform::Window *window;
+    std::unique_ptr<ui::RenderBridge> uiRenderBridge;
 
 public:
     ClientNetwork *network;
     Render *render;
     PhysicsWorld *physics;
     Input *input;
-    GUI *gui;
+    UiSystem *ui;
     Audio *audio;
     ParticleEngine *particles;
 
-    ClientEngine(GLFWwindow *window);
+    ClientEngine(platform::Window &window);
     ~ClientEngine();
 
     void earlyUpdate(TimeUtils::duration deltaTime);

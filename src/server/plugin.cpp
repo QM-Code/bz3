@@ -16,7 +16,7 @@ namespace {
 std::vector<std::string> g_loadedPlugins;
 }
 
-void PluginAPI::loadPythonPlugins(const nlohmann::json &configJson) {
+void PluginAPI::loadPythonPlugins(const bz::json::Value &configJson) {
     namespace py = pybind11;
     namespace fs = std::filesystem;
 
@@ -112,6 +112,7 @@ void PluginAPI::registerCallback(EventType type, pybind11::function func) {
         g_pluginCallbacks[type] = std::vector<pybind11::function>();
     }
     g_pluginCallbacks[type].push_back(func);
+    spdlog::debug("PluginAPI: Registered callback for event {} (total: {})", static_cast<int>(type), g_pluginCallbacks[type].size());
 }
 
 void PluginAPI::sendChatMessage(client_id fromId, client_id toId, const std::string &text) {

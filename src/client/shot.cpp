@@ -14,17 +14,17 @@ Shot::Shot(Game &game,
     position(position),
     prevPosition(position),
     velocity(velocity),
-    renderId(game.engine.render->create(game.world->getAssetPath("shotModel").string(), false)),
+    renderId(game.engine.render->create(game.world->resolveAssetPath("shotModel").string(), false)),
     audioEngine(*game.engine.audio),
-    fireAudio(audioEngine.loadClip(game.world->getAssetPath("audio.shot.Fire").string(), 20)),
-    ricochetAudio(audioEngine.loadClip(game.world->getAssetPath("audio.shot.Ricochet").string(), 20))
+    fireAudio(audioEngine.loadClip(game.world->resolveAssetPath("audio.shot.Fire").string(), 20)),
+    ricochetAudio(audioEngine.loadClip(game.world->resolveAssetPath("audio.shot.Ricochet").string(), 20))
 {
     game.engine.render->setPosition(renderId, position);
     game.engine.render->setScale(renderId, glm::vec3(0.6f));
     game.engine.render->setTransparency(renderId, true);
     game.engine.render->setRadarCircleGraphic(renderId, 0.5f);
 
-    trailEffect = game.engine.particles->createEffect(game.world->getAssetPath("effects.shot").string(), 0.5f);
+    trailEffect = game.engine.particles->createEffect(game.world->resolveAssetPath("effects.shot").string(), 0.5f);
     if (trailEffect.has_value()) {
         trailEffect->setPosition(position);
     }

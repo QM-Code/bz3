@@ -1,6 +1,6 @@
 #include "player.hpp"
 #include "engine/client_engine.hpp"
-#include "engine/types.hpp"
+#include "core/types.hpp"
 #include "game.hpp"
 #include <string>
 #include <utility>
@@ -19,10 +19,10 @@ Player::Player(Game &game,
             grounded(false),
             physics(&game.engine.physics->createPlayer()),
       audioEngine(*game.engine.audio),
-    jumpAudio(audioEngine.loadClip(game.world->getAssetPath("audio.player.Jump"), 5)),
-    dieAudio(audioEngine.loadClip(game.world->getAssetPath("audio.player.Die"), 1)),
-    spawnAudio(audioEngine.loadClip(game.world->getAssetPath("audio.player.Spawn"), 1)),
-    landAudio(audioEngine.loadClip(game.world->getAssetPath("audio.player.Land"), 1)),
+    jumpAudio(audioEngine.loadClip(game.world->resolveAssetPath("audio.player.Jump").string(), 5)),
+    dieAudio(audioEngine.loadClip(game.world->resolveAssetPath("audio.player.Die").string(), 1)),
+    spawnAudio(audioEngine.loadClip(game.world->resolveAssetPath("audio.player.Spawn").string(), 1)),
+    landAudio(audioEngine.loadClip(game.world->resolveAssetPath("audio.player.Land").string(), 1)),
       lastJumpTime(TimeUtils::GetCurrentTime()),
       jumpCooldown(TimeUtils::getDuration(0.1f)) {
         setParameters(std::move(params));
@@ -67,7 +67,7 @@ void Player::earlyUpdate() {
     game.engine.render->setPosition(renderId, state.position);
 
     if (state.alive) {
-        game.engine.gui->displayDeathScreen(false);
+        game.engine.ui->displayDeathScreen(false);
         
         if (grounded) {
             glm::vec2 movement(0.0f);
@@ -137,7 +137,7 @@ void Player::earlyUpdate() {
             physics->setAngularVelocity(glm::vec3(0.0f));
         }
 
-        game.engine.gui->displayDeathScreen(true);
+        game.engine.ui->displayDeathScreen(true);
 
         if (game.engine.input->getInputState().spawn) {
             ClientMsg_RequestPlayerSpawn spawnMsg;

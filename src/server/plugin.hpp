@@ -1,7 +1,7 @@
 #pragma once
-#include "engine/types.hpp"
+#include "core/types.hpp"
 #include "spdlog/spdlog.h"
-#include <nlohmann/json.hpp>
+#include "common/json.hpp"
 #include <vector>
 #include <memory>
 #include <map>
@@ -61,6 +61,9 @@ template<typename T> inline bool g_triggerPluginEvent(EventType type, T& eventDa
                 bool h = false;
 
                 if constexpr (std::is_same_v<T, Event_Chat>) {
+                    if (eventData.message.rfind("/", 0) == 0) {
+                        spdlog::debug("PluginAPI: Chat command candidate '{}' (callbacks: {})", eventData.message, it->second.size());
+                    }
                     if (type == EventType_Chat) {
                         h = func(eventData.fromId, eventData.toId, eventData.message).template cast<bool>();
                     }
@@ -104,7 +107,7 @@ namespace py = pybind11;
 
 namespace PluginAPI {
     void registerCallback(EventType type, pybind11::function func);
-    void loadPythonPlugins(const nlohmann::json &configJson);
+    void loadPythonPlugins(const bz::json::Value &configJson);
     const std::vector<std::string>& getLoadedPluginScripts();
     
     void sendChatMessage(client_id fromId, client_id toId, const std::string &text);

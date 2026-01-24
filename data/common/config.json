@@ -9,9 +9,6 @@
             "playerModel": "models/tank_final.glb",
             "shotModel": "models/shot.glb"
         },
-        "fonts" : {
-            "guiBigFont": "fonts/ShareTech.ttf"
-        },
         "shaders" : {
             "radar" : {
                 "vertex": "shaders/radar.vert",

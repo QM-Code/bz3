@@ -4,6 +4,7 @@ cmake_install.cmake
 Makefile
 vcpkg_installed/
 build/
+build-*/
 _deps/
 vcpkg/
 __pycache__/

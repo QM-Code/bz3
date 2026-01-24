@@ -1,8 +1,8 @@
 #pragma once
 #include <cstdint>
-#include "engine/types.hpp"
+#include "core/types.hpp"
 #include <glm/vec3.hpp>
-#include "engine/components/audio.hpp"
+#include "audio/audio.hpp"
 #include "actor.hpp"
 
 #include <string>

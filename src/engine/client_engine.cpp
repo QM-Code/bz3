@@ -1,26 +1,44 @@
 #include "engine/client_engine.hpp"
-#include "engine/types.hpp"
+#include "core/types.hpp"
 #include "spdlog/spdlog.h"
+#include "ui/render_bridge.hpp"
+#include <glad/glad.h>
 #include <chrono>
+#include <vector>
 
-ClientEngine::ClientEngine(GLFWwindow *window) {
-    this->window = window;
+namespace {
 
-    userPointer = new GLFWUserPointer();
-    glfwSetWindowUserPointer(window, userPointer);
+class RenderBridgeImpl final : public ui::RenderBridge {
+public:
+    explicit RenderBridgeImpl(Render *renderIn) : render(renderIn) {}
+
+    unsigned int getRadarTextureId() const override {
+        return render ? render->getRadarTextureId() : 0u;
+    }
+
+private:
+    Render *render = nullptr;
+};
+
+} // namespace
+
+ClientEngine::ClientEngine(platform::Window &window) {
+    this->window = &window;
 
     network = new ClientNetwork();
     spdlog::trace("ClientEngine: ClientNetwork initialized successfully");
     spdlog::trace("ClientEngine: Render initializing");
     render = new Render(window);
     spdlog::trace("ClientEngine: Render initialized successfully");
+    uiRenderBridge = std::make_unique<RenderBridgeImpl>(render);
     physics = new PhysicsWorld();
     spdlog::trace("ClientEngine: Physics initialized successfully");
     input = new Input(window);
     spdlog::trace("ClientEngine: Input initialized successfully");
-    gui = new GUI(window);
-    spdlog::trace("ClientEngine: GUI initialized successfully");
-    gui->setSpawnHint(input->spawnHintText());
+    ui = new UiSystem(window);
+    ui->setRenderBridge(uiRenderBridge.get());
+    spdlog::trace("ClientEngine: UiSystem initialized successfully");
+    ui->setSpawnHint(input->spawnHintText());
     audio = new Audio();
     spdlog::trace("ClientEngine: Audio initialized successfully");
     particles = new ParticleEngine();
@@ -32,13 +50,26 @@ ClientEngine::~ClientEngine() {
     delete render;
     delete physics;
     delete input;
-    delete gui;
+    delete ui;
     delete audio;
     delete particles;
 }
 
 void ClientEngine::earlyUpdate(TimeUtils::duration deltaTime) {
-    input->update();
+    if (window) {
+        window->pollEvents();
+    }
+    const std::vector<platform::Event> emptyEvents;
+    const auto &events = window ? window->events() : emptyEvents;
+    if (ui) {
+        ui->handleEvents(events);
+    }
+    if (input) {
+        input->update(events);
+    }
+    if (window) {
+        window->clearEvents();
+    }
     network->update();
 }
 
@@ -51,15 +82,17 @@ void ClientEngine::lateUpdate(TimeUtils::duration deltaTime) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
-    
-    render->update();
 
-    gui->setRadarTextureId(render->getRadarTextureId());
+    render->update();
 
     const float deltaSeconds = std::chrono::duration<float>(deltaTime).count();
     particles->update(deltaSeconds);
     particles->render(render->getViewMatrix(), render->getProjectionMatrix(), render->getCameraPosition(), render->getCameraForward());
 
-    gui->update();
+    ui->update();
+    if (ui->consumeKeybindingsReloadRequest()) {
+        input->reloadKeyBindings();
+        ui->setSpawnHint(input->spawnHintText());
+    }
     network->flushPeekedMessages();
 }

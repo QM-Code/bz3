@@ -1,7 +1,7 @@
 #include "client/server/community_auth_client.hpp"
 
 #include <curl/curl.h>
-#include <nlohmann/json.hpp>
+#include "common/json.hpp"
 
 #include "common/curl_global.hpp"
 
@@ -203,7 +203,7 @@ void CommunityAuthClient::workerProc() {
                     response.error = "request_failed";
                 } else {
                     try {
-                        auto jsonData = nlohmann::json::parse(body);
+                        auto jsonData = bz::json::Parse(body);
                         response.ok = jsonData.value("ok", false);
                         response.communityName = jsonData.value("community_name", std::string{});
                         response.registered = jsonData.value("registered", false);
@@ -247,7 +247,7 @@ void CommunityAuthClient::workerProc() {
                     response.error = "request_failed";
                 } else {
                     try {
-                        auto jsonData = nlohmann::json::parse(body);
+                        auto jsonData = bz::json::Parse(body);
                         response.ok = jsonData.value("ok", false);
                         response.error = jsonData.value("error", std::string{});
                         response.communityAdmin = jsonData.value("community_admin", false);

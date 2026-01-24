@@ -2,7 +2,7 @@
 
 #include "common/data_path_resolver.hpp"
 #include "cxxopts.hpp"
-#include <nlohmann/json.hpp>
+#include "common/json.hpp"
 #include <spdlog/spdlog.h>
 #include <stdexcept>
 #include <cstdlib>

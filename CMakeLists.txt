@@ -22,6 +22,67 @@ else()
     message(FATAL_ERROR "Unknown BZ3_UI_BACKEND value: ${BZ3_UI_BACKEND}")
 endif()
 
+set(BZ3_WINDOW_BACKEND "glfw" CACHE STRING "Window backend (glfw or sdl)")
+set_property(CACHE BZ3_WINDOW_BACKEND PROPERTY STRINGS glfw sdl)
+if(BZ3_WINDOW_BACKEND STREQUAL "glfw")
+    add_compile_definitions(BZ3_WINDOW_BACKEND_GLFW)
+    find_package(glfw3 REQUIRED)
+    if(TARGET glfw3::glfw)
+        set(WINDOW_TARGET glfw3::glfw)
+    else()
+        set(WINDOW_TARGET glfw)
+    endif()
+elseif(BZ3_WINDOW_BACKEND STREQUAL "sdl")
+    add_compile_definitions(BZ3_WINDOW_BACKEND_SDL)
+    set(WINDOW_TARGET SDL3::SDL3)
+else()
+    message(FATAL_ERROR "Unknown BZ3_WINDOW_BACKEND value: ${BZ3_WINDOW_BACKEND}")
+endif()
+
+set(BZ3_PHYSICS_BACKEND "jolt" CACHE STRING "Physics backend (jolt or bullet)")
+set_property(CACHE BZ3_PHYSICS_BACKEND PROPERTY STRINGS jolt bullet)
+if(BZ3_PHYSICS_BACKEND STREQUAL "jolt")
+    add_compile_definitions(BZ3_PHYSICS_BACKEND_JOLT)
+elseif(BZ3_PHYSICS_BACKEND STREQUAL "bullet")
+    add_compile_definitions(BZ3_PHYSICS_BACKEND_BULLET)
+else()
+    message(FATAL_ERROR "Unknown BZ3_PHYSICS_BACKEND value: ${BZ3_PHYSICS_BACKEND}")
+endif()
+
+set(BZ3_AUDIO_BACKEND "sdlaudio" CACHE STRING "Audio backend (miniaudio or sdlaudio)")
+set_property(CACHE BZ3_AUDIO_BACKEND PROPERTY STRINGS miniaudio sdlaudio)
+if(BZ3_AUDIO_BACKEND STREQUAL "miniaudio")
+    add_compile_definitions(BZ3_AUDIO_BACKEND_MINIAUDIO)
+elseif(BZ3_AUDIO_BACKEND STREQUAL "sdlaudio")
+    add_compile_definitions(BZ3_AUDIO_BACKEND_SDL)
+else()
+    message(FATAL_ERROR "Unknown BZ3_AUDIO_BACKEND value: ${BZ3_AUDIO_BACKEND}")
+endif()
+
+set(BZ3_NETWORK_BACKEND "enet" CACHE STRING "Network backend (enet)")
+set_property(CACHE BZ3_NETWORK_BACKEND PROPERTY STRINGS enet)
+if(BZ3_NETWORK_BACKEND STREQUAL "enet")
+    add_compile_definitions(BZ3_NETWORK_BACKEND_ENET)
+else()
+    message(FATAL_ERROR "Unknown BZ3_NETWORK_BACKEND value: ${BZ3_NETWORK_BACKEND}")
+endif()
+
+set(BZ3_WORLD_BACKEND "fs" CACHE STRING "World backend (fs)")
+set_property(CACHE BZ3_WORLD_BACKEND PROPERTY STRINGS fs)
+if(BZ3_WORLD_BACKEND STREQUAL "fs")
+    add_compile_definitions(BZ3_WORLD_BACKEND_FS)
+else()
+    message(FATAL_ERROR "Unknown BZ3_WORLD_BACKEND value: ${BZ3_WORLD_BACKEND}")
+endif()
+
+set(BZ3_RENDER_BACKEND "threepp" CACHE STRING "Render backend (threepp)")
+set_property(CACHE BZ3_RENDER_BACKEND PROPERTY STRINGS threepp)
+if(BZ3_RENDER_BACKEND STREQUAL "threepp")
+    add_compile_definitions(BZ3_RENDER_BACKEND_THREEPP)
+else()
+    message(FATAL_ERROR "Unknown BZ3_RENDER_BACKEND value: ${BZ3_RENDER_BACKEND}")
+endif()
+
 set(CMAKE_BUILD_TYPE Release)
 set(BUILD_SHARED_LIBS OFF)
 
@@ -72,9 +133,12 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/libs/effekseer/src)
 
 
 # Find external packages
-find_package(glfw3 REQUIRED)
 find_package(glm REQUIRED)
-find_package(Jolt REQUIRED)
+if(BZ3_PHYSICS_BACKEND STREQUAL "jolt")
+    find_package(Jolt REQUIRED)
+elseif(BZ3_PHYSICS_BACKEND STREQUAL "bullet")
+    find_package(Bullet CONFIG REQUIRED)
+endif()
 find_package(assimp REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(cxxopts REQUIRED)
@@ -83,6 +147,9 @@ if(BZ3_UI_BACKEND STREQUAL "imgui")
 elseif(BZ3_UI_BACKEND STREQUAL "rmlui")
     find_package(RmlUi CONFIG REQUIRED)
     find_package(md4c REQUIRED)
+endif()
+if(BZ3_WINDOW_BACKEND STREQUAL "sdl" OR BZ3_AUDIO_BACKEND STREQUAL "sdlaudio")
+    find_package(SDL3 CONFIG REQUIRED)
 endif()
 find_package(spdlog REQUIRED)
 find_package(miniz REQUIRED)
@@ -126,86 +193,154 @@ list(APPEND SERVER_SOURCES
 ## Separate engine sources for client and server to avoid over-linking
 set(ENGINE_CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/engine/client_engine.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/mesh_loader.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/components/client_network.cpp
+    ${PROJECT_SOURCE_DIR}/src/renderer/mesh_loader.cpp
+    ${PROJECT_SOURCE_DIR}/src/world/content.cpp
+    ${PROJECT_SOURCE_DIR}/src/world/backend_factory.cpp
+    ${PROJECT_SOURCE_DIR}/src/world/backends/fs/backend.cpp
+    ${PROJECT_SOURCE_DIR}/src/network/client_network.cpp
+    ${PROJECT_SOURCE_DIR}/src/network/backend_factory.cpp
+    ${PROJECT_SOURCE_DIR}/src/network/backends/enet/client_backend.cpp
+    ${PROJECT_SOURCE_DIR}/src/network/backends/enet/server_backend.cpp
     ${PROJECT_SOURCE_DIR}/src/network/enet_transport.cpp
     ${PROJECT_SOURCE_DIR}/src/network/transport_factory.cpp
     ${PROJECT_SOURCE_DIR}/src/network/proto_codec.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/components/render.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/components/input.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/components/gui.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/physics/physics_world.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/physics/rigid_body.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/physics/static_body.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/physics/player_controller.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/components/audio.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/components/particle_effect_system.cpp
+    ${PROJECT_SOURCE_DIR}/src/renderer/render.cpp
+    ${PROJECT_SOURCE_DIR}/src/renderer/backend_factory.cpp
+    ${PROJECT_SOURCE_DIR}/src/input/input.cpp
+    ${PROJECT_SOURCE_DIR}/src/input/mapping/binding.cpp
+    ${PROJECT_SOURCE_DIR}/src/input/mapping/map.cpp
+    ${PROJECT_SOURCE_DIR}/src/input/mapping/mapper.cpp
+    ${PROJECT_SOURCE_DIR}/src/platform/window_factory.cpp
+    ${PROJECT_SOURCE_DIR}/src/ui/system.cpp
+    ${PROJECT_SOURCE_DIR}/src/ui/backend_factory.cpp
+    ${PROJECT_SOURCE_DIR}/src/ui/third_party/stb_image_impl.cpp
+    ${PROJECT_SOURCE_DIR}/src/audio/audio.cpp
+    ${PROJECT_SOURCE_DIR}/src/audio/backend_factory.cpp
+    ${PROJECT_SOURCE_DIR}/src/renderer/particle_effect_system.cpp
 )
+if(BZ3_WINDOW_BACKEND STREQUAL "glfw")
+    list(APPEND ENGINE_CLIENT_SOURCES ${PROJECT_SOURCE_DIR}/src/platform/backends/window_glfw.cpp)
+elseif(BZ3_WINDOW_BACKEND STREQUAL "sdl")
+    list(APPEND ENGINE_CLIENT_SOURCES ${PROJECT_SOURCE_DIR}/src/platform/backends/window_sdl.cpp)
+endif()
+
 
 if(BZ3_UI_BACKEND STREQUAL "imgui")
     list(APPEND ENGINE_CLIENT_SOURCES
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/backends/imgui_backend.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/main_menu.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/thumbnail_cache.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rich_text_renderer.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/emoji_utils.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/community_browser_panel.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/settings_panel.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/documentation_panel.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/start_server_panel.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/panels/themes_panel.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/backend.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/console/console.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/console/thumbnail_cache.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/console/panels/panel_community.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/console/panels/panel_settings.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/console/panels/panel_documentation.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/console/panels/panel_start_server.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/console/panels/panel_themes.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/hud/hud.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/hud/chat.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/hud/crosshair.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/hud/fps.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/hud/radar.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/hud/scoreboard.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/hud/spawn_hint.cpp
     )
 elseif(BZ3_UI_BACKEND STREQUAL "rmlui")
     list(APPEND ENGINE_CLIENT_SOURCES
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/backends/rmlui_backend.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_backend/RmlUi_Platform_GLFW.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_backend/RmlUi_Renderer_GL3.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/emoji_utils.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_main_menu.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_hud.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_hud_chat.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_hud_dialog.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_hud_radar.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_hud_scoreboard.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_panels/rmlui_panel.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_modal_dialog.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_panels/rmlui_panel_community.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_panels/rmlui_panel_settings.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_panels/rmlui_panel_documentation.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_panels/rmlui_panel_start_server.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/components/gui/rmlui_panels/rmlui_panel_themes.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/backend.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/platform/RmlUi_Renderer_GL3.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/console/emoji_utils.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/console/console.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/console/modal_dialog.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/hud/hud.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/hud/chat.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/hud/dialog.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/hud/radar.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/hud/scoreboard.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/console/panels/panel.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/console/panels/panel_community.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/console/panels/panel_settings.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/console/panels/panel_documentation.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/console/panels/panel_start_server.cpp
+        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/console/panels/panel_themes.cpp
     )
 endif()
 set(ENGINE_SERVER_SOURCES
     ${PROJECT_SOURCE_DIR}/src/engine/server_engine.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/mesh_loader.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/components/server_network.cpp
+    ${PROJECT_SOURCE_DIR}/src/renderer/mesh_loader.cpp
+    ${PROJECT_SOURCE_DIR}/src/world/content.cpp
+    ${PROJECT_SOURCE_DIR}/src/world/backend_factory.cpp
+    ${PROJECT_SOURCE_DIR}/src/world/backends/fs/backend.cpp
+    ${PROJECT_SOURCE_DIR}/src/network/server_network.cpp
+    ${PROJECT_SOURCE_DIR}/src/network/backend_factory.cpp
+    ${PROJECT_SOURCE_DIR}/src/network/backends/enet/client_backend.cpp
+    ${PROJECT_SOURCE_DIR}/src/network/backends/enet/server_backend.cpp
     ${PROJECT_SOURCE_DIR}/src/network/enet_transport.cpp
     ${PROJECT_SOURCE_DIR}/src/network/transport_factory.cpp
     ${PROJECT_SOURCE_DIR}/src/network/proto_codec.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/physics/physics_world.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/physics/rigid_body.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/physics/static_body.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/physics/player_controller.cpp
 )
+
+set(PHYSICS_SOURCES
+    ${PROJECT_SOURCE_DIR}/src/physics/backend_factory.cpp
+    ${PROJECT_SOURCE_DIR}/src/physics/physics_world.cpp
+    ${PROJECT_SOURCE_DIR}/src/physics/rigid_body.cpp
+    ${PROJECT_SOURCE_DIR}/src/physics/static_body.cpp
+    ${PROJECT_SOURCE_DIR}/src/physics/player_controller.cpp
+)
+if(BZ3_PHYSICS_BACKEND STREQUAL "jolt")
+    list(APPEND PHYSICS_SOURCES
+        ${PROJECT_SOURCE_DIR}/src/physics/backends/jolt/physics_world_jolt.cpp
+        ${PROJECT_SOURCE_DIR}/src/physics/backends/jolt/rigid_body_jolt.cpp
+        ${PROJECT_SOURCE_DIR}/src/physics/backends/jolt/static_body_jolt.cpp
+        ${PROJECT_SOURCE_DIR}/src/physics/backends/jolt/player_controller_jolt.cpp
+    )
+elseif(BZ3_PHYSICS_BACKEND STREQUAL "bullet")
+    list(APPEND PHYSICS_SOURCES
+        ${PROJECT_SOURCE_DIR}/src/physics/backends/bullet/physics_world_bullet.cpp
+        ${PROJECT_SOURCE_DIR}/src/physics/backends/bullet/rigid_body_bullet.cpp
+        ${PROJECT_SOURCE_DIR}/src/physics/backends/bullet/static_body_bullet.cpp
+        ${PROJECT_SOURCE_DIR}/src/physics/backends/bullet/player_controller_bullet.cpp
+    )
+endif()
+
+list(APPEND ENGINE_CLIENT_SOURCES ${PHYSICS_SOURCES})
+list(APPEND ENGINE_SERVER_SOURCES ${PHYSICS_SOURCES})
+
+if(BZ3_AUDIO_BACKEND STREQUAL "miniaudio")
+    list(APPEND ENGINE_CLIENT_SOURCES
+        ${PROJECT_SOURCE_DIR}/src/audio/backends/miniaudio/backend.cpp
+        ${PROJECT_SOURCE_DIR}/src/audio/backends/miniaudio/clip.cpp
+    )
+elseif(BZ3_AUDIO_BACKEND STREQUAL "sdlaudio")
+    list(APPEND ENGINE_CLIENT_SOURCES
+        ${PROJECT_SOURCE_DIR}/src/audio/backends/sdl/backend.cpp
+        ${PROJECT_SOURCE_DIR}/src/audio/backends/sdl/clip.cpp
+    )
+endif()
+
+if(BZ3_RENDER_BACKEND STREQUAL "threepp")
+    list(APPEND ENGINE_CLIENT_SOURCES
+        ${PROJECT_SOURCE_DIR}/src/renderer/backends/threepp/backend.cpp
+    )
+endif()
 
 # Create executables
 set(MACOSX_BUNDLE_ICON_FILE "") # Set to your .icns file if you have one
 add_executable(bz3 MACOSX_BUNDLE ${CLIENT_SOURCES} ${ENGINE_CLIENT_SOURCES})
 
-# Handle GLFW target for portability
-if(TARGET glfw3::glfw)
-    set(GLFW_TARGET glfw3::glfw)
-else()
-    set(GLFW_TARGET glfw)
-endif()
 
 # Handle OpenGL target for portability
-if(TARGET OpenGL::OpenGL)
+if(TARGET OpenGL::GL)
+    set(OPENGL_TARGET OpenGL::GL)
+elseif(TARGET OpenGL::OpenGL)
     set(OPENGL_TARGET OpenGL::OpenGL)
 else()
     set(OPENGL_TARGET ${OPENGL_LIBRARIES})
 endif()
+if(BZ3_WINDOW_BACKEND STREQUAL "glfw")
+    list(APPEND ENGINE_CLIENT_SOURCES ${PROJECT_SOURCE_DIR}/src/platform/backends/window_glfw.cpp)
+elseif(BZ3_WINDOW_BACKEND STREQUAL "sdl")
+    list(APPEND ENGINE_CLIENT_SOURCES ${PROJECT_SOURCE_DIR}/src/platform/backends/window_sdl.cpp)
+endif()
+
 
 if(BZ3_UI_BACKEND STREQUAL "imgui")
     find_package(Freetype REQUIRED)
@@ -228,8 +363,11 @@ target_include_directories(bz3 PRIVATE
     ${enet_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/libs/effekseer/src
     ${PROJECT_SOURCE_DIR}/libs/effekseer/src/Effekseer
-    ${PROJECT_SOURCE_DIR}/include/client
 )
+
+if(DEFINED threepp_SOURCE_DIR)
+    target_include_directories(bz3 PRIVATE ${threepp_SOURCE_DIR}/src/external/glad)
+endif()
 target_include_directories(bz3-server PRIVATE
     ${PROJECT_SOURCE_DIR}/src/
     ${PROJECT_SOURCE_DIR}/src/server
@@ -238,9 +376,8 @@ target_include_directories(bz3-server PRIVATE
 
 # Link libraries
 target_link_libraries(bz3 PRIVATE
-    ${GLFW_TARGET}
+    ${WINDOW_TARGET}
     glm::glm
-    Jolt::Jolt
     enet_static
     assimp::assimp
     ${OPENGL_TARGET}
@@ -255,6 +392,18 @@ target_link_libraries(bz3 PRIVATE
     Effekseer
     EffekseerRendererGL
 )
+if(BZ3_PHYSICS_BACKEND STREQUAL "jolt")
+    target_link_libraries(bz3 PRIVATE Jolt::Jolt)
+elseif(BZ3_PHYSICS_BACKEND STREQUAL "bullet")
+    if(TARGET Bullet::Bullet)
+        target_link_libraries(bz3 PRIVATE Bullet::Bullet)
+    elseif(DEFINED BULLET_LIBRARIES)
+        target_link_libraries(bz3 PRIVATE ${BULLET_LIBRARIES})
+    endif()
+    if(DEFINED BULLET_INCLUDE_DIRS)
+        target_include_directories(bz3 PRIVATE ${BULLET_INCLUDE_DIRS})
+    endif()
+endif()
 if(BZ3_UI_BACKEND STREQUAL "imgui")
     target_link_libraries(bz3 PRIVATE
         imgui::imgui
@@ -275,14 +424,14 @@ endif()
 if(BZ3_UI_BACKEND STREQUAL "rmlui")
     target_link_libraries(bz3 PRIVATE RmlUi::RmlUi md4c::md4c)
     target_compile_definitions(bz3 PRIVATE RMLUI_GL3_CUSTOM_LOADER)
-    if(DEFINED threepp_SOURCE_DIR)
-        target_include_directories(bz3 PRIVATE ${threepp_SOURCE_DIR}/src/external/glad)
-    endif()
+endif()
+
+if(BZ3_AUDIO_BACKEND STREQUAL "sdlaudio")
+    target_link_libraries(bz3 PRIVATE SDL3::SDL3)
 endif()
 
 target_link_libraries(bz3-server PRIVATE
     glm::glm
-    Jolt::Jolt
     enet_static
     assimp::assimp
     pybind11::embed
@@ -293,6 +442,18 @@ target_link_libraries(bz3-server PRIVATE
     proto_lib
     CURL::libcurl
 )
+if(BZ3_PHYSICS_BACKEND STREQUAL "jolt")
+    target_link_libraries(bz3-server PRIVATE Jolt::Jolt)
+elseif(BZ3_PHYSICS_BACKEND STREQUAL "bullet")
+    if(TARGET Bullet::Bullet)
+        target_link_libraries(bz3-server PRIVATE Bullet::Bullet)
+    elseif(DEFINED BULLET_LIBRARIES)
+        target_link_libraries(bz3-server PRIVATE ${BULLET_LIBRARIES})
+    endif()
+    if(DEFINED BULLET_INCLUDE_DIRS)
+        target_include_directories(bz3-server PRIVATE ${BULLET_INCLUDE_DIRS})
+    endif()
+endif()
 
 # System libraries (platform-specific)
 if (UNIX AND NOT APPLE)
@@ -338,7 +499,11 @@ set(CPACK_PACKAGE_INSTALL_DIRECTORY "bz3")
 if(UNIX AND NOT APPLE)
     set(CPACK_GENERATOR "DEB;RPM;TGZ")
     set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Quinn Carmack <quinncarmack@gmail.com>")
-    set(CPACK_DEBIAN_PACKAGE_DEPENDS "libgl1, libglfw3")
+    if(BZ3_WINDOW_BACKEND STREQUAL "glfw")
+        set(CPACK_DEBIAN_PACKAGE_DEPENDS "libgl1, libglfw3")
+    else()
+        set(CPACK_DEBIAN_PACKAGE_DEPENDS "libgl1, libsdl3")
+    endif()
     set(CPACK_RPM_PACKAGE_LICENSE "MIT")
 elseif(APPLE)
     set(CPACK_GENERATOR "DragNDrop")

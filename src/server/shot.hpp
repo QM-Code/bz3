@@ -1,5 +1,5 @@
 #pragma once
-#include "engine/types.hpp"
+#include "core/types.hpp"
 
 class Game;
 class Client;

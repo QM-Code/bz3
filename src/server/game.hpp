@@ -1,9 +1,9 @@
 #pragma once
-#include "engine/types.hpp"
+#include "core/types.hpp"
 #include "engine/server_engine.hpp"
 #include "client.hpp"
 #include "shot.hpp"
-#include "world.hpp"
+#include "world_session.hpp"
 #include "chat.hpp"
 #include <vector>
 #include <memory>
@@ -23,7 +23,7 @@ private:
 
 public:
     ServerEngine &engine;
-    World *world;
+    ServerWorldSession *world;
     Chat *chat;
 
     const std::vector<std::unique_ptr<Client>> &getClients() const { return clients; }
@@ -34,7 +34,7 @@ public:
         Game(class ServerEngine &engine,
             std::string serverName,
             std::string worldName,
-            nlohmann::json worldConfig,
+            bz::json::Value worldConfig,
             std::string worldDir,
             bool enableWorldZipping);
     ~Game();

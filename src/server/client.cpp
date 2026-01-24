@@ -25,7 +25,7 @@ Client::Client(Game &game,
     state.communityAdmin = communityAdmin;
     state.localAdmin = localAdmin;
 
-    state.params = game.world->getDefaultPlayerParameters();
+    state.params = game.world->defaultPlayerParameters();
 
     // Announce this player to all other clients
     ServerMsg_PlayerJoin announceMsg;

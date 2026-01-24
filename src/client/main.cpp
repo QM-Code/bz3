@@ -1,7 +1,7 @@
-#include <GLFW/glfw3.h>
 #include <filesystem>
 #include <initializer_list>
 #include <string>
+#include <glad/glad.h>
 #include "spdlog/spdlog.h"
 #include "engine/client_engine.hpp"
 #include "game.hpp"
@@ -12,67 +12,16 @@
 #include "common/data_dir_override.hpp"
 #include "common/data_path_resolver.hpp"
 #include "common/config_helpers.hpp"
+#include "platform/window.hpp"
 
 TimeUtils::time lastFrameTime;
+constexpr TimeUtils::duration MIN_DELTA_TIME = 1.0f / 120.0f;
 
 namespace {
 struct FullscreenState {
     bool active = false;
-    int windowedX = 0;
-    int windowedY = 0;
-    int windowedWidth = 1280;
-    int windowedHeight = 720;
 };
-
-void ToggleFullscreen(GLFWwindow *window, FullscreenState &state, bool vsyncEnabled) {
-    if (!window) {
-        return;
-    }
-
-    if (!state.active) {
-        glfwGetWindowPos(window, &state.windowedX, &state.windowedY);
-        glfwGetWindowSize(window, &state.windowedWidth, &state.windowedHeight);
-
-        GLFWmonitor *monitor = glfwGetWindowMonitor(window);
-        if (!monitor) {
-            monitor = glfwGetPrimaryMonitor();
-        }
-
-        if (!monitor) {
-            return;
-        }
-
-        int monitorX = 0;
-        int monitorY = 0;
-        glfwGetMonitorPos(monitor, &monitorX, &monitorY);
-
-        const GLFWvidmode *mode = glfwGetVideoMode(monitor);
-        if (!mode) {
-            return;
-        }
-
-        glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_FALSE);
-        glfwSetWindowPos(window, monitorX, monitorY);
-        glfwSetWindowSize(window, mode->width, mode->height);
-
-        glfwSwapInterval(vsyncEnabled ? 1 : 0); // reapply configured vsync after mode switch
-        state.active = true;
-    } else {
-        const int restoreWidth = state.windowedWidth > 0 ? state.windowedWidth : 1280;
-        const int restoreHeight = state.windowedHeight > 0 ? state.windowedHeight : 720;
-        const int restoreX = state.windowedX;
-        const int restoreY = state.windowedY;
-        glfwSetWindowAttrib(window, GLFW_DECORATED, GLFW_TRUE);
-        glfwSetWindowPos(window, restoreX, restoreY);
-        glfwSetWindowSize(window, restoreWidth, restoreHeight);
-        glfwSwapInterval(vsyncEnabled ? 1 : 0); // reapply configured vsync after returning
-        state.active = false;
-    }
 }
-
-} // namespace
-
-#define MIN_DELTA_TIME (1.0f / 120.0f)
 
 spdlog::level::level_enum ParseLogLevel(const std::string &level) {
     if (level == "trace") {
@@ -113,11 +62,6 @@ int main(int argc, char *argv[]) {
 
     const bz::data::DataDirOverrideResult dataDirResult = bz::data::ApplyDataDirOverrideFromArgs(argc, argv);
 
-    if (!glfwInit()) {
-        spdlog::error("GLFW failed to initialize");
-        exit(1);
-    }
-
     const auto clientUserConfigPathFs = dataDirResult.userConfigPath;
     const std::vector<bz::data::ConfigLayerSpec> clientConfigSpecs = {
         {"common/config.json", "data/common/config.json", spdlog::level::err, true},
@@ -144,34 +88,27 @@ int main(int argc, char *argv[]) {
         ? cliOptions.worldDir
         : bz::data::Resolve("client-test").string();
 
-    spdlog::trace("GLFW initialized successfully");
+    platform::WindowConfig windowConfig;
+    windowConfig.width = configWidth;
+    windowConfig.height = configHeight;
+    windowConfig.title = "BZFlag v3";
+    windowConfig.glMajor = 3;
+    windowConfig.glMinor = 3;
+    windowConfig.samples = 4;
 
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_SAMPLES, 4);
-
-    FullscreenState fullscreenState;
-    fullscreenState.windowedWidth = configWidth;
-    fullscreenState.windowedHeight = configHeight;
-
-    GLFWwindow *window = glfwCreateWindow(configWidth, configHeight, "BZFlag v3", nullptr, nullptr);
-    //glfwSetWindowUserPointer(window, userPointer);
-    if (!window) {
-        spdlog::error("GLFW window failed to create");
-        glfwTerminate();
-        exit(1);
+    auto window = platform::CreateWindow(windowConfig);
+    if (!window || !window->nativeHandle()) {
+        spdlog::error("Window failed to create");
+        return 1;
     }
 
-    spdlog::trace("GLFW window created successfully");
-    glfwMakeContextCurrent(window);
-    spdlog::trace("GLFW context made current");
+    if (gladLoadGL() == 0) {
+        spdlog::error("Failed to load OpenGL functions");
+        return 1;
+    }
 
     glEnable(GL_MULTISAMPLE);
-    glfwSwapInterval(vsyncEnabled ? 1 : 0);
-
-
-    spdlog::info("GLFW_SAMPLES attrib = {}", glfwGetWindowAttrib(window, GLFW_SAMPLES));
+    window->setVsync(vsyncEnabled);
 
     spdlog::info("GL_VENDOR   = {}", (const char*)glGetString(GL_VENDOR));
     spdlog::info("GL_RENDERER = {}", (const char*)glGetString(GL_RENDERER));
@@ -182,11 +119,11 @@ int main(int argc, char *argv[]) {
     glGetIntegerv(GL_SAMPLES, &s);
     spdlog::info("GL_SAMPLE_BUFFERS={}, GL_SAMPLES={}", sb, s);
 
-    ClientEngine engine(window);
+    ClientEngine engine(*window);
     spdlog::trace("ClientEngine initialized successfully");
 
     if (fullscreenEnabled) {
-        ToggleFullscreen(window, fullscreenState, vsyncEnabled);
+        window->setFullscreen(true);
     }
 
     std::unique_ptr<Game> game;
@@ -205,8 +142,8 @@ int main(int argc, char *argv[]) {
 
     spdlog::trace("Starting main loop");
 
-    while (!glfwWindowShouldClose(window)) {
-        TimeUtils::time currTime = TimeUtils::GetCurrentTime();  
+    while (!window->shouldClose()) {
+        TimeUtils::time currTime = TimeUtils::GetCurrentTime();
         TimeUtils::duration deltaTime = TimeUtils::GetElapsedTime(lastFrameTime, currTime);
 
         if (deltaTime < MIN_DELTA_TIME) {
@@ -219,31 +156,23 @@ int main(int argc, char *argv[]) {
         engine.earlyUpdate(deltaTime);
 
         static bool prevGraveDown = false;
-        const bool graveDown = glfwGetKey(window, GLFW_KEY_GRAVE_ACCENT) == GLFW_PRESS;
+        const bool graveDown = window->isKeyDown(platform::Key::GraveAccent);
         if (graveDown && !prevGraveDown) {
             if (game) {
-                auto &menu = engine.gui->mainMenu();
-                if (menu.isVisible()) {
-                    menu.hide();
+                auto &console = engine.ui->console();
+                if (console.isVisible()) {
+                    console.hide();
                 } else {
-                    menu.show({});
+                    console.show({});
                 }
             }
         }
         prevGraveDown = graveDown;
 
-        if (engine.gui->mainMenu().consumeQuitRequest()) {
+        if (engine.ui->console().consumeQuitRequest()) {
             if (game) {
                 engine.network->disconnect("Disconnected from server.");
             }
-        }
-
-        if (engine.gui->mainMenu().isVisible()) {
-            engine.input->clearState();
-        }
-
-        if (engine.input->getInputState().toggleFullscreen) {
-            ToggleFullscreen(window, fullscreenState, vsyncEnabled);
         }
 
         if (auto disconnectEvent = engine.network->consumeDisconnectEvent()) {
@@ -253,25 +182,18 @@ int main(int argc, char *argv[]) {
             communityBrowser.handleDisconnected(disconnectEvent->reason);
         }
 
-        if (!game || engine.gui->mainMenu().isVisible()) {
+        if (engine.ui->console().isVisible()) {
             communityBrowser.update();
-        }
-
-        if (game) {
+        } else if (game) {
             game->earlyUpdate(deltaTime);
-        }
-
-        engine.step(deltaTime);
-
-        if (game) {
             game->lateUpdate(deltaTime);
         }
 
+        engine.step(deltaTime);
         engine.lateUpdate(deltaTime);
 
-        glfwSwapBuffers(window);
+        window->swapBuffers();
     }
 
-    glfwDestroyWindow(window);
-    glfwTerminate();
+    return 0;
 }

@@ -9,7 +9,7 @@
 #include "common/data_dir_override.hpp"
 #include "common/data_path_resolver.hpp"
 #include "common/config_helpers.hpp"
-#include <nlohmann/json.hpp>
+#include "common/json.hpp"
 #include <pybind11/embed.h>
 #include <csignal>
 #include <atomic>

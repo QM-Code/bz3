@@ -1,7 +1,7 @@
 #pragma once
-#include "engine/types.hpp"
-#include "engine/components/audio.hpp"
-#include "engine/components/particle_effect_system.hpp"
+#include "core/types.hpp"
+#include "audio/audio.hpp"
+#include "renderer/particle_effect_system.hpp"
 #include <optional>
 
 class Game;

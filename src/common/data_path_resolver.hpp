@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-#include <nlohmann/json.hpp>
+#include "common/json.hpp"
 #include <spdlog/spdlog.h>
 
 namespace bz::data {
@@ -18,7 +18,7 @@ std::filesystem::path Resolve(const std::filesystem::path &relativePath);
 // Overrides the detected data directory. Must be called before the first Resolve/DataRoot invocation.
 void SetDataRootOverride(const std::filesystem::path &path);
 
-std::optional<nlohmann::json> LoadJsonFile(const std::filesystem::path &path,
+std::optional<bz::json::Value> LoadJsonFile(const std::filesystem::path &path,
 										   const std::string &label,
 										   spdlog::level::level_enum missingLevel);
 
@@ -27,7 +27,7 @@ std::filesystem::path EnsureUserConfigFile(const std::string &fileName);
 std::filesystem::path EnsureUserWorldsDirectory();
 std::filesystem::path EnsureUserWorldDirectoryForServer(const std::string &host, uint16_t port);
 bool MergeConfigLayer(const std::string &label,
-					 const nlohmann::json &layerJson,
+					 const bz::json::Value &layerJson,
 					 const std::filesystem::path &baseDir);
 bool MergeExternalConfigLayer(const std::filesystem::path &configPath,
 								 const std::string &label = {},
@@ -41,19 +41,23 @@ struct ConfigLayerSpec {
 };
 
 struct ConfigLayer {
-	nlohmann::json json;
+	bz::json::Value json;
 	std::filesystem::path baseDir;
 	std::string label;
 };
 
 std::vector<ConfigLayer> LoadConfigLayers(const std::vector<ConfigLayerSpec> &specs);
 
-void MergeJsonObjects(nlohmann::json &destination, const nlohmann::json &source);
+void MergeJsonObjects(bz::json::Value &destination, const bz::json::Value &source);
 
-void CollectAssetEntries(const nlohmann::json &node,
+void CollectAssetEntries(const bz::json::Value &node,
 						 const std::filesystem::path &baseDir,
 						 std::map<std::string, std::filesystem::path> &assetMap,
 						 const std::string &prefix = "");
+
+
+// Returns the directory containing the running executable.
+std::filesystem::path ExecutableDirectory();
 
 // Resolve an asset path declared in client/config.json, falling back to a default relative path.
 std::filesystem::path ResolveConfiguredAsset(const std::string &assetKey,
@@ -69,16 +73,16 @@ void InitializeConfigCache(const std::vector<ConfigLayerSpec> &specs);
 bool ConfigCacheInitialized();
 
 // Retrieves the merged configuration hierarchy.
-const nlohmann::json &ConfigCacheRoot();
+const bz::json::Value &ConfigCacheRoot();
 
 // Retrieves the configuration JSON object for a named layer (if available).
-const nlohmann::json *ConfigLayerByLabel(const std::string &label);
+const bz::json::Value *ConfigLayerByLabel(const std::string &label);
 
 // Retrieves a configuration value from the merged cache using dotted path syntax.
-const nlohmann::json *ConfigValue(const std::string &path);
+const bz::json::Value *ConfigValue(const std::string &path);
 
 // Returns a copy of the configuration value at the given path, if present.
-std::optional<nlohmann::json> ConfigValueCopy(const std::string &path);
+std::optional<bz::json::Value> ConfigValueCopy(const std::string &path);
 
 // Returns the configuration value at the given path interpreted as uint16_t, if possible.
 std::optional<uint16_t> ConfigValueUInt16(const std::string &path);
