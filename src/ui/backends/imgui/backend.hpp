@@ -15,15 +15,15 @@ namespace platform {
 class Window;
 }
 
-namespace ui {
+namespace ui_backend {
 
-class ImGuiBackend final : public UiBackend {
+class ImGuiBackend final : public Backend {
 public:
     explicit ImGuiBackend(platform::Window &window);
     ~ImGuiBackend() override;
 
-    ConsoleInterface &console() override;
-    const ConsoleInterface &console() const override;
+    ui::ConsoleInterface &console() override;
+    const ui::ConsoleInterface &console() const override;
     void handleEvents(const std::vector<platform::Event> &events) override;
     void update() override;
     void reloadFonts() override;
@@ -42,10 +42,10 @@ private:
     platform::Window *window = nullptr;
     std::chrono::steady_clock::time_point lastFrameTime;
     ImFont *bigFont = nullptr;
-    ConsoleView consoleView;
-    ImGuiHud hud;
+    ui::ConsoleView consoleView;
+    ui::ImGuiHud hud;
     bool showFPS = false;
     void drawTexture(unsigned int textureId);
 };
 
-} // namespace ui
+} // namespace ui_backend

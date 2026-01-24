@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -7,14 +8,18 @@
 #include "ui/types.hpp"
 #include "ui/console/console_interface.hpp"
 
-namespace ui {
+namespace platform {
+class Window;
+}
 
-class UiBackend {
+namespace ui_backend {
+
+class Backend {
 public:
-    virtual ~UiBackend() = default;
+    virtual ~Backend() = default;
 
-    virtual ConsoleInterface &console() = 0;
-    virtual const ConsoleInterface &console() const = 0;
+    virtual ui::ConsoleInterface &console() = 0;
+    virtual const ui::ConsoleInterface &console() const = 0;
     virtual void handleEvents(const std::vector<platform::Event> &events) = 0;
     virtual void update() = 0;
     virtual void reloadFonts() = 0;
@@ -30,4 +35,6 @@ public:
     virtual void displayDeathScreen(bool show) = 0;
 };
 
-} // namespace ui
+std::unique_ptr<Backend> CreateUiBackend(platform::Window &window);
+
+} // namespace ui_backend

@@ -9,7 +9,7 @@
 
 #include <algorithm>
 
-namespace ui {
+namespace ui_backend {
 namespace {
 
 ImGuiKey toImGuiKey(platform::Key key) {
@@ -338,11 +338,11 @@ void ImGuiBackend::displayDeathScreen(bool show) {
     hud.displayDeathScreen(show);
 }
 
-ConsoleInterface &ImGuiBackend::console() {
+ui::ConsoleInterface &ImGuiBackend::console() {
     return consoleView;
 }
 
-const ConsoleInterface &ImGuiBackend::console() const {
+const ui::ConsoleInterface &ImGuiBackend::console() const {
     return consoleView;
 }
 

@@ -34,10 +34,45 @@ if(BZ3_WINDOW_BACKEND STREQUAL "glfw")
     endif()
 elseif(BZ3_WINDOW_BACKEND STREQUAL "sdl")
     add_compile_definitions(BZ3_WINDOW_BACKEND_SDL)
-    find_package(SDL3 CONFIG REQUIRED)
     set(WINDOW_TARGET SDL3::SDL3)
 else()
     message(FATAL_ERROR "Unknown BZ3_WINDOW_BACKEND value: ${BZ3_WINDOW_BACKEND}")
+endif()
+
+set(BZ3_PHYSICS_BACKEND "jolt" CACHE STRING "Physics backend (jolt or bullet)")
+set_property(CACHE BZ3_PHYSICS_BACKEND PROPERTY STRINGS jolt bullet)
+if(BZ3_PHYSICS_BACKEND STREQUAL "jolt")
+    add_compile_definitions(BZ3_PHYSICS_BACKEND_JOLT)
+elseif(BZ3_PHYSICS_BACKEND STREQUAL "bullet")
+    add_compile_definitions(BZ3_PHYSICS_BACKEND_BULLET)
+else()
+    message(FATAL_ERROR "Unknown BZ3_PHYSICS_BACKEND value: ${BZ3_PHYSICS_BACKEND}")
+endif()
+
+set(BZ3_AUDIO_BACKEND "sdlaudio" CACHE STRING "Audio backend (miniaudio or sdlaudio)")
+set_property(CACHE BZ3_AUDIO_BACKEND PROPERTY STRINGS miniaudio sdlaudio)
+if(BZ3_AUDIO_BACKEND STREQUAL "miniaudio")
+    add_compile_definitions(BZ3_AUDIO_BACKEND_MINIAUDIO)
+elseif(BZ3_AUDIO_BACKEND STREQUAL "sdlaudio")
+    add_compile_definitions(BZ3_AUDIO_BACKEND_SDL)
+else()
+    message(FATAL_ERROR "Unknown BZ3_AUDIO_BACKEND value: ${BZ3_AUDIO_BACKEND}")
+endif()
+
+set(BZ3_NETWORK_BACKEND "enet" CACHE STRING "Network backend (enet)")
+set_property(CACHE BZ3_NETWORK_BACKEND PROPERTY STRINGS enet)
+if(BZ3_NETWORK_BACKEND STREQUAL "enet")
+    add_compile_definitions(BZ3_NETWORK_BACKEND_ENET)
+else()
+    message(FATAL_ERROR "Unknown BZ3_NETWORK_BACKEND value: ${BZ3_NETWORK_BACKEND}")
+endif()
+
+set(BZ3_RENDER_BACKEND "threepp" CACHE STRING "Render backend (threepp)")
+set_property(CACHE BZ3_RENDER_BACKEND PROPERTY STRINGS threepp)
+if(BZ3_RENDER_BACKEND STREQUAL "threepp")
+    add_compile_definitions(BZ3_RENDER_BACKEND_THREEPP)
+else()
+    message(FATAL_ERROR "Unknown BZ3_RENDER_BACKEND value: ${BZ3_RENDER_BACKEND}")
 endif()
 
 set(CMAKE_BUILD_TYPE Release)
@@ -91,7 +126,11 @@ add_subdirectory(${PROJECT_SOURCE_DIR}/libs/effekseer/src)
 
 # Find external packages
 find_package(glm REQUIRED)
-find_package(Jolt REQUIRED)
+if(BZ3_PHYSICS_BACKEND STREQUAL "jolt")
+    find_package(Jolt REQUIRED)
+elseif(BZ3_PHYSICS_BACKEND STREQUAL "bullet")
+    find_package(Bullet CONFIG REQUIRED)
+endif()
 find_package(assimp REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(cxxopts REQUIRED)
@@ -100,6 +139,9 @@ if(BZ3_UI_BACKEND STREQUAL "imgui")
 elseif(BZ3_UI_BACKEND STREQUAL "rmlui")
     find_package(RmlUi CONFIG REQUIRED)
     find_package(md4c REQUIRED)
+endif()
+if(BZ3_WINDOW_BACKEND STREQUAL "sdl" OR BZ3_AUDIO_BACKEND STREQUAL "sdlaudio")
+    find_package(SDL3 CONFIG REQUIRED)
 endif()
 find_package(spdlog REQUIRED)
 find_package(miniz REQUIRED)
@@ -143,27 +185,29 @@ list(APPEND SERVER_SOURCES
 ## Separate engine sources for client and server to avoid over-linking
 set(ENGINE_CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/engine/client_engine.cpp
-    ${PROJECT_SOURCE_DIR}/src/render/mesh_loader.cpp
+    ${PROJECT_SOURCE_DIR}/src/renderer/mesh_loader.cpp
     ${PROJECT_SOURCE_DIR}/src/network/client_network.cpp
+    ${PROJECT_SOURCE_DIR}/src/network/backend_factory.cpp
+    ${PROJECT_SOURCE_DIR}/src/network/backends/enet/client_backend.cpp
+    ${PROJECT_SOURCE_DIR}/src/network/backends/enet/server_backend.cpp
     ${PROJECT_SOURCE_DIR}/src/network/enet_transport.cpp
     ${PROJECT_SOURCE_DIR}/src/network/transport_factory.cpp
     ${PROJECT_SOURCE_DIR}/src/network/proto_codec.cpp
-    ${PROJECT_SOURCE_DIR}/src/render/render.cpp
+    ${PROJECT_SOURCE_DIR}/src/renderer/render.cpp
+    ${PROJECT_SOURCE_DIR}/src/renderer/backend_factory.cpp
     ${PROJECT_SOURCE_DIR}/src/input/input.cpp
     ${PROJECT_SOURCE_DIR}/src/platform/window_factory.cpp
     ${PROJECT_SOURCE_DIR}/src/ui/system.cpp
+    ${PROJECT_SOURCE_DIR}/src/ui/backend_factory.cpp
     ${PROJECT_SOURCE_DIR}/src/ui/third_party/stb_image_impl.cpp
-    ${PROJECT_SOURCE_DIR}/src/physics/physics_world.cpp
-    ${PROJECT_SOURCE_DIR}/src/physics/rigid_body.cpp
-    ${PROJECT_SOURCE_DIR}/src/physics/static_body.cpp
-    ${PROJECT_SOURCE_DIR}/src/physics/player_controller.cpp
     ${PROJECT_SOURCE_DIR}/src/audio/audio.cpp
-    ${PROJECT_SOURCE_DIR}/src/render/particle_effect_system.cpp
+    ${PROJECT_SOURCE_DIR}/src/audio/backend_factory.cpp
+    ${PROJECT_SOURCE_DIR}/src/renderer/particle_effect_system.cpp
 )
 if(BZ3_WINDOW_BACKEND STREQUAL "glfw")
-    list(APPEND ENGINE_CLIENT_SOURCES ${PROJECT_SOURCE_DIR}/src/platform/window_glfw.cpp)
+    list(APPEND ENGINE_CLIENT_SOURCES ${PROJECT_SOURCE_DIR}/src/platform/backends/window_glfw.cpp)
 elseif(BZ3_WINDOW_BACKEND STREQUAL "sdl")
-    list(APPEND ENGINE_CLIENT_SOURCES ${PROJECT_SOURCE_DIR}/src/platform/window_sdl.cpp)
+    list(APPEND ENGINE_CLIENT_SOURCES ${PROJECT_SOURCE_DIR}/src/platform/backends/window_sdl.cpp)
 endif()
 
 
@@ -207,16 +251,59 @@ elseif(BZ3_UI_BACKEND STREQUAL "rmlui")
 endif()
 set(ENGINE_SERVER_SOURCES
     ${PROJECT_SOURCE_DIR}/src/engine/server_engine.cpp
-    ${PROJECT_SOURCE_DIR}/src/render/mesh_loader.cpp
+    ${PROJECT_SOURCE_DIR}/src/renderer/mesh_loader.cpp
     ${PROJECT_SOURCE_DIR}/src/network/server_network.cpp
+    ${PROJECT_SOURCE_DIR}/src/network/backend_factory.cpp
+    ${PROJECT_SOURCE_DIR}/src/network/backends/enet/client_backend.cpp
+    ${PROJECT_SOURCE_DIR}/src/network/backends/enet/server_backend.cpp
     ${PROJECT_SOURCE_DIR}/src/network/enet_transport.cpp
     ${PROJECT_SOURCE_DIR}/src/network/transport_factory.cpp
     ${PROJECT_SOURCE_DIR}/src/network/proto_codec.cpp
+)
+
+set(PHYSICS_SOURCES
+    ${PROJECT_SOURCE_DIR}/src/physics/backend_factory.cpp
     ${PROJECT_SOURCE_DIR}/src/physics/physics_world.cpp
     ${PROJECT_SOURCE_DIR}/src/physics/rigid_body.cpp
     ${PROJECT_SOURCE_DIR}/src/physics/static_body.cpp
     ${PROJECT_SOURCE_DIR}/src/physics/player_controller.cpp
 )
+if(BZ3_PHYSICS_BACKEND STREQUAL "jolt")
+    list(APPEND PHYSICS_SOURCES
+        ${PROJECT_SOURCE_DIR}/src/physics/backends/jolt/physics_world_jolt.cpp
+        ${PROJECT_SOURCE_DIR}/src/physics/backends/jolt/rigid_body_jolt.cpp
+        ${PROJECT_SOURCE_DIR}/src/physics/backends/jolt/static_body_jolt.cpp
+        ${PROJECT_SOURCE_DIR}/src/physics/backends/jolt/player_controller_jolt.cpp
+    )
+elseif(BZ3_PHYSICS_BACKEND STREQUAL "bullet")
+    list(APPEND PHYSICS_SOURCES
+        ${PROJECT_SOURCE_DIR}/src/physics/backends/bullet/physics_world_bullet.cpp
+        ${PROJECT_SOURCE_DIR}/src/physics/backends/bullet/rigid_body_bullet.cpp
+        ${PROJECT_SOURCE_DIR}/src/physics/backends/bullet/static_body_bullet.cpp
+        ${PROJECT_SOURCE_DIR}/src/physics/backends/bullet/player_controller_bullet.cpp
+    )
+endif()
+
+list(APPEND ENGINE_CLIENT_SOURCES ${PHYSICS_SOURCES})
+list(APPEND ENGINE_SERVER_SOURCES ${PHYSICS_SOURCES})
+
+if(BZ3_AUDIO_BACKEND STREQUAL "miniaudio")
+    list(APPEND ENGINE_CLIENT_SOURCES
+        ${PROJECT_SOURCE_DIR}/src/audio/backends/miniaudio/backend.cpp
+        ${PROJECT_SOURCE_DIR}/src/audio/backends/miniaudio/clip.cpp
+    )
+elseif(BZ3_AUDIO_BACKEND STREQUAL "sdlaudio")
+    list(APPEND ENGINE_CLIENT_SOURCES
+        ${PROJECT_SOURCE_DIR}/src/audio/backends/sdl/backend.cpp
+        ${PROJECT_SOURCE_DIR}/src/audio/backends/sdl/clip.cpp
+    )
+endif()
+
+if(BZ3_RENDER_BACKEND STREQUAL "threepp")
+    list(APPEND ENGINE_CLIENT_SOURCES
+        ${PROJECT_SOURCE_DIR}/src/renderer/backends/threepp/backend.cpp
+    )
+endif()
 
 # Create executables
 set(MACOSX_BUNDLE_ICON_FILE "") # Set to your .icns file if you have one
@@ -232,9 +319,9 @@ else()
     set(OPENGL_TARGET ${OPENGL_LIBRARIES})
 endif()
 if(BZ3_WINDOW_BACKEND STREQUAL "glfw")
-    list(APPEND ENGINE_CLIENT_SOURCES ${PROJECT_SOURCE_DIR}/src/platform/window_glfw.cpp)
+    list(APPEND ENGINE_CLIENT_SOURCES ${PROJECT_SOURCE_DIR}/src/platform/backends/window_glfw.cpp)
 elseif(BZ3_WINDOW_BACKEND STREQUAL "sdl")
-    list(APPEND ENGINE_CLIENT_SOURCES ${PROJECT_SOURCE_DIR}/src/platform/window_sdl.cpp)
+    list(APPEND ENGINE_CLIENT_SOURCES ${PROJECT_SOURCE_DIR}/src/platform/backends/window_sdl.cpp)
 endif()
 
 
@@ -259,7 +346,6 @@ target_include_directories(bz3 PRIVATE
     ${enet_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/libs/effekseer/src
     ${PROJECT_SOURCE_DIR}/libs/effekseer/src/Effekseer
-    ${PROJECT_SOURCE_DIR}/include/client
 )
 
 if(DEFINED threepp_SOURCE_DIR)
@@ -275,7 +361,6 @@ target_include_directories(bz3-server PRIVATE
 target_link_libraries(bz3 PRIVATE
     ${WINDOW_TARGET}
     glm::glm
-    Jolt::Jolt
     enet_static
     assimp::assimp
     ${OPENGL_TARGET}
@@ -290,6 +375,18 @@ target_link_libraries(bz3 PRIVATE
     Effekseer
     EffekseerRendererGL
 )
+if(BZ3_PHYSICS_BACKEND STREQUAL "jolt")
+    target_link_libraries(bz3 PRIVATE Jolt::Jolt)
+elseif(BZ3_PHYSICS_BACKEND STREQUAL "bullet")
+    if(TARGET Bullet::Bullet)
+        target_link_libraries(bz3 PRIVATE Bullet::Bullet)
+    elseif(DEFINED BULLET_LIBRARIES)
+        target_link_libraries(bz3 PRIVATE ${BULLET_LIBRARIES})
+    endif()
+    if(DEFINED BULLET_INCLUDE_DIRS)
+        target_include_directories(bz3 PRIVATE ${BULLET_INCLUDE_DIRS})
+    endif()
+endif()
 if(BZ3_UI_BACKEND STREQUAL "imgui")
     target_link_libraries(bz3 PRIVATE
         imgui::imgui
@@ -312,9 +409,12 @@ if(BZ3_UI_BACKEND STREQUAL "rmlui")
     target_compile_definitions(bz3 PRIVATE RMLUI_GL3_CUSTOM_LOADER)
 endif()
 
+if(BZ3_AUDIO_BACKEND STREQUAL "sdlaudio")
+    target_link_libraries(bz3 PRIVATE SDL3::SDL3)
+endif()
+
 target_link_libraries(bz3-server PRIVATE
     glm::glm
-    Jolt::Jolt
     enet_static
     assimp::assimp
     pybind11::embed
@@ -325,6 +425,18 @@ target_link_libraries(bz3-server PRIVATE
     proto_lib
     CURL::libcurl
 )
+if(BZ3_PHYSICS_BACKEND STREQUAL "jolt")
+    target_link_libraries(bz3-server PRIVATE Jolt::Jolt)
+elseif(BZ3_PHYSICS_BACKEND STREQUAL "bullet")
+    if(TARGET Bullet::Bullet)
+        target_link_libraries(bz3-server PRIVATE Bullet::Bullet)
+    elseif(DEFINED BULLET_LIBRARIES)
+        target_link_libraries(bz3-server PRIVATE ${BULLET_LIBRARIES})
+    endif()
+    if(DEFINED BULLET_INCLUDE_DIRS)
+        target_include_directories(bz3-server PRIVATE ${BULLET_INCLUDE_DIRS})
+    endif()
+endif()
 
 # System libraries (platform-specific)
 if (UNIX AND NOT APPLE)

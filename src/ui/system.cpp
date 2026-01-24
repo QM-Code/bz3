@@ -3,20 +3,8 @@
 #include "ui/backend.hpp"
 #include "platform/window.hpp"
 
-#if defined(BZ3_UI_BACKEND_IMGUI)
-#include "ui/backends/imgui/backend.hpp"
-#elif defined(BZ3_UI_BACKEND_RMLUI)
-#include "ui/backends/rmlui/backend.hpp"
-#else
-#error "BZ3 UI backend not set. Define BZ3_UI_BACKEND_IMGUI or BZ3_UI_BACKEND_RMLUI."
-#endif
-
 UiSystem::UiSystem(platform::Window &window) {
-#if defined(BZ3_UI_BACKEND_IMGUI)
-    backend = std::make_unique<ui::ImGuiBackend>(window);
-#elif defined(BZ3_UI_BACKEND_RMLUI)
-    backend = std::make_unique<ui::RmlUiBackend>(window);
-#endif
+    backend = ui_backend::CreateUiBackend(window);
 }
 
 UiSystem::~UiSystem() = default;

@@ -1,14 +1,12 @@
 #pragma once
 
+#include "audio/backend.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <memory>
 #include <string>
 #include <unordered_map>
 
-struct ma_engine;
-
-class AudioClipData;
 class ClientEngine;
 
 class AudioClip {
@@ -24,9 +22,9 @@ public:
 
 private:
     friend class Audio;
-    explicit AudioClip(std::shared_ptr<AudioClipData> data);
+    explicit AudioClip(std::shared_ptr<audio_backend::Clip> data);
 
-    std::shared_ptr<AudioClipData> data_;
+    std::shared_ptr<audio_backend::Clip> data_;
 };
 
 class Audio {
@@ -41,8 +39,8 @@ public:
     void setListenerRotation(const glm::quat& rotation);
 
 private:
-    std::shared_ptr<AudioClipData> createClip(const std::string& filepath, int maxInstances);
+    std::shared_ptr<audio_backend::Clip> createClip(const std::string& filepath, int maxInstances);
 
-    ma_engine* engine = nullptr;
-    std::unordered_map<std::string, std::weak_ptr<AudioClipData>> clipCache_;
+    std::unique_ptr<audio_backend::Backend> backend_;
+    std::unordered_map<std::string, std::weak_ptr<audio_backend::Clip>> clipCache_;
 };

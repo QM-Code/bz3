@@ -1,15 +1,9 @@
 #pragma once
-#include <threepp/threepp.hpp>
-#include <threepp/cameras/OrthographicCamera.hpp>
-#include <threepp/renderers/GLRenderTarget.hpp>
-#include <threepp/objects/Line.hpp>
-#include <threepp/objects/Mesh.hpp>
+#include "renderer/backend.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/mat4x4.hpp>
 #include <filesystem>
-#include <functional>
-#include <map>
 #include <memory>
 #include <string>
 #include "core/types.hpp"
@@ -17,10 +11,6 @@
 #define CAMERA_FOV 60.0f
 #define SCREEN_WIDTH 800.0f
 #define SCREEN_HEIGHT 600.0f
-
-namespace threepp {
-class ShaderMaterial;
-}
 
 namespace platform {
 class Window;
@@ -30,36 +20,7 @@ class Render {
     friend class ClientEngine;
 
 private:
-    // Scene
-    platform::Window *window = nullptr;
-    threepp::GLRenderer renderer;
-    std::shared_ptr<threepp::Scene> scene;
-    std::shared_ptr<threepp::Scene> radarScene;
-    std::shared_ptr<threepp::PerspectiveCamera> camera;
-
-    std::shared_ptr<threepp::ShaderMaterial> radarMaterial;
-    std::function<std::filesystem::path(const std::string&)> assetPathResolver;
-
-    // Optional radar-only helper visuals
-    std::shared_ptr<threepp::Mesh> radarFOVLeft;
-    std::shared_ptr<threepp::Mesh> radarFOVRight;
-    float radarFOVBeamLength = 80.0f;
-    float radarFOVBeamWidth = 0.3f;
-
-    void ensureRadarMaterialLoaded();
-
-    // Radar camera rendering
-    std::shared_ptr<threepp::OrthographicCamera> radarCamera;
-    std::unique_ptr<threepp::GLRenderTarget> radarRenderTarget;
-    unsigned int radarTextureId = 0;
-    glm::vec3 radarAnchorPosition{0.0f};
-    glm::quat radarAnchorRotation{1.0f, 0.0f, 0.0f, 0.0f};
-
-    std::map<render_id, std::shared_ptr<threepp::Group>> objects;
-    std::map<render_id, std::shared_ptr<threepp::Group>> radarObjects;
-
-    int lastFramebufferWidth = 0;
-    int lastFramebufferHeight = 0;
+    std::unique_ptr<render_backend::Backend> backend_;
 
     Render(platform::Window &window);
     ~Render();
@@ -83,7 +44,7 @@ public:
     void setCameraPosition(const glm::vec3 &position);
     void setCameraRotation(const glm::quat &rotation);
 
-    unsigned int getRadarTextureId() const { return radarTextureId; }
+    unsigned int getRadarTextureId() const;
     void setRadarShaderPath(const std::filesystem::path& vertPath,
                             const std::filesystem::path& fragPath);
 

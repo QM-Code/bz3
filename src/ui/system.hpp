@@ -14,8 +14,8 @@ namespace platform {
 class Window;
 }
 
-namespace ui {
-class UiBackend;
+namespace ui_backend {
+class Backend;
 }
 
 class UiSystem {
@@ -26,7 +26,7 @@ public:
     const ui::ConsoleInterface &console() const;
 
 private:
-    std::unique_ptr<ui::UiBackend> backend;
+    std::unique_ptr<ui_backend::Backend> backend;
 
     void update();
     void reloadFonts();

@@ -1,6 +1,6 @@
 #pragma once
 #include "core/types.hpp"
-#include "network/transport.hpp"
+#include "network/backend.hpp"
 
 #include <cstdint>
 #include <functional>
@@ -14,26 +14,11 @@ class ClientNetwork {
     friend class ClientEngine;
 
 public:
-    struct DisconnectEvent {
-        std::string reason;
-    };
-
-    struct ServerEndpointInfo {
-        std::string host;
-        uint16_t port;
-    };
+    using DisconnectEvent = network_backend::DisconnectEvent;
+    using ServerEndpointInfo = network_backend::ServerEndpointInfo;
 
 private:
-    std::unique_ptr<net::IClientTransport> transport;
-    std::optional<DisconnectEvent> pendingDisconnect;
-    std::optional<ServerEndpointInfo> serverEndpoint;
-
-    struct MsgData {
-        ServerMsg* msg;
-        bool peeked = false;
-    };
-
-    std::vector<struct MsgData> receivedMessages;
+    std::unique_ptr<network_backend::ClientBackend> backend_;
 
     ClientNetwork();
     ~ClientNetwork();
@@ -41,20 +26,24 @@ private:
     void flushPeekedMessages();
     void update();
     void sendImpl(const ClientMsg &input, bool flush);
-    void logUnsupportedMessageType();
 
 public:
     bool connect(const std::string &address, uint16_t port, int timeoutMs = 5000);
     void disconnect(const std::string &reason = "");
     std::optional<DisconnectEvent> consumeDisconnectEvent();
-    bool isConnected() const { return transport && transport->isConnected(); }
-    std::optional<ServerEndpointInfo> getServerEndpoint() const { return serverEndpoint; }
+    bool isConnected() const;
+    std::optional<ServerEndpointInfo> getServerEndpoint() const;
 
     template<typename T> T* peekMessage(std::function<bool(const T&)> predicate = [](const T&) { return true; }) {
         static_assert(std::is_base_of_v<ServerMsg, T>, "T must be a subclass of ServerMsg");
 
+        if (!backend_) {
+            return nullptr;
+        }
+
+        auto &receivedMessages = backend_->receivedMessages();
         for (auto &msgData : receivedMessages) {
-            if (msgData.msg->type == T::Type) {
+            if (msgData.msg && msgData.msg->type == T::Type) {
                 auto* casted = static_cast<T*>(msgData.msg);
 
                 if (predicate(*casted)) {
@@ -71,6 +60,10 @@ public:
         static_assert(std::is_base_of_v<ServerMsg, T>, "T must be a subclass of ServerMsg");
 
         std::vector<T> results;
+        if (!backend_) {
+            return results;
+        }
+        auto &receivedMessages = backend_->receivedMessages();
         auto it = receivedMessages.begin();
         while (it != receivedMessages.end()) {
             if (it->msg && it->msg->type == T::Type) {

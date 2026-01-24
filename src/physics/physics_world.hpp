@@ -1,34 +1,18 @@
 #pragma once
 
-#include <Jolt/Jolt.h>
+#include "physics/types.hpp"
 #include "physics/rigid_body.hpp"
 #include "physics/static_body.hpp"
-#include <Jolt/Physics/Body/BodyID.h>
-#include <memory>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <memory>
 #include <string>
-
-namespace JPH {
-class PhysicsSystem;
-class JobSystem;
-class TempAllocator;
-}
 
 class PhysicsPlayerController;
 
-namespace PhysicsLayers {
-using ObjectLayer = uint8_t;
-inline constexpr ObjectLayer NonMoving = 0;
-inline constexpr ObjectLayer Moving = 1;
+namespace physics_backend {
+class PhysicsWorldBackend;
 }
-
-struct PhysicsMaterial {
-    float friction = 0.0f;
-    float restitution = 0.0f;
-    float rollingFriction = 0.0f;
-    float spinningFriction = 0.0f;
-};
 
 class PhysicsWorld {
 public:
@@ -57,18 +41,6 @@ public:
     bool raycast(const glm::vec3& from, const glm::vec3& to, glm::vec3& hitPoint, glm::vec3& hitNormal) const;
 
 private:
-    friend class PhysicsRigidBody;
-    friend class PhysicsPlayerController;
-    friend class PhysicsStaticBody;
-
-    void removeBody(const JPH::BodyID& id) const;
-
-    JPH::PhysicsSystem* physicsSystem() { return physicsSystem_.get(); }
-    const JPH::PhysicsSystem* physicsSystem() const { return physicsSystem_.get(); }
-
+    std::unique_ptr<physics_backend::PhysicsWorldBackend> backend_;
     std::unique_ptr<PhysicsPlayerController> playerController_;
-
-    std::unique_ptr<JPH::TempAllocator> tempAllocator_;
-    std::unique_ptr<JPH::JobSystem> jobSystem_;
-    std::unique_ptr<JPH::PhysicsSystem> physicsSystem_;
 };

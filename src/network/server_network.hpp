@@ -1,7 +1,8 @@
 #pragma once
 #include "core/types.hpp"
-#include "network/transport.hpp"
+#include "network/backend.hpp"
 
+#include <algorithm>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -14,17 +15,7 @@ class ServerNetwork {
     friend class ServerEngine;
 
 private:
-    std::unique_ptr<net::IServerTransport> transport;
-    std::map<client_id, net::ConnectionHandle> clients;
-    std::map<net::ConnectionHandle, client_id> clientByConnection;
-    std::map<net::ConnectionHandle, std::string> ipByConnection;
-
-    struct MsgData {
-        ClientMsg* msg;
-        bool peeked = false;
-    };
-
-    std::vector<struct MsgData> receivedMessages;
+    std::unique_ptr<network_backend::ServerBackend> backend_;
 
     ServerNetwork(
         uint16_t port,
@@ -34,19 +25,20 @@ private:
     ~ServerNetwork();
 
     void flushPeekedMessages();
-    client_id getClient(net::ConnectionHandle connection);
-    client_id getNextClientId();
     void update();
     void sendImpl(client_id clientId, const ServerMsg &input, bool flush);
-    void logUnsupportedMessageType();
 
 public:
     template<typename T> T* peekMessage(std::function<bool(const T&)> predicate = [](const T&) { return true; }) {
         static_assert(std::is_base_of_v<ClientMsg, T>, "T must be a subclass of ClientMsg");
 
+        if (!backend_) {
+            return nullptr;
+        }
+        auto &receivedMessages = backend_->receivedMessages();
         for (auto &msgData : receivedMessages) {
             // Check if the message is of type ClientMsg or if it is of type T
-            if (msgData.msg->type == T::Type) {
+            if (msgData.msg && msgData.msg->type == T::Type) {
                 auto* casted = static_cast<T*>(msgData.msg);
 
                 if (predicate(*casted)) {
@@ -63,6 +55,10 @@ public:
         static_assert(std::is_base_of_v<ClientMsg, T>, "T must be a subclass of ClientMsg");
 
         std::vector<T> results;
+        if (!backend_) {
+            return results;
+        }
+        auto &receivedMessages = backend_->receivedMessages();
         auto it = receivedMessages.begin();
         while (it != receivedMessages.end()) {
             if (it->msg && it->msg->type == T::Type) {
@@ -87,7 +83,11 @@ public:
             return;
         }
 
-        if (clients.find(clientId) == clients.end()) {
+        if (!backend_) {
+            return;
+        }
+        const auto clients = backend_->getClients();
+        if (std::find(clients.begin(), clients.end(), clientId) == clients.end()) {
             return;
         }
 
@@ -97,7 +97,11 @@ public:
     template<typename T> void sendExcept(client_id client, const T *input) {
         static_assert(std::is_base_of_v<ServerMsg, T>, "T must be a subclass of ServerMsg");
 
-        for (const auto& [id, peer] : clients) {
+        if (!backend_) {
+            return;
+        }
+        const auto clients = backend_->getClients();
+        for (const auto& id : clients) {
             if (id != client) {
                 send<T>(id, input);
             }
@@ -107,7 +111,11 @@ public:
     template<typename T> void sendAll(const T *input) {
         static_assert(std::is_base_of_v<ServerMsg, T>, "T must be a subclass of ServerMsg");
 
-        for (const auto& [id, peer] : clients) {
+        if (!backend_) {
+            return;
+        }
+        const auto clients = backend_->getClients();
+        for (const auto& id : clients) {
             send<T>(id, input);
         }
     };

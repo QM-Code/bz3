@@ -7,7 +7,7 @@ At runtime there are two programs:
 - **Client**: creates the window (GLFW/OpenGL), renders via threepp, runs local input/audio/UI, and syncs gameplay state to/from a server.
 - **Server**: authoritative simulation of players/shots/world + chat + plugin callbacks, with LAN discovery support.
 
-The code is organized around a small **engine layer** (orchestrators) and a **gameplay layer** (World/Player/Shot/Game/Chat/etc.) that uses the subsystem modules (render/physics/network/input/audio/ui).
+The code is organized around a small **engine layer** (orchestrators) and a **gameplay layer** (World/Player/Shot/Game/Chat/etc.) that uses the subsystem modules (renderer/physics/network/input/audio/ui).
 
 ## Important directories (highlighted tree)
 
@@ -48,7 +48,7 @@ src/
     platform/
         glfw_user_pointer.hpp          # GLFW callback indirection
 
-    render/
+    renderer/
         render.*                       # threepp scene/camera/renderer; loads models via Assimp
         mesh_loader.*                  # Loads GLB meshes for physics/render helpers
         particle_effect_system.*       # Client particle effects

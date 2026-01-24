@@ -1,25 +1,22 @@
 #pragma once
 
-#include <Jolt/Jolt.h>
-#include <Jolt/Physics/Body/BodyID.h>
+#include "physics/backend.hpp"
+#include <cstdint>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <memory>
-#include <optional>
-
-class PhysicsWorld;
 
 class PhysicsRigidBody {
 public:
     PhysicsRigidBody() = default;
-    PhysicsRigidBody(PhysicsWorld* world, const JPH::BodyID& bodyId);
+    explicit PhysicsRigidBody(std::unique_ptr<physics_backend::PhysicsRigidBodyBackend> backend);
     PhysicsRigidBody(const PhysicsRigidBody&) = delete;
     PhysicsRigidBody& operator=(const PhysicsRigidBody&) = delete;
-    PhysicsRigidBody(PhysicsRigidBody&& other) noexcept;
-    PhysicsRigidBody& operator=(PhysicsRigidBody&& other) noexcept;
+    PhysicsRigidBody(PhysicsRigidBody&& other) noexcept = default;
+    PhysicsRigidBody& operator=(PhysicsRigidBody&& other) noexcept = default;
     ~PhysicsRigidBody();
 
-    bool isValid() const { return world_ != nullptr && body_.has_value(); }
+    bool isValid() const;
 
     glm::vec3 getPosition() const;
     glm::quat getRotation() const;
@@ -36,9 +33,8 @@ public:
 
     void destroy();
 
-    JPH::BodyID nativeHandle() const;
+    std::uintptr_t nativeHandle() const;
 
 private:
-    PhysicsWorld* world_ = nullptr;
-    std::optional<JPH::BodyID> body_;
+    std::unique_ptr<physics_backend::PhysicsRigidBodyBackend> backend_;
 };

@@ -15,16 +15,19 @@ class Event;
 }
 
 namespace ui {
-
 class RmlUiHud;
+class RmlUiConsole;
+}
 
-class RmlUiBackend final : public UiBackend {
+namespace ui_backend {
+
+class RmlUiBackend final : public Backend {
 public:
     explicit RmlUiBackend(platform::Window &window);
     ~RmlUiBackend() override;
 
-    ConsoleInterface &console() override;
-    const ConsoleInterface &console() const override;
+    ui::ConsoleInterface &console() override;
+    const ui::ConsoleInterface &console() const override;
     void handleEvents(const std::vector<platform::Event> &events) override;
     void update() override;
     void reloadFonts() override;
@@ -45,10 +48,10 @@ private:
     platform::Window *windowRef = nullptr;
     struct RmlUiState;
     std::unique_ptr<RmlUiState> state;
-    std::unique_ptr<class RmlUiConsole> consoleView;
+    std::unique_ptr<ui::RmlUiConsole> consoleView;
     void loadConsoleDocument();
     void loadHudDocument();
     const std::string &cachedTwemojiMarkup(const std::string &text);
 };
 
-} // namespace ui
+} // namespace ui_backend

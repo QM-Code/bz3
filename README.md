@@ -82,11 +82,11 @@ Networking
 - Custom LAN discovery protocol (see `src/network/discovery_protocol.hpp`)
 
 Simulation
-- **Bullet** (physics)
+- **Jolt** or **Bullet** (physics, selectable)
 - **glm** (math)
 
 Other
-- **miniaudio** (audio)
+- **miniaudio** or **SDL3 audio** (selectable)
 - **spdlog** (logging)
 - **cxxopts** (CLI parsing)
 - **nlohmann-json** (config)
@@ -99,6 +99,56 @@ Other
 - Most dependencies are provided by vcpkg (see `vcpkg.json`).
 - Some libraries are fetched via CMake FetchContent (notably `threepp`, `enet`, `pybind11`).
 - Python plugin bytecode is redirected to a writable cache: set `BZ3_PY_CACHE_DIR` to choose the location (defaults to `/tmp/bz3-pycache`). If the directory cannot be created, bytecode writing is disabled. Current behavior is acceptable for now; we may revisit a dedicated cache path later.
+
+## Backends and entry points
+
+BZ3 uses a consistent interface → backend pattern for several subsystems. The public interface classes live in `src/<subsystem>/` and delegate to backend implementations under `src/<subsystem>/backends/<name>/`.
+
+Entry points (public interfaces)
+- Audio: `Audio` in `src/audio/audio.hpp`
+- Windowing: `Window` in `src/platform/window.hpp`
+- UI: `UiSystem` in `src/ui/system.hpp`
+- Physics: `PhysicsWorld` in `src/physics/physics_world.hpp`
+- Networking: `ClientNetwork` and `ServerNetwork` in `src/network/`
+
+Backend factories (compile-time selection)
+- Audio: `src/audio/backend_factory.cpp`
+- Windowing: `src/platform/window_factory.cpp`
+- UI: `src/ui/backend_factory.cpp`
+- Physics: `src/physics/backend_factory.cpp`
+- Networking: `src/network/backend_factory.cpp`
+
+Backend layouts (examples)
+- `src/audio/backends/miniaudio/` and `src/audio/backends/sdl/`
+- `src/platform/backends/glfw/` and `src/platform/backends/sdl/`
+- `src/ui/backends/imgui/` and `src/ui/backends/rmlui/`
+- `src/physics/backends/jolt/` and `src/physics/backends/bullet/`
+- `src/renderer/backends/threepp/` (future: ogre, wicked, etc.)
+- `src/network/backends/enet/` (future: steam, webrtc, etc.)
+
+## Build options (backend selection)
+
+These CMake cache variables select backends at build time:
+
+- `BZ3_UI_BACKEND=imgui|rmlui`
+- `BZ3_WINDOW_BACKEND=glfw|sdl`
+- `BZ3_PHYSICS_BACKEND=jolt|bullet`
+- `BZ3_AUDIO_BACKEND=miniaudio|sdlaudio`
+- `BZ3_RENDER_BACKEND=threepp`
+- `BZ3_NETWORK_BACKEND=enet`
+
+Example:
+
+```bash
+cmake -S . -B build-sdl-rmlui-bullet-sdlaudio-threepp-enet \
+  -DBZ3_WINDOW_BACKEND=sdl \
+  -DBZ3_UI_BACKEND=rmlui \
+  -DBZ3_PHYSICS_BACKEND=bullet \
+  -DBZ3_AUDIO_BACKEND=sdlaudio \
+  -DBZ3_RENDER_BACKEND=threepp \
+  -DBZ3_NETWORK_BACKEND=enet
+cmake --build build-sdl-rmlui-bullet-sdlaudio-threepp-enet
+```
 
 ## Agent prompts
 

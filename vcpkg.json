@@ -6,6 +6,7 @@
     "sdl3",
     "glm",
     "joltphysics",
+    "bullet3",
     "assimp",
     "opengl",
     "freetype",

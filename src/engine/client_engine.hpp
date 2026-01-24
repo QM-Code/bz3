@@ -1,12 +1,12 @@
 #pragma once
 #include "core/types.hpp"
 #include "network/client_network.hpp"
-#include "render/render.hpp"
+#include "renderer/render.hpp"
 #include "physics/physics_world.hpp"
 #include "input/input.hpp"
 #include "ui/system.hpp"
 #include "audio/audio.hpp"
-#include "render/particle_effect_system.hpp"
+#include "renderer/particle_effect_system.hpp"
 #include "platform/window.hpp"
 #include <string>
 

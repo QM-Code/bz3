@@ -29,21 +29,21 @@
 #include "common/data_path_resolver.hpp"
 #include "spdlog/spdlog.h"
 
-namespace ui {
+namespace ui_backend {
 namespace {
 
-class NullConsole final : public ConsoleInterface {
+class NullConsole final : public ui::ConsoleInterface {
 public:
-    void show(const std::vector<CommunityBrowserEntry> &entriesIn) override {
+    void show(const std::vector<ui::CommunityBrowserEntry> &entriesIn) override {
         entries = entriesIn;
         visible = true;
     }
 
-    void setEntries(const std::vector<CommunityBrowserEntry> &entriesIn) override {
+    void setEntries(const std::vector<ui::CommunityBrowserEntry> &entriesIn) override {
         entries = entriesIn;
     }
 
-    void setListOptions(const std::vector<ServerListOption> &options, int selectedIndexIn) override {
+    void setListOptions(const std::vector<ui::ServerListOption> &options, int selectedIndexIn) override {
         listOptions = options;
         listSelectedIndex = selectedIndexIn;
     }
@@ -86,7 +86,7 @@ public:
         return serverDescriptionErrorText;
     }
 
-    std::optional<CommunityBrowserSelection> consumeSelection() override {
+    std::optional<ui::CommunityBrowserSelection> consumeSelection() override {
         return consumeOptional(pendingSelection);
     }
 
@@ -94,7 +94,7 @@ public:
         return consumeOptional(pendingListSelection);
     }
 
-    std::optional<ServerListOption> consumeNewListRequest() override {
+    std::optional<ui::ServerListOption> consumeNewListRequest() override {
         return consumeOptional(pendingNewList);
     }
 
@@ -142,7 +142,7 @@ public:
         communityStatusTone = tone;
     }
 
-    std::optional<CommunityBrowserEntry> getSelectedEntry() const override {
+    std::optional<ui::CommunityBrowserEntry> getSelectedEntry() const override {
         if (selectedIndex < 0 || selectedIndex >= static_cast<int>(entries.size())) {
             return std::nullopt;
         }
@@ -197,9 +197,9 @@ private:
     }
 
     bool visible = false;
-    std::vector<CommunityBrowserEntry> entries;
+    std::vector<ui::CommunityBrowserEntry> entries;
     int selectedIndex = -1;
-    std::vector<ServerListOption> listOptions;
+    std::vector<ui::ServerListOption> listOptions;
     int listSelectedIndex = -1;
     std::string statusText;
     bool statusIsError = false;
@@ -210,9 +210,9 @@ private:
     bool serverDescriptionLoading = false;
     std::string serverDescriptionErrorKey;
     std::string serverDescriptionErrorText;
-    std::optional<CommunityBrowserSelection> pendingSelection;
+    std::optional<ui::CommunityBrowserSelection> pendingSelection;
     std::optional<int> pendingListSelection;
-    std::optional<ServerListOption> pendingNewList;
+    std::optional<ui::ServerListOption> pendingNewList;
     std::optional<std::string> pendingDeleteListHost;
     std::string listStatusText;
     bool listStatusIsError = false;
@@ -460,7 +460,7 @@ struct RmlUiBackend::RmlUiState {
     Rml::Element *contentElement = nullptr;
     std::vector<std::unique_ptr<Rml::EventListener>> tabListeners;
     std::unordered_map<std::string, std::string> emojiMarkupCache;
-    std::vector<std::unique_ptr<RmlUiPanel>> panels;
+    std::vector<std::unique_ptr<ui::RmlUiPanel>> panels;
     std::unordered_set<std::string> loadedFontFiles;
     std::string consolePath;
     std::string hudPath;
@@ -469,7 +469,7 @@ struct RmlUiBackend::RmlUiState {
     bool hardReloadRequested = false;
     std::string regularFontPath;
     std::string emojiFontPath;
-    std::unique_ptr<RmlUiHud> hud;
+    std::unique_ptr<ui::RmlUiHud> hud;
     bool showFps = false;
     double fpsLastTime = 0.0;
     double fpsValue = 0.0;
@@ -478,7 +478,7 @@ struct RmlUiBackend::RmlUiState {
 
 RmlUiBackend::RmlUiBackend(platform::Window &windowRefIn) : windowRef(&windowRefIn) {
     state = std::make_unique<RmlUiState>();
-    consoleView = std::make_unique<RmlUiConsole>();
+    consoleView = std::make_unique<ui::RmlUiConsole>();
     state->systemInterface.SetWindow(windowRef);
 
     Rml::SetSystemInterface(&state->systemInterface);
@@ -555,20 +555,20 @@ RmlUiBackend::RmlUiBackend(platform::Window &windowRefIn) : windowRef(&windowRef
 
     state->consolePath = bz::data::Resolve("client/ui/console.rml").string();
     state->hudPath = bz::data::Resolve("client/ui/hud.rml").string();
-    state->hud = std::make_unique<RmlUiHud>();
+    state->hud = std::make_unique<ui::RmlUiHud>();
     state->showFps = bz::data::ReadBoolConfig({"debug.ShowFPS"}, false);
     state->fpsLastTime = state->systemInterface.GetElapsedTime();
-    auto communityPanel = std::make_unique<RmlUiPanelCommunity>();
+    auto communityPanel = std::make_unique<ui::RmlUiPanelCommunity>();
     auto *communityPanelPtr = communityPanel.get();
     state->panels.emplace_back(std::move(communityPanel));
-    auto settingsPanel = std::make_unique<RmlUiPanelSettings>();
+    auto settingsPanel = std::make_unique<ui::RmlUiPanelSettings>();
     auto *settingsPanelPtr = settingsPanel.get();
     state->panels.emplace_back(std::move(settingsPanel));
-    state->panels.emplace_back(std::make_unique<RmlUiPanelDocumentation>());
-    auto startServerPanel = std::make_unique<RmlUiPanelStartServer>();
+    state->panels.emplace_back(std::make_unique<ui::RmlUiPanelDocumentation>());
+    auto startServerPanel = std::make_unique<ui::RmlUiPanelStartServer>();
     auto *startServerPanelPtr = startServerPanel.get();
     state->panels.emplace_back(std::move(startServerPanel));
-    state->panels.emplace_back(std::make_unique<RmlUiPanelThemes>());
+    state->panels.emplace_back(std::make_unique<ui::RmlUiPanelThemes>());
     consoleView->attachCommunityPanel(communityPanelPtr);
     consoleView->attachSettingsPanel(settingsPanelPtr);
     consoleView->attachStartServerPanel(startServerPanelPtr);
@@ -634,11 +634,11 @@ RmlUiBackend::~RmlUiBackend() {
     RmlGL3::Shutdown();
 }
 
-ConsoleInterface &RmlUiBackend::console() {
+ui::ConsoleInterface &RmlUiBackend::console() {
     return *consoleView;
 }
 
-const ConsoleInterface &RmlUiBackend::console() const {
+const ui::ConsoleInterface &RmlUiBackend::console() const {
     return *consoleView;
 }
 
@@ -1081,7 +1081,7 @@ const std::string &RmlUiBackend::cachedTwemojiMarkup(const std::string &text) {
     if (it != state->emojiMarkupCache.end()) {
         return it->second;
     }
-    const std::string markup = renderTextWithTwemoji(text);
+    const std::string markup = ui::renderTextWithTwemoji(text);
     auto [inserted, _] = state->emojiMarkupCache.emplace(text, markup);
     return inserted->second;
 }

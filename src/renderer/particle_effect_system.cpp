@@ -1,6 +1,6 @@
 // Effekseer-backed particle system implementation.
 
-#include "render/particle_effect_system.hpp"
+#include "renderer/particle_effect_system.hpp"
 
 #include <Effekseer/Effekseer.h>
 #include <EffekseerRendererGL/EffekseerRendererGL.h>
