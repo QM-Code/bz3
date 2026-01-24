@@ -1,6 +1,7 @@
 #include "ui/backends/imgui/hud/radar.hpp"
 
 #include <imgui.h>
+#include <cstdint>
 
 namespace ui {
 

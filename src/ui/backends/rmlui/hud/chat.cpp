@@ -116,6 +116,7 @@ bool RmlUiHudChat::isFocused() const {
     return focused;
 }
 
+
 bool RmlUiHudChat::consumeSuppressNextChar() {
     if (!suppressNextChar) {
         return false;

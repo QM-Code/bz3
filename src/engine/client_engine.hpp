@@ -1,19 +1,18 @@
 #pragma once
-#include "engine/types.hpp"
-#include "engine/components/client_network.hpp"
-#include "engine/components/render.hpp"
-#include "engine/physics/physics_world.hpp"
-#include "engine/components/input.hpp"
+#include "core/types.hpp"
+#include "network/client_network.hpp"
+#include "render/render.hpp"
+#include "physics/physics_world.hpp"
+#include "input/input.hpp"
 #include "ui/system.hpp"
-#include "engine/components/audio.hpp"
-#include "engine/components/particle_effect_system.hpp"
-#include "engine/user_pointer.hpp"
+#include "audio/audio.hpp"
+#include "render/particle_effect_system.hpp"
+#include "platform/window.hpp"
 #include <string>
 
 class ClientEngine {
 private:
-    GLFWwindow *window;
-    GLFWUserPointer *userPointer;
+    platform::Window *window;
 
 public:
     ClientNetwork *network;
@@ -24,7 +23,7 @@ public:
     Audio *audio;
     ParticleEngine *particles;
 
-    ClientEngine(GLFWwindow *window);
+    ClientEngine(platform::Window &window);
     ~ClientEngine();
 
     void earlyUpdate(TimeUtils::duration deltaTime);

@@ -1,7 +1,7 @@
 #pragma once
-#include "engine/types.hpp"
-#include "engine/components/server_network.hpp"
-#include "engine/physics/physics_world.hpp"
+#include "core/types.hpp"
+#include "network/server_network.hpp"
+#include "physics/physics_world.hpp"
 
 class ServerEngine {
 public:

@@ -1,5 +1,5 @@
-#include "engine/physics/player_controller.hpp"
-#include "engine/physics/physics_world.hpp"
+#include "physics/player_controller.hpp"
+#include "physics/physics_world.hpp"
 #include <Jolt/Jolt.h>
 #include <Jolt/Physics/Character/CharacterVirtual.h>
 #include <Jolt/Physics/Collision/BroadPhase/BroadPhaseLayer.h>

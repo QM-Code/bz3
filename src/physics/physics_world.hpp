@@ -1,8 +1,8 @@
 #pragma once
 
 #include <Jolt/Jolt.h>
-#include "engine/physics/rigid_body.hpp"
-#include "engine/physics/static_body.hpp"
+#include "physics/rigid_body.hpp"
+#include "physics/static_body.hpp"
 #include <Jolt/Physics/Body/BodyID.h>
 #include <memory>
 #include <glm/glm.hpp>

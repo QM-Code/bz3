@@ -6,7 +6,10 @@
 
 #include "ui/backend.hpp"
 
-struct GLFWwindow;
+namespace platform {
+class Window;
+}
+
 namespace Rml {
 class Event;
 }
@@ -17,11 +20,12 @@ class RmlUiHud;
 
 class RmlUiBackend final : public UiBackend {
 public:
-    explicit RmlUiBackend(GLFWwindow *window);
+    explicit RmlUiBackend(platform::Window &window);
     ~RmlUiBackend() override;
 
     ConsoleInterface &console() override;
     const ConsoleInterface &console() const override;
+    void handleEvents(const std::vector<platform::Event> &events) override;
     void update() override;
     void reloadFonts() override;
 
@@ -38,7 +42,7 @@ public:
     bool isUiInputEnabled() const;
 
 private:
-    GLFWwindow *window = nullptr;
+    platform::Window *windowRef = nullptr;
     struct RmlUiState;
     std::unique_ptr<RmlUiState> state;
     std::unique_ptr<class RmlUiConsole> consoleView;

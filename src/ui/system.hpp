@@ -6,10 +6,14 @@
 #include <string>
 #include <vector>
 
+#include "platform/events.hpp"
 #include "ui/types.hpp"
 #include "ui/console/console_interface.hpp"
 
-struct GLFWwindow;
+namespace platform {
+class Window;
+}
+
 namespace ui {
 class UiBackend;
 }
@@ -27,10 +31,11 @@ private:
     void update();
     void reloadFonts();
 
-    UiSystem(GLFWwindow *window);
+    UiSystem(platform::Window &window);
     ~UiSystem();
 
 public:
+    void handleEvents(const std::vector<platform::Event> &events);
     void setScoreboardEntries(const std::vector<ScoreboardEntry> &entries);
     void setSpawnHint(const std::string &hint);
     void setRadarTextureId(unsigned int textureId);

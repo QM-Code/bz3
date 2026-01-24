@@ -1,9 +1,9 @@
 #pragma once
 #include <glm/glm.hpp>
 #include <string>
-#include "engine/types.hpp"
-#include "engine/physics/player_controller.hpp"
-#include "engine/components/audio.hpp"
+#include "core/types.hpp"
+#include "physics/player_controller.hpp"
+#include "audio/audio.hpp"
 #include <spdlog/spdlog.h>
 
 #include "actor.hpp"

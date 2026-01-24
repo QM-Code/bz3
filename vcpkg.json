@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "dependencies": [
     "glfw3",
+    "sdl3",
     "glm",
     "joltphysics",
     "assimp",
@@ -24,7 +25,6 @@
       "features": [
         "freetype",
         "wchar32",
-        "glfw-binding",
         "opengl3-binding"
       ]
     },

@@ -1,6 +1,6 @@
 #pragma once
-#include "engine/types.hpp"
-#include "engine/physics/static_body.hpp"
+#include "core/types.hpp"
+#include "physics/static_body.hpp"
 #include <filesystem>
 #include <map>
 #include <nlohmann/json.hpp>

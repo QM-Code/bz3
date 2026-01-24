@@ -1,5 +1,5 @@
 #pragma once
-#include "engine/types.hpp"
+#include "core/types.hpp"
 #include "engine/server_engine.hpp"
 #include "client.hpp"
 #include "shot.hpp"

@@ -1,13 +1,12 @@
 #include "engine/client_engine.hpp"
-#include "engine/types.hpp"
+#include "core/types.hpp"
 #include "spdlog/spdlog.h"
+#include <glad/glad.h>
 #include <chrono>
+#include <vector>
 
-ClientEngine::ClientEngine(GLFWwindow *window) {
-    this->window = window;
-
-    userPointer = new GLFWUserPointer();
-    glfwSetWindowUserPointer(window, userPointer);
+ClientEngine::ClientEngine(platform::Window &window) {
+    this->window = &window;
 
     network = new ClientNetwork();
     spdlog::trace("ClientEngine: ClientNetwork initialized successfully");
@@ -38,7 +37,20 @@ ClientEngine::~ClientEngine() {
 }
 
 void ClientEngine::earlyUpdate(TimeUtils::duration deltaTime) {
-    input->update();
+    if (window) {
+        window->pollEvents();
+    }
+    const std::vector<platform::Event> emptyEvents;
+    const auto &events = window ? window->events() : emptyEvents;
+    if (ui) {
+        ui->handleEvents(events);
+    }
+    if (input) {
+        input->update(events);
+    }
+    if (window) {
+        window->clearEvents();
+    }
     network->update();
 }
 
@@ -51,7 +63,7 @@ void ClientEngine::lateUpdate(TimeUtils::duration deltaTime) {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
-    
+
     render->update();
 
     ui->setRadarTextureId(render->getRadarTextureId());

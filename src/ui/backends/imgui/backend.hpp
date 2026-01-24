@@ -1,25 +1,30 @@
 #pragma once
 
 #include <array>
+#include <chrono>
 #include <string>
 #include <vector>
 
-#include <GLFW/glfw3.h>
 #include <imgui.h>
 
 #include "ui/backends/imgui/hud/hud.hpp"
 #include "ui/backends/imgui/console/console.hpp"
 #include "ui/backend.hpp"
 
+namespace platform {
+class Window;
+}
+
 namespace ui {
 
 class ImGuiBackend final : public UiBackend {
 public:
-    explicit ImGuiBackend(GLFWwindow *window);
+    explicit ImGuiBackend(platform::Window &window);
     ~ImGuiBackend() override;
 
     ConsoleInterface &console() override;
     const ConsoleInterface &console() const override;
+    void handleEvents(const std::vector<platform::Event> &events) override;
     void update() override;
     void reloadFonts() override;
 
@@ -34,7 +39,8 @@ public:
     void displayDeathScreen(bool show) override;
 
 private:
-    GLFWwindow *window = nullptr;
+    platform::Window *window = nullptr;
+    std::chrono::steady_clock::time_point lastFrameTime;
     ImFont *bigFont = nullptr;
     ConsoleView consoleView;
     ImGuiHud hud;

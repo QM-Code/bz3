@@ -4,7 +4,6 @@
 #include <threepp/renderers/GLRenderTarget.hpp>
 #include <threepp/objects/Line.hpp>
 #include <threepp/objects/Mesh.hpp>
-#include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/mat4x4.hpp>
@@ -13,8 +12,7 @@
 #include <map>
 #include <memory>
 #include <string>
-#include <map>
-#include "engine/types.hpp"
+#include "core/types.hpp"
 
 #define CAMERA_FOV 60.0f
 #define SCREEN_WIDTH 800.0f
@@ -24,12 +22,16 @@ namespace threepp {
 class ShaderMaterial;
 }
 
+namespace platform {
+class Window;
+}
+
 class Render {
     friend class ClientEngine;
 
 private:
     // Scene
-    GLFWwindow *window;
+    platform::Window *window = nullptr;
     threepp::GLRenderer renderer;
     std::shared_ptr<threepp::Scene> scene;
     std::shared_ptr<threepp::Scene> radarScene;
@@ -56,7 +58,10 @@ private:
     std::map<render_id, std::shared_ptr<threepp::Group>> objects;
     std::map<render_id, std::shared_ptr<threepp::Group>> radarObjects;
 
-    Render(GLFWwindow *window);
+    int lastFramebufferWidth = 0;
+    int lastFramebufferHeight = 0;
+
+    Render(platform::Window &window);
     ~Render();
 
     void update();
@@ -88,4 +93,4 @@ public:
     glm::mat4 getProjectionMatrix() const;
     glm::vec3 getCameraPosition() const;
     glm::vec3 getCameraForward() const;
-};  
+};

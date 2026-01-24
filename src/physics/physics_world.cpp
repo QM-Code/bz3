@@ -1,5 +1,5 @@
-#include "engine/physics/physics_world.hpp"
-#include "engine/physics/player_controller.hpp"
+#include "physics/physics_world.hpp"
+#include "physics/player_controller.hpp"
 #include <Jolt/Jolt.h>
 #include <Jolt/Core/Factory.h>
 #include <Jolt/Core/JobSystemThreadPool.h>
@@ -20,8 +20,8 @@
 #include <glm/gtc/quaternion.hpp>
 #include <spdlog/spdlog.h>
 #include <thread>
-#include "engine/physics/static_body.hpp"
-#include "engine/mesh_loader.hpp"
+#include "physics/static_body.hpp"
+#include "render/mesh_loader.hpp"
 
 namespace {
 using namespace JPH;

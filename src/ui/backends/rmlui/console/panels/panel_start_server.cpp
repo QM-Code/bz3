@@ -631,9 +631,9 @@ void RmlUiPanelStartServer::updateWorldSelect() {
     worldChoices.clear();
     worldChoices.emplace_back("");
 
+    std::error_code ec;
     const auto addDirectoryEntries = [&](const std::filesystem::path &basePath) {
-        std::error_code ec;
-        if (!std::filesystem::exists(basePath, ec) || !std::filesystem::is_directory(basePath, ec)) {
+            if (!std::filesystem::exists(basePath, ec) || !std::filesystem::is_directory(basePath, ec)) {
             return;
         }
         for (const auto &entry : std::filesystem::directory_iterator(basePath, ec)) {
@@ -906,8 +906,7 @@ std::string RmlUiPanelStartServer::findServerBinary() {
     serverBinaryChecked = true;
 
     std::error_code ec;
-    const auto dataRoot = bz::data::DataRoot();
-    const auto root = dataRoot.parent_path();
+    const auto root = bz::data::ExecutableDirectory();
 
     auto isExecutable = [](const std::filesystem::path &path) {
         std::error_code localEc;
@@ -928,25 +927,18 @@ std::string RmlUiPanelStartServer::findServerBinary() {
     };
 
     if (!root.empty()) {
-        const auto candidate = root / "build" / "bz3-server";
+        const auto candidate = root / "bz3-server";
         if (isExecutable(candidate)) {
             serverBinaryPath = candidate.string();
             return serverBinaryPath;
         }
-    }
-
-    const auto dataRootResolved = bz::data::Resolve("server");
-    if (!dataRootResolved.empty()) {
-        for (const auto &it : std::filesystem::recursive_directory_iterator(dataRootResolved, ec)) {
-            if (ec) {
-                break;
-            }
-            const auto &path = it.path();
-            if (path.filename() == "bz3-server" && isExecutable(path)) {
-                serverBinaryPath = path.string();
-                return serverBinaryPath;
-            }
+#if defined(_WIN32)
+        const auto candidateExe = root / "bz3-server.exe";
+        if (isExecutable(candidateExe)) {
+            serverBinaryPath = candidateExe.string();
+            return serverBinaryPath;
         }
+#endif
     }
 
     serverBinaryPath.clear();

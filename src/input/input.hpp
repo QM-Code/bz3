@@ -1,9 +1,14 @@
 #pragma once
-#include <GLFW/glfw3.h>
-#include <glm/vec2.hpp>
-#include <vector>
+
 #include <string>
-#include "engine/types.hpp"
+#include <vector>
+
+#include "core/types.hpp"
+#include "platform/events.hpp"
+
+namespace platform {
+class Window;
+}
 
 class Input {
     friend class ClientEngine;
@@ -11,7 +16,8 @@ class Input {
 public:
     struct Binding {
         enum class Type { Key, MouseButton } type;
-        int code;
+        platform::Key key = platform::Key::Unknown;
+        platform::MouseButton mouseButton = platform::MouseButton::Left;
     };
 
 private:
@@ -30,18 +36,16 @@ private:
     } keyBindings;
 
     InputState inputState;
-    GLFWwindow *window;
+    platform::Window *window = nullptr;
 
-    Input(GLFWwindow *window);
+    Input(platform::Window &window);
     ~Input() = default;
 
     void loadKeyBindings();
-    bool keyMatches(const std::vector<Binding> &binding, int key) const;
-    bool mouseMatches(const std::vector<Binding> &binding, int button) const;
+    bool keyMatches(const std::vector<Binding> &binding, platform::Key key) const;
+    bool mouseMatches(const std::vector<Binding> &binding, platform::MouseButton button) const;
     bool isBindingPressed(const std::vector<Binding> &binding) const;
-    void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
-    void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
-    void update();
+    void update(const std::vector<platform::Event> &events);
 
 public:
     const InputState &getInputState() const;

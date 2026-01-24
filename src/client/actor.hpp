@@ -1,7 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <string>
-#include "engine/types.hpp"
+#include "core/types.hpp"
 #include <glm/vec3.hpp>
 
 class Game;

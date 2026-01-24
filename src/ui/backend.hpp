@@ -3,10 +3,9 @@
 #include <string>
 #include <vector>
 
+#include "platform/events.hpp"
 #include "ui/types.hpp"
 #include "ui/console/console_interface.hpp"
-
-struct GLFWwindow;
 
 namespace ui {
 
@@ -16,6 +15,7 @@ public:
 
     virtual ConsoleInterface &console() = 0;
     virtual const ConsoleInterface &console() const = 0;
+    virtual void handleEvents(const std::vector<platform::Event> &events) = 0;
     virtual void update() = 0;
     virtual void reloadFonts() = 0;
 

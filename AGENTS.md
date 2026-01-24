@@ -10,7 +10,14 @@ This file provides quick, repo-specific instructions for coding agents.
 ## Key directories
 - `src/client/`: client gameplay and main loop.
 - `src/server/`: server gameplay and main loop.
-- `src/engine/`: shared systems (render, physics, network, input, audio).
+- `src/engine/`: client/server engine orchestrators.
+- `src/core/`: shared types and constants.
+- `src/render/`: rendering, mesh loading, particles.
+- `src/audio/`: audio system.
+- `src/input/`: input handling.
+- `src/physics/`: physics world and bodies.
+- `src/network/`: networking (client/server, transports, codec).
+- `src/platform/`: platform glue (GLFW callbacks).
 - `src/ui/`: UI entry point, backends, and shared UI interfaces.
 - `src/common/`: config/data root resolution helpers.
 - `src/protos/`: protobuf schema.
@@ -33,7 +40,7 @@ Windows:
 
 ## Common workflows
 - New networked feature: update `src/protos/messages.proto`, then encode/decode in
-  `src/engine/components/*_network.*`, then handle in `src/client/*` and/or `src/server/*`.
+  `src/*_network.*`, then handle in `src/client/*` and/or `src/server/*`.
 - World loading changes: `src/server/world.*` and `src/client/world.*`.
 - UI/HUD changes: `src/ui.*`.
 - Plugins: `src/server/plugin.*` and `data/plugins/*`.

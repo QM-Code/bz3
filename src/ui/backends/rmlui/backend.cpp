@@ -4,17 +4,20 @@
 #include <RmlUi/Core/Element.h>
 #include <RmlUi/Core/EventListener.h>
 #include <RmlUi/Core/Factory.h>
+#include <RmlUi/Core/Input.h>
+#include <RmlUi/Core/SystemInterface.h>
 
 #include <filesystem>
 #include <fstream>
 #include <functional>
 #include <unordered_map>
 #include <unordered_set>
-#include <unordered_map>
+#include <chrono>
+#include <cmath>
 
-#include "ui/backends/rmlui/platform/RmlUi_Platform_GLFW.h"
 #include "ui/backends/rmlui/platform/RmlUi_Renderer_GL3.h"
 #include "ui/backends/rmlui/console/emoji_utils.hpp"
+#include "platform/window.hpp"
 #include "common/config_helpers.hpp"
 #include "ui/backends/rmlui/hud/hud.hpp"
 #include "ui/backends/rmlui/console/console.hpp"
@@ -23,7 +26,6 @@
 #include "ui/backends/rmlui/console/panels/panel_settings.hpp"
 #include "ui/backends/rmlui/console/panels/panel_start_server.hpp"
 #include "ui/backends/rmlui/console/panels/panel_themes.hpp"
-#include "engine/user_pointer.hpp"
 #include "common/data_path_resolver.hpp"
 #include "spdlog/spdlog.h"
 
@@ -227,27 +229,183 @@ private:
     ConnectionState connectionState{};
 };
 
-RmlUiBackend *g_backend_instance = nullptr;
+class SystemInterface_Platform final : public Rml::SystemInterface {
+public:
+    void SetWindow(platform::Window *windowIn) { window = windowIn; }
 
-int getModifierFlags(GLFWwindow *window) {
-    int mods = 0;
-    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ||
-        glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS) {
-        mods |= GLFW_MOD_SHIFT;
+    double GetElapsedTime() override {
+        using namespace std::chrono;
+        const auto now = steady_clock::now();
+        return duration<double>(now - startTime).count();
     }
-    if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS ||
-        glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS) {
-        mods |= GLFW_MOD_CONTROL;
+
+    void SetMouseCursor(const Rml::String &cursor_name) override {
+        if (!window) {
+            return;
+        }
+        const bool visible = (cursor_name != "none");
+        window->setCursorVisible(visible);
     }
-    if (glfwGetKey(window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS ||
-        glfwGetKey(window, GLFW_KEY_RIGHT_ALT) == GLFW_PRESS) {
-        mods |= GLFW_MOD_ALT;
+
+    void SetClipboardText(const Rml::String &text) override {
+        if (!window) {
+            return;
+        }
+        window->setClipboardText(text);
     }
-    if (glfwGetKey(window, GLFW_KEY_LEFT_SUPER) == GLFW_PRESS ||
-        glfwGetKey(window, GLFW_KEY_RIGHT_SUPER) == GLFW_PRESS) {
-        mods |= GLFW_MOD_SUPER;
+
+    void GetClipboardText(Rml::String &text) override {
+        if (!window) {
+            text.clear();
+            return;
+        }
+        text = window->getClipboardText();
     }
-    return mods;
+
+private:
+    platform::Window *window = nullptr;
+    std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
+};
+
+Rml::Input::KeyIdentifier toRmlKey(platform::Key key) {
+    switch (key) {
+        case platform::Key::A: return Rml::Input::KI_A;
+        case platform::Key::B: return Rml::Input::KI_B;
+        case platform::Key::C: return Rml::Input::KI_C;
+        case platform::Key::D: return Rml::Input::KI_D;
+        case platform::Key::E: return Rml::Input::KI_E;
+        case platform::Key::F: return Rml::Input::KI_F;
+        case platform::Key::G: return Rml::Input::KI_G;
+        case platform::Key::H: return Rml::Input::KI_H;
+        case platform::Key::I: return Rml::Input::KI_I;
+        case platform::Key::J: return Rml::Input::KI_J;
+        case platform::Key::K: return Rml::Input::KI_K;
+        case platform::Key::L: return Rml::Input::KI_L;
+        case platform::Key::M: return Rml::Input::KI_M;
+        case platform::Key::N: return Rml::Input::KI_N;
+        case platform::Key::O: return Rml::Input::KI_O;
+        case platform::Key::P: return Rml::Input::KI_P;
+        case platform::Key::Q: return Rml::Input::KI_Q;
+        case platform::Key::R: return Rml::Input::KI_R;
+        case platform::Key::S: return Rml::Input::KI_S;
+        case platform::Key::T: return Rml::Input::KI_T;
+        case platform::Key::U: return Rml::Input::KI_U;
+        case platform::Key::V: return Rml::Input::KI_V;
+        case platform::Key::W: return Rml::Input::KI_W;
+        case platform::Key::X: return Rml::Input::KI_X;
+        case platform::Key::Y: return Rml::Input::KI_Y;
+        case platform::Key::Z: return Rml::Input::KI_Z;
+        case platform::Key::Num0: return Rml::Input::KI_0;
+        case platform::Key::Num1: return Rml::Input::KI_1;
+        case platform::Key::Num2: return Rml::Input::KI_2;
+        case platform::Key::Num3: return Rml::Input::KI_3;
+        case platform::Key::Num4: return Rml::Input::KI_4;
+        case platform::Key::Num5: return Rml::Input::KI_5;
+        case platform::Key::Num6: return Rml::Input::KI_6;
+        case platform::Key::Num7: return Rml::Input::KI_7;
+        case platform::Key::Num8: return Rml::Input::KI_8;
+        case platform::Key::Num9: return Rml::Input::KI_9;
+        case platform::Key::F1: return Rml::Input::KI_F1;
+        case platform::Key::F2: return Rml::Input::KI_F2;
+        case platform::Key::F3: return Rml::Input::KI_F3;
+        case platform::Key::F4: return Rml::Input::KI_F4;
+        case platform::Key::F5: return Rml::Input::KI_F5;
+        case platform::Key::F6: return Rml::Input::KI_F6;
+        case platform::Key::F7: return Rml::Input::KI_F7;
+        case platform::Key::F8: return Rml::Input::KI_F8;
+        case platform::Key::F9: return Rml::Input::KI_F9;
+        case platform::Key::F10: return Rml::Input::KI_F10;
+        case platform::Key::F11: return Rml::Input::KI_F11;
+        case platform::Key::F12: return Rml::Input::KI_F12;
+        case platform::Key::F13: return Rml::Input::KI_F13;
+        case platform::Key::F14: return Rml::Input::KI_F14;
+        case platform::Key::F15: return Rml::Input::KI_F15;
+        case platform::Key::F16: return Rml::Input::KI_F16;
+        case platform::Key::F17: return Rml::Input::KI_F17;
+        case platform::Key::F18: return Rml::Input::KI_F18;
+        case platform::Key::F19: return Rml::Input::KI_F19;
+        case platform::Key::F20: return Rml::Input::KI_F20;
+        case platform::Key::F21: return Rml::Input::KI_F21;
+        case platform::Key::F22: return Rml::Input::KI_F22;
+        case platform::Key::F23: return Rml::Input::KI_F23;
+        case platform::Key::F24: return Rml::Input::KI_F24;
+        case platform::Key::Space: return Rml::Input::KI_SPACE;
+        case platform::Key::Escape: return Rml::Input::KI_ESCAPE;
+        case platform::Key::Enter: return Rml::Input::KI_RETURN;
+        case platform::Key::Tab: return Rml::Input::KI_TAB;
+        case platform::Key::Backspace: return Rml::Input::KI_BACK;
+        case platform::Key::Left: return Rml::Input::KI_LEFT;
+        case platform::Key::Right: return Rml::Input::KI_RIGHT;
+        case platform::Key::Up: return Rml::Input::KI_UP;
+        case platform::Key::Down: return Rml::Input::KI_DOWN;
+        case platform::Key::LeftBracket: return Rml::Input::KI_OEM_4;
+        case platform::Key::RightBracket: return Rml::Input::KI_OEM_6;
+        case platform::Key::Minus: return Rml::Input::KI_OEM_MINUS;
+        case platform::Key::Equal: return Rml::Input::KI_OEM_PLUS;
+        case platform::Key::Apostrophe: return Rml::Input::KI_OEM_7;
+        case platform::Key::GraveAccent: return Rml::Input::KI_OEM_3;
+        case platform::Key::LeftShift: return Rml::Input::KI_LSHIFT;
+        case platform::Key::RightShift: return Rml::Input::KI_RSHIFT;
+        case platform::Key::LeftControl: return Rml::Input::KI_LCONTROL;
+        case platform::Key::RightControl: return Rml::Input::KI_RCONTROL;
+        case platform::Key::LeftAlt: return Rml::Input::KI_LMENU;
+        case platform::Key::RightAlt: return Rml::Input::KI_RMENU;
+        case platform::Key::LeftSuper: return Rml::Input::KI_LMETA;
+        case platform::Key::RightSuper: return Rml::Input::KI_RMETA;
+        case platform::Key::Home: return Rml::Input::KI_HOME;
+        case platform::Key::End: return Rml::Input::KI_END;
+        case platform::Key::PageUp: return Rml::Input::KI_PRIOR;
+        case platform::Key::PageDown: return Rml::Input::KI_NEXT;
+        case platform::Key::Insert: return Rml::Input::KI_INSERT;
+        case platform::Key::Delete: return Rml::Input::KI_DELETE;
+        case platform::Key::CapsLock: return Rml::Input::KI_CAPITAL;
+        case platform::Key::NumLock: return Rml::Input::KI_NUMLOCK;
+        case platform::Key::ScrollLock: return Rml::Input::KI_SCROLL;
+        default: return Rml::Input::KI_UNKNOWN;
+    }
+}
+
+int toRmlMods(const platform::Modifiers &mods) {
+    int out = 0;
+    if (mods.control) {
+        out |= Rml::Input::KM_CTRL;
+    }
+    if (mods.shift) {
+        out |= Rml::Input::KM_SHIFT;
+    }
+    if (mods.alt) {
+        out |= Rml::Input::KM_ALT;
+    }
+    if (mods.super) {
+        out |= Rml::Input::KM_META;
+    }
+    return out;
+}
+
+int currentRmlMods(platform::Window *window) {
+    if (!window) {
+        return 0;
+    }
+    platform::Modifiers mods;
+    mods.shift = window->isKeyDown(platform::Key::LeftShift) || window->isKeyDown(platform::Key::RightShift);
+    mods.control = window->isKeyDown(platform::Key::LeftControl) || window->isKeyDown(platform::Key::RightControl);
+    mods.alt = window->isKeyDown(platform::Key::LeftAlt) || window->isKeyDown(platform::Key::RightAlt);
+    mods.super = window->isKeyDown(platform::Key::LeftSuper) || window->isKeyDown(platform::Key::RightSuper);
+    return toRmlMods(mods);
+}
+
+int toRmlMouseButton(platform::MouseButton button) {
+    switch (button) {
+        case platform::MouseButton::Left: return 0;
+        case platform::MouseButton::Right: return 1;
+        case platform::MouseButton::Middle: return 2;
+        case platform::MouseButton::Button4: return 3;
+        case platform::MouseButton::Button5: return 4;
+        case platform::MouseButton::Button6: return 5;
+        case platform::MouseButton::Button7: return 6;
+        case platform::MouseButton::Button8: return 7;
+        default: return 0;
+    }
 }
 
 class TabClickListener final : public Rml::EventListener {
@@ -287,13 +445,11 @@ std::string escapeRmlText(const std::string &text) {
 
 
 struct RmlUiBackend::RmlUiState {
-    SystemInterface_GLFW systemInterface;
+    SystemInterface_Platform systemInterface;
     RenderInterface_GL3 renderInterface;
     Rml::Context *context = nullptr;
     Rml::ElementDocument *document = nullptr;
     Rml::Element *bodyElement = nullptr;
-    std::function<void(GLFWwindow*, int, int, int, int)> previousKeyCallback;
-    std::function<void(GLFWwindow*, int, int, int)> previousMouseCallback;
     int lastWidth = 0;
     int lastHeight = 0;
     float lastDpRatio = 1.0f;
@@ -320,11 +476,10 @@ struct RmlUiBackend::RmlUiState {
     int fpsFrames = 0;
 };
 
-RmlUiBackend::RmlUiBackend(GLFWwindow *window) : window(window) {
-    g_backend_instance = this;
+RmlUiBackend::RmlUiBackend(platform::Window &windowRefIn) : windowRef(&windowRefIn) {
     state = std::make_unique<RmlUiState>();
     consoleView = std::make_unique<RmlUiConsole>();
-    state->systemInterface.SetWindow(window);
+    state->systemInterface.SetWindow(windowRef);
 
     Rml::SetSystemInterface(&state->systemInterface);
     Rml::SetRenderInterface(&state->renderInterface);
@@ -343,7 +498,7 @@ RmlUiBackend::RmlUiBackend(GLFWwindow *window) : window(window) {
 
     int fbWidth = 0;
     int fbHeight = 0;
-    glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+    if (windowRef) { windowRef->getFramebufferSize(fbWidth, fbHeight); }
     state->lastWidth = fbWidth;
     state->lastHeight = fbHeight;
     state->renderInterface.SetViewport(fbWidth, fbHeight);
@@ -355,7 +510,7 @@ RmlUiBackend::RmlUiBackend(GLFWwindow *window) : window(window) {
     }
 
     float dpRatio = 1.0f;
-    glfwGetWindowContentScale(window, &dpRatio, nullptr);
+    if (windowRef) { dpRatio = windowRef->getContentScale(); }
     state->lastDpRatio = dpRatio;
     state->context->SetDensityIndependentPixelRatio(dpRatio);
 
@@ -402,7 +557,7 @@ RmlUiBackend::RmlUiBackend(GLFWwindow *window) : window(window) {
     state->hudPath = bz::data::Resolve("client/ui/hud.rml").string();
     state->hud = std::make_unique<RmlUiHud>();
     state->showFps = bz::data::ReadBoolConfig({"debug.ShowFPS"}, false);
-    state->fpsLastTime = glfwGetTime();
+    state->fpsLastTime = state->systemInterface.GetElapsedTime();
     auto communityPanel = std::make_unique<RmlUiPanelCommunity>();
     auto *communityPanelPtr = communityPanel.get();
     state->panels.emplace_back(std::move(communityPanel));
@@ -457,109 +612,6 @@ RmlUiBackend::RmlUiBackend(GLFWwindow *window) : window(window) {
     loadConsoleDocument();
     loadHudDocument();
 
-    auto *userPointer = static_cast<GLFWUserPointer *>(glfwGetWindowUserPointer(window));
-    if (userPointer) {
-        state->previousKeyCallback = userPointer->keyCallback;
-        userPointer->keyCallback = [this](GLFWwindow *w, int key, int scancode, int action, int mods) {
-            const bool captureKeys = isUiInputEnabled();
-            if (!captureKeys && state && state->previousKeyCallback) {
-                state->previousKeyCallback(w, key, scancode, action, mods);
-            }
-            if (action == GLFW_PRESS && key == GLFW_KEY_R && (mods & GLFW_MOD_CONTROL)) {
-                state->reloadRequested = true;
-                state->reloadArmed = true;
-                if (mods & GLFW_MOD_SHIFT) {
-                    state->hardReloadRequested = true;
-                }
-                return;
-            }
-            if (state && state->context && captureKeys) {
-                RmlGLFW::ProcessKeyCallback(state->context, key, action, mods);
-            }
-        };
-
-        state->previousMouseCallback = userPointer->mouseButtonCallback;
-        userPointer->mouseButtonCallback = [this](GLFWwindow *w, int button, int action, int mods) {
-            if (state && state->previousMouseCallback) {
-                state->previousMouseCallback(w, button, action, mods);
-            }
-            const bool captureMouse = consoleView && consoleView->isVisible();
-            const bool hudVisible = state && state->hud && state->hud->isVisible();
-            if (state && state->context && (captureMouse || hudVisible)) {
-                RmlGLFW::ProcessMouseButtonCallback(state->context, button, action, mods);
-            }
-        };
-    }
-
-    glfwSetCharCallback(window, [](GLFWwindow *w, unsigned int codepoint) {
-        if (!g_backend_instance || !g_backend_instance->state || !g_backend_instance->state->context) {
-            return;
-        }
-        if (!g_backend_instance->isUiInputEnabled()) {
-            return;
-        }
-        if (g_backend_instance->state && g_backend_instance->state->hud &&
-            g_backend_instance->state->hud->consumeSuppressNextChatChar()) {
-            return;
-        }
-        RmlGLFW::ProcessCharCallback(g_backend_instance->state->context, codepoint);
-    });
-
-    glfwSetCursorEnterCallback(window, [](GLFWwindow *w, int entered) {
-        if (!g_backend_instance || !g_backend_instance->state || !g_backend_instance->state->context) {
-            return;
-        }
-        const bool hudVisible = g_backend_instance->state->hud && g_backend_instance->state->hud->isVisible();
-        if (!g_backend_instance->isUiInputEnabled() && !hudVisible) {
-            return;
-        }
-        RmlGLFW::ProcessCursorEnterCallback(g_backend_instance->state->context, entered);
-    });
-
-    glfwSetCursorPosCallback(window, [](GLFWwindow *w, double xpos, double ypos) {
-        if (!g_backend_instance || !g_backend_instance->state || !g_backend_instance->state->context) {
-            return;
-        }
-        const bool hudVisible = g_backend_instance->state->hud && g_backend_instance->state->hud->isVisible();
-        if (!g_backend_instance->isUiInputEnabled() && !hudVisible) {
-            return;
-        }
-        const int mods = getModifierFlags(w);
-        RmlGLFW::ProcessCursorPosCallback(g_backend_instance->state->context, w, xpos, ypos, mods);
-    });
-
-    glfwSetScrollCallback(window, [](GLFWwindow *w, double, double yoffset) {
-        if (!g_backend_instance || !g_backend_instance->state || !g_backend_instance->state->context) {
-            return;
-        }
-        const bool hudVisible = g_backend_instance->state->hud && g_backend_instance->state->hud->isVisible();
-        if (!g_backend_instance->isUiInputEnabled() && !hudVisible) {
-            return;
-        }
-        const int mods = getModifierFlags(w);
-        RmlGLFW::ProcessScrollCallback(g_backend_instance->state->context, yoffset, mods);
-    });
-
-    glfwSetFramebufferSizeCallback(window, [](GLFWwindow *w, int width, int height) {
-        if (!g_backend_instance || !g_backend_instance->state) {
-            return;
-        }
-        g_backend_instance->state->lastWidth = width;
-        g_backend_instance->state->lastHeight = height;
-        g_backend_instance->state->renderInterface.SetViewport(width, height);
-        if (g_backend_instance->state->context) {
-            g_backend_instance->state->context->SetDimensions(Rml::Vector2i(width, height));
-        }
-    });
-
-    glfwSetWindowContentScaleCallback(window, [](GLFWwindow *w, float xscale, float) {
-        if (!g_backend_instance || !g_backend_instance->state || !g_backend_instance->state->context) {
-            return;
-        }
-        g_backend_instance->state->lastDpRatio = xscale;
-        g_backend_instance->state->context->SetDensityIndependentPixelRatio(xscale);
-    });
-
     spdlog::info("UiSystem: RmlUi backend initialized.");
 }
 
@@ -567,7 +619,6 @@ RmlUiBackend::~RmlUiBackend() {
     if (!state) {
         return;
     }
-    g_backend_instance = nullptr;
     if (state->document) {
         state->document->Close();
         state->document = nullptr;
@@ -591,6 +642,125 @@ const ConsoleInterface &RmlUiBackend::console() const {
     return *consoleView;
 }
 
+void RmlUiBackend::handleEvents(const std::vector<platform::Event> &events) {
+    if (!state || !state->context) {
+        return;
+    }
+
+    const bool consoleVisible = consoleView && consoleView->isVisible();
+    const bool hudVisible = state->hud && state->hud->isVisible();
+
+    for (const auto &event : events) {
+        switch (event.type) {
+            case platform::EventType::KeyDown: {
+                int mods = toRmlMods(event.mods);
+                if (mods == 0) {
+                    mods = currentRmlMods(windowRef);
+                }
+                if (event.key == platform::Key::R && (mods & Rml::Input::KM_CTRL)) {
+                    state->reloadRequested = true;
+                    state->reloadArmed = true;
+                    if (mods & Rml::Input::KM_SHIFT) {
+                        state->hardReloadRequested = true;
+                    }
+                    break;
+                }
+                if (!isUiInputEnabled()) {
+                    break;
+                }
+                state->context->ProcessKeyDown(toRmlKey(event.key), mods);
+                break;
+            }
+            case platform::EventType::KeyUp: {
+                if (!isUiInputEnabled()) {
+                    break;
+                }
+                int mods = toRmlMods(event.mods);
+                if (mods == 0) {
+                    mods = currentRmlMods(windowRef);
+                }
+                state->context->ProcessKeyUp(toRmlKey(event.key), mods);
+                break;
+            }
+            case platform::EventType::TextInput: {
+                if (!isUiInputEnabled()) {
+                    break;
+                }
+                if (state->hud && state->hud->consumeSuppressNextChatChar()) {
+                    break;
+                }
+                state->context->ProcessTextInput(static_cast<Rml::Character>(event.codepoint));
+                break;
+            }
+            case platform::EventType::MouseButtonDown: {
+                if (!(consoleVisible || hudVisible)) {
+                    break;
+                }
+                int mods = toRmlMods(event.mods);
+                if (mods == 0) {
+                    mods = currentRmlMods(windowRef);
+                }
+                state->context->ProcessMouseButtonDown(toRmlMouseButton(event.mouseButton), mods);
+                break;
+            }
+            case platform::EventType::MouseButtonUp: {
+                if (!(consoleVisible || hudVisible)) {
+                    break;
+                }
+                int mods = toRmlMods(event.mods);
+                if (mods == 0) {
+                    mods = currentRmlMods(windowRef);
+                }
+                state->context->ProcessMouseButtonUp(toRmlMouseButton(event.mouseButton), mods);
+                break;
+            }
+            case platform::EventType::MouseMove: {
+                if (!(consoleVisible || hudVisible)) {
+                    break;
+                }
+                int mods = toRmlMods(event.mods);
+                if (mods == 0) {
+                    mods = currentRmlMods(windowRef);
+                }
+                const int x = static_cast<int>(std::lround(event.x));
+                const int y = static_cast<int>(std::lround(event.y));
+                state->context->ProcessMouseMove(x, y, mods);
+                break;
+            }
+            case platform::EventType::MouseScroll: {
+                if (!(consoleVisible || hudVisible)) {
+                    break;
+                }
+                int mods = toRmlMods(event.mods);
+                if (mods == 0) {
+                    mods = currentRmlMods(windowRef);
+                }
+                state->context->ProcessMouseWheel(-static_cast<float>(event.scrollY), mods);
+                break;
+            }
+            case platform::EventType::WindowFocus: {
+                if (!event.focused) {
+                    state->context->ProcessMouseLeave();
+                }
+                break;
+            }
+            case platform::EventType::WindowResize: {
+                state->lastWidth = event.width;
+                state->lastHeight = event.height;
+                state->renderInterface.SetViewport(event.width, event.height);
+                state->context->SetDimensions(Rml::Vector2i(event.width, event.height));
+                break;
+            }
+            case platform::EventType::WindowClose: {
+                state->context->ProcessMouseLeave();
+                break;
+            }
+            default:
+                break;
+        }
+    }
+}
+
 bool RmlUiBackend::isUiInputEnabled() const {
     if (consoleView && consoleView->isVisible()) {
         return true;
@@ -605,12 +775,21 @@ void RmlUiBackend::update() {
 
     int fbWidth = 0;
     int fbHeight = 0;
-    glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+    if (windowRef) { windowRef->getFramebufferSize(fbWidth, fbHeight); }
     if (fbWidth != state->lastWidth || fbHeight != state->lastHeight) {
         state->lastWidth = fbWidth;
         state->lastHeight = fbHeight;
         state->renderInterface.SetViewport(fbWidth, fbHeight);
         state->context->SetDimensions(Rml::Vector2i(fbWidth, fbHeight));
+    }
+
+    float dpRatio = 1.0f;
+    if (windowRef) {
+        dpRatio = windowRef->getContentScale();
+    }
+    if (dpRatio != state->lastDpRatio) {
+        state->lastDpRatio = dpRatio;
+        state->context->SetDensityIndependentPixelRatio(dpRatio);
     }
 
     const bool consoleVisible = consoleView && consoleView->isVisible();
@@ -648,7 +827,7 @@ void RmlUiBackend::update() {
             state->hud->update();
             if (state->showFps) {
                 state->fpsFrames += 1;
-                const double now = glfwGetTime();
+                const double now = state->systemInterface.GetElapsedTime();
                 const double elapsed = now - state->fpsLastTime;
                 if (elapsed >= 0.25) {
                     state->fpsValue = state->fpsFrames / elapsed;

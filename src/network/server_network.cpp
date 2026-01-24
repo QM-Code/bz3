@@ -1,4 +1,4 @@
-#include "engine/components/server_network.hpp"
+#include "network/server_network.hpp"
 #include "spdlog/spdlog.h"
 
 #include "network/proto_codec.hpp"

@@ -1,6 +1,6 @@
 #include "player.hpp"
 #include "engine/client_engine.hpp"
-#include "engine/types.hpp"
+#include "core/types.hpp"
 #include "game.hpp"
 #include <string>
 #include <utility>

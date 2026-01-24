@@ -89,6 +89,7 @@ bool RmlUiHud::isChatFocused() const {
     return chat.isFocused();
 }
 
+
 bool RmlUiHud::consumeSuppressNextChatChar() {
     return chat.consumeSuppressNextChar();
 }

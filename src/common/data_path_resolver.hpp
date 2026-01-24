@@ -55,6 +55,10 @@ void CollectAssetEntries(const nlohmann::json &node,
 						 std::map<std::string, std::filesystem::path> &assetMap,
 						 const std::string &prefix = "");
 
+
+// Returns the directory containing the running executable.
+std::filesystem::path ExecutableDirectory();
+
 // Resolve an asset path declared in client/config.json, falling back to a default relative path.
 std::filesystem::path ResolveConfiguredAsset(const std::string &assetKey,
 											 const std::filesystem::path &defaultRelativePath = {});

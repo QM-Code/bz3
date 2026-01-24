@@ -212,6 +212,10 @@ const nlohmann::json *ResolveConfigPath(const nlohmann::json &root, const std::s
 
 namespace bz::data {
 
+std::filesystem::path ExecutableDirectory() {
+    return ::ExecutableDirectory();
+}
+
 const std::filesystem::path &DataRoot() {
     static std::once_flag initFlag;
     static std::filesystem::path root;

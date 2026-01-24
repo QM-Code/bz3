@@ -1,5 +1,6 @@
 #include "ui/backends/imgui/hud/hud.hpp"
 
+#include <algorithm>
 #include <imgui.h>
 
 namespace ui {

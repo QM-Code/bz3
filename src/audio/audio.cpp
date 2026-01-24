@@ -1,4 +1,4 @@
-#include "engine/components/audio.hpp"
+#include "audio/audio.hpp"
 
 #define MINIAUDIO_IMPLEMENTATION
 #include <miniaudio.h>

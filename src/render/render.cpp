@@ -1,7 +1,8 @@
-#include "engine/components/render.hpp"
+#include "render/render.hpp"
+
 #include "threepp/loaders/AssimpLoader.hpp"
 #include "spdlog/spdlog.h"
-#include "engine/user_pointer.hpp"
+#include "platform/window.hpp"
 #include <threepp/materials/ShaderMaterial.hpp>
 #include <threepp/materials/MeshBasicMaterial.hpp>
 #include <threepp/materials/LineBasicMaterial.hpp>
@@ -29,8 +30,8 @@ std::string readFileToString(const std::filesystem::path& path) {
 }
 } // namespace
 
-Render::Render(GLFWwindow *window) :
-    window(window),
+Render::Render(platform::Window &window) :
+    window(&window),
     renderer({1, 1}) {
     spdlog::trace("Render: init start");
 
@@ -38,7 +39,7 @@ Render::Render(GLFWwindow *window) :
     radarScene = threepp::Scene::create();
 
     int fbWidth = 800, fbHeight = 600;
-    glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+    window.getFramebufferSize(fbWidth, fbHeight);
     if (fbHeight == 0) fbHeight = 1; // guard against zero height
     renderer.setSize({fbWidth, fbHeight});
 
@@ -76,23 +77,6 @@ Render::Render(GLFWwindow *window) :
         radarRenderTarget = std::make_unique<threepp::GLRenderTarget>(radarTexSize, radarTexSize, opts);
     }
 
-    // Setup resize callback
-    auto* userPointer = static_cast<GLFWUserPointer*>(glfwGetWindowUserPointer(window));
-    if (!userPointer) {
-        spdlog::error("Render: GLFW user pointer missing; resize callbacks disabled.");
-    } else {
-        userPointer->resizeCallback = [this](int width, int height) {
-            this->resizeCallback(width, height);
-        };
-        glfwSetFramebufferSizeCallback(window, [](GLFWwindow* w, int width, int height) {
-            auto* userPointer = static_cast<GLFWUserPointer*>(glfwGetWindowUserPointer(w));
-            if (!userPointer) {
-                return;
-            }
-            userPointer->resizeCallback(width, height);
-        });
-    }
-    
     renderer.setClearColor(threepp::Color(0x3399ff));
     renderer.shadowMap().enabled = true;
     renderer.shadowMap().type = threepp::ShadowMap::PFCSoft;
@@ -154,8 +138,13 @@ void Render::resizeCallback(int width, int height) {
 }
 
 void Render::update() {
-    int width, height;
-    glfwGetFramebufferSize(window, &width, &height);
+    int width = 0;
+    int height = 0;
+    if (window) {
+        window->getFramebufferSize(width, height);
+    }
+    if (width <= 0) width = 1;
+    if (height <= 0) height = 1;
     renderer.setSize({width, height});
 
     // Radar render (offscreen)
@@ -287,7 +276,7 @@ void Render::setRadarFOVLinesAngle(float fovDegrees) {
     // Use current framebuffer aspect so lines match the on-screen view
     int fbWidth = 1, fbHeight = 1;
     if (window) {
-        glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+        window->getFramebufferSize(fbWidth, fbHeight);
         if (fbHeight == 0) fbHeight = 1;
     }
     const float aspect = static_cast<float>(fbWidth) / static_cast<float>(fbHeight);
@@ -326,7 +315,7 @@ void Render::destroy(render_id id) {
     if (it != objects.end()) {
         scene->remove(*(it->second));
         objects.erase(it);
-    } 
+    }
 
     auto rit = radarObjects.find(id);
     if (rit != radarObjects.end()) {
@@ -387,10 +376,10 @@ void Render::setTransparency(render_id id, bool transparency) {
     auto it = objects.find(id);
     if (it != objects.end()) {
         auto *object = it->second.get();
-        object->traverse([](threepp::Object3D& obj) {
+        object->traverse([transparency](threepp::Object3D& obj) {
             if (auto mesh = obj.as<threepp::Mesh>()) {
                 for (auto& mat : mesh->materials()) {
-                    mat->transparent = true;
+                    mat->transparent = transparency;
                     mat->alphaTest = 0.01f;
                     mat->depthWrite = false;
                 }

@@ -7,7 +7,7 @@ At runtime there are two programs:
 - **Client**: creates the window (GLFW/OpenGL), renders via threepp, runs local input/audio/UI, and syncs gameplay state to/from a server.
 - **Server**: authoritative simulation of players/shots/world + chat + plugin callbacks, with LAN discovery support.
 
-The code is organized around a small **engine layer** (systems: render/physics/network/input/audio/gui) and a **gameplay layer** (World/Player/Shot/Game/Chat/etc.) that uses those systems.
+The code is organized around a small **engine layer** (orchestrators) and a **gameplay layer** (World/Player/Shot/Game/Chat/etc.) that uses the subsystem modules (render/physics/network/input/audio/ui).
 
 ## Important directories (highlighted tree)
 
@@ -41,22 +41,29 @@ src/
     engine/
         client_engine.*                # Owns client systems and update ordering
         server_engine.*                # Owns server systems and update ordering
+
+    core/
         types.hpp                      # Shared types + ids + thresholds
-        user_pointer.hpp               # GLFW callback indirection
 
-        components/
-            client_network.*             # ENet client + protobuf decode + message queue (peek/flush)
-            server_network.*             # ENet server + protobuf decode + send helpers
-            render.*                     # threepp scene/camera/renderer; loads models via Assimp
-            input.*                      # GLFW key handling + per-frame InputState
-            audio.*                      # miniaudio engine + pooled clip instances
+    platform/
+        glfw_user_pointer.hpp          # GLFW callback indirection
 
-        physics/
-            physics_world.*              # Bullet world + body creation + raycasts
-            rigid_body.*                 # Rigid body wrapper
-            compound_body.*              # Compound wrapper for multi-mesh static collisions
-
+    render/
+        render.*                       # threepp scene/camera/renderer; loads models via Assimp
         mesh_loader.*                  # Loads GLB meshes for physics/render helpers
+        particle_effect_system.*       # Client particle effects
+
+    audio/
+        audio.*                        # miniaudio engine + pooled clip instances
+
+    input/
+        input.*                        # GLFW key handling + per-frame InputState
+
+    physics/
+        physics_world.*                # Bullet world + body creation + raycasts
+        rigid_body.*                   # Rigid body wrapper
+        static_body.*                  # Static collision bodies
+        player_controller.*            # Player physics control
 
     ui/
         system.*                      # UI entry point + backend selection
@@ -180,8 +187,8 @@ The network components decode protobuf messages and translate them into simple C
 
 Key files:
 
-- Client network: `src/engine/components/client_network.*`
-- Server network: `src/engine/components/server_network.*`
+- Client network: `src/client_network.*`
+- Server network: `src/server_network.*`
 
 ### Message lifecycle (peek/flush)
 
@@ -258,7 +265,7 @@ If you see “connected but nothing happens”, follow this exact chain and veri
 
 ### Render (client)
 
-`src/engine/components/render.*` owns:
+`src/render.*` owns:
 
 - a threepp `Scene`
 - a `PerspectiveCamera`
@@ -277,18 +284,18 @@ Fonts are loaded via `ResolveConfiguredAsset(...)` using configured font keys.
 
 ### Input (client)
 
-`src/engine/components/input.*` translates GLFW key state into an `InputState` struct. Gameplay reads this from `engine.input->getInputState()`.
+`src/input.*` translates GLFW key state into an `InputState` struct. Gameplay reads this from `engine.input->getInputState()`.
 
 ### Audio (client)
 
-`src/engine/components/audio.*` wraps miniaudio:
+`src/audio.*` wraps miniaudio:
 
 - `Audio::loadClip(path, maxInstances)` pools multiple instances to avoid “dropouts” when many events occur (e.g. rapid firing).
 - Listener position and direction are updated from the local player each frame.
 
 ### Physics (client + server)
 
-`src/engine/physics/physics_world.*` wraps Bullet.
+`src/physics/physics_world.*` wraps Bullet.
 
 - The world steps at fixed timestep substeps.
 - `createStaticMesh()` loads a GLB and builds convex hull shapes per mesh.
@@ -354,9 +361,9 @@ Plugin callbacks are keyed by `ClientMsg_Type` and currently invoked from gamepl
 ## “Where do I implement X?” cheat sheet
 
 - **Main loop timing / ordering**: `src/client/main.cpp`, `src/server/main.cpp`, `src/engine/*_engine.*`
-- **New networked feature**: `src/protos/messages.proto` + `src/engine/components/*_network.*` + gameplay handler in `src/client/*` and/or `src/server/*`
+- **New networked feature**: `src/protos/messages.proto` + `src/*_network.*` + gameplay handler in `src/client/*` and/or `src/server/*`
 - **World loading / packaging**: `src/server/world.*` and `src/client/world.*`
-- **Physics issues**: `src/engine/physics/physics_world.*` (and GLB meshes used by world assets)
+- **Physics issues**: `src/physics/physics_world.*` (and GLB meshes used by world assets)
 - **UI/HUD**: `src/ui/` (backend entry + backends/*/hud)
 - **Community browser**: `src/client/server/*` (control) + `src/ui/backends/*/console/console.*` (view)
 - **Plugins / moderation / commands**: `src/server/plugin.*` and `data/plugins/*`

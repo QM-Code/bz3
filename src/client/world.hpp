@@ -3,9 +3,9 @@
 #include <map>
 #include <string>
 #include <vector>
-#include "engine/types.hpp"
+#include "core/types.hpp"
 #include <nlohmann/json.hpp>
-#include "engine/physics/static_body.hpp"
+#include "physics/static_body.hpp"
 
 class Game;
 
