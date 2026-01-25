@@ -55,11 +55,21 @@ void CollectAssetEntries(const bz::json::Value &node,
 						 std::map<std::string, std::filesystem::path> &assetMap,
 						 const std::string &prefix = "");
 
+struct DataPathSpec {
+    std::string appName = "app";
+    std::string dataDirEnvVar = "DATA_DIR";
+    std::filesystem::path requiredDataMarker;
+    std::vector<ConfigLayerSpec> fallbackAssetLayers;
+};
+
+void SetDataPathSpec(DataPathSpec spec);
+DataPathSpec GetDataPathSpec();
+
 
 // Returns the directory containing the running executable.
 std::filesystem::path ExecutableDirectory();
 
-// Resolve an asset path declared in client/config.json, falling back to a default relative path.
+// Resolve an asset path declared in configuration layers, falling back to a default relative path.
 std::filesystem::path ResolveConfiguredAsset(const std::string &assetKey,
 											 const std::filesystem::path &defaultRelativePath = {});
 

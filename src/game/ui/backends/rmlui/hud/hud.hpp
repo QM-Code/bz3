@@ -62,6 +62,8 @@ private:
     RmlUiHudScoreboard scoreboard;
     Rml::Element *fpsElement = nullptr;
     float lastFps = 0.0f;
+    int lastFpsInt = -1;
+    bool fpsVisible = false;
 
     void bindElements();
 };

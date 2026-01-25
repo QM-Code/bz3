@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "ui/backend.hpp"
+#include "ui/backends/rmlui/console/panels/panel_settings.hpp"
 
 namespace platform {
 class Window;
@@ -42,6 +43,8 @@ public:
     void displayDeathScreen(bool show) override;
     bool consumeKeybindingsReloadRequest() override;
     void setRenderBridge(const ui::RenderBridge *bridge) override;
+    ui::RenderOutput getRenderOutput() const override;
+    float getRenderBrightness() const override;
     void setActiveTab(const std::string &tabKey);
     bool isUiInputEnabled() const;
 
@@ -51,6 +54,8 @@ private:
     std::unique_ptr<RmlUiState> state;
     std::unique_ptr<ui::RmlUiConsole> consoleView;
     const ui::RenderBridge *renderBridge = nullptr;
+    ui::RmlUiPanelSettings *settingsPanel = nullptr;
+    float renderBrightness = 1.0f;
     void loadConsoleDocument();
     void loadHudDocument();
     const std::string &cachedTwemojiMarkup(const std::string &text);

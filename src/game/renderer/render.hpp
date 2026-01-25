@@ -2,6 +2,7 @@
 
 #include "engine/graphics/device.hpp"
 #include "core/types.hpp"
+#include "ui/types.hpp"
 
 #include <filesystem>
 #include <glm/glm.hpp>
@@ -9,6 +10,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <utility>
 
 #define CAMERA_FOV 60.0f
 #define SCREEN_WIDTH 800.0f
@@ -51,6 +53,12 @@ private:
     float lastAspect = 1.0f;
     float radarFovDegrees = CAMERA_FOV;
 
+#if defined(BZ3_RENDER_BACKEND_FILAMENT)
+    graphics::RenderTargetId mainTarget = graphics::kDefaultRenderTarget;
+    int mainTargetWidth = 0;
+    int mainTargetHeight = 0;
+#endif
+
     Render(platform::Window &window);
     ~Render();
 
@@ -58,6 +66,7 @@ private:
     void resizeCallback(int width, int height);
 
     void ensureRadarResources();
+    void ensureMainTarget(int width, int height);
     void updateRadarFovLines();
     glm::quat computeRadarCameraRotation(const glm::vec3& radarCamPos) const;
 
@@ -76,8 +85,12 @@ public:
     void setTransparency(render_id id, bool transparency);
     void setCameraPosition(const glm::vec3 &position);
     void setCameraRotation(const glm::quat &rotation);
+    void setUiOverlayTexture(const ui::RenderOutput& output);
+    void setBrightness(float brightness);
 
     unsigned int getRadarTextureId() const;
+    unsigned int getMainTextureId() const;
+    std::pair<int, int> getMainTextureSize() const;
     void setRadarShaderPath(const std::filesystem::path& vertPath,
                             const std::filesystem::path& fragPath);
 

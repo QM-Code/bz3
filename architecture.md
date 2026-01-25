@@ -57,14 +57,13 @@ src/
 
     geometry/
         mesh_loader.*                  # Assimp mesh loading helpers
-        mesh_loader.*                  # Loads GLB meshes for physics/render helpers
         particle_effect_system.*       # Client particle effects
 
     audio/
         audio.*                        # miniaudio engine + pooled clip instances
 
     input/
-        input.*                        # GLFW key handling + per-frame InputState
+        input.*                        # Action-agnostic input mapping wrapper
 
     physics/
         physics_world.*                # Bullet world + body creation + raycasts
@@ -78,7 +77,7 @@ src/
         backends/                     # RmlUi + ImGui implementations
 
     common/
-        data_path_resolver.*           # BZ3_DATA_DIR resolution + config layering + asset lookup
+        data_path_resolver.*           # Data root + config layering + asset lookup (configured by game)
 
     game/protos/
         messages.proto                 # Protobuf wire schema (ClientMsg/ServerMsg)
@@ -99,14 +98,14 @@ data/
 
 ### Data root and configuration layering
 
-The runtime **data root** is discovered via the `BZ3_DATA_DIR` environment variable (required). All config and assets are loaded relative to this directory.
+The runtime **data root** is discovered via a game-provided spec (`src/game/common/data_path_spec.*`). For BZ3 this uses the `BZ3_DATA_DIR` environment variable. All config and assets are loaded relative to this directory.
 
 Configuration is **layered JSON** merged into a single “config cache”:
 
 - Client initializes layers: `data/common/config.json` → `data/client/config.json` → user config (created if missing).
 - Server initializes layers: `data/common/config.json` → `data/server/config.json` → selected world `config.json`.
 
-This is implemented in `src/engine/common/data_path_resolver.*`. It also builds an **asset key lookup** by flattening `assets.*` and `fonts.*` entries across layers.
+This is implemented in `src/engine/common/data_path_resolver.*` (parameterized by the game spec). It also builds an **asset key lookup** by flattening `assets.*` and `fonts.*` entries across layers.
 
 Practical implication:
 
@@ -119,7 +118,7 @@ The code keeps a per-user config directory (platform-specific) and uses it for:
 - `config.json` (client-side user overrides)
 - downloaded worlds received from servers
 
-On Linux this typically ends up under `$XDG_CONFIG_HOME/bz3` or `~/.config/bz3`.
+On Linux this typically ends up under `$XDG_CONFIG_HOME/bz3` or `~/.config/bz3` (based on the game spec’s app name).
 
 Relevant helpers live in `src/engine/common/data_path_resolver.*`:
 
@@ -291,7 +290,7 @@ Fonts are loaded via `ResolveConfiguredAsset(...)` using configured font keys.
 
 ### Input (client)
 
-`src/engine/input.*` translates GLFW key state into an `InputState` struct. Gameplay reads this from `engine.input->getInputState()`.
+`src/engine/input.*` is action-agnostic mapping (bindings + mapper). BZ3 builds a game-specific `InputState` in `src/game/input/state.*`, and `ClientEngine` exposes it via `engine.getInputState()`.
 
 ### Audio (client)
 

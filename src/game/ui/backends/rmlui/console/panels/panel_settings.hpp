@@ -21,6 +21,7 @@ public:
     RmlUiPanelSettings();
     void setUserConfigPath(const std::string &path);
     bool consumeKeybindingsReloadRequest();
+    float getRenderBrightness() const;
 
 protected:
     void onLoaded(Rml::ElementDocument *document) override;
@@ -44,6 +45,7 @@ private:
     class SettingsActionListener;
     class SettingsKeyListener;
     class SettingsMouseListener;
+    class BrightnessListener;
 
     void loadBindings();
     void rebuildBindings();
@@ -53,6 +55,10 @@ private:
     void clearSelected();
     void saveBindings();
     void resetBindings();
+    void loadRenderSettings(const bz::json::Value &userConfig);
+    void saveRenderSettings(bz::json::Value &userConfig) const;
+    void setRenderBrightness(float value, bool fromUser);
+    void syncRenderBrightnessControls();
     void showStatus(const std::string &message, bool isError);
     void requestKeybindingsReload();
     void captureKey(int keyIdentifier);
@@ -89,6 +95,11 @@ private:
     std::string userConfigPath;
     std::vector<std::unique_ptr<Rml::EventListener>> listeners;
     std::vector<std::unique_ptr<Rml::EventListener>> rowListeners;
+
+    Rml::Element *brightnessSlider = nullptr;
+    Rml::Element *brightnessValueLabel = nullptr;
+    float renderBrightness = 1.0f;
+    bool renderBrightnessDirty = false;
 };
 
 } // namespace ui

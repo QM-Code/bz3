@@ -6,12 +6,12 @@
 
 #include "common/curl_global.hpp"
 
-#include "ui/third_party/stb_image.h"
+#include <stb_image.h>
 
 namespace {
-using stbi_uc = Effekseer::stbi_uc;
-using Effekseer::stbi_image_free;
-using Effekseer::stbi_load_from_memory;
+using stbi_uc = ::stbi_uc;
+using ::stbi_image_free;
+using ::stbi_load_from_memory;
 
 size_t CurlWriteToVector(char *ptr, size_t size, size_t nmemb, void *userdata) {
     auto *buffer = static_cast<std::vector<unsigned char> *>(userdata);

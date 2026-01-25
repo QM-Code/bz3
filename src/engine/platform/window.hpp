@@ -31,6 +31,7 @@ public:
     virtual void requestClose() = 0;
 
     virtual void swapBuffers() = 0;
+    virtual void makeContextCurrent() = 0;
     virtual void setVsync(bool enabled) = 0;
     virtual void setFullscreen(bool enabled) = 0;
     virtual bool isFullscreen() const = 0;

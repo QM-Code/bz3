@@ -32,6 +32,8 @@
 
 namespace {
 
+using bz::data::DataPathSpec;
+
 std::filesystem::path TryCanonical(const std::filesystem::path &path) {
     std::error_code ec;
     auto result = std::filesystem::weakly_canonical(path, ec);
@@ -100,6 +102,8 @@ std::filesystem::path ExecutableDirectory() {
 std::mutex g_dataRootMutex;
 std::optional<std::filesystem::path> g_dataRootOverride;
 bool g_dataRootInitialized = false;
+std::mutex g_dataSpecMutex;
+DataPathSpec g_dataSpec;
 
 std::filesystem::path ValidateDataRootCandidate(const std::filesystem::path &path) {
     const auto canonical = TryCanonical(path);
@@ -108,9 +112,17 @@ std::filesystem::path ValidateDataRootCandidate(const std::filesystem::path &pat
         throw std::runtime_error("data_path_resolver: Data directory is invalid: " + canonical.string());
     }
 
-    const auto commonConfig = canonical / "common" / "config.json";
-    if (!std::filesystem::exists(commonConfig, ec) || !std::filesystem::is_regular_file(commonConfig, ec)) {
-        throw std::runtime_error("Invalid data directory: " + canonical.string() + "\n" + commonConfig.string() + " does not exist.");
+    DataPathSpec spec;
+    {
+        std::lock_guard<std::mutex> lock(g_dataSpecMutex);
+        spec = g_dataSpec;
+    }
+
+    if (!spec.requiredDataMarker.empty()) {
+        const auto markerPath = canonical / spec.requiredDataMarker;
+        if (!std::filesystem::exists(markerPath, ec) || !std::filesystem::is_regular_file(markerPath, ec)) {
+            throw std::runtime_error("Invalid data directory: " + canonical.string() + "\n" + markerPath.string() + " does not exist.");
+        }
     }
     return canonical;
 }
@@ -120,9 +132,15 @@ std::filesystem::path DetectDataRoot(const std::optional<std::filesystem::path> 
         return ValidateDataRootCandidate(*overridePath);
     }
 
-    const char *envDataDir = std::getenv("BZ3_DATA_DIR");
+    DataPathSpec spec;
+    {
+        std::lock_guard<std::mutex> lock(g_dataSpecMutex);
+        spec = g_dataSpec;
+    }
+
+    const char *envDataDir = std::getenv(spec.dataDirEnvVar.c_str());
     if (!envDataDir || *envDataDir == '\0') {
-        throw std::runtime_error("BZ3_DATA_DIR environment variable must be set to the game data directory");
+        throw std::runtime_error(spec.dataDirEnvVar + " environment variable must be set to the data directory");
     }
 
     return ValidateDataRootCandidate(envDataDir);
@@ -212,6 +230,16 @@ const bz::json::Value *ResolveConfigPath(const bz::json::Value &root, const std:
 
 namespace bz::data {
 
+void SetDataPathSpec(DataPathSpec spec) {
+    std::lock_guard<std::mutex> lock(g_dataSpecMutex);
+    g_dataSpec = std::move(spec);
+}
+
+DataPathSpec GetDataPathSpec() {
+    std::lock_guard<std::mutex> lock(g_dataSpecMutex);
+    return g_dataSpec;
+}
+
 std::filesystem::path ExecutableDirectory() {
     return ::ExecutableDirectory();
 }
@@ -263,6 +291,12 @@ std::filesystem::path ResolveWithBase(const std::filesystem::path &baseDir, cons
 
 std::filesystem::path UserConfigDirectory() {
     static const std::filesystem::path dir = [] {
+        DataPathSpec spec;
+        {
+            std::lock_guard<std::mutex> lock(g_dataSpecMutex);
+            spec = g_dataSpec;
+        }
+        const std::string appName = spec.appName.empty() ? std::string("app") : spec.appName;
         std::filesystem::path base;
 
 #if defined(_WIN32)
@@ -287,7 +321,7 @@ std::filesystem::path UserConfigDirectory() {
             throw std::runtime_error("Unable to determine user configuration directory: no home path detected");
         }
 
-        return TryCanonical(base / "bz3");
+        return TryCanonical(base / appName);
     }();
 
     return dir;
@@ -565,18 +599,20 @@ std::filesystem::path ResolveConfiguredAsset(const std::string &assetKey,
         }
     }
 
+    DataPathSpec spec;
+    {
+        std::lock_guard<std::mutex> lock(g_dataSpecMutex);
+        spec = g_dataSpec;
+    }
+    if (spec.fallbackAssetLayers.empty()) {
+        spdlog::warn("data_path_resolver: Asset '{}' not found in configuration layers, using default.", assetKey);
+        return defaultPath;
+    }
+
     static std::once_flag fallbackLoadFlag;
     static std::unordered_map<std::string, std::filesystem::path> fallbackLookup;
-    std::call_once(fallbackLoadFlag, [] {
-        const auto userConfigPath = EnsureUserConfigFile("config.json");
-
-        const std::vector<ConfigLayerSpec> specs = {
-            {"common/config.json", "data/common/config.json", spdlog::level::err, false},
-            {"client/config.json", "data/client/config.json", spdlog::level::debug, false},
-            {userConfigPath, "user config", spdlog::level::debug, false}
-        };
-
-        const auto layers = LoadConfigLayers(specs);
+    std::call_once(fallbackLoadFlag, [spec] {
+        const auto layers = LoadConfigLayers(spec.fallbackAssetLayers);
         fallbackLookup = BuildAssetLookupFromLayers(layers);
     });
 

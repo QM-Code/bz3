@@ -312,6 +312,12 @@ public:
         }
     }
 
+    void makeContextCurrent() override {
+        if (window) {
+            glfwMakeContextCurrent(window);
+        }
+    }
+
     void setVsync(bool enabled) override {
         glfwSwapInterval(enabled ? 1 : 0);
     }

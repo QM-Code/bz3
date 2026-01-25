@@ -68,3 +68,11 @@ bool UiSystem::consumeKeybindingsReloadRequest() {
 void UiSystem::setRenderBridge(const ui::RenderBridge *bridge) {
     backend->setRenderBridge(bridge);
 }
+
+ui::RenderOutput UiSystem::getRenderOutput() const {
+    return backend ? backend->getRenderOutput() : ui::RenderOutput{};
+}
+
+float UiSystem::getRenderBrightness() const {
+    return backend ? backend->getRenderBrightness() : 1.0f;
+}

@@ -47,4 +47,6 @@ public:
     void displayDeathScreen(bool show);
     bool consumeKeybindingsReloadRequest();
     void setRenderBridge(const ui::RenderBridge *bridge);
+    ui::RenderOutput getRenderOutput() const;
+    float getRenderBrightness() const;
 };

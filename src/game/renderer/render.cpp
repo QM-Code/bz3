@@ -1,6 +1,7 @@
 #include "renderer/render.hpp"
 
 #include "platform/window.hpp"
+#include "common/data_path_resolver.hpp"
 #include "spdlog/spdlog.h"
 
 #include <algorithm>
@@ -59,6 +60,7 @@ Render::Render(platform::Window &windowIn)
     : window(&windowIn) {
     device_ = std::make_unique<graphics::GraphicsDevice>(windowIn);
     ensureRadarResources();
+
 }
 
 Render::~Render() = default;
@@ -112,6 +114,38 @@ void Render::ensureRadarResources() {
     if (radarBeamMesh == graphics::kInvalidMesh) {
         radarBeamMesh = device_->createMesh(makeBeamMesh());
     }
+}
+
+void Render::ensureMainTarget(int width, int height) {
+#if defined(BZ3_RENDER_BACKEND_FILAMENT)
+    if (!device_) {
+        return;
+    }
+    if (width <= 0) {
+        width = 1;
+    }
+    if (height <= 0) {
+        height = 1;
+    }
+    if (mainTarget != graphics::kDefaultRenderTarget &&
+        (mainTargetWidth != width || mainTargetHeight != height)) {
+        device_->destroyRenderTarget(mainTarget);
+        mainTarget = graphics::kDefaultRenderTarget;
+    }
+    if (mainTarget == graphics::kDefaultRenderTarget) {
+        graphics::RenderTargetDesc desc;
+        desc.width = width;
+        desc.height = height;
+        desc.depth = true;
+        desc.stencil = false;
+        mainTarget = device_->createRenderTarget(desc);
+        mainTargetWidth = width;
+        mainTargetHeight = height;
+    }
+#else
+    (void)width;
+    (void)height;
+#endif
 }
 
 void Render::updateRadarFovLines() {
@@ -213,6 +247,7 @@ void Render::update() {
     device_->beginFrame();
 
     ensureRadarResources();
+    ensureMainTarget(width, height);
     updateRadarFovLines();
 
     // Render radar layer to offscreen target
@@ -249,7 +284,12 @@ void Render::update() {
     device_->setPerspective(CAMERA_FOV, lastAspect, 0.1f, 1000.0f);
     device_->setCameraPosition(cameraPosition);
     device_->setCameraRotation(cameraRotation);
+#if defined(BZ3_RENDER_BACKEND_FILAMENT)
+    device_->renderLayer(mainLayer, mainTarget);
+#else
     device_->renderLayer(mainLayer, graphics::kDefaultRenderTarget);
+    device_->renderUiOverlay();
+#endif
 
     device_->endFrame();
 }
@@ -413,6 +453,40 @@ unsigned int Render::getRadarTextureId() const {
         return 0;
     }
     return device_->getRenderTargetTextureId(radarTarget);
+}
+
+unsigned int Render::getMainTextureId() const {
+#if defined(BZ3_RENDER_BACKEND_FILAMENT)
+    if (!device_ || mainTarget == graphics::kDefaultRenderTarget) {
+        return 0;
+    }
+    return device_->getRenderTargetTextureId(mainTarget);
+#else
+    return 0;
+#endif
+}
+
+std::pair<int, int> Render::getMainTextureSize() const {
+#if defined(BZ3_RENDER_BACKEND_FILAMENT)
+    return {mainTargetWidth, mainTargetHeight};
+#else
+    return {0, 0};
+#endif
+}
+
+void Render::setUiOverlayTexture(const ui::RenderOutput& output) {
+    if (!device_) {
+        return;
+    }
+    device_->setUiOverlayTexture(output.textureId, output.width, output.height);
+    device_->setUiOverlayVisible(output.valid());
+}
+
+void Render::setBrightness(float brightness) {
+    if (!device_) {
+        return;
+    }
+    device_->setBrightness(brightness);
 }
 
 void Render::setRadarShaderPath(const std::filesystem::path& vertPath,

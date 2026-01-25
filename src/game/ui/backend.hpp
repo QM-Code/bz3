@@ -35,6 +35,9 @@ public:
     virtual void displayDeathScreen(bool show) = 0;
     virtual bool consumeKeybindingsReloadRequest() = 0;
     virtual void setRenderBridge(const ui::RenderBridge *bridge) = 0;
+
+    virtual ui::RenderOutput getRenderOutput() const { return {}; }
+    virtual float getRenderBrightness() const { return 1.0f; }
 };
 
 std::unique_ptr<Backend> CreateUiBackend(platform::Window &window);

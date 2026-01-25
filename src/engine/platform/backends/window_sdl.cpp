@@ -455,6 +455,12 @@ public:
         }
     }
 
+    void makeContextCurrent() override {
+        if (window && glContext) {
+            SDL_GL_MakeCurrent(window, glContext);
+        }
+    }
+
     void setVsync(bool enabled) override {
         SDL_GL_SetSwapInterval(enabled ? 1 : 0);
     }

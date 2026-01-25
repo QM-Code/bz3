@@ -16,7 +16,7 @@ This project uses vcpkg to provide most native dependencies and the setup script
 
 ## Runtime Data
 
-The programs load assets/config from a data root resolved via the `BZ3_DATA_DIR` environment variable.
+The programs load assets/config from a data root resolved via the `BZ3_DATA_DIR` environment variable (configured by `src/game/common/data_path_spec.*`).
 
 - Linux/macOS:
 
@@ -71,6 +71,7 @@ After building:
 
 Rendering and windowing
 - **threepp** (renderer/scene graph)
+- **Filament** (renderer/scene graph, optional)
 - **OpenGL** + **GLFW** (window + context)
 - **Assimp** (model loading)
 
@@ -104,6 +105,7 @@ Other
 
 - **Engine** (game-agnostic systems) lives under `src/engine/`.
 - **Game** (BZ3-specific rules, UI, and gameplay) lives under `src/game/`.
+- The game configures engine data/asset discovery via `src/game/common/data_path_spec.*`.
 
 ## Backends and entry points
 
@@ -119,6 +121,8 @@ Entry points (public interfaces)
 - Physics: `PhysicsWorld` in `src/engine/physics/physics_world.hpp`
 - Networking: `ClientNetwork` and `ServerNetwork` in `src/game/net/` (message-level); transports live in `src/engine/network/`
 - World runtime: `ClientWorldSession` and `ServerWorldSession` in `src/game/client/` and `src/game/server/`
+- Input: `Input` in `src/engine/input/input.hpp` (mapping only) + game input state in `src/game/input/state.*`
+- Data paths: `DataPathSpec` in `src/engine/common/data_path_resolver.hpp` (configured in `src/game/common/data_path_spec.*`)
 
 Backend factories (compile-time selection)
 - Audio: `src/engine/audio/backend_factory.cpp`
@@ -147,7 +151,7 @@ These CMake cache variables select backends at build time:
 - `BZ3_WINDOW_BACKEND=glfw|sdl`
 - `BZ3_PHYSICS_BACKEND=jolt|bullet`
 - `BZ3_AUDIO_BACKEND=miniaudio|sdlaudio`
-- `BZ3_RENDER_BACKEND=threepp`
+- `BZ3_RENDER_BACKEND=threepp|filament`
 - `BZ3_NETWORK_BACKEND=enet`
 - `BZ3_WORLD_BACKEND=fs`
 

@@ -61,6 +61,13 @@ public:
 	// Optional, can be used to clear the active framebuffer.
 	void Clear();
 
+	// Controls whether EndFrame presents to the backbuffer.
+	void SetPresentToBackbuffer(bool enabled);
+	// Returns the postprocess output texture (for compositing).
+	unsigned int GetOutputTextureId() const;
+	int GetOutputWidth() const;
+	int GetOutputHeight() const;
+
 	// -- Inherited from Rml::RenderInterface --
 
 	Rml::CompiledGeometryHandle CompileGeometry(Rml::Span<const Rml::Vertex> vertices, Rml::Span<const int> indices) override;
@@ -188,6 +195,7 @@ private:
 	};
 
 	RenderLayerStack render_layers;
+	bool present_to_backbuffer = true;
 
 	struct GLStateBackup {
 		bool enable_cull_face;

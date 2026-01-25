@@ -62,7 +62,7 @@ if not args:
     ui = prompt_choice("UI (rmlui/imgui)", "rmlui", ["rmlui", "imgui"])
     physics = prompt_choice("Physics (jolt/bullet)", "jolt", ["jolt", "bullet"])
     audio = prompt_choice("Audio (miniaudio/sdlaudio)", "sdlaudio", ["miniaudio", "sdlaudio"])
-    render = prompt_choice("Renderer (threepp)", "threepp", ["threepp"])
+    render = prompt_choice("Renderer (threepp/filament)", "threepp", ["threepp", "filament"])
     network = prompt_choice("Network (enet)", "enet", ["enet"])
     world = prompt_choice("World (fs)", "fs", ["fs"])
     build_dir = f"build-{window}-{ui}-{physics}-{audio}-{render}-{network}-{world}"
@@ -85,7 +85,7 @@ else:
             physics = part
         elif part in ("miniaudio", "sdlaudio"):
             audio = part
-        elif part == "threepp":
+        elif part in ("threepp", "filament"):
             render = part
         elif part == "enet":
             network = part

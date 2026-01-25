@@ -54,6 +54,11 @@ public:
 
     virtual unsigned int getRenderTargetTextureId(graphics::RenderTargetId target) const = 0;
 
+    virtual void setUiOverlayTexture(unsigned int textureId, int width, int height) { (void)textureId; (void)width; (void)height; }
+    virtual void setUiOverlayVisible(bool visible) { (void)visible; }
+    virtual void renderUiOverlay() {}
+    virtual void setBrightness(float brightness) { (void)brightness; }
+
     virtual void setPosition(graphics::EntityId entity, const glm::vec3& position) = 0;
     virtual void setRotation(graphics::EntityId entity, const glm::quat& rotation) = 0;
     virtual void setScale(graphics::EntityId entity, const glm::vec3& scale) = 0;

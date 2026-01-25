@@ -2,7 +2,6 @@
 #include "core/types.hpp"
 #include "game/net/messages.hpp"
 #include "audio/audio.hpp"
-#include "renderer/particle_effect_system.hpp"
 #include <optional>
 
 class Game;
@@ -20,7 +19,6 @@ private:
     Audio& audioEngine;
     AudioClip fireAudio;
     AudioClip ricochetAudio;
-    std::optional<ParticleEffect> trailEffect;
 
     shot_id getNextLocalShotId() {
         static shot_id nextId = 1;

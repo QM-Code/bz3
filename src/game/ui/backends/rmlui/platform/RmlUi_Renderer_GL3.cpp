@@ -35,17 +35,18 @@
 #include <RmlUi/Core/MeshUtilities.h>
 #include <RmlUi/Core/Platform.h>
 #include <RmlUi/Core/SystemInterface.h>
-#include "ui/third_party/stb_image.h"
+#include <stb_image.h>
 #include <cctype>
 #include <algorithm>
-#include <cstdlib>
+#include <cstdint>
 #include <string.h>
 
 namespace {
-using stbi_uc = Effekseer::stbi_uc;
-using Effekseer::stbi_failure_reason;
-using Effekseer::stbi_image_free;
-using Effekseer::stbi_load_from_memory;
+using stbi_uc = ::stbi_uc;
+using ::stbi_failure_reason;
+using ::stbi_image_free;
+using ::stbi_load_from_memory;
+
 } // namespace
 
 #if defined RMLUI_PLATFORM_WIN32_NATIVE
@@ -940,16 +941,20 @@ void RenderInterface_GL3::EndFrame()
 
 	glBlitFramebuffer(0, 0, fb_active.width, fb_active.height, 0, 0, fb_postprocess.width, fb_postprocess.height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
-	// Draw to backbuffer
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glViewport(viewport_offset_x, viewport_offset_y, viewport_width, viewport_height);
+	// Draw to backbuffer (optional)
+	if (present_to_backbuffer) {
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glViewport(viewport_offset_x, viewport_offset_y, viewport_width, viewport_height);
 
-	// Assuming we have an opaque background, we can just write to it with the premultiplied alpha blend mode and we'll get the correct result.
-	// Instead, if we had a transparent destination that didn't use premultiplied alpha, we would need to perform a manual un-premultiplication step.
-	glActiveTexture(GL_TEXTURE0);
-	Gfx::BindTexture(fb_postprocess);
-	UseProgram(ProgramId::Passthrough);
-	DrawFullscreenQuad();
+		// Assuming we have an opaque background, we can just write to it with the premultiplied alpha blend mode and we'll get the correct result.
+		// Instead, if we had a transparent destination that didn't use premultiplied alpha, we would need to perform a manual un-premultiplication step.
+		glActiveTexture(GL_TEXTURE0);
+		Gfx::BindTexture(fb_postprocess);
+		UseProgram(ProgramId::Passthrough);
+		DrawFullscreenQuad();
+	} else {
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	}
 
 	render_layers.EndFrame();
 
@@ -1010,6 +1015,29 @@ void RenderInterface_GL3::Clear()
 {
 	glClearColor(0, 0, 0, 1);
 	glClear(GL_COLOR_BUFFER_BIT);
+}
+
+void RenderInterface_GL3::SetPresentToBackbuffer(bool enabled)
+{
+	present_to_backbuffer = enabled;
+}
+
+unsigned int RenderInterface_GL3::GetOutputTextureId() const
+{
+	const auto& fb = const_cast<RenderInterface_GL3*>(this)->render_layers.GetPostprocessPrimary();
+	return fb.color_tex_buffer;
+}
+
+int RenderInterface_GL3::GetOutputWidth() const
+{
+	const auto& fb = const_cast<RenderInterface_GL3*>(this)->render_layers.GetPostprocessPrimary();
+	return fb.width;
+}
+
+int RenderInterface_GL3::GetOutputHeight() const
+{
+	const auto& fb = const_cast<RenderInterface_GL3*>(this)->render_layers.GetPostprocessPrimary();
+	return fb.height;
 }
 
 Rml::CompiledGeometryHandle RenderInterface_GL3::CompileGeometry(Rml::Span<const Rml::Vertex> vertices, Rml::Span<const int> indices)
@@ -1993,8 +2021,8 @@ void RenderInterface_GL3::RenderFilters(Rml::Span<const Rml::CompiledFilterHandl
 			Rml::Log::Message(Rml::Log::LT_WARNING, "Unhandled render filter %d.", (int)type);
 		}
 		break;
-		}
 	}
+}
 
 	Gfx::CheckGLError("RenderFilter");
 }
