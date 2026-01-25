@@ -159,7 +159,7 @@ find_package(CURL REQUIRED)
 find_package(OpenSSL REQUIRED)
 
 # Compile protobuf files
-set(PROTO_FILES ${PROJECT_SOURCE_DIR}/src/protos/messages.proto)
+set(PROTO_FILES ${PROJECT_SOURCE_DIR}/src/game/protos/messages.proto)
 set(PROTO_OUTPUT_DIR ${CMAKE_BINARY_DIR}/generated)
 file(MAKE_DIRECTORY ${PROTO_OUTPUT_DIR})
 
@@ -172,132 +172,134 @@ target_link_libraries(proto_lib PUBLIC protobuf::libprotobuf)
 target_include_directories(proto_lib PUBLIC ${CMAKE_BINARY_DIR})
 
 # Gather sources
-file(GLOB_RECURSE CLIENT_SOURCES CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/src/client/*.cpp")
+file(GLOB_RECURSE CLIENT_SOURCES CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/src/game/client/*.cpp")
 list(APPEND CLIENT_SOURCES
-    ${PROJECT_SOURCE_DIR}/src/client/actor.cpp
-    ${PROJECT_SOURCE_DIR}/src/client/server/community_browser_controller.cpp
-    ${PROJECT_SOURCE_DIR}/src/common/curl_global.cpp
-    ${PROJECT_SOURCE_DIR}/src/common/config_helpers.cpp
-    ${PROJECT_SOURCE_DIR}/src/common/data_path_resolver.cpp
-    ${PROJECT_SOURCE_DIR}/src/common/data_dir_override.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/client/actor.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/client/server/community_browser_controller.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/common/curl_global.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/common/config_helpers.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/common/data_path_resolver.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/common/data_dir_override.cpp
 )
-file(GLOB_RECURSE SERVER_SOURCES CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/src/server/*.cpp")
+file(GLOB_RECURSE SERVER_SOURCES CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/src/game/server/*.cpp")
 list(APPEND SERVER_SOURCES
-    ${PROJECT_SOURCE_DIR}/src/server/terminal_commands.cpp
-    ${PROJECT_SOURCE_DIR}/src/server/server_cli_options.cpp
-    ${PROJECT_SOURCE_DIR}/src/common/curl_global.cpp
-    ${PROJECT_SOURCE_DIR}/src/common/config_helpers.cpp
-    ${PROJECT_SOURCE_DIR}/src/common/data_path_resolver.cpp
-    ${PROJECT_SOURCE_DIR}/src/common/data_dir_override.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/server/terminal_commands.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/server/server_cli_options.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/common/curl_global.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/common/config_helpers.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/common/data_path_resolver.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/common/data_dir_override.cpp
 )
 ## Separate engine sources for client and server to avoid over-linking
 set(ENGINE_CLIENT_SOURCES
-    ${PROJECT_SOURCE_DIR}/src/engine/client_engine.cpp
-    ${PROJECT_SOURCE_DIR}/src/renderer/mesh_loader.cpp
-    ${PROJECT_SOURCE_DIR}/src/world/content.cpp
-    ${PROJECT_SOURCE_DIR}/src/world/backend_factory.cpp
-    ${PROJECT_SOURCE_DIR}/src/world/backends/fs/backend.cpp
-    ${PROJECT_SOURCE_DIR}/src/network/client_network.cpp
-    ${PROJECT_SOURCE_DIR}/src/network/backend_factory.cpp
-    ${PROJECT_SOURCE_DIR}/src/network/backends/enet/client_backend.cpp
-    ${PROJECT_SOURCE_DIR}/src/network/backends/enet/server_backend.cpp
-    ${PROJECT_SOURCE_DIR}/src/network/enet_transport.cpp
-    ${PROJECT_SOURCE_DIR}/src/network/transport_factory.cpp
-    ${PROJECT_SOURCE_DIR}/src/network/proto_codec.cpp
-    ${PROJECT_SOURCE_DIR}/src/renderer/render.cpp
-    ${PROJECT_SOURCE_DIR}/src/renderer/backend_factory.cpp
-    ${PROJECT_SOURCE_DIR}/src/input/input.cpp
-    ${PROJECT_SOURCE_DIR}/src/input/mapping/binding.cpp
-    ${PROJECT_SOURCE_DIR}/src/input/mapping/map.cpp
-    ${PROJECT_SOURCE_DIR}/src/input/mapping/mapper.cpp
-    ${PROJECT_SOURCE_DIR}/src/platform/window_factory.cpp
-    ${PROJECT_SOURCE_DIR}/src/ui/system.cpp
-    ${PROJECT_SOURCE_DIR}/src/ui/backend_factory.cpp
-    ${PROJECT_SOURCE_DIR}/src/ui/third_party/stb_image_impl.cpp
-    ${PROJECT_SOURCE_DIR}/src/audio/audio.cpp
-    ${PROJECT_SOURCE_DIR}/src/audio/backend_factory.cpp
-    ${PROJECT_SOURCE_DIR}/src/renderer/particle_effect_system.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/engine/client_engine.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/renderer/mesh_loader.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/world/content.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/world/backend_factory.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/world/backends/fs/backend.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/network/enet_transport.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/network/transport_factory.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/net/client_network.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/net/server_network.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/net/backend_factory.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/net/proto_codec.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/net/backends/enet/client_backend.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/net/backends/enet/server_backend.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/renderer/render.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/renderer/backend_factory.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/input/input.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/input/mapping/binding.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/input/mapping/map.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/input/mapping/mapper.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/platform/window_factory.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/system.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/backend_factory.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/third_party/stb_image_impl.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/audio/audio.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/audio/backend_factory.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/renderer/particle_effect_system.cpp
 )
 if(BZ3_WINDOW_BACKEND STREQUAL "glfw")
-    list(APPEND ENGINE_CLIENT_SOURCES ${PROJECT_SOURCE_DIR}/src/platform/backends/window_glfw.cpp)
+    list(APPEND ENGINE_CLIENT_SOURCES ${PROJECT_SOURCE_DIR}/src/engine/platform/backends/window_glfw.cpp)
 elseif(BZ3_WINDOW_BACKEND STREQUAL "sdl")
-    list(APPEND ENGINE_CLIENT_SOURCES ${PROJECT_SOURCE_DIR}/src/platform/backends/window_sdl.cpp)
+    list(APPEND ENGINE_CLIENT_SOURCES ${PROJECT_SOURCE_DIR}/src/engine/platform/backends/window_sdl.cpp)
 endif()
 
 
 if(BZ3_UI_BACKEND STREQUAL "imgui")
     list(APPEND ENGINE_CLIENT_SOURCES
-        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/backend.cpp
-        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/console/console.cpp
-        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/console/thumbnail_cache.cpp
-        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/console/panels/panel_community.cpp
-        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/console/panels/panel_settings.cpp
-        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/console/panels/panel_documentation.cpp
-        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/console/panels/panel_start_server.cpp
-        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/console/panels/panel_themes.cpp
-        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/hud/hud.cpp
-        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/hud/chat.cpp
-        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/hud/crosshair.cpp
-        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/hud/fps.cpp
-        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/hud/radar.cpp
-        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/hud/scoreboard.cpp
-        ${PROJECT_SOURCE_DIR}/src/ui/backends/imgui/hud/spawn_hint.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/imgui/backend.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/imgui/console/console.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/imgui/console/thumbnail_cache.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/imgui/console/panels/panel_community.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/imgui/console/panels/panel_settings.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/imgui/console/panels/panel_documentation.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/imgui/console/panels/panel_start_server.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/imgui/console/panels/panel_themes.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/imgui/hud/hud.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/imgui/hud/chat.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/imgui/hud/crosshair.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/imgui/hud/fps.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/imgui/hud/radar.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/imgui/hud/scoreboard.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/imgui/hud/spawn_hint.cpp
     )
 elseif(BZ3_UI_BACKEND STREQUAL "rmlui")
     list(APPEND ENGINE_CLIENT_SOURCES
-        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/backend.cpp
-        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/platform/RmlUi_Renderer_GL3.cpp
-        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/console/emoji_utils.cpp
-        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/console/console.cpp
-        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/console/modal_dialog.cpp
-        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/hud/hud.cpp
-        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/hud/chat.cpp
-        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/hud/dialog.cpp
-        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/hud/radar.cpp
-        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/hud/scoreboard.cpp
-        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/console/panels/panel.cpp
-        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/console/panels/panel_community.cpp
-        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/console/panels/panel_settings.cpp
-        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/console/panels/panel_documentation.cpp
-        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/console/panels/panel_start_server.cpp
-        ${PROJECT_SOURCE_DIR}/src/ui/backends/rmlui/console/panels/panel_themes.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/backend.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/platform/RmlUi_Renderer_GL3.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/console/emoji_utils.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/console/console.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/console/modal_dialog.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/hud/hud.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/hud/chat.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/hud/dialog.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/hud/radar.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/hud/scoreboard.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/console/panels/panel.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/console/panels/panel_community.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/console/panels/panel_settings.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/console/panels/panel_documentation.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/console/panels/panel_start_server.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/console/panels/panel_themes.cpp
     )
 endif()
 set(ENGINE_SERVER_SOURCES
-    ${PROJECT_SOURCE_DIR}/src/engine/server_engine.cpp
-    ${PROJECT_SOURCE_DIR}/src/renderer/mesh_loader.cpp
-    ${PROJECT_SOURCE_DIR}/src/world/content.cpp
-    ${PROJECT_SOURCE_DIR}/src/world/backend_factory.cpp
-    ${PROJECT_SOURCE_DIR}/src/world/backends/fs/backend.cpp
-    ${PROJECT_SOURCE_DIR}/src/network/server_network.cpp
-    ${PROJECT_SOURCE_DIR}/src/network/backend_factory.cpp
-    ${PROJECT_SOURCE_DIR}/src/network/backends/enet/client_backend.cpp
-    ${PROJECT_SOURCE_DIR}/src/network/backends/enet/server_backend.cpp
-    ${PROJECT_SOURCE_DIR}/src/network/enet_transport.cpp
-    ${PROJECT_SOURCE_DIR}/src/network/transport_factory.cpp
-    ${PROJECT_SOURCE_DIR}/src/network/proto_codec.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/engine/server_engine.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/renderer/mesh_loader.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/world/content.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/world/backend_factory.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/world/backends/fs/backend.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/network/enet_transport.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/network/transport_factory.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/net/client_network.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/net/server_network.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/net/backend_factory.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/net/proto_codec.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/net/backends/enet/client_backend.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/net/backends/enet/server_backend.cpp
 )
 
 set(PHYSICS_SOURCES
-    ${PROJECT_SOURCE_DIR}/src/physics/backend_factory.cpp
-    ${PROJECT_SOURCE_DIR}/src/physics/physics_world.cpp
-    ${PROJECT_SOURCE_DIR}/src/physics/rigid_body.cpp
-    ${PROJECT_SOURCE_DIR}/src/physics/static_body.cpp
-    ${PROJECT_SOURCE_DIR}/src/physics/player_controller.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/physics/backend_factory.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/physics/physics_world.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/physics/rigid_body.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/physics/static_body.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/physics/player_controller.cpp
 )
 if(BZ3_PHYSICS_BACKEND STREQUAL "jolt")
     list(APPEND PHYSICS_SOURCES
-        ${PROJECT_SOURCE_DIR}/src/physics/backends/jolt/physics_world_jolt.cpp
-        ${PROJECT_SOURCE_DIR}/src/physics/backends/jolt/rigid_body_jolt.cpp
-        ${PROJECT_SOURCE_DIR}/src/physics/backends/jolt/static_body_jolt.cpp
-        ${PROJECT_SOURCE_DIR}/src/physics/backends/jolt/player_controller_jolt.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/physics/backends/jolt/physics_world_jolt.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/physics/backends/jolt/rigid_body_jolt.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/physics/backends/jolt/static_body_jolt.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/physics/backends/jolt/player_controller_jolt.cpp
     )
 elseif(BZ3_PHYSICS_BACKEND STREQUAL "bullet")
     list(APPEND PHYSICS_SOURCES
-        ${PROJECT_SOURCE_DIR}/src/physics/backends/bullet/physics_world_bullet.cpp
-        ${PROJECT_SOURCE_DIR}/src/physics/backends/bullet/rigid_body_bullet.cpp
-        ${PROJECT_SOURCE_DIR}/src/physics/backends/bullet/static_body_bullet.cpp
-        ${PROJECT_SOURCE_DIR}/src/physics/backends/bullet/player_controller_bullet.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/physics/backends/bullet/physics_world_bullet.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/physics/backends/bullet/rigid_body_bullet.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/physics/backends/bullet/static_body_bullet.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/physics/backends/bullet/player_controller_bullet.cpp
     )
 endif()
 
@@ -306,19 +308,19 @@ list(APPEND ENGINE_SERVER_SOURCES ${PHYSICS_SOURCES})
 
 if(BZ3_AUDIO_BACKEND STREQUAL "miniaudio")
     list(APPEND ENGINE_CLIENT_SOURCES
-        ${PROJECT_SOURCE_DIR}/src/audio/backends/miniaudio/backend.cpp
-        ${PROJECT_SOURCE_DIR}/src/audio/backends/miniaudio/clip.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/audio/backends/miniaudio/backend.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/audio/backends/miniaudio/clip.cpp
     )
 elseif(BZ3_AUDIO_BACKEND STREQUAL "sdlaudio")
     list(APPEND ENGINE_CLIENT_SOURCES
-        ${PROJECT_SOURCE_DIR}/src/audio/backends/sdl/backend.cpp
-        ${PROJECT_SOURCE_DIR}/src/audio/backends/sdl/clip.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/audio/backends/sdl/backend.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/audio/backends/sdl/clip.cpp
     )
 endif()
 
 if(BZ3_RENDER_BACKEND STREQUAL "threepp")
     list(APPEND ENGINE_CLIENT_SOURCES
-        ${PROJECT_SOURCE_DIR}/src/renderer/backends/threepp/backend.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/renderer/backends/threepp/backend.cpp
     )
 endif()
 
@@ -336,9 +338,9 @@ else()
     set(OPENGL_TARGET ${OPENGL_LIBRARIES})
 endif()
 if(BZ3_WINDOW_BACKEND STREQUAL "glfw")
-    list(APPEND ENGINE_CLIENT_SOURCES ${PROJECT_SOURCE_DIR}/src/platform/backends/window_glfw.cpp)
+    list(APPEND ENGINE_CLIENT_SOURCES ${PROJECT_SOURCE_DIR}/src/engine/platform/backends/window_glfw.cpp)
 elseif(BZ3_WINDOW_BACKEND STREQUAL "sdl")
-    list(APPEND ENGINE_CLIENT_SOURCES ${PROJECT_SOURCE_DIR}/src/platform/backends/window_sdl.cpp)
+    list(APPEND ENGINE_CLIENT_SOURCES ${PROJECT_SOURCE_DIR}/src/engine/platform/backends/window_sdl.cpp)
 endif()
 
 
@@ -358,8 +360,9 @@ add_executable(bz3-server ${SERVER_SOURCES} ${ENGINE_SERVER_SOURCES})
 
 # Include directories
 target_include_directories(bz3 PRIVATE
-    ${PROJECT_SOURCE_DIR}/src/
-    ${PROJECT_SOURCE_DIR}/src/client
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/src/engine
+    ${PROJECT_SOURCE_DIR}/src/game
     ${enet_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/libs/effekseer/src
     ${PROJECT_SOURCE_DIR}/libs/effekseer/src/Effekseer
@@ -369,8 +372,9 @@ if(DEFINED threepp_SOURCE_DIR)
     target_include_directories(bz3 PRIVATE ${threepp_SOURCE_DIR}/src/external/glad)
 endif()
 target_include_directories(bz3-server PRIVATE
-    ${PROJECT_SOURCE_DIR}/src/
-    ${PROJECT_SOURCE_DIR}/src/server
+    ${PROJECT_SOURCE_DIR}/src
+    ${PROJECT_SOURCE_DIR}/src/engine
+    ${PROJECT_SOURCE_DIR}/src/game
     ${enet_SOURCE_DIR}/include
 )
 

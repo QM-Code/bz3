@@ -79,7 +79,7 @@ UI
 Networking
 - **ENet** (reliable UDP transport)
 - **Protobuf** (message schema/serialization)
-- Custom LAN discovery protocol (see `src/network/discovery_protocol.hpp`)
+- Custom LAN discovery protocol (see `src/game/net/discovery_protocol.hpp`)
 
 Simulation
 - **Jolt** or **Bullet** (physics, selectable)
@@ -100,36 +100,41 @@ Other
 - Some libraries are fetched via CMake FetchContent (notably `threepp`, `enet`, `pybind11`).
 - Python plugin bytecode is redirected to a writable cache: set `BZ3_PY_CACHE_DIR` to choose the location (defaults to `/tmp/bz3-pycache`). If the directory cannot be created, bytecode writing is disabled. Current behavior is acceptable for now; we may revisit a dedicated cache path later.
 
+## Engine vs game
+
+- **Engine** (game-agnostic systems) lives under `src/engine/`.
+- **Game** (BZ3-specific rules, UI, and gameplay) lives under `src/game/`.
+
 ## Backends and entry points
 
-BZ3 uses a consistent interface → backend pattern for several subsystems. The public interface classes live in `src/<subsystem>/` and delegate to backend implementations under `src/<subsystem>/backends/<name>/`.
+BZ3 uses a consistent interface → backend pattern for several subsystems. Engine-side public interfaces live in `src/engine/<subsystem>/` and delegate to backend implementations under `src/engine/<subsystem>/backends/<name>/`.
 
 Entry points (public interfaces)
-- Audio: `Audio` in `src/audio/audio.hpp`
-- Windowing: `Window` in `src/platform/window.hpp`
-- UI: `UiSystem` in `src/ui/system.hpp`
-- UI render bridge: `ui::RenderBridge` in `src/ui/render_bridge.hpp`
-- Physics: `PhysicsWorld` in `src/physics/physics_world.hpp`
-- Networking: `ClientNetwork` and `ServerNetwork` in `src/network/`
-- World runtime: `ClientWorldSession` and `ServerWorldSession` in `src/client/` and `src/server/`
+- Audio: `Audio` in `src/engine/audio/audio.hpp`
+- Windowing: `Window` in `src/engine/platform/window.hpp`
+- UI: `UiSystem` in `src/game/ui/system.hpp`
+- UI render bridge: `ui::RenderBridge` in `src/game/ui/render_bridge.hpp`
+- Physics: `PhysicsWorld` in `src/engine/physics/physics_world.hpp`
+- Networking: `ClientNetwork` and `ServerNetwork` in `src/game/net/` (message-level); transports live in `src/engine/network/`
+- World runtime: `ClientWorldSession` and `ServerWorldSession` in `src/game/client/` and `src/game/server/`
 
 Backend factories (compile-time selection)
-- Audio: `src/audio/backend_factory.cpp`
-- Windowing: `src/platform/window_factory.cpp`
-- UI: `src/ui/backend_factory.cpp`
-- Physics: `src/physics/backend_factory.cpp`
-- Networking: `src/network/backend_factory.cpp`
-- World: `src/world/backend_factory.cpp`
+- Audio: `src/engine/audio/backend_factory.cpp`
+- Windowing: `src/engine/platform/window_factory.cpp`
+- UI: `src/game/ui/backend_factory.cpp`
+- Physics: `src/engine/physics/backend_factory.cpp`
+- Networking: `src/game/net/backend_factory.cpp`
+- World: `src/engine/world/backend_factory.cpp`
 
 Backend layouts (examples)
-- `src/audio/backends/miniaudio/` and `src/audio/backends/sdl/`
-- `src/platform/backends/glfw/` and `src/platform/backends/sdl/`
-- `src/ui/backends/imgui/` and `src/ui/backends/rmlui/`
-- `src/physics/backends/jolt/` and `src/physics/backends/bullet/`
-- `src/renderer/backends/threepp/` (future: ogre, wicked, etc.)
-- `src/network/backends/enet/` (future: steam, webrtc, etc.)
-- `src/world/backends/fs/` (future: zip, remote, etc.)
-- `src/input/mapping/` (action mappings: bindings, maps, mapper)
+- `src/engine/audio/backends/miniaudio/` and `src/engine/audio/backends/sdl/`
+- `src/engine/platform/backends/glfw/` and `src/engine/platform/backends/sdl/`
+- `src/game/ui/backends/imgui/` and `src/game/ui/backends/rmlui/`
+- `src/engine/physics/backends/jolt/` and `src/engine/physics/backends/bullet/`
+- `src/engine/renderer/backends/threepp/` (future: ogre, wicked, etc.)
+- `src/game/net/backends/enet/` (future: steam, webrtc, etc.)
+- `src/engine/world/backends/fs/` (future: zip, remote, etc.)
+- `src/engine/input/mapping/` (action mappings: bindings, maps, mapper)
 
 ## Build options (backend selection)
 
