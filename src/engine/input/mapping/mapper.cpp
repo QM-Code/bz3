@@ -21,12 +21,12 @@ bool MatchesMouse(const std::vector<Binding>& bindings, platform::MouseButton bu
 
 } // namespace
 
-void InputMapper::loadBindings(const bz::json::Value* keybindings) {
-    map_.load(keybindings);
+void InputMapper::loadBindings(const bz::json::Value* keybindings, const InputMap::DefaultBindingsMap& defaults) {
+    map_.load(keybindings, defaults);
 }
 
-bool InputMapper::actionTriggered(Action action, const std::vector<platform::Event>& events) const {
-    const auto &bindings = map_.bindings(action);
+bool InputMapper::actionTriggered(std::string_view actionId, const std::vector<platform::Event>& events) const {
+    const auto &bindings = map_.bindings(actionId);
     for (const auto &event : events) {
         if (event.type == platform::EventType::KeyDown) {
             if (MatchesKey(bindings, event.key)) {
@@ -41,11 +41,11 @@ bool InputMapper::actionTriggered(Action action, const std::vector<platform::Eve
     return false;
 }
 
-bool InputMapper::actionDown(Action action, const platform::Window* window) const {
+bool InputMapper::actionDown(std::string_view actionId, const platform::Window* window) const {
     if (!window) {
         return false;
     }
-    const auto &bindings = map_.bindings(action);
+    const auto &bindings = map_.bindings(actionId);
     for (const auto &binding : bindings) {
         if (binding.type == Binding::Type::Key) {
             if (window->isKeyDown(binding.key)) {

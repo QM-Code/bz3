@@ -110,6 +110,17 @@ if not os.path.isdir(build_dir):
     os.makedirs(build_dir, exist_ok=True)
     run_configure = True
 
+# If the build directory exists but hasn't been configured, force a configure.
+cache_path = os.path.join(build_dir, "CMakeCache.txt")
+if not os.path.isfile(cache_path):
+    run_configure = True
+else:
+    # If the cache exists but no build files are present, reconfigure.
+    has_makefile = os.path.isfile(os.path.join(build_dir, "Makefile"))
+    has_ninja = os.path.isfile(os.path.join(build_dir, "build.ninja"))
+    if not (has_makefile or has_ninja):
+        run_configure = True
+
 if run_configure:
     run(["cmake", "-S", ".", "-B", build_dir, *cmake_args])
 

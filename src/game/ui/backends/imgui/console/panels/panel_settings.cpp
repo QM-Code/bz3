@@ -10,27 +10,27 @@
 #include <vector>
 
 #include "common/json.hpp"
+#include "game/input/bindings.hpp"
 
 namespace {
 
 struct KeybindingDefinition {
     const char *action;
     const char *label;
-    const char *defaults;
 };
 
 constexpr KeybindingDefinition kKeybindings[] = {
-    {"moveForward", "Move Forward", "UP, I"},
-    {"moveBackward", "Move Backward", "DOWN, K"},
-    {"moveLeft", "Move Left", "LEFT, J"},
-    {"moveRight", "Move Right", "RIGHT, L"},
-    {"jump", "Jump", "SPACE"},
-    {"fire", "Fire", "F, E, LEFT_MOUSE"},
-    {"spawn", "Spawn", "U"},
-    {"chat", "Chat", "T"},
-    {"toggleFullscreen", "Toggle Fullscreen", "RIGHT_BRACKET"},
-    {"escape", "Escape Menu", "ESCAPE"},
-    {"quickQuit", "Quick Quit", "F12"}
+    {"moveForward", "Move Forward"},
+    {"moveBackward", "Move Backward"},
+    {"moveLeft", "Move Left"},
+    {"moveRight", "Move Right"},
+    {"jump", "Jump"},
+    {"fire", "Fire"},
+    {"spawn", "Spawn"},
+    {"chat", "Chat"},
+    {"toggleFullscreen", "Toggle Fullscreen"},
+    {"escape", "Escape Menu"},
+    {"quickQuit", "Quick Quit"}
 };
 
 bool IsMouseBindingName(const std::string &name) {
@@ -84,6 +84,16 @@ std::vector<std::string> SplitKeyList(const std::string &text) {
         }
     }
     return entries;
+}
+
+const std::vector<std::string>& DefaultBindingsForAction(std::string_view action) {
+    static const game_input::DefaultBindingsMap kDefaults = game_input::DefaultKeybindings();
+    static const std::vector<std::string> kEmpty;
+    auto it = kDefaults.find(std::string(action));
+    if (it == kDefaults.end()) {
+        return kEmpty;
+    }
+    return it->second;
 }
 
 void WriteBuffer(std::array<char, 128> &buffer, const std::string &value) {
@@ -278,7 +288,7 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
             }
 
             if (keyboardEntries.empty() && mouseEntries.empty()) {
-                const std::vector<std::string> defaults = SplitKeyList(kKeybindings[i].defaults);
+                const auto &defaults = DefaultBindingsForAction(kKeybindings[i].action);
                 for (const auto &value : defaults) {
                     if (IsMouseBindingName(value)) {
                         mouseEntries.push_back(value);
@@ -482,7 +492,7 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
         for (std::size_t i = 0; i < kKeybindingCount; ++i) {
             std::vector<std::string> keyboardEntries;
             std::vector<std::string> mouseEntries;
-            const std::vector<std::string> defaults = SplitKeyList(kKeybindings[i].defaults);
+            const auto &defaults = DefaultBindingsForAction(kKeybindings[i].action);
             for (const auto &value : defaults) {
                 if (IsMouseBindingName(value)) {
                     mouseEntries.push_back(value);

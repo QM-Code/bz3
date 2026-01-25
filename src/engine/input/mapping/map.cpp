@@ -6,13 +6,9 @@
 namespace input {
 namespace {
 
-constexpr std::size_t ActionIndex(Action action) {
-    return static_cast<std::size_t>(action);
-}
-
 std::vector<Binding> ParseBindings(const bz::json::Value* keybindings,
-                                  Action action,
-                                  std::initializer_list<const char*> defaults) {
+                                   std::string_view actionId,
+                                   const std::vector<std::string>& defaults) {
     std::vector<Binding> bindings;
 
     auto addBinding = [&](const std::string& name) {
@@ -23,21 +19,21 @@ std::vector<Binding> ParseBindings(const bz::json::Value* keybindings,
                 bindings.push_back(*binding);
             }
         } else {
-            spdlog::warn("Input: Unknown key '{}' for action '{}'", name, ActionName(action));
+            spdlog::warn("Input: Unknown key '{}' for action '{}'", name, actionId);
         }
     };
 
     if (keybindings) {
-        const auto it = keybindings->find(ActionName(action));
+        const auto it = keybindings->find(std::string(actionId));
         if (it != keybindings->end()) {
             if (!it->is_array()) {
-                spdlog::warn("Input: keybindings.{} must be an array of strings", ActionName(action));
+                spdlog::warn("Input: keybindings.{} must be an array of strings", actionId);
             } else {
                 for (const auto &value : *it) {
                     if (value.is_string()) {
                         addBinding(value.get<std::string>());
                     } else {
-                        spdlog::warn("Input: keybindings.{} entries must be strings", ActionName(action));
+                        spdlog::warn("Input: keybindings.{} entries must be strings", actionId);
                     }
                 }
             }
@@ -45,7 +41,7 @@ std::vector<Binding> ParseBindings(const bz::json::Value* keybindings,
     }
 
     if (bindings.empty()) {
-        for (const auto *name : defaults) {
+        for (const auto &name : defaults) {
             addBinding(name);
         }
     }
@@ -55,28 +51,26 @@ std::vector<Binding> ParseBindings(const bz::json::Value* keybindings,
 
 } // namespace
 
-void InputMap::load(const bz::json::Value* keybindings) {
-    bindings_[ActionIndex(Action::Fire)] = ParseBindings(keybindings, Action::Fire, {"F", "E", "LEFT_MOUSE"});
-    bindings_[ActionIndex(Action::Spawn)] = ParseBindings(keybindings, Action::Spawn, {"U"});
-    bindings_[ActionIndex(Action::Jump)] = ParseBindings(keybindings, Action::Jump, {"SPACE"});
-    bindings_[ActionIndex(Action::QuickQuit)] = ParseBindings(keybindings, Action::QuickQuit, {"F12"});
-    bindings_[ActionIndex(Action::Chat)] = ParseBindings(keybindings, Action::Chat, {"T"});
-    bindings_[ActionIndex(Action::Escape)] = ParseBindings(keybindings, Action::Escape, {"ESCAPE"});
-    bindings_[ActionIndex(Action::ToggleFullscreen)] = ParseBindings(keybindings, Action::ToggleFullscreen, {"RIGHT_BRACKET"});
-    bindings_[ActionIndex(Action::MoveLeft)] = ParseBindings(keybindings, Action::MoveLeft, {"LEFT", "J"});
-    bindings_[ActionIndex(Action::MoveRight)] = ParseBindings(keybindings, Action::MoveRight, {"RIGHT", "L"});
-    bindings_[ActionIndex(Action::MoveForward)] = ParseBindings(keybindings, Action::MoveForward, {"UP", "I"});
-    bindings_[ActionIndex(Action::MoveBackward)] = ParseBindings(keybindings, Action::MoveBackward, {"DOWN", "K"});
+void InputMap::load(const bz::json::Value* keybindings, const DefaultBindingsMap& defaults) {
+    bindings_.clear();
+    for (const auto& [actionId, defaultList] : defaults) {
+        bindings_[actionId] = ParseBindings(keybindings, actionId, defaultList);
+    }
 }
 
-const std::vector<Binding>& InputMap::bindings(Action action) const {
-    return bindings_[ActionIndex(action)];
+const std::vector<Binding>& InputMap::bindings(std::string_view actionId) const {
+    static const std::vector<Binding> kEmptyBindings;
+    auto it = bindings_.find(std::string(actionId));
+    if (it == bindings_.end()) {
+        return kEmptyBindings;
+    }
+    return it->second;
 }
 
-std::string InputMap::bindingListDisplay(Action action) const {
-    const auto &list = bindings(action);
+std::string InputMap::bindingListDisplay(std::string_view actionId) const {
+    const auto &list = bindings(actionId);
     if (list.empty()) {
-        return "U";
+        return "Unbound";
     }
     return JoinBindingStrings(list);
 }

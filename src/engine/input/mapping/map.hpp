@@ -1,23 +1,25 @@
 #pragma once
 
 #include "common/json.hpp"
-#include "input/mapping/actions.hpp"
 #include "input/mapping/binding.hpp"
 
-#include <array>
+#include <string_view>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace input {
 
 class InputMap {
 public:
-    void load(const bz::json::Value* keybindings);
-    const std::vector<Binding>& bindings(Action action) const;
-    std::string bindingListDisplay(Action action) const;
+    using DefaultBindingsMap = std::unordered_map<std::string, std::vector<std::string>>;
+
+    void load(const bz::json::Value* keybindings, const DefaultBindingsMap& defaults);
+    const std::vector<Binding>& bindings(std::string_view actionId) const;
+    std::string bindingListDisplay(std::string_view actionId) const;
 
 private:
-    std::array<std::vector<Binding>, kAllActions.size()> bindings_{};
+    std::unordered_map<std::string, std::vector<Binding>> bindings_{};
 };
 
 } // namespace input

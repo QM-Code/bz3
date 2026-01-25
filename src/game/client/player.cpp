@@ -73,7 +73,7 @@ void Player::earlyUpdate() {
         if (grounded) {
             glm::vec2 movement(0.0f);
             if (game.getFocusState() == FOCUS_STATE_GAME)
-                movement = game.engine.input->getInputState().movement;
+                movement = game.engine.getInputState().movement;
             glm::vec3 movementVector = physics->getForwardVector();
             movementVector *= movement.y * getParameter("speed");
             movementVector.y = physics->getVelocity().y;
@@ -87,7 +87,7 @@ void Player::earlyUpdate() {
             ));
 
             if (game.getFocusState() == FOCUS_STATE_GAME) {
-                if (grounded && game.engine.input->getInputState().jump && TimeUtils::GetElapsedTime(lastJumpTime, TimeUtils::GetCurrentTime()) >= jumpCooldown) {
+                if (grounded && game.engine.getInputState().jump && TimeUtils::GetElapsedTime(lastJumpTime, TimeUtils::GetCurrentTime()) >= jumpCooldown) {
                     glm::vec3 velocity = physics->getVelocity();
                     velocity.y = getParameter("jumpSpeed");
                     physics->setVelocity(velocity);
@@ -103,7 +103,7 @@ void Player::earlyUpdate() {
         }
 
         if (game.getFocusState() == FOCUS_STATE_GAME) {
-            if (game.engine.input->getInputState().fire) {
+            if (game.engine.getInputState().fire) {
                 const glm::vec3 cameraPos = state.position + glm::vec3(0.0f, muzzleOffset.y, 0.0f);
                 const glm::vec3 muzzlePos = state.position + getForwardVector() * muzzleOffset.z +
                                             glm::vec3(0.0f, muzzleOffset.y, 0.0f);
@@ -140,7 +140,7 @@ void Player::earlyUpdate() {
 
         game.engine.ui->displayDeathScreen(true);
 
-        if (game.engine.input->getInputState().spawn) {
+        if (game.engine.getInputState().spawn) {
             ClientMsg_RequestPlayerSpawn spawnMsg;
             game.engine.network->send<ClientMsg_RequestPlayerSpawn>(spawnMsg);
         }

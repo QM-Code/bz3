@@ -20,6 +20,7 @@ ClientWorldSession::ClientWorldSession(Game &game, std::string worldDir)
                                      std::filesystem::path(worldDir),
                                      std::string{},
                                      "ClientWorldSession");
+    defaultPlayerParameters_ = game_world::ExtractDefaultPlayerParameters(content_.config);
 }
 
 ClientWorldSession::~ClientWorldSession() {
@@ -49,8 +50,9 @@ void ClientWorldSession::update() {
             game.engine.network->disconnect("Protocol version mismatch.");
             return;
         }
+        defaultPlayerParameters_.clear();
         for (const auto& [key, val] : initMsg.defaultPlayerParams) {
-            content_.defaultPlayerParameters[key] = val;
+            defaultPlayerParameters_[key] = val;
         }
         playerId = initMsg.clientId;
 
@@ -79,6 +81,9 @@ void ClientWorldSession::update() {
                     } else {
                         bz::data::MergeJsonObjects(content_.config, *worldConfigOpt);
                         content_.mergeLayer(*worldConfigOpt, downloadsDir);
+                        if (defaultPlayerParameters_.empty()) {
+                            defaultPlayerParameters_ = game_world::ExtractDefaultPlayerParameters(content_.config);
+                        }
                     }
                 }
             } else {

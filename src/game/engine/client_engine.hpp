@@ -5,6 +5,7 @@
 #include "renderer/render.hpp"
 #include "physics/physics_world.hpp"
 #include "input/input.hpp"
+#include "game/input/state.hpp"
 #include "ui/system.hpp"
 #include "audio/audio.hpp"
 #include "renderer/particle_effect_system.hpp"
@@ -26,6 +27,7 @@ public:
     Render *render;
     PhysicsWorld *physics;
     Input *input;
+    game_input::InputState inputState;
     UiSystem *ui;
     Audio *audio;
     ParticleEngine *particles;
@@ -36,4 +38,6 @@ public:
     void earlyUpdate(TimeUtils::duration deltaTime);
     void step(TimeUtils::duration deltaTime);
     void lateUpdate(TimeUtils::duration deltaTime);
+
+    const game_input::InputState& getInputState() const { return inputState; }
 };

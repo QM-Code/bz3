@@ -1,7 +1,5 @@
 #pragma once
 
-#include "core/types.hpp"
-
 #include <filesystem>
 #include <map>
 #include "common/json.hpp"
@@ -25,7 +23,6 @@ struct WorldContent {
     std::string name;
     std::filesystem::path rootDir;
     bz::json::Value config;
-    PlayerParameters defaultPlayerParameters;
     AssetCatalog assets;
 
     void mergeLayer(const bz::json::Value& layerJson, const std::filesystem::path& baseDir);

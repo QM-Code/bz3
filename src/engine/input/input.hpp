@@ -1,9 +1,10 @@
 #pragma once
 
 #include <string>
+#include <string_view>
+#include <unordered_map>
 #include <vector>
 
-#include "core/types.hpp"
 #include "platform/events.hpp"
 #include "input/mapping/mapper.hpp"
 
@@ -16,20 +17,20 @@ class Input {
 
 private:
     input::InputMapper mapper_;
+    input::InputMap::DefaultBindingsMap defaultBindings_{};
 
-    InputState inputState;
     platform::Window *window = nullptr;
+    std::vector<platform::Event> lastEvents_;
 
-    Input(platform::Window &window);
+    Input(platform::Window &window, input::InputMap::DefaultBindingsMap defaultBindings);
     ~Input() = default;
 
     void loadKeyBindings();
     void update(const std::vector<platform::Event> &events);
 
 public:
-    const InputState &getInputState() const;
-    void clearState();
+    bool actionTriggered(std::string_view actionId) const;
+    bool actionDown(std::string_view actionId) const;
     void reloadKeyBindings();
-    std::string spawnHintText() const;
-    std::string bindingListDisplay(input::Action action) const;
+    std::string bindingListDisplay(std::string_view actionId) const;
 };
