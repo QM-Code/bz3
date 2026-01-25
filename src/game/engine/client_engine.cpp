@@ -1,6 +1,8 @@
 #include "engine/client_engine.hpp"
 #include "core/types.hpp"
 #include "game/net/messages.hpp"
+#include "game/input/bindings.hpp"
+#include "game/input/state.hpp"
 #include "spdlog/spdlog.h"
 #include "ui/render_bridge.hpp"
 #include <glad/glad.h>
@@ -34,12 +36,12 @@ ClientEngine::ClientEngine(platform::Window &window) {
     uiRenderBridge = std::make_unique<RenderBridgeImpl>(render);
     physics = new PhysicsWorld();
     spdlog::trace("ClientEngine: Physics initialized successfully");
-    input = new Input(window);
+    input = new Input(window, game_input::DefaultKeybindings());
     spdlog::trace("ClientEngine: Input initialized successfully");
     ui = new UiSystem(window);
     ui->setRenderBridge(uiRenderBridge.get());
     spdlog::trace("ClientEngine: UiSystem initialized successfully");
-    ui->setSpawnHint(input->spawnHintText());
+    ui->setSpawnHint(game_input::SpawnHintText(*input));
     audio = new Audio();
     spdlog::trace("ClientEngine: Audio initialized successfully");
     particles = new ParticleEngine();
@@ -68,6 +70,7 @@ void ClientEngine::earlyUpdate(TimeUtils::duration deltaTime) {
     if (input) {
         input->update(events);
     }
+    inputState = game_input::BuildInputState(*input);
     if (window) {
         window->clearEvents();
     }
@@ -93,7 +96,7 @@ void ClientEngine::lateUpdate(TimeUtils::duration deltaTime) {
     ui->update();
     if (ui->consumeKeybindingsReloadRequest()) {
         input->reloadKeyBindings();
-        ui->setSpawnHint(input->spawnHintText());
+        ui->setSpawnHint(game_input::SpawnHintText(*input));
     }
     network->flushPeekedMessages();
 }

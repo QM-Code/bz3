@@ -3,6 +3,7 @@
 #include "core/types.hpp"
 #include "game/net/messages.hpp"
 #include "physics/static_body.hpp"
+#include "game/world/config.hpp"
 #include "world/backend.hpp"
 #include "world/content.hpp"
 
@@ -21,6 +22,7 @@ private:
     render_id renderId{};
     PhysicsStaticBody physics;
     world::WorldContent content_;
+    PlayerParameters defaultPlayerParameters_;
     bool initialized = false;
 
     std::string serverName;
@@ -39,6 +41,6 @@ public:
     std::filesystem::path resolveAssetPath(const std::string &assetName) const;
 
     PlayerParameters defaultPlayerParameters() const {
-        return content_.defaultPlayerParameters;
+        return defaultPlayerParameters_;
     }
 };

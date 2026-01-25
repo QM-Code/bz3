@@ -59,7 +59,7 @@ void Game::earlyUpdate(TimeUtils::duration deltaTime) {
         spdlog::trace("Game: Player created successfully");
     }
 
-    if (focusState == FOCUS_STATE_GAME && engine.input->getInputState().chat) {
+    if (focusState == FOCUS_STATE_GAME && engine.getInputState().chat) {
         focusState = FOCUS_STATE_CONSOLE;
         spdlog::trace("Game: Switching focus to console");
         console->focusChatInput();

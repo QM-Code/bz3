@@ -1,6 +1,6 @@
 #include "physics/backends/jolt/static_body_jolt.hpp"
 #include "physics/backends/jolt/physics_world_jolt.hpp"
-#include "renderer/mesh_loader.hpp"
+#include "engine/geometry/mesh_loader.hpp"
 #include <Jolt/Physics/Body/Body.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 #include <Jolt/Physics/Body/BodyInterface.h>

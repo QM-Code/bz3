@@ -112,6 +112,8 @@ BZ3 uses a consistent interface → backend pattern for several subsystems. Engi
 Entry points (public interfaces)
 - Audio: `Audio` in `src/engine/audio/audio.hpp`
 - Windowing: `Window` in `src/engine/platform/window.hpp`
+- Graphics: `GraphicsDevice` in `src/engine/graphics/device.hpp`
+- Renderer orchestration: `Render` in `src/game/renderer/render.hpp`
 - UI: `UiSystem` in `src/game/ui/system.hpp`
 - UI render bridge: `ui::RenderBridge` in `src/game/ui/render_bridge.hpp`
 - Physics: `PhysicsWorld` in `src/engine/physics/physics_world.hpp`
@@ -131,10 +133,11 @@ Backend layouts (examples)
 - `src/engine/platform/backends/glfw/` and `src/engine/platform/backends/sdl/`
 - `src/game/ui/backends/imgui/` and `src/game/ui/backends/rmlui/`
 - `src/engine/physics/backends/jolt/` and `src/engine/physics/backends/bullet/`
-- `src/engine/renderer/backends/threepp/` (future: ogre, wicked, etc.)
+- `src/engine/graphics/backends/threepp/` (future: ogre, wicked, etc.)
 - `src/game/net/backends/enet/` (future: steam, webrtc, etc.)
 - `src/engine/world/backends/fs/` (future: zip, remote, etc.)
-- `src/engine/input/mapping/` (action mappings: bindings, maps, mapper)
+- `src/engine/input/mapping/` (action-agnostic mapping: bindings, maps, mapper)
+- `src/game/input/` (BZ3 action IDs + default bindings)
 
 ## Build options (backend selection)
 

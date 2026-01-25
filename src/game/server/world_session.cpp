@@ -31,6 +31,7 @@ ServerWorldSession::ServerWorldSession(Game &game,
                                      std::filesystem::path(worldDir),
                                      std::move(worldName),
                                      "ServerWorldSession");
+    defaultPlayerParameters_ = game_world::ExtractDefaultPlayerParameters(content_.config);
 
     if (archiveOnStartup) {
         archiveCache = buildArchive();
@@ -71,7 +72,7 @@ void ServerWorldSession::sendWorldInit(client_id clientId) {
     initHeaderMsg.serverName = serverName;
     initHeaderMsg.worldName = content_.name;
     initHeaderMsg.protocolVersion = NET_PROTOCOL_VERSION;
-    initHeaderMsg.defaultPlayerParams = content_.defaultPlayerParameters;
+    initHeaderMsg.defaultPlayerParams = defaultPlayerParameters_;
     initHeaderMsg.worldData = worldData;
     game.engine.network->send<ServerMsg_Init>(clientId, &initHeaderMsg);
 

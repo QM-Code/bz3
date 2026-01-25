@@ -48,8 +48,15 @@ src/
     platform/
         glfw_user_pointer.hpp          # GLFW callback indirection
 
-    renderer/
-        render.*                       # threepp scene/camera/renderer; loads models via Assimp
+    engine/graphics/
+        device.*                       # engine-agnostic graphics API + backend selection
+        backends/threepp/*             # threepp backend implementation
+
+    game/renderer/
+        render.*                       # BZ3 render orchestration (radar, models, camera)
+
+    geometry/
+        mesh_loader.*                  # Assimp mesh loading helpers
         mesh_loader.*                  # Loads GLB meshes for physics/render helpers
         particle_effect_system.*       # Client particle effects
 
@@ -265,13 +272,13 @@ If you see “connected but nothing happens”, follow this exact chain and veri
 
 ### Render (client)
 
-`src/engine/renderer/render.*` owns:
+`src/game/renderer/render.*` owns BZ3 render orchestration on top of the engine graphics device:
 
-- a threepp `Scene`
-- a `PerspectiveCamera`
-- a renderer bound to the GLFW/OpenGL context
+- `GraphicsDevice` (engine) exposes an engine-agnostic render API.
+- The threepp backend owns the scene/cameras and model loading.
+- `Render` manages radar targets, layers, and gameplay-facing `render_id`s.
 
-Models are loaded via `threepp::AssimpLoader` (GLB/Assimp formats). Gameplay stores a `render_id` per object and updates transforms each frame.
+Gameplay stores a `render_id` per object and updates transforms each frame.
 
 ### UiSystem (client)
 

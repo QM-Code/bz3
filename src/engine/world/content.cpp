@@ -56,14 +56,6 @@ void WorldContent::mergeLayer(const bz::json::Value& layerJson, const std::files
             assets.mergeFromJson(*assetsIt, baseDir);
         }
     }
-
-    if (layerJson.contains("defaultPlayerParameters") && layerJson["defaultPlayerParameters"].is_object()) {
-        for (const auto& [key, value] : layerJson["defaultPlayerParameters"].items()) {
-            if (value.is_number()) {
-                defaultPlayerParameters[key] = value.get<float>();
-            }
-        }
-    }
 }
 
 std::filesystem::path WorldContent::resolveAssetPath(const std::string& key, const char* logContext) const {

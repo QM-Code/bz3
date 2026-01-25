@@ -14,6 +14,7 @@
 #include "common/json.hpp"
 
 #include "common/data_path_resolver.hpp"
+#include "game/input/bindings.hpp"
 #include "spdlog/spdlog.h"
 
 namespace ui {
@@ -22,21 +23,20 @@ namespace {
 struct KeybindingDefinition {
     const char *action;
     const char *label;
-    const char *defaults;
 };
 
 constexpr KeybindingDefinition kKeybindings[] = {
-    {"moveForward", "Move Forward", "UP, I"},
-    {"moveBackward", "Move Backward", "DOWN, K"},
-    {"moveLeft", "Move Left", "LEFT, J"},
-    {"moveRight", "Move Right", "RIGHT, L"},
-    {"jump", "Jump", "SPACE"},
-    {"fire", "Fire", "F, E, LEFT_MOUSE"},
-    {"spawn", "Spawn", "U"},
-    {"chat", "Chat", "T"},
-    {"toggleFullscreen", "Toggle Fullscreen", "RIGHT_BRACKET"},
-    {"escape", "Escape Menu", "ESCAPE"},
-    {"quickQuit", "Quick Quit", "F12"}
+    {"moveForward", "Move Forward"},
+    {"moveBackward", "Move Backward"},
+    {"moveLeft", "Move Left"},
+    {"moveRight", "Move Right"},
+    {"jump", "Jump"},
+    {"fire", "Fire"},
+    {"spawn", "Spawn"},
+    {"chat", "Chat"},
+    {"toggleFullscreen", "Toggle Fullscreen"},
+    {"escape", "Escape Menu"},
+    {"quickQuit", "Quick Quit"}
 };
 
 bool isMouseBindingName(const std::string &name) {
@@ -90,6 +90,16 @@ std::string joinEntries(const std::vector<std::string> &entries) {
         first = false;
     }
     return oss.str();
+}
+
+const std::vector<std::string>& defaultBindingsForAction(std::string_view action) {
+    static const game_input::DefaultBindingsMap kDefaults = game_input::DefaultKeybindings();
+    static const std::vector<std::string> kEmpty;
+    auto it = kDefaults.find(std::string(action));
+    if (it == kDefaults.end()) {
+        return kEmpty;
+    }
+    return it->second;
 }
 
 std::string escapeRmlText(std::string_view text) {
@@ -307,7 +317,7 @@ void RmlUiPanelSettings::loadBindings() {
         }
 
         if (keyboardEntries.empty() && mouseEntries.empty()) {
-            const std::vector<std::string> defaults = splitKeyList(kKeybindings[i].defaults);
+            const auto &defaults = defaultBindingsForAction(kKeybindings[i].action);
             for (const auto &value : defaults) {
                 if (isMouseBindingName(value)) {
                     mouseEntries.push_back(value);
@@ -512,7 +522,7 @@ void RmlUiPanelSettings::resetBindings() {
     for (std::size_t i = 0; i < std::size(kKeybindings); ++i) {
         std::vector<std::string> keyboardEntries;
         std::vector<std::string> mouseEntries;
-        const std::vector<std::string> defaults = splitKeyList(kKeybindings[i].defaults);
+        const auto &defaults = defaultBindingsForAction(kKeybindings[i].action);
         for (const auto &value : defaults) {
             if (isMouseBindingName(value)) {
                 mouseEntries.push_back(value);

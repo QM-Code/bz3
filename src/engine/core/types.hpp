@@ -11,17 +11,6 @@
 #include <thread>
 #include <map>
 
-typedef struct InputState {
-    bool fire;
-    bool spawn;
-    bool jump;
-    bool quickQuit;
-    bool chat;
-    bool escape;
-    bool toggleFullscreen;
-    glm::vec2 movement;
-} InputState;
-
 using SettingsMap = std::unordered_map<std::string, float>;
 using ConfigMap = std::unordered_map<std::string, float>;
 

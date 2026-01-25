@@ -193,7 +193,7 @@ list(APPEND SERVER_SOURCES
 ## Separate engine sources for client and server to avoid over-linking
 set(ENGINE_CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/game/engine/client_engine.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/renderer/mesh_loader.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/geometry/mesh_loader.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/world/content.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/world/backend_factory.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/world/backends/fs/backend.cpp
@@ -205,19 +205,23 @@ set(ENGINE_CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/game/net/proto_codec.cpp
     ${PROJECT_SOURCE_DIR}/src/game/net/backends/enet/client_backend.cpp
     ${PROJECT_SOURCE_DIR}/src/game/net/backends/enet/server_backend.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/renderer/render.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/renderer/backend_factory.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/world/config.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/renderer/render.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/graphics/device.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/graphics/backend_factory.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/input/input.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/input/mapping/binding.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/input/mapping/map.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/input/mapping/mapper.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/input/bindings.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/input/state.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/platform/window_factory.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/system.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/backend_factory.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/third_party/stb_image_impl.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/audio/audio.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/audio/backend_factory.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/renderer/particle_effect_system.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/renderer/particle_effect_system.cpp
 )
 if(BZ3_WINDOW_BACKEND STREQUAL "glfw")
     list(APPEND ENGINE_CLIENT_SOURCES ${PROJECT_SOURCE_DIR}/src/engine/platform/backends/window_glfw.cpp)
@@ -266,7 +270,7 @@ elseif(BZ3_UI_BACKEND STREQUAL "rmlui")
 endif()
 set(ENGINE_SERVER_SOURCES
     ${PROJECT_SOURCE_DIR}/src/game/engine/server_engine.cpp
-    ${PROJECT_SOURCE_DIR}/src/engine/renderer/mesh_loader.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/geometry/mesh_loader.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/world/content.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/world/backend_factory.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/world/backends/fs/backend.cpp
@@ -278,6 +282,7 @@ set(ENGINE_SERVER_SOURCES
     ${PROJECT_SOURCE_DIR}/src/game/net/proto_codec.cpp
     ${PROJECT_SOURCE_DIR}/src/game/net/backends/enet/client_backend.cpp
     ${PROJECT_SOURCE_DIR}/src/game/net/backends/enet/server_backend.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/world/config.cpp
 )
 
 set(PHYSICS_SOURCES
@@ -320,7 +325,7 @@ endif()
 
 if(BZ3_RENDER_BACKEND STREQUAL "threepp")
     list(APPEND ENGINE_CLIENT_SOURCES
-        ${PROJECT_SOURCE_DIR}/src/engine/renderer/backends/threepp/backend.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/graphics/backends/threepp/backend.cpp
     )
 endif()
 
