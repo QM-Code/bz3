@@ -73,10 +73,10 @@ src/
     common/
         data_path_resolver.*           # BZ3_DATA_DIR resolution + config layering + asset lookup
 
-    protos/
+    game/protos/
         messages.proto                 # Protobuf wire schema (ClientMsg/ServerMsg)
 
-    network/
+    game/net/
         discovery_protocol.hpp         # UDP LAN discovery packet format
 
 data/
@@ -99,7 +99,7 @@ Configuration is **layered JSON** merged into a single “config cache”:
 - Client initializes layers: `data/common/config.json` → `data/client/config.json` → user config (created if missing).
 - Server initializes layers: `data/common/config.json` → `data/server/config.json` → selected world `config.json`.
 
-This is implemented in `src/common/data_path_resolver.*`. It also builds an **asset key lookup** by flattening `assets.*` and `fonts.*` entries across layers.
+This is implemented in `src/engine/common/data_path_resolver.*`. It also builds an **asset key lookup** by flattening `assets.*` and `fonts.*` entries across layers.
 
 Practical implication:
 
@@ -114,7 +114,7 @@ The code keeps a per-user config directory (platform-specific) and uses it for:
 
 On Linux this typically ends up under `$XDG_CONFIG_HOME/bz3` or `~/.config/bz3`.
 
-Relevant helpers live in `src/common/data_path_resolver.*`:
+Relevant helpers live in `src/engine/common/data_path_resolver.*`:
 
 - `UserConfigDirectory()`
 - `EnsureUserConfigFile("config.json")`
@@ -123,8 +123,8 @@ Relevant helpers live in `src/common/data_path_resolver.*`:
 
 ### Engine vs gameplay
 
-- **Engine** classes (`src/engine/...`) wrap subsystems: rendering, physics, networking, input, audio, UiSystem.
-- **Gameplay** classes (`src/client/...`, `src/server/...`) define the game rules and state: players, shots, world loading, chat.
+- **Engine** classes (`src/engine/...`) wrap subsystems: rendering, physics, networking, input, audio.
+- **Gameplay** classes (`src/game/client/...`, `src/game/server/...`) define the game rules and state: players, shots, world loading, chat.
 
 The engine exposes direct pointers (e.g. `engine.render`, `engine.physics`, `engine.network`) and the gameplay layer calls into these systems.
 
@@ -132,7 +132,7 @@ The engine exposes direct pointers (e.g. `engine.render`, `engine.physics`, `eng
 
 ### Client main loop
 
-The client loop lives in `src/client/main.cpp`.
+The client loop lives in `src/game/client/main.cpp`.
 
 High-level per-frame ordering:
 
@@ -160,7 +160,7 @@ The important pattern is **peek + flush**: gameplay “peeks” messages it want
 
 ### Server main loop
 
-The server loop lives in `src/server/main.cpp`.
+The server loop lives in `src/game/server/main.cpp`.
 
 High-level per-frame ordering:
 
@@ -181,14 +181,14 @@ High-level per-frame ordering:
 ### Transport + protocol
 
 - Transport: **ENet** (reliable UDP).
-- Schema: **protobuf** in `src/protos/messages.proto`.
+- Schema: **protobuf** in `src/game/protos/messages.proto`.
 
 The network components decode protobuf messages and translate them into simple C++ structs (`ClientMsg_*`, `ServerMsg_*`) stored in an internal queue.
 
 Key files:
 
-- Client network: `src/client_network.*`
-- Server network: `src/server_network.*`
+- Client network: `src/game/net/client_network.*`
+- Server network: `src/game/net/server_network.*`
 
 ### Message lifecycle (peek/flush)
 
@@ -199,7 +199,7 @@ Both client and server store received messages as heap-allocated structs and/or 
 
 If you add a new message type, you must:
 
-1. Update `src/protos/messages.proto`.
+1. Update `src/game/protos/messages.proto`.
 2. Update the encode/decode glue in the network components.
 3. Add handling in the appropriate gameplay layer.
 
@@ -207,7 +207,7 @@ If you add a new message type, you must:
 
 ### Server side
 
-`src/server/world.*` loads config and assets for the selected world.
+`src/game/server/world_session.*` loads config and assets for the selected world.
 
 If the server is launched with a “custom world directory” (CLI), it can zip that directory on startup and later send it to connecting clients via `ServerMsg_Init.worldData`.
 
@@ -220,7 +220,7 @@ On a new connection, the server sends:
 
 ### Client side
 
-`src/client/world.*` waits for `ServerMsg_Init`.
+`src/game/client/world_session.*` waits for `ServerMsg_Init`.
 
 If `worldData` is present:
 
@@ -265,7 +265,7 @@ If you see “connected but nothing happens”, follow this exact chain and veri
 
 ### Render (client)
 
-`src/render.*` owns:
+`src/engine/renderer/render.*` owns:
 
 - a threepp `Scene`
 - a `PerspectiveCamera`
@@ -275,7 +275,7 @@ Models are loaded via `threepp::AssimpLoader` (GLB/Assimp formats). Gameplay sto
 
 ### UiSystem (client)
 
-`src/ui.*` owns Dear ImGui setup and two major views:
+`src/game/ui.*` owns Dear ImGui setup and two major views:
 
 - **Community browser** view (when not connected)
 - **HUD/console** view (when in game)
@@ -284,18 +284,18 @@ Fonts are loaded via `ResolveConfiguredAsset(...)` using configured font keys.
 
 ### Input (client)
 
-`src/input.*` translates GLFW key state into an `InputState` struct. Gameplay reads this from `engine.input->getInputState()`.
+`src/engine/input.*` translates GLFW key state into an `InputState` struct. Gameplay reads this from `engine.input->getInputState()`.
 
 ### Audio (client)
 
-`src/audio.*` wraps miniaudio:
+`src/engine/audio.*` wraps miniaudio:
 
 - `Audio::loadClip(path, maxInstances)` pools multiple instances to avoid “dropouts” when many events occur (e.g. rapid firing).
 - Listener position and direction are updated from the local player each frame.
 
 ### Physics (client + server)
 
-`src/physics/physics_world.*` wraps Bullet.
+`src/engine/physics/physics_world.*` wraps Bullet.
 
 - The world steps at fixed timestep substeps.
 - `createStaticMesh()` loads a GLB and builds convex hull shapes per mesh.
@@ -305,45 +305,45 @@ Fonts are loaded via `ResolveConfiguredAsset(...)` using configured font keys.
 
 ### Client gameplay
 
-- `Game` (`src/client/game.*`): owns `World`, `Player`, remote `Client` objects, and `Shot` list; handles focus switching between HUD and chat.
-- `World` (`src/client/world.*`): merges assets + defaults, receives server init, unzips/merges world layer, creates render+physics world.
-- `Player` (`src/client/player.*`):
+- `Game` (`src/game/client/game.*`): owns `World`, `Player`, remote `Client` objects, and `Shot` list; handles focus switching between HUD and chat.
+- `World` (`src/game/client/world_session.*`): merges assets + defaults, receives server init, unzips/merges world layer, creates render+physics world.
+- `Player` (`src/game/client/player.*`):
     - Sends `ClientMsg_Init` once on construction.
     - Handles spawn request (`ClientMsg_RequestPlayerSpawn`).
     - Applies movement/jump/fire based on `InputState`.
     - Sends location updates when position/rotation exceed thresholds.
-- `Shot` (`src/client/shot.*`):
+- `Shot` (`src/game/client/shot.*`):
     - Local shots send `ClientMsg_CreateShot` with a local shot id.
     - Replicated shots use a global id from the server.
     - Client simulates shot motion and does a physics raycast each tick for ricochet.
 
 ### Server gameplay
 
-- `Game` (`src/server/game.*`): authoritative hub; creates `Client` objects on join and updates shots/clients/chat/world.
-- `Client` (`src/server/client.*`): authoritative per-player state; handles initialization, spawn, location forwarding, parameter updates, and death.
-- `Shot` (`src/server/shot.*`): authoritative creation/expiry + hit checks; sends create/remove messages.
-- `Chat` (`src/server/chat.*`): routes chat; offers plugin interception.
-- `World` (`src/server/world.*`): world config/assets + optional world zip distribution.
+- `Game` (`src/game/server/game.*`): authoritative hub; creates `Client` objects on join and updates shots/clients/chat/world.
+- `Client` (`src/game/server/client.*`): authoritative per-player state; handles initialization, spawn, location forwarding, parameter updates, and death.
+- `Shot` (`src/game/server/shot.*`): authoritative creation/expiry + hit checks; sends create/remove messages.
+- `Chat` (`src/game/server/chat.*`): routes chat; offers plugin interception.
+- `World` (`src/game/server/world_session.*`): world config/assets + optional world zip distribution.
 
 ## Community browser and discovery
 
 There are two server discovery sources:
 
 1. **LAN discovery**
-     - Protocol: `src/network/discovery_protocol.hpp`
-     - Server responder: `src/server/server_discovery.*` (UDP port 47800)
-     - Client scanner: `src/client/server/server_discovery.*`
+     - Protocol: `src/game/net/discovery_protocol.hpp`
+     - Server responder: `src/game/server/server_discovery.*` (UDP port 47800)
+     - Client scanner: `src/game/client/server/server_discovery.*`
 
 2. **Remote server lists (HTTP JSON)**
-     - Fetch: `src/client/server/server_list_fetcher.*` (libcurl)
-     - Orchestration: `src/client/server/community_browser_controller.*`
-     - UI: `src/ui/backends/*/console/console.*`
+     - Fetch: `src/game/client/server/server_list_fetcher.*` (libcurl)
+     - Orchestration: `src/game/client/server/community_browser_controller.*`
+     - UI: `src/game/ui/backends/*/console/console.*`
 
 The server browser controller merges results from LAN + remote lists into a single list of UI entries and delegates connection to `ServerConnector`.
 
 ## Plugins (server)
 
-The server embeds Python using pybind11 (`src/server/plugin.*`).
+The server embeds Python using pybind11 (`src/game/server/plugin.*`).
 
 At startup the server:
 
@@ -360,13 +360,13 @@ Plugin callbacks are keyed by `ClientMsg_Type` and currently invoked from gamepl
 
 ## “Where do I implement X?” cheat sheet
 
-- **Main loop timing / ordering**: `src/client/main.cpp`, `src/server/main.cpp`, `src/engine/*_engine.*`
-- **New networked feature**: `src/protos/messages.proto` + `src/*_network.*` + gameplay handler in `src/client/*` and/or `src/server/*`
-- **World loading / packaging**: `src/server/world.*` and `src/client/world.*`
-- **Physics issues**: `src/physics/physics_world.*` (and GLB meshes used by world assets)
-- **UI/HUD**: `src/ui/` (backend entry + backends/*/hud)
-- **Community browser**: `src/client/server/*` (control) + `src/ui/backends/*/console/console.*` (view)
-- **Plugins / moderation / commands**: `src/server/plugin.*` and `data/plugins/*`
+- **Main loop timing / ordering**: `src/game/client/main.cpp`, `src/game/server/main.cpp`, `src/game/engine/*_engine.*`
+- **New networked feature**: `src/game/protos/messages.proto` + `src/game/net/*` + gameplay handler in `src/game/client/*` and/or `src/game/server/*`
+- **World loading / packaging**: `src/game/server/world_session.*` and `src/game/client/world_session.*`
+- **Physics issues**: `src/engine/physics/physics_world.*` (and GLB meshes used by world assets)
+- **UI/HUD**: `src/game/ui/` (backend entry + backends/*/hud)
+- **Community browser**: `src/game/client/server/*` (control) + `src/game/ui/backends/*/console/console.*` (view)
+- **Plugins / moderation / commands**: `src/game/server/plugin.*` and `data/plugins/*`
 
 ## Common gotchas
 

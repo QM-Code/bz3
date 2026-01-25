@@ -8,19 +8,20 @@ This file provides quick, repo-specific instructions for coding agents.
 - Runtime assets/config resolve from `BZ3_DATA_DIR` (usually `data/`).
 
 ## Key directories
-- `src/client/`: client gameplay and main loop.
-- `src/server/`: server gameplay and main loop.
-- `src/engine/`: client/server engine orchestrators.
-- `src/core/`: shared types and constants.
-- `src/render/`: rendering, mesh loading, particles.
-- `src/audio/`: audio system.
-- `src/input/`: input handling.
-- `src/physics/`: physics world and bodies.
-- `src/network/`: networking (client/server, transports, codec).
-- `src/platform/`: platform glue (GLFW callbacks).
-- `src/ui/`: UI entry point, backends, and shared UI interfaces.
-- `src/common/`: config/data root resolution helpers.
-- `src/protos/`: protobuf schema.
+- `src/game/client/`: client gameplay and main loop.
+- `src/game/server/`: server gameplay and main loop.
+- `src/game/engine/`: BZ3-specific engine orchestrators.
+- `src/engine/core/`: shared types and constants.
+- `src/engine/renderer/`: rendering, mesh loading, particles.
+- `src/engine/audio/`: audio system.
+- `src/engine/input/`: input handling.
+- `src/engine/physics/`: physics world and bodies.
+- `src/engine/network/`: networking transports.
+- `src/game/net/`: game protocol, codec, and message-level networking.
+- `src/engine/platform/`: platform glue (GLFW callbacks).
+- `src/game/ui/`: UI entry point, backends, and shared UI interfaces.
+- `src/engine/common/`: config/data root resolution helpers.
+- `src/game/protos/`: protobuf schema.
 - `data/`: configs, assets, worlds, plugins.
 - `webserver/`: optional Python community server.
 
@@ -39,11 +40,11 @@ Windows:
 - `build\Release\bz3-server.exe`
 
 ## Common workflows
-- New networked feature: update `src/protos/messages.proto`, then encode/decode in
-  `src/*_network.*`, then handle in `src/client/*` and/or `src/server/*`.
-- World loading changes: `src/server/world.*` and `src/client/world.*`.
-- UI/HUD changes: `src/ui.*`.
-- Plugins: `src/server/plugin.*` and `data/plugins/*`.
+- New networked feature: update `src/game/protos/messages.proto`, then encode/decode in
+  `src/game/net/*`, then handle in `src/game/client/*` and/or `src/game/server/*`.
+- World loading changes: `src/game/server/world_session.*` and `src/game/client/world_session.*`.
+- UI/HUD changes: `src/game/ui.*`.
+- Plugins: `src/game/server/plugin.*` and `data/plugins/*`.
 
 ## Notes / gotchas
 - Config is layered via `src/common/data_path_resolver.*`; prefer asset keys over hard paths.
