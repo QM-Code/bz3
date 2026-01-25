@@ -45,6 +45,11 @@ public:
 
     unsigned int getRenderTargetTextureId(RenderTargetId target) const;
 
+    void setUiOverlayTexture(unsigned int textureId, int width, int height);
+    void setUiOverlayVisible(bool visible);
+    void renderUiOverlay();
+    void setBrightness(float brightness);
+
     void setPosition(EntityId entity, const glm::vec3& position);
     void setRotation(EntityId entity, const glm::quat& rotation);
     void setScale(EntityId entity, const glm::vec3& scale);

@@ -94,8 +94,9 @@ void ClientWorldSession::update() {
             spdlog::debug("ClientWorldSession: Received bundled world indication; skipping download");
         }
 
-        renderId = game.engine.render->create(resolveAssetPath("world").string());
-        physics = game.engine.physics->createStaticMesh(resolveAssetPath("world").string());
+        const auto worldPath = resolveAssetPath("world");
+        renderId = game.engine.render->create(worldPath.string());
+        physics = game.engine.physics->createStaticMesh(worldPath.string());
 
         spdlog::info("ClientWorldSession: World initialized from server");
         initialized = true;

@@ -413,6 +413,11 @@ unsigned int ThreeppBackend::getRenderTargetTextureId(graphics::RenderTargetId t
     return texId.value_or(0);
 }
 
+void ThreeppBackend::setBrightness(float brightness) {
+    const float clamped = std::clamp(brightness, 0.2f, 3.0f);
+    renderer.toneMappingExposure = clamped;
+}
+
 void ThreeppBackend::setPosition(graphics::EntityId entity, const glm::vec3& position) {
     auto it = entities_.find(entity);
     if (it == entities_.end() || !it->second.object) {

@@ -9,6 +9,7 @@
 #include "client/config_client.hpp"
 #include "client/server/community_browser_controller.hpp"
 #include "client/server/server_connector.hpp"
+#include "game/common/data_path_spec.hpp"
 #include "common/data_dir_override.hpp"
 #include "common/data_path_resolver.hpp"
 #include "common/config_helpers.hpp"
@@ -59,6 +60,8 @@ void ConfigureLogging(spdlog::level::level_enum level, bool includeTimestamp) {
 
 int main(int argc, char *argv[]) {
     ConfigureLogging(spdlog::level::info, false);
+
+    game_common::ConfigureDataPathSpec();
 
     const bz::data::DataDirOverrideResult dataDirResult = bz::data::ApplyDataDirOverrideFromArgs(argc, argv);
 

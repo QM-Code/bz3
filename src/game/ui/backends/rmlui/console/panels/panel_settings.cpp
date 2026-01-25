@@ -4,8 +4,10 @@
 #include <RmlUi/Core/ElementDocument.h>
 #include <RmlUi/Core/EventListener.h>
 #include <RmlUi/Core/Input.h>
+#include <RmlUi/Core/Elements/ElementFormControlInput.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cctype>
 #include <filesystem>
 #include <fstream>
@@ -203,6 +205,32 @@ private:
     RmlUiPanelSettings *panel = nullptr;
 };
 
+class RmlUiPanelSettings::BrightnessListener final : public Rml::EventListener {
+public:
+    explicit BrightnessListener(RmlUiPanelSettings *panelIn) : panel(panelIn) {}
+
+    void ProcessEvent(Rml::Event &event) override {
+        if (!panel) {
+            return;
+        }
+        auto *target = event.GetTargetElement();
+        auto *input = rmlui_dynamic_cast<Rml::ElementFormControlInput*>(target);
+        if (!input) {
+            return;
+        }
+        const std::string value = input->GetValue();
+        try {
+            const float brightness = std::stof(value);
+            panel->setRenderBrightness(brightness, true);
+        } catch (...) {
+            return;
+        }
+    }
+
+private:
+    RmlUiPanelSettings *panel = nullptr;
+};
+
 RmlUiPanelSettings::RmlUiPanelSettings()
     : RmlUiPanel("settings", "client/ui/console_panel_settings.rml") {}
 
@@ -222,6 +250,8 @@ void RmlUiPanelSettings::onLoaded(Rml::ElementDocument *doc) {
     clearButton = document->GetElementById("bindings-clear");
     saveButton = document->GetElementById("bindings-save");
     resetButton = document->GetElementById("bindings-reset");
+    brightnessSlider = document->GetElementById("settings-brightness-slider");
+    brightnessValueLabel = document->GetElementById("settings-brightness-value");
 
     listeners.clear();
     if (clearButton) {
@@ -247,6 +277,12 @@ void RmlUiPanelSettings::onLoaded(Rml::ElementDocument *doc) {
     if (document) {
         auto listener = std::make_unique<SettingsMouseListener>(this);
         document->AddEventListener("mousedown", listener.get());
+        listeners.emplace_back(std::move(listener));
+    }
+    if (brightnessSlider) {
+        auto listener = std::make_unique<BrightnessListener>(this);
+        brightnessSlider->AddEventListener("change", listener.get());
+        brightnessSlider->AddEventListener("input", listener.get());
         listeners.emplace_back(std::move(listener));
     }
 
@@ -280,6 +316,8 @@ void RmlUiPanelSettings::loadBindings() {
     if (!loadedConfig) {
         showStatus("Failed to load user config; showing defaults.", true);
     }
+    loadRenderSettings(userConfig);
+    syncRenderBrightnessControls();
 
     const bz::json::Value *bindingsNode = nullptr;
     if (auto it = userConfig.find("keybindings"); it != userConfig.end() && it->is_object()) {
@@ -509,6 +547,8 @@ void RmlUiPanelSettings::saveBindings() {
         eraseNestedConfig(userConfig, {"gui", "keybindings", "controller"});
     }
 
+    saveRenderSettings(userConfig);
+
     std::string error;
     if (!saveUserConfig(userConfig, error)) {
         showStatus(error.empty() ? "Failed to save bindings." : error, true);
@@ -541,6 +581,7 @@ void RmlUiPanelSettings::resetBindings() {
     } else {
         eraseNestedConfig(userConfig, {"keybindings"});
         eraseNestedConfig(userConfig, {"gui", "keybindings", "controller"});
+        eraseNestedConfig(userConfig, {"render", "brightness"});
         std::string error;
         if (!saveUserConfig(userConfig, error)) {
             showStatus(error.empty() ? "Failed to reset bindings." : error, true);
@@ -551,6 +592,55 @@ void RmlUiPanelSettings::resetBindings() {
     }
 
     rebuildBindings();
+    setRenderBrightness(1.0f, false);
+}
+
+float RmlUiPanelSettings::getRenderBrightness() const {
+    return renderBrightness;
+}
+
+void RmlUiPanelSettings::loadRenderSettings(const bz::json::Value &userConfig) {
+    renderBrightness = 1.0f;
+    if (!userConfig.is_object()) {
+        return;
+    }
+    if (auto renderIt = userConfig.find("render"); renderIt != userConfig.end() && renderIt->is_object()) {
+        if (auto brightIt = renderIt->find("brightness"); brightIt != renderIt->end() && brightIt->is_number()) {
+            renderBrightness = static_cast<float>(brightIt->get<double>());
+        }
+    }
+}
+
+void RmlUiPanelSettings::saveRenderSettings(bz::json::Value &userConfig) const {
+    setNestedConfig(userConfig, {"render", "brightness"}, renderBrightness);
+}
+
+void RmlUiPanelSettings::setRenderBrightness(float value, bool fromUser) {
+    const float clamped = std::max(0.2f, std::min(3.0f, value));
+    if (std::abs(clamped - renderBrightness) < 0.0001f) {
+        return;
+    }
+    renderBrightness = clamped;
+    if (fromUser) {
+        renderBrightnessDirty = true;
+    }
+    syncRenderBrightnessControls();
+}
+
+void RmlUiPanelSettings::syncRenderBrightnessControls() {
+    if (brightnessSlider) {
+        auto *input = rmlui_dynamic_cast<Rml::ElementFormControlInput*>(brightnessSlider);
+        if (input) {
+            input->SetValue(std::to_string(renderBrightness));
+        }
+    }
+    if (brightnessValueLabel) {
+        std::ostringstream oss;
+        oss.setf(std::ios::fixed);
+        oss.precision(2);
+        oss << renderBrightness << "x";
+        brightnessValueLabel->SetInnerRML(oss.str());
+    }
 }
 
 void RmlUiPanelSettings::requestKeybindingsReload() {

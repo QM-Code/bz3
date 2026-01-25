@@ -9,6 +9,7 @@
     "bullet3",
     "assimp",
     "opengl",
+    "glad",
     "freetype",
     "harfbuzz",
     {

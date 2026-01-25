@@ -53,6 +53,7 @@ public:
     void renderLayer(graphics::LayerId layer, graphics::RenderTargetId target) override;
 
     unsigned int getRenderTargetTextureId(graphics::RenderTargetId target) const override;
+    void setBrightness(float brightness) override;
 
     void setPosition(graphics::EntityId entity, const glm::vec3& position) override;
     void setRotation(graphics::EntityId entity, const glm::quat& rotation) override;

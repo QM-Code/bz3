@@ -171,14 +171,17 @@ void ValidateDataDirOrExit(const std::filesystem::path &path, const std::string 
     }
 
     std::error_code ec;
-    const auto commonConfig = path / "common" / "config.json";
-    if (!std::filesystem::exists(commonConfig, ec) || !std::filesystem::is_regular_file(commonConfig, ec)) {
-        std::cerr << "Invalid data directory specified: \"" << sourceLabel << "\"\n";
-        std::cerr << commonConfig.string() << " does not exist." << std::endl;
-        if (configPath) {
-            std::cerr << "User config path: " << configPath->string() << std::endl;
+    const auto spec = bz::data::GetDataPathSpec();
+    if (!spec.requiredDataMarker.empty()) {
+        const auto markerPath = path / spec.requiredDataMarker;
+        if (!std::filesystem::exists(markerPath, ec) || !std::filesystem::is_regular_file(markerPath, ec)) {
+            std::cerr << "Invalid data directory specified: \"" << sourceLabel << "\"\n";
+            std::cerr << markerPath.string() << " does not exist." << std::endl;
+            if (configPath) {
+                std::cerr << "User config path: " << configPath->string() << std::endl;
+            }
+            std::exit(1);
         }
-        std::exit(1);
     }
 }
 
@@ -208,21 +211,23 @@ DataDirOverrideResult ApplyDataDirOverrideFromArgs(int argc, char *argv[], const
             return {configPath, *configDataDir};
         }
 
-        // Fall back to BZ3_DATA_DIR if present; otherwise fail with a friendly message.
-        if (const char *envDataDir = std::getenv("BZ3_DATA_DIR"); envDataDir && *envDataDir) {
+        const auto spec = bz::data::GetDataPathSpec();
+
+        // Fall back to env var if present; otherwise fail with a friendly message.
+        if (const char *envDataDir = std::getenv(spec.dataDirEnvVar.c_str()); envDataDir && *envDataDir) {
             const std::filesystem::path envPath(envDataDir);
-            ValidateDataDirOrExit(envPath, std::string("BZ3_DATA_DIR: ") + envDataDir);
+            ValidateDataDirOrExit(envPath, std::string(spec.dataDirEnvVar) + ": " + envDataDir);
             bz::data::SetDataRootOverride(envPath);
-            spdlog::debug("Using data directory from BZ3_DATA_DIR: {}", envPath.string());
+            spdlog::debug("Using data directory from {}: {}", spec.dataDirEnvVar, envPath.string());
             return {configPath, envPath};
         }
 
         std::cerr << "\n";
-        std::cerr << "The bz3 data directory could not be found.\n";
+        std::cerr << "The data directory could not be found.\n";
         std::cerr << "\n";
         std::cerr << "This should not happen and may indicate a problem with installation.\n\n";
         std::cerr << "This directory can be specified in three ways:\n";
-        std::cerr << "  1. Set the BZ3_DATA_DIR environment variable.\n";
+        std::cerr << "  1. Set the " << spec.dataDirEnvVar << " environment variable.\n";
         std::cerr << "  2. Use the command-line option \"-d <datadir>\".\n";
         std::cerr << "  3. Add the following to your config file:\n";
         std::cerr << "     " << configPath.string() << "\n";

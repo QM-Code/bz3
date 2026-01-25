@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cmath>
 #include <cstdio>
 #include <optional>
 #include <sstream>
@@ -251,6 +252,7 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
             settingsStatusText = "Failed to load user config; showing defaults.";
             settingsStatusIsError = true;
         }
+        loadRenderSettings(userConfig);
 
         const bz::json::Value *bindingsNode = nullptr;
         if (auto it = userConfig.find("keybindings"); it != userConfig.end() && it->is_object()) {
@@ -314,6 +316,15 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
             WriteBuffer(keybindingControllerBuffers[i], JoinEntries(controllerEntries));
         }
     }
+
+    ImGui::TextUnformatted("Render");
+    ImGui::Spacing();
+    float brightness = renderBrightness;
+    if (ImGui::SliderFloat("Brightness", &brightness, 0.2f, 3.0f, "%.2fx")) {
+        setRenderBrightness(brightness, true);
+    }
+    ImGui::Separator();
+    ImGui::Spacing();
 
     ImGui::TextUnformatted("Bindings");
     ImGui::TextDisabled("Select a cell, then press a key/button to add it. Changes apply on next launch.");
@@ -475,6 +486,7 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
             } else {
                 eraseNestedConfig(userConfig, {"gui", "keybindings", "controller"});
             }
+            saveRenderSettings(userConfig);
 
             std::string error;
             if (!saveUserConfig(userConfig, error)) {
@@ -512,6 +524,7 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
         } else {
             eraseNestedConfig(userConfig, {"keybindings"});
             eraseNestedConfig(userConfig, {"gui", "keybindings", "controller"});
+            eraseNestedConfig(userConfig, {"render", "brightness"});
             std::string error;
             if (!saveUserConfig(userConfig, error)) {
                 settingsStatusText = error.empty() ? "Failed to reset bindings." : error;
@@ -522,6 +535,24 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
                 settingsStatusIsError = false;
             }
         }
+        renderBrightness = 1.0f;
+        renderBrightnessDirty = false;
+    }
+
+    if (renderBrightnessDirty) {
+        bz::json::Value userConfig;
+        if (!loadUserConfig(userConfig)) {
+            settingsStatusText = "Failed to load user config.";
+            settingsStatusIsError = true;
+        } else {
+            saveRenderSettings(userConfig);
+            std::string error;
+            if (!saveUserConfig(userConfig, error)) {
+                settingsStatusText = error.empty() ? "Failed to save render settings." : error;
+                settingsStatusIsError = true;
+            }
+        }
+        renderBrightnessDirty = false;
     }
 
     if (!settingsStatusText.empty()) {
@@ -529,6 +560,37 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
         ImGui::TextColored(statusColor, "%s", settingsStatusText.c_str());
     }
 
+}
+
+float ConsoleView::getRenderBrightness() const {
+    return renderBrightness;
+}
+
+void ConsoleView::loadRenderSettings(const bz::json::Value &userConfig) {
+    renderBrightness = 1.0f;
+    if (!userConfig.is_object()) {
+        return;
+    }
+    if (auto renderIt = userConfig.find("render"); renderIt != userConfig.end() && renderIt->is_object()) {
+        if (auto brightIt = renderIt->find("brightness"); brightIt != renderIt->end() && brightIt->is_number()) {
+            renderBrightness = static_cast<float>(brightIt->get<double>());
+        }
+    }
+}
+
+void ConsoleView::saveRenderSettings(bz::json::Value &userConfig) const {
+    setNestedConfig(userConfig, {"render", "brightness"}, renderBrightness);
+}
+
+void ConsoleView::setRenderBrightness(float value, bool fromUser) {
+    const float clamped = std::max(0.2f, std::min(3.0f, value));
+    if (std::abs(clamped - renderBrightness) < 0.0001f) {
+        return;
+    }
+    renderBrightness = clamped;
+    if (fromUser) {
+        renderBrightnessDirty = true;
+    }
 }
 
 } // namespace ui

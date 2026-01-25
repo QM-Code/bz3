@@ -75,10 +75,12 @@ else()
     message(FATAL_ERROR "Unknown BZ3_WORLD_BACKEND value: ${BZ3_WORLD_BACKEND}")
 endif()
 
-set(BZ3_RENDER_BACKEND "threepp" CACHE STRING "Render backend (threepp)")
-set_property(CACHE BZ3_RENDER_BACKEND PROPERTY STRINGS threepp)
+set(BZ3_RENDER_BACKEND "threepp" CACHE STRING "Render backend (threepp|filament)")
+set_property(CACHE BZ3_RENDER_BACKEND PROPERTY STRINGS threepp filament)
 if(BZ3_RENDER_BACKEND STREQUAL "threepp")
     add_compile_definitions(BZ3_RENDER_BACKEND_THREEPP)
+elseif(BZ3_RENDER_BACKEND STREQUAL "filament")
+    add_compile_definitions(BZ3_RENDER_BACKEND_FILAMENT)
 else()
     message(FATAL_ERROR "Unknown BZ3_RENDER_BACKEND value: ${BZ3_RENDER_BACKEND}")
 endif()
@@ -97,18 +99,20 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(pybind11)
 
-FetchContent_Declare(
-    threepp
-    GIT_REPOSITORY https://github.com/markaren/threepp.git
-    GIT_TAG master
-)
-set(THREEPP_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(THREEPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(THREEPP_WITH_AUDIO OFF CACHE BOOL "" FORCE)
-set(THREEPP_USE_EXTERNAL_GLFW ON CACHE BOOL "" FORCE)
-set(THREEPP_FETCH_ASSIMP OFF CACHE BOOL "" FORCE)
+if(BZ3_RENDER_BACKEND STREQUAL "threepp")
+    FetchContent_Declare(
+        threepp
+        GIT_REPOSITORY https://github.com/markaren/threepp.git
+        GIT_TAG master
+    )
+    set(THREEPP_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(THREEPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(THREEPP_WITH_AUDIO OFF CACHE BOOL "" FORCE)
+    set(THREEPP_USE_EXTERNAL_GLFW ON CACHE BOOL "" FORCE)
+    set(THREEPP_FETCH_ASSIMP OFF CACHE BOOL "" FORCE)
 
-FetchContent_MakeAvailable(threepp)
+    FetchContent_MakeAvailable(threepp)
+endif()
 
 FetchContent_Declare(
     enet
@@ -119,17 +123,7 @@ set(ENET_TEST OFF CACHE BOOL "" FORCE)
 set(ENET_SHARED OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(enet)
 
-# Effekseer (embedded copy under libs/effekseer)
-list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/libs/effekseer/cmake)
-include(FilterFolder)
-set(BUILD_EXAMPLES OFF CACHE BOOL "Disable Effekseer examples" FORCE)
-set(BUILD_VIEWER OFF CACHE BOOL "Disable Effekseer viewer" FORCE)
-set(BUILD_EDITOR OFF CACHE BOOL "Disable Effekseer editor" FORCE)
-set(BUILD_TEST OFF CACHE BOOL "Disable Effekseer tests" FORCE)
-set(BUILD_GL ON CACHE BOOL "Enable Effekseer OpenGL renderer" FORCE)
-set(BUILD_VULKAN OFF CACHE BOOL "Disable Effekseer Vulkan backend" FORCE)
-set(USE_OPENAL OFF CACHE BOOL "Prefer host audio path instead of OpenAL" FORCE)
-add_subdirectory(${PROJECT_SOURCE_DIR}/libs/effekseer/src)
+# No particle system dependency.
 
 
 # Find external packages
@@ -206,6 +200,7 @@ set(ENGINE_CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/game/net/backends/enet/client_backend.cpp
     ${PROJECT_SOURCE_DIR}/src/game/net/backends/enet/server_backend.cpp
     ${PROJECT_SOURCE_DIR}/src/game/world/config.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/common/data_path_spec.cpp
     ${PROJECT_SOURCE_DIR}/src/game/renderer/render.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/graphics/device.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/graphics/backend_factory.cpp
@@ -218,10 +213,8 @@ set(ENGINE_CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/engine/platform/window_factory.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/system.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/backend_factory.cpp
-    ${PROJECT_SOURCE_DIR}/src/game/ui/third_party/stb_image_impl.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/audio/audio.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/audio/backend_factory.cpp
-    ${PROJECT_SOURCE_DIR}/src/game/renderer/particle_effect_system.cpp
 )
 if(BZ3_WINDOW_BACKEND STREQUAL "glfw")
     list(APPEND ENGINE_CLIENT_SOURCES ${PROJECT_SOURCE_DIR}/src/engine/platform/backends/window_glfw.cpp)
@@ -268,6 +261,12 @@ elseif(BZ3_UI_BACKEND STREQUAL "rmlui")
         ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/console/panels/panel_themes.cpp
     )
 endif()
+
+if(NOT BZ3_RENDER_BACKEND STREQUAL "threepp")
+    list(APPEND ENGINE_CLIENT_SOURCES
+        ${PROJECT_SOURCE_DIR}/src/game/ui/third_party/stb_image_impl.cpp
+    )
+endif()
 set(ENGINE_SERVER_SOURCES
     ${PROJECT_SOURCE_DIR}/src/game/engine/server_engine.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/geometry/mesh_loader.cpp
@@ -283,6 +282,7 @@ set(ENGINE_SERVER_SOURCES
     ${PROJECT_SOURCE_DIR}/src/game/net/backends/enet/client_backend.cpp
     ${PROJECT_SOURCE_DIR}/src/game/net/backends/enet/server_backend.cpp
     ${PROJECT_SOURCE_DIR}/src/game/world/config.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/common/data_path_spec.cpp
 )
 
 set(PHYSICS_SOURCES
@@ -327,6 +327,10 @@ if(BZ3_RENDER_BACKEND STREQUAL "threepp")
     list(APPEND ENGINE_CLIENT_SOURCES
         ${PROJECT_SOURCE_DIR}/src/engine/graphics/backends/threepp/backend.cpp
     )
+elseif(BZ3_RENDER_BACKEND STREQUAL "filament")
+    list(APPEND ENGINE_CLIENT_SOURCES
+        ${PROJECT_SOURCE_DIR}/src/engine/graphics/backends/filament/backend.cpp
+    )
 endif()
 
 # Create executables
@@ -360,6 +364,7 @@ find_package(PkgConfig REQUIRED)
 if(BZ3_UI_BACKEND STREQUAL "imgui")
     pkg_check_modules(LIBRSVG REQUIRED IMPORTED_TARGET librsvg-2.0)
 endif()
+find_package(glad CONFIG REQUIRED)
 
 add_executable(bz3-server ${SERVER_SOURCES} ${ENGINE_SERVER_SOURCES})
 
@@ -369,8 +374,6 @@ target_include_directories(bz3 PRIVATE
     ${PROJECT_SOURCE_DIR}/src/engine
     ${PROJECT_SOURCE_DIR}/src/game
     ${enet_SOURCE_DIR}/include
-    ${PROJECT_SOURCE_DIR}/libs/effekseer/src
-    ${PROJECT_SOURCE_DIR}/libs/effekseer/src/Effekseer
 )
 
 if(DEFINED threepp_SOURCE_DIR)
@@ -390,7 +393,7 @@ target_link_libraries(bz3 PRIVATE
     enet_static
     assimp::assimp
     ${OPENGL_TARGET}
-    threepp::threepp
+    glad::glad
     cxxopts::cxxopts
     spdlog::spdlog
     miniz::miniz
@@ -398,9 +401,41 @@ target_link_libraries(bz3 PRIVATE
     proto_lib
     CURL::libcurl
     OpenSSL::Crypto
-    Effekseer
-    EffekseerRendererGL
 )
+if(BZ3_RENDER_BACKEND STREQUAL "threepp")
+    target_link_libraries(bz3 PRIVATE threepp::threepp)
+elseif(BZ3_RENDER_BACKEND STREQUAL "filament")
+    set(FILAMENT_SDK_DIR "${PROJECT_SOURCE_DIR}/libs/filament-sdk" CACHE PATH "Filament SDK root directory")
+    set(FILAMENT_SDK_INCLUDE_DIR "${FILAMENT_SDK_DIR}/include")
+    set(FILAMENT_SDK_LIB_DIR "${FILAMENT_SDK_DIR}/lib/x86_64")
+
+    if(NOT EXISTS "${FILAMENT_SDK_INCLUDE_DIR}" OR NOT EXISTS "${FILAMENT_SDK_LIB_DIR}")
+        message(FATAL_ERROR "Filament SDK not found at ${FILAMENT_SDK_DIR}. Download the Linux SDK and extract it to libs/filament-sdk or set FILAMENT_SDK_DIR.")
+    endif()
+
+    file(GLOB FILAMENT_SDK_LIBS "${FILAMENT_SDK_LIB_DIR}/*.a")
+    if(NOT FILAMENT_SDK_LIBS)
+        message(FATAL_ERROR "Filament SDK libraries not found in ${FILAMENT_SDK_LIB_DIR}.")
+    endif()
+
+    find_library(LIBCXX_LIBRARY NAMES c++ libc++)
+    find_library(LIBCXXABI_LIBRARY NAMES c++abi)
+    if(NOT LIBCXX_LIBRARY OR NOT LIBCXXABI_LIBRARY)
+        message(FATAL_ERROR "Filament SDK requires libc++ and libc++abi. Install libc++-dev and libc++abi-dev, or use a Filament build that targets libstdc++.")
+    endif()
+
+    target_include_directories(bz3 PRIVATE ${FILAMENT_SDK_INCLUDE_DIR})
+    target_link_libraries(bz3 PRIVATE
+        -Wl,--start-group
+        ${FILAMENT_SDK_LIBS}
+        -Wl,--end-group
+        ${LIBCXX_LIBRARY}
+        ${LIBCXXABI_LIBRARY}
+        pthread
+        dl
+        m
+    )
+endif()
 if(BZ3_PHYSICS_BACKEND STREQUAL "jolt")
     target_link_libraries(bz3 PRIVATE Jolt::Jolt)
 elseif(BZ3_PHYSICS_BACKEND STREQUAL "bullet")

@@ -478,6 +478,7 @@ struct RmlUiBackend::RmlUiState {
     double fpsLastTime = 0.0;
     double fpsValue = 0.0;
     int fpsFrames = 0;
+    bool outputVisible = false;
 };
 
 RmlUiBackend::RmlUiBackend(platform::Window &windowRefIn) : windowRef(&windowRefIn) {
@@ -487,7 +488,6 @@ RmlUiBackend::RmlUiBackend(platform::Window &windowRefIn) : windowRef(&windowRef
 
     Rml::SetSystemInterface(&state->systemInterface);
     Rml::SetRenderInterface(&state->renderInterface);
-
     Rml::String renderer_message;
     if (!RmlGL3::Initialize(&renderer_message)) {
         spdlog::error("RmlUi: failed to initialize GL3 renderer.");
@@ -568,6 +568,7 @@ RmlUiBackend::RmlUiBackend(platform::Window &windowRefIn) : windowRef(&windowRef
     auto settingsPanel = std::make_unique<ui::RmlUiPanelSettings>();
     auto *settingsPanelPtr = settingsPanel.get();
     state->panels.emplace_back(std::move(settingsPanel));
+    this->settingsPanel = settingsPanelPtr;
     state->panels.emplace_back(std::make_unique<ui::RmlUiPanelDocumentation>());
     auto startServerPanel = std::make_unique<ui::RmlUiPanelStartServer>();
     auto *startServerPanelPtr = startServerPanel.get();
@@ -826,6 +827,7 @@ void RmlUiBackend::update() {
 
     const bool anyVisible = (state->document && state->document->IsVisible())
         || (state->hud && state->hud->isVisible());
+    state->outputVisible = anyVisible;
     if (anyVisible && !state->reloadRequested && !state->reloadArmed) {
         if (consoleVisible) {
             for (const auto &panel : state->panels) {
@@ -852,6 +854,10 @@ void RmlUiBackend::update() {
         state->renderInterface.BeginFrame();
         state->context->Render();
         state->renderInterface.EndFrame();
+    }
+
+    if (settingsPanel) {
+        renderBrightness = settingsPanel->getRenderBrightness();
     }
 
     if (state->reloadArmed) {
@@ -935,6 +941,39 @@ bool RmlUiBackend::consumeKeybindingsReloadRequest() {
 
 void RmlUiBackend::setRenderBridge(const ui::RenderBridge *bridge) {
     renderBridge = bridge;
+}
+
+ui::RenderOutput RmlUiBackend::getRenderOutput() const {
+    if (!state) {
+        return {};
+    }
+    static bool loggedHidden = false;
+    if (!state->outputVisible) {
+        if (!loggedHidden) {
+            spdlog::info("UiSystem: render output hidden (no visible UI)");
+            loggedHidden = true;
+        }
+        return {};
+    }
+    loggedHidden = false;
+    ui::RenderOutput out;
+    out.textureId = state->renderInterface.GetOutputTextureId();
+    out.width = state->renderInterface.GetOutputWidth();
+    out.height = state->renderInterface.GetOutputHeight();
+    static unsigned int lastTex = 0;
+    static int lastW = 0;
+    static int lastH = 0;
+    if (out.textureId != lastTex || out.width != lastW || out.height != lastH) {
+        spdlog::info("UiSystem: render output texture={} size={}x{}", out.textureId, out.width, out.height);
+        lastTex = out.textureId;
+        lastW = out.width;
+        lastH = out.height;
+    }
+    return out;
+}
+
+float RmlUiBackend::getRenderBrightness() const {
+    return renderBrightness;
 }
 
 void RmlUiBackend::setActiveTab(const std::string &tabKey) {

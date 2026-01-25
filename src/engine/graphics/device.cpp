@@ -112,6 +112,30 @@ unsigned int GraphicsDevice::getRenderTargetTextureId(RenderTargetId target) con
     return backend_ ? backend_->getRenderTargetTextureId(target) : 0u;
 }
 
+void GraphicsDevice::setUiOverlayTexture(unsigned int textureId, int width, int height) {
+    if (backend_) {
+        backend_->setUiOverlayTexture(textureId, width, height);
+    }
+}
+
+void GraphicsDevice::setUiOverlayVisible(bool visible) {
+    if (backend_) {
+        backend_->setUiOverlayVisible(visible);
+    }
+}
+
+void GraphicsDevice::renderUiOverlay() {
+    if (backend_) {
+        backend_->renderUiOverlay();
+    }
+}
+
+void GraphicsDevice::setBrightness(float brightness) {
+    if (backend_) {
+        backend_->setBrightness(brightness);
+    }
+}
+
 void GraphicsDevice::setPosition(EntityId entity, const glm::vec3& position) {
     if (backend_) {
         backend_->setPosition(entity, position);

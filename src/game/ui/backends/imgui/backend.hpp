@@ -38,6 +38,8 @@ public:
     void displayDeathScreen(bool show) override;
     bool consumeKeybindingsReloadRequest() override;
     void setRenderBridge(const ui::RenderBridge *bridge) override;
+    ui::RenderOutput getRenderOutput() const override;
+    float getRenderBrightness() const override { return consoleView.getRenderBrightness(); }
 
 private:
     platform::Window *window = nullptr;

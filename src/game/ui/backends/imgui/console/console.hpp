@@ -76,6 +76,7 @@ public:
     bool consumeRefreshRequest() override;
     void setScanning(bool scanning) override;
     void setUserConfigPath(const std::string &path) override;
+    float getRenderBrightness() const;
     bool consumeFontReloadRequest() override;
     bool consumeKeybindingsReloadRequest() override;
     void requestKeybindingsReload();
@@ -106,6 +107,9 @@ private:
     void applyThemeToView(const ThemeConfig &theme);
     bool loadUserConfig(bz::json::Value &out) const;
     bool saveUserConfig(const bz::json::Value &userConfig, std::string &error) const;
+    void loadRenderSettings(const bz::json::Value &userConfig);
+    void saveRenderSettings(bz::json::Value &userConfig) const;
+    void setRenderBrightness(float value, bool fromUser);
     void setNestedConfig(bz::json::Value &root, std::initializer_list<const char*> path, bz::json::Value value) const;
     void setNestedConfig(bz::json::Value &root, const std::vector<std::string> &path, bz::json::Value value) const;
     void eraseNestedConfig(bz::json::Value &root, std::initializer_list<const char*> path) const;
@@ -212,6 +216,8 @@ private:
     bool settingsLoaded = false;
     std::string settingsStatusText;
     bool settingsStatusIsError = false;
+    float renderBrightness = 1.0f;
+    bool renderBrightnessDirty = false;
 
     struct LocalServerProcess {
         int id = 0;

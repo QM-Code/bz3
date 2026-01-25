@@ -6,6 +6,7 @@
 #include "server/terminal_commands.hpp"
 #include "server/server_cli_options.hpp"
 #include "server/community_heartbeat.hpp"
+#include "game/common/data_path_spec.hpp"
 #include "common/data_dir_override.hpp"
 #include "common/data_path_resolver.hpp"
 #include "common/config_helpers.hpp"
@@ -74,6 +75,8 @@ void signalHandler(int signum) {
 
 int main(int argc, char *argv[]) {
     ConfigureLogging(spdlog::level::info, false);
+
+    game_common::ConfigureDataPathSpec();
 
     // Register signal handler
     signal(SIGINT, signalHandler);

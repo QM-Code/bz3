@@ -8,7 +8,6 @@
 #include "game/input/state.hpp"
 #include "ui/system.hpp"
 #include "audio/audio.hpp"
-#include "renderer/particle_effect_system.hpp"
 #include "platform/window.hpp"
 #include <string>
 #include <memory>
@@ -30,7 +29,6 @@ public:
     game_input::InputState inputState;
     UiSystem *ui;
     Audio *audio;
-    ParticleEngine *particles;
 
     ClientEngine(platform::Window &window);
     ~ClientEngine();

@@ -345,6 +345,10 @@ void ImGuiBackend::setRenderBridge(const ui::RenderBridge *bridge) {
     renderBridge = bridge;
 }
 
+ui::RenderOutput ImGuiBackend::getRenderOutput() const {
+    return {};
+}
+
 ui::ConsoleInterface &ImGuiBackend::console() {
     return consoleView;
 }
