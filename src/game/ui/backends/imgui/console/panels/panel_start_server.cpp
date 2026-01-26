@@ -16,6 +16,7 @@
 
 #include "common/config_helpers.hpp"
 #include "common/data_path_resolver.hpp"
+#include "common/i18n.hpp"
 
 #if !defined(_WIN32)
 #include <arpa/inet.h>
@@ -439,11 +440,12 @@ bool ConsoleView::launchLocalServer(LocalServerProcess &server, std::string &err
 }
 
 void ConsoleView::drawStartServerPanel(const MessageColors &colors) {
+    auto &i18n = bz::i18n::Get();
     const bool hasHeadingFont = (headingFont != nullptr);
     if (hasHeadingFont) {
         ImGui::PushFont(headingFont);
     }
-    ImGui::TextUnformatted("Start Server");
+    ImGui::TextUnformatted(i18n.get("ui.console.start_server.title").c_str());
     if (hasHeadingFont) {
         ImGui::PopFont();
     }
@@ -451,7 +453,7 @@ void ConsoleView::drawStartServerPanel(const MessageColors &colors) {
 
     const std::string serverBinary = findServerBinary();
     if (serverBinary.empty()) {
-        ImGui::TextColored(colors.error, "bz3-server binary not found.");
+        ImGui::TextColored(colors.error, "%s", i18n.get("ui.console.start_server.server_binary_missing").c_str());
     }
 
     ImGui::Spacing();
@@ -495,14 +497,14 @@ void ConsoleView::drawStartServerPanel(const MessageColors &colors) {
         serverLogLevelIndex = 2;
     }
 
-    ImGui::TextUnformatted("New Server");
+    ImGui::TextUnformatted(i18n.get("ui.console.start_server.new_server").c_str());
     if (ImGui::BeginTable("NewServerForm", 6, ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_BordersOuter)) {
-        ImGui::TableSetupColumn("IP Address", ImGuiTableColumnFlags_WidthFixed, ipWidth);
-        ImGui::TableSetupColumn("Port", ImGuiTableColumnFlags_WidthFixed, portWidth);
-        ImGui::TableSetupColumn("Community", ImGuiTableColumnFlags_WidthFixed, communityWidth);
-        ImGui::TableSetupColumn("World Directory", ImGuiTableColumnFlags_WidthFixed, worldWidth);
-        ImGui::TableSetupColumn("Logging", ImGuiTableColumnFlags_WidthFixed, loggingWidth);
-        ImGui::TableSetupColumn("Action", ImGuiTableColumnFlags_WidthFixed, actionWidth);
+        ImGui::TableSetupColumn(i18n.get("ui.console.start_server.ip_address").c_str(), ImGuiTableColumnFlags_WidthFixed, ipWidth);
+        ImGui::TableSetupColumn(i18n.get("ui.console.start_server.port").c_str(), ImGuiTableColumnFlags_WidthFixed, portWidth);
+        ImGui::TableSetupColumn(i18n.get("ui.console.start_server.community").c_str(), ImGuiTableColumnFlags_WidthFixed, communityWidth);
+        ImGui::TableSetupColumn(i18n.get("ui.console.start_server.world_directory").c_str(), ImGuiTableColumnFlags_WidthFixed, worldWidth);
+        ImGui::TableSetupColumn(i18n.get("ui.console.start_server.logging").c_str(), ImGuiTableColumnFlags_WidthFixed, loggingWidth);
+        ImGui::TableSetupColumn(i18n.get("ui.console.start_server.action").c_str(), ImGuiTableColumnFlags_WidthFixed, actionWidth);
         ImGui::TableHeadersRow();
 
         ImGui::TableNextRow();
@@ -601,7 +603,7 @@ void ConsoleView::drawStartServerPanel(const MessageColors &colors) {
         ImGui::Combo("##ServerLogLevel", &serverLogLevelIndex, kLogLevels, kLogLevelCount);
 
         ImGui::TableSetColumnIndex(5);
-        if (ImGui::Button("Start")) {
+        if (ImGui::Button(i18n.get("ui.console.start_server.start_button").c_str())) {
             const std::string worldDir = trimCopy(serverWorldBuffer.data());
             const std::string advertiseHost = trimCopy(serverAdvertiseHostBuffer.data());
             const bool useDefaultWorld = worldDir.empty();
@@ -740,7 +742,7 @@ void ConsoleView::drawStartServerPanel(const MessageColors &colors) {
                         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.35f, 0.78f, 0.40f, 1.0f));
                         ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.26f, 0.60f, 0.30f, 1.0f));
                         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(style.FramePadding.x, 1.0f));
-                        if (ImGui::Button("Start")) {
+                        if (ImGui::Button(i18n.get("ui.console.start_server.start_button").c_str())) {
                             selectedLogServerId = server.id;
                             std::string error;
                             if (!launchLocalServer(server, error)) {

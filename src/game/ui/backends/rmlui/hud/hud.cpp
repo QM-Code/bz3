@@ -2,6 +2,8 @@
 
 #include <RmlUi/Core/Context.h>
 #include <RmlUi/Core/ElementDocument.h>
+#include "common/i18n.hpp"
+#include "ui/backends/rmlui/translate.hpp"
 #include <utility>
 
 namespace ui {
@@ -24,6 +26,7 @@ void RmlUiHud::load(Rml::Context *contextIn, const std::string &pathIn, EmojiMar
     if (!document) {
         return;
     }
+    rmlui::ApplyTranslations(document, bz::i18n::Get());
     bindElements();
     document->Show();
 }
@@ -124,7 +127,9 @@ void RmlUiHud::setFpsValue(float fps) {
             return;
         }
         lastFpsInt = fpsInt;
-        fpsElement->SetInnerRML("FPS: " + std::to_string(fpsInt));
+        const std::string value = std::to_string(fpsInt);
+        const std::string fpsText = bz::i18n::Get().format("ui.hud.fps_label", {{"value", value}});
+        fpsElement->SetInnerRML(fpsText);
     }
 }
 

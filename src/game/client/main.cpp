@@ -13,6 +13,7 @@
 #include "common/data_dir_override.hpp"
 #include "common/data_path_resolver.hpp"
 #include "common/config_helpers.hpp"
+#include "common/i18n.hpp"
 #include "platform/window.hpp"
 
 TimeUtils::time lastFrameTime;
@@ -72,6 +73,7 @@ int main(int argc, char *argv[]) {
         {clientUserConfigPathFs, "user config", spdlog::level::debug, false}
     };
     bz::data::InitializeConfigCache(clientConfigSpecs);
+    bz::i18n::Get().loadFromConfig();
 
     const uint16_t configWidth = bz::data::ReadUInt16Config({"graphics.resolution.Width"}, 1280);
     const uint16_t configHeight = bz::data::ReadUInt16Config({"graphics.resolution.Height"}, 720);
@@ -79,6 +81,9 @@ int main(int argc, char *argv[]) {
     const bool vsyncEnabled = bz::data::ReadBoolConfig({"graphics.VSync"}, true);
 
     const ClientCLIOptions cliOptions = ParseClientCLIOptions(argc, argv);
+    if (cliOptions.languageExplicit && !cliOptions.language.empty()) {
+        bz::i18n::Get().loadLanguage(cliOptions.language);
+    }
     const spdlog::level::level_enum logLevel = cliOptions.logLevelExplicit
         ? ParseLogLevel(cliOptions.logLevel)
         : (cliOptions.verbose ? spdlog::level::trace : spdlog::level::info);
@@ -105,22 +110,33 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    if (gladLoadGL() == 0) {
-        spdlog::error("Failed to load OpenGL functions");
-        return 1;
+    bool skipGlInit = false;
+#if defined(BZ3_RENDER_BACKEND_BGFX)
+    if (const char* noGl = std::getenv("BZ3_BGFX_NO_GL"); noGl && noGl[0] != '\0') {
+        skipGlInit = true;
     }
+#endif
 
-    glEnable(GL_MULTISAMPLE);
-    window->setVsync(vsyncEnabled);
+    if (!skipGlInit) {
+        if (gladLoadGL() == 0) {
+            spdlog::error("Failed to load OpenGL functions");
+            return 1;
+        }
 
-    spdlog::info("GL_VENDOR   = {}", (const char*)glGetString(GL_VENDOR));
-    spdlog::info("GL_RENDERER = {}", (const char*)glGetString(GL_RENDERER));
-    spdlog::info("GL_VERSION  = {}", (const char*)glGetString(GL_VERSION));
+        glEnable(GL_MULTISAMPLE);
+        window->setVsync(vsyncEnabled);
 
-    int sb = 0, s = 0;
-    glGetIntegerv(GL_SAMPLE_BUFFERS, &sb);
-    glGetIntegerv(GL_SAMPLES, &s);
-    spdlog::info("GL_SAMPLE_BUFFERS={}, GL_SAMPLES={}", sb, s);
+        spdlog::info("GL_VENDOR   = {}", (const char*)glGetString(GL_VENDOR));
+        spdlog::info("GL_RENDERER = {}", (const char*)glGetString(GL_RENDERER));
+        spdlog::info("GL_VERSION  = {}", (const char*)glGetString(GL_VERSION));
+
+        int sb = 0, s = 0;
+        glGetIntegerv(GL_SAMPLE_BUFFERS, &sb);
+        glGetIntegerv(GL_SAMPLES, &s);
+        spdlog::info("GL_SAMPLE_BUFFERS={}, GL_SAMPLES={}", sb, s);
+    } else {
+        spdlog::info("GL init skipped (BZ3_BGFX_NO_GL)");
+    }
 
     ClientEngine engine(*window);
     spdlog::trace("ClientEngine initialized successfully");

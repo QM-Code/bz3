@@ -9,6 +9,8 @@
 #include <spdlog/spdlog.h>
 
 #include "common/data_path_resolver.hpp"
+#include "common/i18n.hpp"
+#include "ui/backends/rmlui/translate.hpp"
 
 namespace ui {
 
@@ -42,6 +44,7 @@ void RmlUiPanel::load(Rml::ElementDocument *document) {
     std::stringstream buffer;
     buffer << file.rdbuf();
     panel->SetInnerRML(buffer.str());
+    rmlui::ApplyTranslations(panel, bz::i18n::Get());
     onLoaded(document);
 }
 

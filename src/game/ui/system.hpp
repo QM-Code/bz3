@@ -37,6 +37,7 @@ private:
 
 public:
     void handleEvents(const std::vector<platform::Event> &events);
+    void setLanguage(const std::string &language);
     void setScoreboardEntries(const std::vector<ScoreboardEntry> &entries);
     void setSpawnHint(const std::string &hint);
     void addConsoleLine(const std::string &playerName, const std::string &line);

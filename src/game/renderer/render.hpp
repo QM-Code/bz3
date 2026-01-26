@@ -87,6 +87,7 @@ public:
     void setCameraRotation(const glm::quat &rotation);
     void setUiOverlayTexture(const ui::RenderOutput& output);
     void setBrightness(float brightness);
+    void present();
 
     unsigned int getRadarTextureId() const;
     unsigned int getMainTextureId() const;

@@ -5,9 +5,9 @@
 #include <RmlUi/Core/EventListener.h>
 #include <RmlUi/Core/Input.h>
 #include <RmlUi/Core/Elements/ElementFormControlInput.h>
+#include <RmlUi/Core/Elements/ElementFormControlSelect.h>
 
 #include <algorithm>
-#include <cmath>
 #include <cctype>
 #include <filesystem>
 #include <fstream>
@@ -16,11 +16,16 @@
 #include "common/json.hpp"
 
 #include "common/data_path_resolver.hpp"
+#include "common/i18n.hpp"
 #include "game/input/bindings.hpp"
 #include "spdlog/spdlog.h"
 
 namespace ui {
 namespace {
+
+const std::vector<std::string> kLanguageCodes = {
+    "en", "es", "fr", "de", "pt", "ru", "jp", "zh", "ko", "it", "hi", "ar"
+};
 
 struct KeybindingDefinition {
     const char *action;
@@ -231,12 +236,48 @@ private:
     RmlUiPanelSettings *panel = nullptr;
 };
 
+class RmlUiPanelSettings::LanguageListener final : public Rml::EventListener {
+public:
+    explicit LanguageListener(RmlUiPanelSettings *panelIn)
+        : panel(panelIn) {}
+
+    void ProcessEvent(Rml::Event &event) override {
+        if (!panel) {
+            return;
+        }
+        if (panel->isLanguageSelectionSuppressed()) {
+            return;
+        }
+        auto *element = event.GetTargetElement();
+        auto *select = rmlui_dynamic_cast<Rml::ElementFormControlSelect *>(element);
+        if (!select) {
+            return;
+        }
+        panel->applyLanguageSelection(select->GetValue());
+    }
+
+private:
+    RmlUiPanelSettings *panel = nullptr;
+};
+
 RmlUiPanelSettings::RmlUiPanelSettings()
     : RmlUiPanel("settings", "client/ui/console_panel_settings.rml") {}
 
 void RmlUiPanelSettings::setUserConfigPath(const std::string &path) {
     userConfigPath = path;
     loaded = false;
+    renderSettings.reset();
+    if (!userConfigPath.empty()) {
+        bz::json::Value userConfig;
+        if (loadUserConfig(userConfig)) {
+            renderSettings.load(userConfig);
+            syncRenderBrightnessControls();
+        }
+    }
+}
+
+void RmlUiPanelSettings::setLanguageCallback(std::function<void(const std::string &)> callback) {
+    languageCallback = std::move(callback);
 }
 
 void RmlUiPanelSettings::onLoaded(Rml::ElementDocument *doc) {
@@ -252,6 +293,7 @@ void RmlUiPanelSettings::onLoaded(Rml::ElementDocument *doc) {
     resetButton = document->GetElementById("bindings-reset");
     brightnessSlider = document->GetElementById("settings-brightness-slider");
     brightnessValueLabel = document->GetElementById("settings-brightness-value");
+    languageSelect = document->GetElementById("settings-language-select");
 
     listeners.clear();
     if (clearButton) {
@@ -285,6 +327,12 @@ void RmlUiPanelSettings::onLoaded(Rml::ElementDocument *doc) {
         brightnessSlider->AddEventListener("input", listener.get());
         listeners.emplace_back(std::move(listener));
     }
+    if (languageSelect) {
+        auto listener = std::make_unique<LanguageListener>(this);
+        languageSelect->AddEventListener("change", listener.get());
+        listeners.emplace_back(std::move(listener));
+        rebuildLanguageOptions();
+    }
 
     loadBindings();
     rebuildBindings();
@@ -302,7 +350,80 @@ void RmlUiPanelSettings::onUpdate() {
         updateSelectedLabel();
         updateStatus();
     }
+    if (renderSettings.consumeDirty()) {
+        bz::json::Value userConfig;
+        if (!loadUserConfig(userConfig)) {
+            showStatus("Failed to load user config.", true);
+        } else {
+            renderSettings.save(userConfig);
+            std::string error;
+            if (!saveUserConfig(userConfig, error)) {
+                showStatus(error.empty() ? "Failed to save render settings." : error, true);
+            }
+        }
+    }
     selectionJustChanged = false;
+}
+
+void RmlUiPanelSettings::rebuildLanguageOptions() {
+    if (!languageSelect) {
+        return;
+    }
+    auto *select = rmlui_dynamic_cast<Rml::ElementFormControlSelect *>(languageSelect);
+    if (!select) {
+        return;
+    }
+    suppressLanguageSelection = true;
+    select->RemoveAll();
+    for (const auto &code : kLanguageCodes) {
+        const std::string labelKey = "languages." + code;
+        const std::string &label = bz::i18n::Get().get(labelKey);
+        select->Add(label.empty() ? code : label, code);
+    }
+    const std::string selected = selectedLanguageFromConfig();
+    for (std::size_t i = 0; i < kLanguageCodes.size(); ++i) {
+        if (kLanguageCodes[i] == selected) {
+            select->SetSelection(static_cast<int>(i));
+            break;
+        }
+    }
+    suppressLanguageSelection = false;
+}
+
+void RmlUiPanelSettings::applyLanguageSelection(const std::string &code) {
+    if (code.empty()) {
+        return;
+    }
+    if (code == selectedLanguageFromConfig() && code == bz::i18n::Get().language()) {
+        return;
+    }
+    bz::json::Value userConfig;
+    if (!loadUserConfig(userConfig)) {
+        showStatus("Failed to load user config.", true);
+        return;
+    }
+    userConfig["language"] = code;
+    std::string error;
+    if (!saveUserConfig(userConfig, error)) {
+        showStatus(error.empty() ? "Failed to save language." : error, true);
+        return;
+    }
+    if (!userConfigPath.empty()) {
+        bz::data::MergeExternalConfigLayer(userConfigPath, "user config", spdlog::level::debug);
+    }
+    if (languageCallback) {
+        languageCallback(code);
+    }
+}
+
+std::string RmlUiPanelSettings::selectedLanguageFromConfig() const {
+    bz::json::Value userConfig;
+    if (loadUserConfig(userConfig)) {
+        if (auto it = userConfig.find("language"); it != userConfig.end() && it->is_string()) {
+            return it->get<std::string>();
+        }
+    }
+    return bz::i18n::Get().language();
 }
 
 void RmlUiPanelSettings::loadBindings() {
@@ -316,7 +437,7 @@ void RmlUiPanelSettings::loadBindings() {
     if (!loadedConfig) {
         showStatus("Failed to load user config; showing defaults.", true);
     }
-    loadRenderSettings(userConfig);
+    renderSettings.load(userConfig);
     syncRenderBrightnessControls();
 
     const bz::json::Value *bindingsNode = nullptr;
@@ -547,7 +668,7 @@ void RmlUiPanelSettings::saveBindings() {
         eraseNestedConfig(userConfig, {"gui", "keybindings", "controller"});
     }
 
-    saveRenderSettings(userConfig);
+    renderSettings.save(userConfig);
 
     std::string error;
     if (!saveUserConfig(userConfig, error)) {
@@ -581,7 +702,7 @@ void RmlUiPanelSettings::resetBindings() {
     } else {
         eraseNestedConfig(userConfig, {"keybindings"});
         eraseNestedConfig(userConfig, {"gui", "keybindings", "controller"});
-        eraseNestedConfig(userConfig, {"render", "brightness"});
+        RenderSettings::eraseFromConfig(userConfig);
         std::string error;
         if (!saveUserConfig(userConfig, error)) {
             showStatus(error.empty() ? "Failed to reset bindings." : error, true);
@@ -592,37 +713,17 @@ void RmlUiPanelSettings::resetBindings() {
     }
 
     rebuildBindings();
-    setRenderBrightness(1.0f, false);
+    renderSettings.reset();
+    syncRenderBrightnessControls();
 }
 
 float RmlUiPanelSettings::getRenderBrightness() const {
-    return renderBrightness;
-}
-
-void RmlUiPanelSettings::loadRenderSettings(const bz::json::Value &userConfig) {
-    renderBrightness = 1.0f;
-    if (!userConfig.is_object()) {
-        return;
-    }
-    if (auto renderIt = userConfig.find("render"); renderIt != userConfig.end() && renderIt->is_object()) {
-        if (auto brightIt = renderIt->find("brightness"); brightIt != renderIt->end() && brightIt->is_number()) {
-            renderBrightness = static_cast<float>(brightIt->get<double>());
-        }
-    }
-}
-
-void RmlUiPanelSettings::saveRenderSettings(bz::json::Value &userConfig) const {
-    setNestedConfig(userConfig, {"render", "brightness"}, renderBrightness);
+    return renderSettings.brightness();
 }
 
 void RmlUiPanelSettings::setRenderBrightness(float value, bool fromUser) {
-    const float clamped = std::max(0.2f, std::min(3.0f, value));
-    if (std::abs(clamped - renderBrightness) < 0.0001f) {
+    if (!renderSettings.setBrightness(value, fromUser)) {
         return;
-    }
-    renderBrightness = clamped;
-    if (fromUser) {
-        renderBrightnessDirty = true;
     }
     syncRenderBrightnessControls();
 }
@@ -631,14 +732,14 @@ void RmlUiPanelSettings::syncRenderBrightnessControls() {
     if (brightnessSlider) {
         auto *input = rmlui_dynamic_cast<Rml::ElementFormControlInput*>(brightnessSlider);
         if (input) {
-            input->SetValue(std::to_string(renderBrightness));
+            input->SetValue(std::to_string(renderSettings.brightness()));
         }
     }
     if (brightnessValueLabel) {
         std::ostringstream oss;
         oss.setf(std::ios::fixed);
         oss.precision(2);
-        oss << renderBrightness << "x";
+        oss << renderSettings.brightness() << "x";
         brightnessValueLabel->SetInnerRML(oss.str());
     }
 }

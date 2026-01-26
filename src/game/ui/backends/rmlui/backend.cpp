@@ -12,13 +12,16 @@
 #include <functional>
 #include <unordered_map>
 #include <unordered_set>
+#include <optional>
 #include <chrono>
 #include <cmath>
 
 #include "ui/backends/rmlui/platform/RmlUi_Renderer_GL3.h"
 #include "ui/backends/rmlui/console/emoji_utils.hpp"
+#include "ui/backends/rmlui/translate.hpp"
 #include "platform/window.hpp"
 #include "common/config_helpers.hpp"
+#include "common/i18n.hpp"
 #include "ui/backends/rmlui/hud/hud.hpp"
 #include "ui/backends/rmlui/console/console.hpp"
 #include "ui/backends/rmlui/console/panels/panel_community.hpp"
@@ -471,6 +474,7 @@ struct RmlUiBackend::RmlUiState {
     bool reloadRequested = false;
     bool reloadArmed = false;
     bool hardReloadRequested = false;
+    std::optional<std::string> pendingLanguage;
     std::string regularFontPath;
     std::string emojiFontPath;
     std::unique_ptr<ui::RmlUiHud> hud;
@@ -518,44 +522,7 @@ RmlUiBackend::RmlUiBackend(platform::Window &windowRefIn) : windowRef(&windowRef
     state->lastDpRatio = dpRatio;
     state->context->SetDensityIndependentPixelRatio(dpRatio);
 
-    const auto regularFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Regular.Font");
-    if (!regularFontPath.empty()) {
-        state->regularFontPath = regularFontPath.string();
-        if (!Rml::LoadFontFace(state->regularFontPath)) {
-            spdlog::warn("RmlUi: failed to load regular font '{}'.", state->regularFontPath);
-        }
-    }
-    const auto emojiFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Emoji.Font");
-    if (!emojiFontPath.empty()) {
-        state->emojiFontPath = emojiFontPath.string();
-        if (!Rml::LoadFontFace(state->emojiFontPath, true)) {
-            spdlog::warn("RmlUi: failed to load emoji font '{}'.", state->emojiFontPath);
-        }
-    }
-    const auto robotoFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Button.Font");
-    if (!robotoFontPath.empty()) {
-        if (!Rml::LoadFontFace(robotoFontPath.string())) {
-            spdlog::warn("RmlUi: failed to load Roboto font '{}'.", robotoFontPath.string());
-        }
-    }
-
-    const std::vector<std::string> fallbackKeys = {
-        "hud.fonts.console.FallbackLatin.Font",
-        "hud.fonts.console.FallbackArabic.Font",
-        "hud.fonts.console.FallbackDevanagari.Font",
-        "hud.fonts.console.FallbackCJK_JP.Font",
-        "hud.fonts.console.FallbackCJK_KR.Font",
-        "hud.fonts.console.FallbackCJK_SC.Font",
-        "hud.fonts.console.FallbackCJK_TC.Font"
-    };
-    for (const auto &key : fallbackKeys) {
-        const auto fallbackPath = bz::data::ResolveConfiguredAsset(key);
-        if (!fallbackPath.empty()) {
-            if (!Rml::LoadFontFace(fallbackPath.string(), true)) {
-                spdlog::warn("RmlUi: failed to load fallback font '{}' ({})", fallbackPath.string(), key);
-            }
-        }
-    }
+    loadConfiguredFonts(bz::i18n::Get().language());
 
     state->consolePath = bz::data::Resolve("client/ui/console.rml").string();
     state->hudPath = bz::data::Resolve("client/ui/hud.rml").string();
@@ -569,6 +536,18 @@ RmlUiBackend::RmlUiBackend(platform::Window &windowRefIn) : windowRef(&windowRef
     auto *settingsPanelPtr = settingsPanel.get();
     state->panels.emplace_back(std::move(settingsPanel));
     this->settingsPanel = settingsPanelPtr;
+    settingsPanelPtr->setLanguageCallback([this](const std::string &language) {
+        if (!state) {
+            return;
+        }
+        const bool liveReload = bz::data::ReadBoolConfig({"ui.LanguageLiveReload"}, false);
+        if (!liveReload) {
+            return;
+        }
+        state->pendingLanguage = language;
+        state->reloadRequested = false;
+        state->reloadArmed = true;
+    });
     state->panels.emplace_back(std::make_unique<ui::RmlUiPanelDocumentation>());
     auto startServerPanel = std::make_unique<ui::RmlUiPanelStartServer>();
     auto *startServerPanelPtr = startServerPanel.get();
@@ -856,10 +835,6 @@ void RmlUiBackend::update() {
         state->renderInterface.EndFrame();
     }
 
-    if (settingsPanel) {
-        renderBrightness = settingsPanel->getRenderBrightness();
-    }
-
     if (state->reloadArmed) {
         state->reloadRequested = true;
         state->reloadArmed = false;
@@ -867,12 +842,22 @@ void RmlUiBackend::update() {
     }
     if (state->reloadRequested) {
         state->reloadRequested = false;
+        if (state->pendingLanguage) {
+            bz::i18n::Get().loadLanguage(*state->pendingLanguage);
+            state->pendingLanguage.reset();
+        }
         loadConsoleDocument();
         loadHudDocument();
     }
 }
 
-void RmlUiBackend::reloadFonts() {}
+void RmlUiBackend::reloadFonts() {
+    if (!state) {
+        return;
+    }
+    loadConsoleDocument();
+    loadHudDocument();
+}
 
 void RmlUiBackend::setScoreboardEntries(const std::vector<ScoreboardEntry> &entries) {
     if (!state || !state->hud) {
@@ -947,33 +932,18 @@ ui::RenderOutput RmlUiBackend::getRenderOutput() const {
     if (!state) {
         return {};
     }
-    static bool loggedHidden = false;
     if (!state->outputVisible) {
-        if (!loggedHidden) {
-            spdlog::info("UiSystem: render output hidden (no visible UI)");
-            loggedHidden = true;
-        }
         return {};
     }
-    loggedHidden = false;
     ui::RenderOutput out;
     out.textureId = state->renderInterface.GetOutputTextureId();
     out.width = state->renderInterface.GetOutputWidth();
     out.height = state->renderInterface.GetOutputHeight();
-    static unsigned int lastTex = 0;
-    static int lastW = 0;
-    static int lastH = 0;
-    if (out.textureId != lastTex || out.width != lastW || out.height != lastH) {
-        spdlog::info("UiSystem: render output texture={} size={}x{}", out.textureId, out.width, out.height);
-        lastTex = out.textureId;
-        lastW = out.width;
-        lastH = out.height;
-    }
     return out;
 }
 
 float RmlUiBackend::getRenderBrightness() const {
-    return renderBrightness;
+    return settingsPanel ? settingsPanel->getRenderBrightness() : 1.0f;
 }
 
 void RmlUiBackend::setActiveTab(const std::string &tabKey) {
@@ -1005,11 +975,84 @@ void RmlUiBackend::setActiveTab(const std::string &tabKey) {
     }
 }
 
+void RmlUiBackend::loadConfiguredFonts(const std::string &language) {
+    if (!state) {
+        return;
+    }
+    auto loadFont = [&](const std::filesystem::path &path, bool fallback) {
+        if (path.empty()) {
+            return;
+        }
+        const std::string pathStr = path.string();
+        if (!state->loadedFontFiles.insert(pathStr).second) {
+            return;
+        }
+        if (!Rml::LoadFontFace(pathStr, fallback)) {
+            spdlog::warn("RmlUi: failed to load font '{}' (fallback={}).", pathStr, fallback);
+        }
+    };
+
+    state->regularFontPath.clear();
+    state->emojiFontPath.clear();
+
+    const auto regularFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Regular.Font");
+    if (!regularFontPath.empty()) {
+        state->regularFontPath = regularFontPath.string();
+        loadFont(regularFontPath, false);
+    }
+    const auto titleFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Title.Font");
+    loadFont(titleFontPath, false);
+    const auto headingFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Heading.Font");
+    loadFont(headingFontPath, false);
+    const auto buttonFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Button.Font");
+    loadFont(buttonFontPath, false);
+
+    const auto emojiFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Emoji.Font");
+    if (!emojiFontPath.empty()) {
+        state->emojiFontPath = emojiFontPath.string();
+        loadFont(emojiFontPath, true);
+    }
+
+    if (const auto *extras = bz::data::ConfigValue("assets.hud.fonts.console.Extras")) {
+        if (extras->is_array()) {
+            for (const auto &entry : *extras) {
+                if (!entry.is_string()) {
+                    continue;
+                }
+                const std::string extra = entry.get<std::string>();
+                std::filesystem::path extraPath;
+                if (extra.rfind("client/", 0) == 0 || extra.rfind("common/", 0) == 0) {
+                    extraPath = bz::data::Resolve(extra);
+                } else {
+                    extraPath = bz::data::Resolve(std::filesystem::path("client") / extra);
+                }
+                loadFont(extraPath, false);
+            }
+        }
+    }
+
+    const std::string lang = language;
+    if (lang == "ru") {
+        loadFont(bz::data::ResolveConfiguredAsset("hud.fonts.console.FallbackLatin.Font"), true);
+    } else if (lang == "ar") {
+        loadFont(bz::data::ResolveConfiguredAsset("hud.fonts.console.FallbackArabic.Font"), true);
+    } else if (lang == "hi") {
+        loadFont(bz::data::ResolveConfiguredAsset("hud.fonts.console.FallbackDevanagari.Font"), true);
+    } else if (lang == "jp") {
+        loadFont(bz::data::ResolveConfiguredAsset("hud.fonts.console.FallbackCJK_JP.Font"), true);
+    } else if (lang == "ko") {
+        loadFont(bz::data::ResolveConfiguredAsset("hud.fonts.console.FallbackCJK_KR.Font"), true);
+    } else if (lang == "zh") {
+        loadFont(bz::data::ResolveConfiguredAsset("hud.fonts.console.FallbackCJK_SC.Font"), true);
+    }
+}
+
 void RmlUiBackend::loadConsoleDocument() {
     if (!state || !state->context) {
         return;
     }
 
+    const std::string previousTab = state->activeTab;
     state->reloadRequested = false;
     state->reloadArmed = false;
     if (state->document) {
@@ -1027,24 +1070,7 @@ void RmlUiBackend::loadConsoleDocument() {
     state->bodyElement = nullptr;
     state->emojiMarkupCache.clear();
 
-    const auto fontsDir = bz::data::Resolve("client/fonts");
-    if (!fontsDir.empty() && std::filesystem::exists(fontsDir)) {
-        for (const auto &entry : std::filesystem::directory_iterator(fontsDir)) {
-            if (!entry.is_regular_file()) {
-                continue;
-            }
-            const auto ext = entry.path().extension().string();
-            if (ext != ".ttf" && ext != ".otf") {
-                continue;
-            }
-            const std::string path = entry.path().string();
-            if (state->loadedFontFiles.insert(path).second) {
-                if (!Rml::LoadFontFace(path, true)) {
-                    spdlog::warn("RmlUi: failed to load font '{}'.", path);
-                }
-            }
-        }
-    }
+    loadConfiguredFonts(bz::i18n::Get().language());
 
     Rml::Factory::ClearStyleSheetCache();
     Rml::Factory::ClearTemplateCache();
@@ -1062,6 +1088,7 @@ void RmlUiBackend::loadConsoleDocument() {
         spdlog::error("RmlUi: failed to load console RML from '{}'.", state->consolePath);
         return;
     }
+    ui::rmlui::ApplyTranslations(state->document, bz::i18n::Get());
 
     state->document->Show();
     state->bodyElement = state->document->GetElementById("main-body");
@@ -1103,7 +1130,11 @@ void RmlUiBackend::loadConsoleDocument() {
         }
     }
     if (!state->tabs.empty()) {
-        setActiveTab(defaultTabKey.empty() ? state->tabs.begin()->first : defaultTabKey);
+        if (!previousTab.empty() && state->tabs.find(previousTab) != state->tabs.end()) {
+            setActiveTab(previousTab);
+        } else {
+            setActiveTab(defaultTabKey.empty() ? state->tabs.begin()->first : defaultTabKey);
+        }
     }
 }
 

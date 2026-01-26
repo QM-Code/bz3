@@ -11,6 +11,10 @@
             </div>
             <input id="settings-brightness-slider" class="settings-brightness-slider" type="range" min="0.2" max="3.0" step="0.05" value="1.0" />
         </div>
+        <div class="settings-language">
+            <span class="settings-language-label" data-i18n="ui.settings.language_label"></span>
+            <select id="settings-language-select" class="settings-language-select"></select>
+        </div>
         <div class="bindings-table">
             <div class="bindings-row header">
                 <div class="bindings-cell action">Action</div>

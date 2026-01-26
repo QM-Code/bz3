@@ -10,13 +10,13 @@
 </head>
 <body id="main-body">
     <div id="main-window">
-        <div id="title">BZ3 - BZFlag Revisited</div>
+        <div id="title" data-i18n="ui.console.title"></div>
         <div id="tab-bar">
-            <span id="tab-community" class="tab default">Community</span>
-            <span id="tab-settings" class="tab">Settings</span>
-            <span id="tab-documentation" class="tab">Documentation</span>
-            <span id="tab-start-server" class="tab">Start Server</span>
-            <span id="tab-themes" class="tab">Themes</span>
+            <span id="tab-community" class="tab default" data-i18n="ui.console.tabs.community"></span>
+            <span id="tab-settings" class="tab" data-i18n="ui.console.tabs.settings"></span>
+            <span id="tab-documentation" class="tab" data-i18n="ui.console.tabs.documentation"></span>
+            <span id="tab-start-server" class="tab" data-i18n="ui.console.tabs.start_server"></span>
+            <span id="tab-themes" class="tab" data-i18n="ui.console.tabs.themes"></span>
         </div>
         <div id="tab-content">
             <div id="panel-community" class="tab-panel"></div>

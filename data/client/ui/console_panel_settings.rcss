@@ -33,6 +33,27 @@
     background-color: #0f1720;
 }
 
+.settings-language {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 10px;
+    border-width: 1px;
+    border-color: #22303d;
+    border-radius: 6px;
+    background-color: #0f1720;
+}
+
+.settings-language-label {
+    color: #c7d6e4;
+    font-size: 13px;
+}
+
+.settings-language-select {
+    min-width: 200px;
+}
+
 .settings-brightness-row {
     display: flex;
     justify-content: space-between;

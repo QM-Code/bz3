@@ -1,5 +1,7 @@
 #include "engine/graphics/device.hpp"
 
+#include <algorithm>
+
 namespace graphics {
 
 GraphicsDevice::GraphicsDevice(platform::Window& window) {
@@ -132,7 +134,8 @@ void GraphicsDevice::renderUiOverlay() {
 
 void GraphicsDevice::setBrightness(float brightness) {
     if (backend_) {
-        backend_->setBrightness(brightness);
+        const float clamped = std::clamp(brightness, 0.2f, 3.0f);
+        backend_->setBrightness(clamped);
     }
 }
 

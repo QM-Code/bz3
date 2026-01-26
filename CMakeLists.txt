@@ -75,12 +75,16 @@ else()
     message(FATAL_ERROR "Unknown BZ3_WORLD_BACKEND value: ${BZ3_WORLD_BACKEND}")
 endif()
 
-set(BZ3_RENDER_BACKEND "threepp" CACHE STRING "Render backend (threepp|filament)")
-set_property(CACHE BZ3_RENDER_BACKEND PROPERTY STRINGS threepp filament)
+set(BZ3_RENDER_BACKEND "threepp" CACHE STRING "Render backend (threepp|filament|diligent|bgfx)")
+set_property(CACHE BZ3_RENDER_BACKEND PROPERTY STRINGS threepp filament diligent bgfx)
 if(BZ3_RENDER_BACKEND STREQUAL "threepp")
     add_compile_definitions(BZ3_RENDER_BACKEND_THREEPP)
 elseif(BZ3_RENDER_BACKEND STREQUAL "filament")
     add_compile_definitions(BZ3_RENDER_BACKEND_FILAMENT)
+elseif(BZ3_RENDER_BACKEND STREQUAL "diligent")
+    add_compile_definitions(BZ3_RENDER_BACKEND_DILIGENT)
+elseif(BZ3_RENDER_BACKEND STREQUAL "bgfx")
+    add_compile_definitions(BZ3_RENDER_BACKEND_BGFX)
 else()
     message(FATAL_ERROR "Unknown BZ3_RENDER_BACKEND value: ${BZ3_RENDER_BACKEND}")
 endif()
@@ -151,6 +155,68 @@ find_package(nlohmann_json REQUIRED)
 find_package(Protobuf REQUIRED)
 find_package(CURL REQUIRED)
 find_package(OpenSSL REQUIRED)
+if(BZ3_RENDER_BACKEND STREQUAL "bgfx")
+    find_package(bgfx CONFIG REQUIRED)
+    set(BGFX_SHADER_DIR "${PROJECT_SOURCE_DIR}/data/bgfx/shaders")
+    set(BGFX_SHADER_BIN_DIR "${PROJECT_SOURCE_DIR}/data/bgfx/shaders/bin")
+    file(MAKE_DIRECTORY "${BGFX_SHADER_BIN_DIR}")
+
+    if(DEFINED VCPKG_INSTALLED_DIR AND DEFINED VCPKG_HOST_TRIPLET)
+        set(_BGFX_SHADERC_HINT "${VCPKG_INSTALLED_DIR}/${VCPKG_HOST_TRIPLET}/tools/bgfx")
+    endif()
+    if(DEFINED VCPKG_INSTALLED_DIR AND DEFINED VCPKG_TARGET_TRIPLET)
+        set(_BGFX_SHADER_INCLUDE_HINT "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/include")
+    endif()
+    if(NOT _BGFX_SHADER_INCLUDE_HINT)
+        set(_BGFX_SHADER_INCLUDE_HINT "${BGFX_SHADER_DIR}")
+    endif()
+
+    find_program(BGFX_SHADERC_EXECUTABLE NAMES shaderc HINTS ${_BGFX_SHADERC_HINT})
+    if(NOT BGFX_SHADERC_EXECUTABLE)
+        message(WARNING "bgfx shaderc not found; bgfx shaders will not be compiled.")
+    endif()
+
+    set(BGFX_SHADER_PROFILE "spirv")
+    set(BGFX_SHADER_RAW "")
+
+    function(bz3_bgfx_compile_shader out_file type profile input)
+        if(NOT BGFX_SHADERC_EXECUTABLE)
+            return()
+        endif()
+        set(_shaderc_args
+            -f "${input}"
+            -o "${out_file}"
+            --type "${type}"
+            --platform linux
+            --profile "${profile}"
+            --varyingdef "${BGFX_SHADER_DIR}/varying.def.sc"
+            -i "${BGFX_SHADER_DIR}"
+            -i "${_BGFX_SHADER_INCLUDE_HINT}"
+            -i "${_BGFX_SHADER_INCLUDE_HINT}/bgfx"
+        )
+        if(BGFX_SHADER_RAW)
+            list(APPEND _shaderc_args --raw)
+        endif()
+        add_custom_command(
+            OUTPUT "${out_file}"
+            COMMAND "${BGFX_SHADERC_EXECUTABLE}" ${_shaderc_args}
+            DEPENDS "${input}" "${BGFX_SHADER_DIR}/varying.def.sc"
+            COMMENT "Compiling bgfx shader ${input}"
+            VERBATIM
+        )
+    endfunction()
+
+    set(BGFX_VS_BIN "${BGFX_SHADER_BIN_DIR}/vs_triangle.bin")
+    set(BGFX_FS_BIN "${BGFX_SHADER_BIN_DIR}/fs_triangle.bin")
+    bz3_bgfx_compile_shader("${BGFX_VS_BIN}" vertex "${BGFX_SHADER_PROFILE}" "${BGFX_SHADER_DIR}/vs_triangle.sc")
+    bz3_bgfx_compile_shader("${BGFX_FS_BIN}" fragment "${BGFX_SHADER_PROFILE}" "${BGFX_SHADER_DIR}/fs_triangle.sc")
+
+    if(BGFX_SHADERC_EXECUTABLE)
+        add_custom_target(bz3_bgfx_shaders ALL DEPENDS "${BGFX_VS_BIN}" "${BGFX_FS_BIN}")
+    else()
+        add_custom_target(bz3_bgfx_shaders ALL)
+    endif()
+endif()
 
 # Compile protobuf files
 set(PROTO_FILES ${PROJECT_SOURCE_DIR}/src/game/protos/messages.proto)
@@ -172,6 +238,7 @@ list(APPEND CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/game/client/server/community_browser_controller.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/common/curl_global.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/common/config_helpers.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/common/i18n.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/common/data_path_resolver.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/common/data_dir_override.cpp
 )
@@ -181,6 +248,7 @@ list(APPEND SERVER_SOURCES
     ${PROJECT_SOURCE_DIR}/src/game/server/server_cli_options.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/common/curl_global.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/common/config_helpers.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/common/i18n.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/common/data_path_resolver.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/common/data_dir_override.cpp
 )
@@ -213,6 +281,7 @@ set(ENGINE_CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/engine/platform/window_factory.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/system.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/backend_factory.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/render_settings.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/audio/audio.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/audio/backend_factory.cpp
 )
@@ -253,6 +322,7 @@ elseif(BZ3_UI_BACKEND STREQUAL "rmlui")
         ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/hud/dialog.cpp
         ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/hud/radar.cpp
         ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/hud/scoreboard.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/translate.cpp
         ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/console/panels/panel.cpp
         ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/console/panels/panel_community.cpp
         ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/console/panels/panel_settings.cpp
@@ -330,6 +400,14 @@ if(BZ3_RENDER_BACKEND STREQUAL "threepp")
 elseif(BZ3_RENDER_BACKEND STREQUAL "filament")
     list(APPEND ENGINE_CLIENT_SOURCES
         ${PROJECT_SOURCE_DIR}/src/engine/graphics/backends/filament/backend.cpp
+    )
+elseif(BZ3_RENDER_BACKEND STREQUAL "diligent")
+    list(APPEND ENGINE_CLIENT_SOURCES
+        ${PROJECT_SOURCE_DIR}/src/engine/graphics/backends/diligent/backend.cpp
+    )
+elseif(BZ3_RENDER_BACKEND STREQUAL "bgfx")
+    list(APPEND ENGINE_CLIENT_SOURCES
+        ${PROJECT_SOURCE_DIR}/src/engine/graphics/backends/bgfx/backend.cpp
     )
 endif()
 
@@ -435,6 +513,11 @@ elseif(BZ3_RENDER_BACKEND STREQUAL "filament")
         dl
         m
     )
+elseif(BZ3_RENDER_BACKEND STREQUAL "diligent")
+    message(STATUS "Diligent backend selected: add DiligentCore/DiligentTools linkage when ready.")
+elseif(BZ3_RENDER_BACKEND STREQUAL "bgfx")
+    target_link_libraries(bz3 PRIVATE bgfx::bgfx)
+    add_dependencies(bz3 bz3_bgfx_shaders)
 endif()
 if(BZ3_PHYSICS_BACKEND STREQUAL "jolt")
     target_link_libraries(bz3 PRIVATE Jolt::Jolt)

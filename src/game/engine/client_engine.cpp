@@ -24,7 +24,14 @@ private:
     Render *render = nullptr;
 };
 
- 
+bool ShouldUseOpenGL() {
+#if defined(BZ3_RENDER_BACKEND_BGFX)
+    if (const char* noGl = std::getenv("BZ3_BGFX_NO_GL"); noGl && noGl[0] != '\0') {
+        return false;
+    }
+#endif
+    return true;
+}
 
 } // namespace
 
@@ -82,38 +89,15 @@ void ClientEngine::step(TimeUtils::duration deltaTime) {
 }
 
 void ClientEngine::lateUpdate(TimeUtils::duration deltaTime) {
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glEnable(GL_DEPTH_TEST);
-    glDepthMask(GL_TRUE);
+    if (ShouldUseOpenGL()) {
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glEnable(GL_DEPTH_TEST);
+        glDepthMask(GL_TRUE);
+    }
 
     render->update();
-
-#if defined(BZ3_RENDER_BACKEND_FILAMENT)
-    {
-        const unsigned int mainTex = render->getMainTextureId();
-        int fbWidth = 0;
-        int fbHeight = 0;
-        if (window) {
-            window->getFramebufferSize(fbWidth, fbHeight);
-        }
-        const auto [mainW, mainH] = render->getMainTextureSize();
-        if (mainTex != 0 && mainW > 0 && mainH > 0 && fbWidth > 0 && fbHeight > 0) {
-            static unsigned int blitFbo = 0;
-            if (blitFbo == 0) {
-                glGenFramebuffers(1, &blitFbo);
-            }
-            glBindFramebuffer(GL_READ_FRAMEBUFFER, blitFbo);
-            glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, mainTex, 0);
-            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-            glViewport(0, 0, fbWidth, fbHeight);
-            glDisable(GL_DEPTH_TEST);
-            glDepthMask(GL_FALSE);
-            glBlitFramebuffer(0, 0, mainW, mainH, 0, 0, fbWidth, fbHeight, GL_COLOR_BUFFER_BIT, GL_LINEAR);
-            glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
-        }
-    }
-#endif
+    render->present();
 
     ui->update();
 

@@ -4,6 +4,7 @@
 
 #include "common/data_path_resolver.hpp"
 #include "common/config_helpers.hpp"
+#include "common/i18n.hpp"
 #include "platform/window.hpp"
 #include "spdlog/spdlog.h"
 
@@ -185,6 +186,15 @@ ImGuiBackend::ImGuiBackend(platform::Window &windowRef) : window(&windowRef) {
     showFPS = bz::data::ReadBoolConfig({"debug.ShowFPS"}, false);
     hud.setShowFps(showFPS);
 
+    consoleView.setLanguageCallback([this](const std::string &language) {
+        const bool liveReload = bz::data::ReadBoolConfig({"ui.LanguageLiveReload"}, false);
+        if (!liveReload) {
+            return;
+        }
+        pendingLanguage = language;
+        languageReloadArmed = true;
+    });
+
     io.Fonts->Build();
 }
 
@@ -237,6 +247,12 @@ void ImGuiBackend::handleEvents(const std::vector<platform::Event> &events) {
 }
 
 void ImGuiBackend::update() {
+    if (languageReloadArmed && pendingLanguage) {
+        languageReloadArmed = false;
+        bz::i18n::Get().loadLanguage(*pendingLanguage);
+        pendingLanguage.reset();
+        reloadFonts();
+    }
     if (consoleView.consumeFontReloadRequest()) {
         reloadFonts();
     }

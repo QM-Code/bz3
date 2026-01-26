@@ -295,29 +295,51 @@ public:
         }
         spdlog::info("SDL video driver: {}", SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "(null)");
 
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, config.glMajor);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, config.glMinor);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, config.glCoreProfile ? SDL_GL_CONTEXT_PROFILE_CORE : SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
-        SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, config.samples > 0 ? 1 : 0);
-        SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, config.samples);
+        bool enableGlContext = true;
+#if defined(BZ3_RENDER_BACKEND_BGFX)
+        if (const char* noGl = std::getenv("BZ3_BGFX_NO_GL"); noGl && noGl[0] != '\0') {
+            enableGlContext = false;
+        }
+#endif
 
-        window = SDL_CreateWindow(config.title.c_str(), config.width, config.height, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+        if (enableGlContext) {
+            SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, config.glMajor);
+            SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, config.glMinor);
+            SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, config.glCoreProfile ? SDL_GL_CONTEXT_PROFILE_CORE : SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
+            SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, config.samples > 0 ? 1 : 0);
+            SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, config.samples);
+        }
+
+        uint32_t windowFlags = SDL_WINDOW_RESIZABLE;
+        if (enableGlContext) {
+            windowFlags |= SDL_WINDOW_OPENGL;
+        } else {
+            windowFlags |= SDL_WINDOW_VULKAN;
+        }
+
+        window = SDL_CreateWindow(config.title.c_str(), config.width, config.height, windowFlags);
+        if (!window && !enableGlContext) {
+            spdlog::warn("SDL window failed to create with Vulkan flag: {}", SDL_GetError());
+            windowFlags = SDL_WINDOW_RESIZABLE;
+            window = SDL_CreateWindow(config.title.c_str(), config.width, config.height, windowFlags);
+        }
         if (!window) {
             spdlog::error("SDL window failed to create: {}", SDL_GetError());
             SDL_Quit();
             return;
         }
 
-        glContext = SDL_GL_CreateContext(window);
-        if (!glContext) {
-            spdlog::error("SDL GL context failed to create: {}", SDL_GetError());
-            SDL_DestroyWindow(window);
-            window = nullptr;
-            SDL_Quit();
-            return;
+        if (enableGlContext) {
+            glContext = SDL_GL_CreateContext(window);
+            if (!glContext) {
+                spdlog::error("SDL GL context failed to create: {}", SDL_GetError());
+                SDL_DestroyWindow(window);
+                window = nullptr;
+                SDL_Quit();
+                return;
+            }
+            SDL_GL_MakeCurrent(window, glContext);
         }
-
-        SDL_GL_MakeCurrent(window, glContext);
         SDL_StartTextInput(window);
     }
 
@@ -450,7 +472,11 @@ public:
     }
 
     void swapBuffers() override {
-        if (window) {
+        if (window
+#if defined(BZ3_RENDER_BACKEND_BGFX)
+            && glContext
+#endif
+        ) {
             SDL_GL_SwapWindow(window);
         }
     }
@@ -462,7 +488,9 @@ public:
     }
 
     void setVsync(bool enabled) override {
-        SDL_GL_SetSwapInterval(enabled ? 1 : 0);
+        if (glContext) {
+            SDL_GL_SetSwapInterval(enabled ? 1 : 0);
+        }
     }
 
     void setFullscreen(bool enabled) override {

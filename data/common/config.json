@@ -1,4 +1,8 @@
 {
+    "language": "en",
+    "ui": {
+        "LanguageLiveReload": false
+    },
     "assets": {
         "models": {
             "playerModel": "models/tank_final.glb",

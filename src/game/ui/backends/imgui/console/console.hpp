@@ -4,6 +4,7 @@
 #include <atomic>
 #include <cstdint>
 #include <deque>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -20,6 +21,7 @@ struct ImFont;
 
 #include "ui/console/console_interface.hpp"
 #include "ui/backends/imgui/console/thumbnail_cache.hpp"
+#include "ui/render_settings.hpp"
 
 namespace ui {
 
@@ -76,6 +78,7 @@ public:
     bool consumeRefreshRequest() override;
     void setScanning(bool scanning) override;
     void setUserConfigPath(const std::string &path) override;
+    void setLanguageCallback(std::function<void(const std::string &)> callback);
     float getRenderBrightness() const;
     bool consumeFontReloadRequest() override;
     bool consumeKeybindingsReloadRequest() override;
@@ -107,9 +110,6 @@ private:
     void applyThemeToView(const ThemeConfig &theme);
     bool loadUserConfig(bz::json::Value &out) const;
     bool saveUserConfig(const bz::json::Value &userConfig, std::string &error) const;
-    void loadRenderSettings(const bz::json::Value &userConfig);
-    void saveRenderSettings(bz::json::Value &userConfig) const;
-    void setRenderBrightness(float value, bool fromUser);
     void setNestedConfig(bz::json::Value &root, std::initializer_list<const char*> path, bz::json::Value value) const;
     void setNestedConfig(bz::json::Value &root, const std::vector<std::string> &path, bz::json::Value value) const;
     void eraseNestedConfig(bz::json::Value &root, std::initializer_list<const char*> path) const;
@@ -214,10 +214,11 @@ private:
     int selectedBindingIndex = -1;
     BindingColumn selectedBindingColumn = BindingColumn::Keyboard;
     bool settingsLoaded = false;
+    int selectedLanguageIndex = 0;
     std::string settingsStatusText;
     bool settingsStatusIsError = false;
-    float renderBrightness = 1.0f;
-    bool renderBrightnessDirty = false;
+    RenderSettings renderSettings;
+    std::function<void(const std::string &)> languageCallback;
 
     struct LocalServerProcess {
         int id = 0;

@@ -1,6 +1,8 @@
 #include "ui/backends/imgui/hud/fps.hpp"
 
 #include <imgui.h>
+#include <cstdio>
+#include "common/i18n.hpp"
 
 namespace ui {
 
@@ -22,7 +24,10 @@ void ImGuiHudFps::draw(ImGuiIO &io) {
         ImGuiWindowFlags_NoScrollbar |
         ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_AlwaysAutoResize);
-    ImGui::Text("FPS: %.1f", io.Framerate);
+    char fpsBuffer[32];
+    std::snprintf(fpsBuffer, sizeof(fpsBuffer), "%.1f", io.Framerate);
+    const std::string fpsText = bz::i18n::Get().format("ui.hud.fps_label", {{"value", fpsBuffer}});
+    ImGui::TextUnformatted(fpsText.c_str());
     ImGui::End();
 }
 

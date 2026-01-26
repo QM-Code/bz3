@@ -2,9 +2,11 @@
 
 #include <optional>
 #include <string>
+#include <functional>
 #include <vector>
 
 #include "common/json.hpp"
+#include "ui/render_settings.hpp"
 
 namespace Rml {
 class Element;
@@ -22,6 +24,7 @@ public:
     void setUserConfigPath(const std::string &path);
     bool consumeKeybindingsReloadRequest();
     float getRenderBrightness() const;
+    void setLanguageCallback(std::function<void(const std::string &)> callback);
 
 protected:
     void onLoaded(Rml::ElementDocument *document) override;
@@ -46,6 +49,7 @@ private:
     class SettingsKeyListener;
     class SettingsMouseListener;
     class BrightnessListener;
+    class LanguageListener;
 
     void loadBindings();
     void rebuildBindings();
@@ -55,8 +59,6 @@ private:
     void clearSelected();
     void saveBindings();
     void resetBindings();
-    void loadRenderSettings(const bz::json::Value &userConfig);
-    void saveRenderSettings(bz::json::Value &userConfig) const;
     void setRenderBrightness(float value, bool fromUser);
     void syncRenderBrightnessControls();
     void showStatus(const std::string &message, bool isError);
@@ -64,6 +66,10 @@ private:
     void captureKey(int keyIdentifier);
     void captureMouse(int button);
     std::string keyIdentifierToName(int keyIdentifier) const;
+    void rebuildLanguageOptions();
+    void applyLanguageSelection(const std::string &code);
+    std::string selectedLanguageFromConfig() const;
+    bool isLanguageSelectionSuppressed() const { return suppressLanguageSelection; }
 
     bool loadUserConfig(bz::json::Value &out) const;
     bool saveUserConfig(const bz::json::Value &userConfig, std::string &error) const;
@@ -80,6 +86,7 @@ private:
     Rml::Element *clearButton = nullptr;
     Rml::Element *saveButton = nullptr;
     Rml::Element *resetButton = nullptr;
+    Rml::Element *languageSelect = nullptr;
 
     std::vector<BindingRow> rows;
     std::vector<std::string> keyboardBindings;
@@ -98,8 +105,9 @@ private:
 
     Rml::Element *brightnessSlider = nullptr;
     Rml::Element *brightnessValueLabel = nullptr;
-    float renderBrightness = 1.0f;
-    bool renderBrightnessDirty = false;
+    RenderSettings renderSettings;
+    std::function<void(const std::string &)> languageCallback;
+    bool suppressLanguageSelection = false;
 };
 
 } // namespace ui

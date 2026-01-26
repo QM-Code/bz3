@@ -1142,11 +1142,10 @@ void FilamentBackend::renderUiOverlay() {
 }
 
 void FilamentBackend::setBrightness(float value) {
-    const float clamped = std::max(0.2f, std::min(3.0f, value));
-    if (std::abs(clamped - brightness) < 0.0001f) {
+    if (std::abs(value - brightness) < 0.0001f) {
         return;
     }
-    brightness = clamped;
+    brightness = value;
 
     if (engine) {
         auto& lm = engine->getLightManager();

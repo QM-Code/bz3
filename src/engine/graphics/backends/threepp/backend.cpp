@@ -414,8 +414,7 @@ unsigned int ThreeppBackend::getRenderTargetTextureId(graphics::RenderTargetId t
 }
 
 void ThreeppBackend::setBrightness(float brightness) {
-    const float clamped = std::clamp(brightness, 0.2f, 3.0f);
-    renderer.toneMappingExposure = clamped;
+    renderer.toneMappingExposure = brightness;
 }
 
 void ThreeppBackend::setPosition(graphics::EntityId entity, const glm::vec3& position) {

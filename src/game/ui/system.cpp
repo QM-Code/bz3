@@ -2,6 +2,7 @@
 
 #include "ui/backend.hpp"
 #include "platform/window.hpp"
+#include "common/i18n.hpp"
 
 UiSystem::UiSystem(platform::Window &window) {
     backend = ui_backend::CreateUiBackend(window);
@@ -18,6 +19,11 @@ void UiSystem::update() {
 }
 
 void UiSystem::reloadFonts() {
+    backend->reloadFonts();
+}
+
+void UiSystem::setLanguage(const std::string &language) {
+    bz::i18n::Get().loadLanguage(language);
     backend->reloadFonts();
 }
 

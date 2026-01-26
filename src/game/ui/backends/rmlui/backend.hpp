@@ -55,7 +55,7 @@ private:
     std::unique_ptr<ui::RmlUiConsole> consoleView;
     const ui::RenderBridge *renderBridge = nullptr;
     ui::RmlUiPanelSettings *settingsPanel = nullptr;
-    float renderBrightness = 1.0f;
+    void loadConfiguredFonts(const std::string &language);
     void loadConsoleDocument();
     void loadHudDocument();
     const std::string &cachedTwemojiMarkup(const std::string &text);

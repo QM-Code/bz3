@@ -141,7 +141,10 @@
               1.0,
               1.0
             ]
-          }
+          },
+          "Extras": [
+            "fonts/Tourney.ttf"
+          ]
         }
       }
     },

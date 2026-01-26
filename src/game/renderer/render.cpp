@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <glad/glad.h>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <limits>
@@ -487,6 +488,35 @@ void Render::setBrightness(float brightness) {
         return;
     }
     device_->setBrightness(brightness);
+}
+
+void Render::present() {
+#if defined(BZ3_RENDER_BACKEND_FILAMENT)
+    if (!device_ || !window) {
+        return;
+    }
+    const unsigned int mainTex = getMainTextureId();
+    const auto [mainW, mainH] = getMainTextureSize();
+    int fbWidth = 0;
+    int fbHeight = 0;
+    window->getFramebufferSize(fbWidth, fbHeight);
+    if (mainTex == 0 || mainW <= 0 || mainH <= 0 || fbWidth <= 0 || fbHeight <= 0) {
+        return;
+    }
+
+    static unsigned int blitFbo = 0;
+    if (blitFbo == 0) {
+        glGenFramebuffers(1, &blitFbo);
+    }
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, blitFbo);
+    glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, mainTex, 0);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    glViewport(0, 0, fbWidth, fbHeight);
+    glDisable(GL_DEPTH_TEST);
+    glDepthMask(GL_FALSE);
+    glBlitFramebuffer(0, 0, mainW, mainH, 0, 0, fbWidth, fbHeight, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+#endif
 }
 
 void Render::setRadarShaderPath(const std::filesystem::path& vertPath,

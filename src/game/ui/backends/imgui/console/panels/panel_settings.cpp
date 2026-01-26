@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
-#include <cmath>
 #include <cstdio>
 #include <optional>
 #include <sstream>
@@ -11,13 +10,20 @@
 #include <vector>
 
 #include "common/json.hpp"
+#include "common/i18n.hpp"
+#include "common/data_path_resolver.hpp"
 #include "game/input/bindings.hpp"
+#include "spdlog/spdlog.h"
 
 namespace {
 
 struct KeybindingDefinition {
     const char *action;
     const char *label;
+};
+
+const std::vector<std::string> kLanguageCodes = {
+    "en", "es", "fr", "de", "pt", "ru", "jp", "zh", "ko", "it", "hi", "ar"
 };
 
 constexpr KeybindingDefinition kKeybindings[] = {
@@ -252,7 +258,17 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
             settingsStatusText = "Failed to load user config; showing defaults.";
             settingsStatusIsError = true;
         }
-        loadRenderSettings(userConfig);
+        renderSettings.load(userConfig);
+        std::string configuredLanguage = bz::i18n::Get().language();
+        if (auto it = userConfig.find("language"); it != userConfig.end() && it->is_string()) {
+            configuredLanguage = it->get<std::string>();
+        }
+        for (std::size_t i = 0; i < kLanguageCodes.size(); ++i) {
+            if (kLanguageCodes[i] == configuredLanguage) {
+                selectedLanguageIndex = static_cast<int>(i);
+                break;
+            }
+        }
 
         const bz::json::Value *bindingsNode = nullptr;
         if (auto it = userConfig.find("keybindings"); it != userConfig.end() && it->is_object()) {
@@ -317,11 +333,59 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
         }
     }
 
+    auto &i18n = bz::i18n::Get();
+    ImGui::TextUnformatted(i18n.get("ui.settings.language_label").c_str());
+    ImGui::SameLine();
+    std::string selectedLangCode = (selectedLanguageIndex >= 0 &&
+                                    selectedLanguageIndex < static_cast<int>(kLanguageCodes.size()))
+        ? kLanguageCodes[static_cast<std::size_t>(selectedLanguageIndex)]
+        : i18n.language();
+    std::string selectedLangLabel = i18n.get("languages." + selectedLangCode);
+    if (selectedLangLabel.empty()) {
+        selectedLangLabel = selectedLangCode;
+    }
+    if (ImGui::BeginCombo("##LanguageSelect", selectedLangLabel.c_str())) {
+        for (std::size_t i = 0; i < kLanguageCodes.size(); ++i) {
+            const std::string &code = kLanguageCodes[i];
+            std::string label = i18n.get("languages." + code);
+            if (label.empty()) {
+                label = code;
+            }
+            const bool isSelected = (selectedLanguageIndex == static_cast<int>(i));
+            if (ImGui::Selectable(label.c_str(), isSelected)) {
+                selectedLanguageIndex = static_cast<int>(i);
+                bz::json::Value userConfig;
+                if (!loadUserConfig(userConfig)) {
+                    settingsStatusText = "Failed to load user config.";
+                    settingsStatusIsError = true;
+                } else {
+                    userConfig["language"] = code;
+                    std::string error;
+                    if (!saveUserConfig(userConfig, error)) {
+                        settingsStatusText = error.empty() ? "Failed to save language." : error;
+                        settingsStatusIsError = true;
+                    } else {
+                        if (!userConfigPath.empty()) {
+                            bz::data::MergeExternalConfigLayer(userConfigPath, "user config", spdlog::level::debug);
+                        }
+                        if (languageCallback) {
+                            languageCallback(code);
+                        }
+                    }
+                }
+            }
+            if (isSelected) {
+                ImGui::SetItemDefaultFocus();
+            }
+        }
+        ImGui::EndCombo();
+    }
+
     ImGui::TextUnformatted("Render");
     ImGui::Spacing();
-    float brightness = renderBrightness;
+    float brightness = renderSettings.brightness();
     if (ImGui::SliderFloat("Brightness", &brightness, 0.2f, 3.0f, "%.2fx")) {
-        setRenderBrightness(brightness, true);
+        renderSettings.setBrightness(brightness, true);
     }
     ImGui::Separator();
     ImGui::Spacing();
@@ -486,7 +550,7 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
             } else {
                 eraseNestedConfig(userConfig, {"gui", "keybindings", "controller"});
             }
-            saveRenderSettings(userConfig);
+            renderSettings.save(userConfig);
 
             std::string error;
             if (!saveUserConfig(userConfig, error)) {
@@ -524,7 +588,7 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
         } else {
             eraseNestedConfig(userConfig, {"keybindings"});
             eraseNestedConfig(userConfig, {"gui", "keybindings", "controller"});
-            eraseNestedConfig(userConfig, {"render", "brightness"});
+            RenderSettings::eraseFromConfig(userConfig);
             std::string error;
             if (!saveUserConfig(userConfig, error)) {
                 settingsStatusText = error.empty() ? "Failed to reset bindings." : error;
@@ -535,24 +599,22 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
                 settingsStatusIsError = false;
             }
         }
-        renderBrightness = 1.0f;
-        renderBrightnessDirty = false;
+        renderSettings.reset();
     }
 
-    if (renderBrightnessDirty) {
+    if (renderSettings.consumeDirty()) {
         bz::json::Value userConfig;
         if (!loadUserConfig(userConfig)) {
             settingsStatusText = "Failed to load user config.";
             settingsStatusIsError = true;
         } else {
-            saveRenderSettings(userConfig);
+            renderSettings.save(userConfig);
             std::string error;
             if (!saveUserConfig(userConfig, error)) {
                 settingsStatusText = error.empty() ? "Failed to save render settings." : error;
                 settingsStatusIsError = true;
             }
         }
-        renderBrightnessDirty = false;
     }
 
     if (!settingsStatusText.empty()) {
@@ -563,34 +625,7 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
 }
 
 float ConsoleView::getRenderBrightness() const {
-    return renderBrightness;
-}
-
-void ConsoleView::loadRenderSettings(const bz::json::Value &userConfig) {
-    renderBrightness = 1.0f;
-    if (!userConfig.is_object()) {
-        return;
-    }
-    if (auto renderIt = userConfig.find("render"); renderIt != userConfig.end() && renderIt->is_object()) {
-        if (auto brightIt = renderIt->find("brightness"); brightIt != renderIt->end() && brightIt->is_number()) {
-            renderBrightness = static_cast<float>(brightIt->get<double>());
-        }
-    }
-}
-
-void ConsoleView::saveRenderSettings(bz::json::Value &userConfig) const {
-    setNestedConfig(userConfig, {"render", "brightness"}, renderBrightness);
-}
-
-void ConsoleView::setRenderBrightness(float value, bool fromUser) {
-    const float clamped = std::max(0.2f, std::min(3.0f, value));
-    if (std::abs(clamped - renderBrightness) < 0.0001f) {
-        return;
-    }
-    renderBrightness = clamped;
-    if (fromUser) {
-        renderBrightnessDirty = true;
-    }
+    return renderSettings.brightness();
 }
 
 } // namespace ui

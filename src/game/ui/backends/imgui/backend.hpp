@@ -2,6 +2,7 @@
 
 #include <array>
 #include <chrono>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -49,6 +50,8 @@ private:
     ui::ImGuiHud hud;
     bool showFPS = false;
     const ui::RenderBridge *renderBridge = nullptr;
+    bool languageReloadArmed = false;
+    std::optional<std::string> pendingLanguage;
     void drawTexture(unsigned int textureId);
 };
 

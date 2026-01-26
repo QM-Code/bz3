@@ -14,6 +14,7 @@
 
 #include "common/config_helpers.hpp"
 #include "common/data_path_resolver.hpp"
+#include "common/i18n.hpp"
 
 namespace {
 std::string trimCopy(const std::string &value) {
@@ -65,17 +66,91 @@ void ConsoleView::initializeFonts(ImGuiIO &io) {
 #if defined(IMGUI_ENABLE_FREETYPE) && defined(ImGuiFreeTypeBuilderFlags_LoadColor)
     io.Fonts->FontBuilderFlags |= ImGuiFreeTypeBuilderFlags_LoadColor;
 #endif
-    const auto regularFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Regular.Font");
+    auto addFallbackFont = [&](const char *assetKey, float size, const ImWchar *ranges, const char *label) {
+        const auto fontPath = bz::data::ResolveConfiguredAsset(assetKey);
+        if (fontPath.empty()) {
+            return;
+        }
+        ImFontConfig config;
+        config.MergeMode = true;
+        config.PixelSnapH = true;
+        ImFont *font = io.Fonts->AddFontFromFileTTF(fontPath.string().c_str(), size, &config, ranges);
+        if (!font) {
+            spdlog::warn("Failed to load fallback font {} ({}).", label, fontPath.string());
+        }
+    };
+    auto addFallbacksForSize = [&](float size, const std::string &language) {
+        ImFontGlyphRangesBuilder builder;
+        builder.AddRanges(io.Fonts->GetGlyphRangesDefault());
+        builder.AddRanges(io.Fonts->GetGlyphRangesCyrillic());
+        ImVector<ImWchar> latinRanges;
+        builder.BuildRanges(&latinRanges);
+        addFallbackFont("hud.fonts.console.FallbackLatin.Font", size, latinRanges.Data, "FallbackLatin");
+        if (language == "ar") {
+            static const ImWchar arabicRanges[] = {
+                0x0600, 0x06FF, 0x0750, 0x077F, 0x08A0, 0x08FF, 0xFB50, 0xFDFF, 0xFE70, 0xFEFF, 0
+            };
+            addFallbackFont("hud.fonts.console.FallbackArabic.Font", size, arabicRanges, "FallbackArabic");
+        } else if (language == "hi") {
+            static const ImWchar devanagariRanges[] = { 0x0900, 0x097F, 0 };
+            addFallbackFont("hud.fonts.console.FallbackDevanagari.Font", size, devanagariRanges, "FallbackDevanagari");
+        } else if (language == "jp") {
+            addFallbackFont("hud.fonts.console.FallbackCJK_JP.Font", size, io.Fonts->GetGlyphRangesJapanese(), "FallbackCJK_JP");
+        } else if (language == "ko") {
+            addFallbackFont("hud.fonts.console.FallbackCJK_KR.Font", size, io.Fonts->GetGlyphRangesKorean(), "FallbackCJK_KR");
+        } else if (language == "zh") {
+            addFallbackFont("hud.fonts.console.FallbackCJK_SC.Font", size, io.Fonts->GetGlyphRangesChineseSimplifiedCommon(), "FallbackCJK_SC");
+        }
+    };
+    const std::string language = bz::i18n::Get().language();
+    const char *regularFontKey = "hud.fonts.console.Regular.Font";
+    if (language == "ru") {
+        regularFontKey = "hud.fonts.console.FallbackLatin.Font";
+    } else if (language == "zh") {
+        regularFontKey = "hud.fonts.console.FallbackCJK_SC.Font";
+    } else if (language == "jp") {
+        regularFontKey = "hud.fonts.console.FallbackCJK_JP.Font";
+    } else if (language == "ko") {
+        regularFontKey = "hud.fonts.console.FallbackCJK_KR.Font";
+    } else if (language == "ar") {
+        regularFontKey = "hud.fonts.console.FallbackArabic.Font";
+    } else if (language == "hi") {
+        regularFontKey = "hud.fonts.console.FallbackDevanagari.Font";
+    }
+    const auto regularFontPath = bz::data::ResolveConfiguredAsset(regularFontKey);
     const std::string regularFontPathStr = regularFontPath.string();
+    const ImWchar *regularRanges = nullptr;
+    if (language == "ru") {
+        regularRanges = io.Fonts->GetGlyphRangesCyrillic();
+    } else if (language == "ar") {
+        static const ImWchar arabicRanges[] = {
+            0x0600, 0x06FF, 0x0750, 0x077F, 0x08A0, 0x08FF, 0xFB50, 0xFDFF, 0xFE70, 0xFEFF, 0
+        };
+        regularRanges = arabicRanges;
+    } else if (language == "hi") {
+        static const ImWchar devanagariRanges[] = { 0x0900, 0x097F, 0 };
+        regularRanges = devanagariRanges;
+    } else if (language == "jp") {
+        regularRanges = io.Fonts->GetGlyphRangesJapanese();
+    } else if (language == "ko") {
+        regularRanges = io.Fonts->GetGlyphRangesKorean();
+    } else if (language == "zh") {
+        regularRanges = io.Fonts->GetGlyphRangesChineseSimplifiedCommon();
+    }
     const float regularFontSize = useThemeOverrides
         ? currentTheme.regular.size
         : bz::data::ReadFloatConfig({"assets.hud.fonts.console.Regular.Size"}, 20.0f);
     this->regularFontSize = regularFontSize;
     regularFont = io.Fonts->AddFontFromFileTTF(
         regularFontPathStr.c_str(),
-        regularFontSize
+        regularFontSize,
+        nullptr,
+        regularRanges
     );
     regularColor = readColorConfig("assets.hud.fonts.console.Regular.Color", defaultTextColor);
+    if (regularFont) {
+        addFallbacksForSize(regularFontSize, bz::i18n::Get().language());
+    }
 
     if (!regularFont) {
         spdlog::warn("Failed to load console regular font for community browser ({}).", regularFontPathStr);
@@ -188,7 +263,8 @@ void ConsoleView::draw(ImGuiIO &io) {
 
     ImGui::SetNextWindowPos(windowPos, ImGuiCond_Always);
     ImGui::SetNextWindowSize(windowSize, ImGuiCond_Always);
-    ImGui::SetNextWindowBgAlpha(0.95f);
+    const float bgAlpha = connectionState.connected ? 0.95f : 1.0f;
+    ImGui::SetNextWindowBgAlpha(bgAlpha);
 
     ImGuiWindowFlags flags =
         ImGuiWindowFlags_NoResize |
@@ -197,6 +273,14 @@ void ConsoleView::draw(ImGuiIO &io) {
         ImGuiWindowFlags_NoMove;
 
     const ImGuiStyle &style = ImGui::GetStyle();
+    if (!connectionState.connected) {
+        const ImVec2 screenMin(0.0f, 0.0f);
+        const ImVec2 screenMax(io.DisplaySize.x, io.DisplaySize.y);
+        ImVec4 bg = style.Colors[ImGuiCol_WindowBg];
+        bg.w = 1.0f;
+        ImGui::GetBackgroundDrawList()->AddRectFilled(screenMin, screenMax,
+                                                      ImGui::GetColorU32(bg));
+    }
     ImFont *titleFontToUse = titleFont ? titleFont : (headingFont ? headingFont : regularFont);
     if (titleFontToUse) {
         ImGui::PushFont(titleFontToUse);
@@ -204,7 +288,9 @@ void ConsoleView::draw(ImGuiIO &io) {
     ImGui::PushStyleColor(ImGuiCol_Text, titleColor);
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
                         ImVec2(style.FramePadding.x + 6.0f, style.FramePadding.y + 4.0f));
-    ImGui::Begin("BZ3 - BZFlag Revisited", nullptr, flags);
+    auto &i18n = bz::i18n::Get();
+    const std::string windowTitle = i18n.get("ui.console.title");
+    ImGui::Begin((windowTitle + "###MainConsole").c_str(), nullptr, flags);
     ImGui::PopStyleVar();
     ImGui::PopStyleColor();
     if (titleFontToUse) {
@@ -213,23 +299,28 @@ void ConsoleView::draw(ImGuiIO &io) {
 
     const MessageColors messageColors = getMessageColors();
     if (ImGui::BeginTabBar("CommunityBrowserTabs", ImGuiTabBarFlags_FittingPolicyScroll)) {
-        if (ImGui::BeginTabItem("Community")) {
+        const std::string tabCommunity = i18n.get("ui.console.tabs.community");
+        const std::string tabSettings = i18n.get("ui.console.tabs.settings");
+        const std::string tabDocumentation = i18n.get("ui.console.tabs.documentation");
+        const std::string tabStartServer = i18n.get("ui.console.tabs.start_server");
+        const std::string tabThemes = i18n.get("ui.console.tabs.themes");
+        if (ImGui::BeginTabItem((tabCommunity + "###TabCommunity").c_str())) {
             drawCommunityPanel(messageColors);
             ImGui::EndTabItem();
         }
-    if (ImGui::BeginTabItem("Settings")) {
+    if (ImGui::BeginTabItem((tabSettings + "###TabSettings").c_str())) {
         drawSettingsPanel(messageColors);
         ImGui::EndTabItem();
     }
-    if (ImGui::BeginTabItem("Documentation")) {
+    if (ImGui::BeginTabItem((tabDocumentation + "###TabDocumentation").c_str())) {
         drawDocumentationPanel(messageColors);
         ImGui::EndTabItem();
     }
-    if (ImGui::BeginTabItem("Start Server")) {
+    if (ImGui::BeginTabItem((tabStartServer + "###TabStartServer").c_str())) {
         drawStartServerPanel(messageColors);
         ImGui::EndTabItem();
     }
-    if (ImGui::BeginTabItem("Themes")) {
+    if (ImGui::BeginTabItem((tabThemes + "###TabThemes").c_str())) {
         drawThemesPanel(messageColors);
         ImGui::EndTabItem();
     }
@@ -250,6 +341,17 @@ void ConsoleView::setUserConfigPath(const std::string &path) {
     userConfigPath = path;
     themesLoaded = false;
     settingsLoaded = false;
+    renderSettings.reset();
+    if (!userConfigPath.empty()) {
+        bz::json::Value userConfig;
+        if (loadUserConfig(userConfig)) {
+            renderSettings.load(userConfig);
+        }
+    }
+}
+
+void ConsoleView::setLanguageCallback(std::function<void(const std::string &)> callback) {
+    languageCallback = std::move(callback);
 }
 
 bool ConsoleView::consumeFontReloadRequest() {
