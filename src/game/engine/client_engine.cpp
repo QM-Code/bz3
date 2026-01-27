@@ -58,10 +58,10 @@ ClientEngine::ClientEngine(platform::Window &window) {
 
 ClientEngine::~ClientEngine() {
     delete network;
+    delete ui;
     delete render;
     delete physics;
     delete input;
-    delete ui;
     delete audio;
 }
 

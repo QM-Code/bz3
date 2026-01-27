@@ -179,7 +179,7 @@ if(BZ3_RENDER_BACKEND STREQUAL "bgfx")
     set(BGFX_SHADER_PROFILE "spirv")
     set(BGFX_SHADER_RAW "")
 
-    function(bz3_bgfx_compile_shader out_file type profile input)
+    function(bz3_bgfx_compile_shader out_file type profile input varying)
         if(NOT BGFX_SHADERC_EXECUTABLE)
             return()
         endif()
@@ -189,7 +189,7 @@ if(BZ3_RENDER_BACKEND STREQUAL "bgfx")
             --type "${type}"
             --platform linux
             --profile "${profile}"
-            --varyingdef "${BGFX_SHADER_DIR}/varying.def.sc"
+            --varyingdef "${varying}"
             -i "${BGFX_SHADER_DIR}"
             -i "${_BGFX_SHADER_INCLUDE_HINT}"
             -i "${_BGFX_SHADER_INCLUDE_HINT}/bgfx"
@@ -200,7 +200,7 @@ if(BZ3_RENDER_BACKEND STREQUAL "bgfx")
         add_custom_command(
             OUTPUT "${out_file}"
             COMMAND "${BGFX_SHADERC_EXECUTABLE}" ${_shaderc_args}
-            DEPENDS "${input}" "${BGFX_SHADER_DIR}/varying.def.sc"
+            DEPENDS "${input}" "${varying}"
             COMMENT "Compiling bgfx shader ${input}"
             VERBATIM
         )
@@ -208,11 +208,27 @@ if(BZ3_RENDER_BACKEND STREQUAL "bgfx")
 
     set(BGFX_VS_BIN "${BGFX_SHADER_BIN_DIR}/vs_triangle.bin")
     set(BGFX_FS_BIN "${BGFX_SHADER_BIN_DIR}/fs_triangle.bin")
-    bz3_bgfx_compile_shader("${BGFX_VS_BIN}" vertex "${BGFX_SHADER_PROFILE}" "${BGFX_SHADER_DIR}/vs_triangle.sc")
-    bz3_bgfx_compile_shader("${BGFX_FS_BIN}" fragment "${BGFX_SHADER_PROFILE}" "${BGFX_SHADER_DIR}/fs_triangle.sc")
+    bz3_bgfx_compile_shader("${BGFX_VS_BIN}" vertex "${BGFX_SHADER_PROFILE}" "${BGFX_SHADER_DIR}/vs_triangle.sc" "${BGFX_SHADER_DIR}/varying.def.sc")
+    bz3_bgfx_compile_shader("${BGFX_FS_BIN}" fragment "${BGFX_SHADER_PROFILE}" "${BGFX_SHADER_DIR}/fs_triangle.sc" "${BGFX_SHADER_DIR}/varying.def.sc")
+
+    set(BGFX_IMGUI_SHADER_DIR "${BGFX_SHADER_DIR}/imgui")
+    set(BGFX_IMGUI_BIN_DIR "${BGFX_SHADER_BIN_DIR}/imgui")
+    file(MAKE_DIRECTORY "${BGFX_IMGUI_BIN_DIR}")
+    set(BGFX_IMGUI_VS_BIN "${BGFX_IMGUI_BIN_DIR}/vs_imgui.bin")
+    set(BGFX_IMGUI_FS_BIN "${BGFX_IMGUI_BIN_DIR}/fs_imgui.bin")
+    bz3_bgfx_compile_shader("${BGFX_IMGUI_VS_BIN}" vertex "${BGFX_SHADER_PROFILE}" "${BGFX_IMGUI_SHADER_DIR}/vs_imgui.sc" "${BGFX_IMGUI_SHADER_DIR}/varying.def.sc")
+    bz3_bgfx_compile_shader("${BGFX_IMGUI_FS_BIN}" fragment "${BGFX_SHADER_PROFILE}" "${BGFX_IMGUI_SHADER_DIR}/fs_imgui.sc" "${BGFX_IMGUI_SHADER_DIR}/varying.def.sc")
+
+    set(BGFX_MESH_SHADER_DIR "${BGFX_SHADER_DIR}/mesh")
+    set(BGFX_MESH_BIN_DIR "${BGFX_SHADER_BIN_DIR}/mesh")
+    file(MAKE_DIRECTORY "${BGFX_MESH_BIN_DIR}")
+    set(BGFX_MESH_VS_BIN "${BGFX_MESH_BIN_DIR}/vs_mesh.bin")
+    set(BGFX_MESH_FS_BIN "${BGFX_MESH_BIN_DIR}/fs_mesh.bin")
+    bz3_bgfx_compile_shader("${BGFX_MESH_VS_BIN}" vertex "${BGFX_SHADER_PROFILE}" "${BGFX_MESH_SHADER_DIR}/vs_mesh.sc" "${BGFX_MESH_SHADER_DIR}/varying.def.sc")
+    bz3_bgfx_compile_shader("${BGFX_MESH_FS_BIN}" fragment "${BGFX_SHADER_PROFILE}" "${BGFX_MESH_SHADER_DIR}/fs_mesh.sc" "${BGFX_MESH_SHADER_DIR}/varying.def.sc")
 
     if(BGFX_SHADERC_EXECUTABLE)
-        add_custom_target(bz3_bgfx_shaders ALL DEPENDS "${BGFX_VS_BIN}" "${BGFX_FS_BIN}")
+        add_custom_target(bz3_bgfx_shaders ALL DEPENDS "${BGFX_VS_BIN}" "${BGFX_FS_BIN}" "${BGFX_IMGUI_VS_BIN}" "${BGFX_IMGUI_FS_BIN}" "${BGFX_MESH_VS_BIN}" "${BGFX_MESH_FS_BIN}")
     else()
         add_custom_target(bz3_bgfx_shaders ALL)
     endif()
@@ -340,6 +356,7 @@ endif()
 set(ENGINE_SERVER_SOURCES
     ${PROJECT_SOURCE_DIR}/src/game/engine/server_engine.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/geometry/mesh_loader.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/third_party/stb_image_impl.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/world/content.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/world/backend_factory.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/world/backends/fs/backend.cpp

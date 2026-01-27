@@ -1,6 +1,7 @@
 #include "engine/graphics/backends/bgfx/backend.hpp"
 
 #include "engine/common/data_path_resolver.hpp"
+#include "engine/geometry/mesh_loader.hpp"
 #include "platform/window.hpp"
 
 #include <bgfx/bgfx.h>
@@ -9,9 +10,12 @@
 #include <algorithm>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <spdlog/spdlog.h>
 #include <fstream>
 #include <cstdlib>
+#include <cmath>
+#include <stb_image.h>
 
 #if defined(BZ3_WINDOW_BACKEND_GLFW)
 #define GLFW_EXPOSE_NATIVE_X11
@@ -120,6 +124,131 @@ bgfx::ShaderHandle loadShader(const std::filesystem::path& path) {
     return bgfx::createShader(mem);
 }
 
+bgfx::TextureHandle createTextureRGBA8(int width, int height, const uint8_t* pixels) {
+    if (width <= 0 || height <= 0 || !pixels) {
+        return BGFX_INVALID_HANDLE;
+    }
+    const uint32_t size = static_cast<uint32_t>(width * height * 4);
+    const bgfx::Memory* mem = bgfx::copy(pixels, size);
+    return bgfx::createTexture2D(static_cast<uint16_t>(width),
+                                 static_cast<uint16_t>(height),
+                                 false,
+                                 1,
+                                 bgfx::TextureFormat::RGBA8,
+                                 BGFX_SAMPLER_NONE,
+                                 mem);
+}
+
+bool isShotModelPath(const std::filesystem::path& path) {
+    return path.filename() == "shot.glb";
+}
+
+bool isWorldModelPath(const std::filesystem::path& path) {
+    return path.filename() == "world.glb";
+}
+
+std::string getBrickThemeName() {
+    const char* env = std::getenv("BZ3_BGFX_BRICK_THEME");
+    if (!env || !*env) {
+        return "none";
+    }
+    return std::string(env);
+}
+
+bgfx::TextureHandle loadTextureFromFile(const std::filesystem::path& path) {
+    int width = 0;
+    int height = 0;
+    int channels = 0;
+    unsigned char* pixels = stbi_load(path.string().c_str(), &width, &height, &channels, 4);
+    if (!pixels || width <= 0 || height <= 0) {
+        if (pixels) {
+            stbi_image_free(pixels);
+        }
+        return BGFX_INVALID_HANDLE;
+    }
+    bgfx::TextureHandle handle = createTextureRGBA8(width, height, pixels);
+    stbi_image_free(pixels);
+    return handle;
+}
+
+bool isLikelyGrass(const MeshLoader::TextureData& texture) {
+    if (texture.pixels.empty() || texture.width <= 0 || texture.height <= 0) {
+        return false;
+    }
+    const int sampleCount = 4096;
+    const int totalPixels = texture.width * texture.height;
+    const int step = std::max(1, totalPixels / sampleCount);
+    uint64_t sumR = 0;
+    uint64_t sumG = 0;
+    uint64_t sumB = 0;
+    int samples = 0;
+    for (int i = 0; i < totalPixels; i += step) {
+        const size_t idx = static_cast<size_t>(i) * 4;
+        if (idx + 2 >= texture.pixels.size()) {
+            break;
+        }
+        sumR += texture.pixels[idx + 0];
+        sumG += texture.pixels[idx + 1];
+        sumB += texture.pixels[idx + 2];
+        ++samples;
+    }
+    if (samples == 0) {
+        return false;
+    }
+    const float r = static_cast<float>(sumR) / samples;
+    const float g = static_cast<float>(sumG) / samples;
+    const float b = static_cast<float>(sumB) / samples;
+    return g > r * 1.15f && g > b * 1.15f;
+}
+
+graphics::MeshData makeSphereMesh(int slices = 24, int stacks = 16, float radius = 0.5f) {
+    graphics::MeshData mesh;
+    if (slices < 3 || stacks < 2) {
+        return mesh;
+    }
+
+    const int vertCount = (stacks + 1) * (slices + 1);
+    mesh.vertices.reserve(static_cast<size_t>(vertCount));
+    mesh.texcoords.reserve(static_cast<size_t>(vertCount));
+
+    constexpr float kPi = 3.14159265358979323846f;
+    const float invSlices = 1.0f / static_cast<float>(slices);
+    const float invStacks = 1.0f / static_cast<float>(stacks);
+    for (int stack = 0; stack <= stacks; ++stack) {
+        const float v = static_cast<float>(stack) * invStacks;
+        const float phi = v * kPi;
+        const float y = std::cos(phi);
+        const float r = std::sin(phi);
+        for (int slice = 0; slice <= slices; ++slice) {
+            const float u = static_cast<float>(slice) * invSlices;
+            const float theta = u * (kPi * 2.0f);
+            const float x = r * std::cos(theta);
+            const float z = r * std::sin(theta);
+            mesh.vertices.emplace_back(x * radius, y * radius, z * radius);
+            mesh.texcoords.emplace_back(u, 1.0f - v);
+        }
+    }
+
+    mesh.indices.reserve(static_cast<size_t>(stacks * slices * 6));
+    for (int stack = 0; stack < stacks; ++stack) {
+        for (int slice = 0; slice < slices; ++slice) {
+            const uint32_t a = static_cast<uint32_t>(stack * (slices + 1) + slice);
+            const uint32_t b = static_cast<uint32_t>((stack + 1) * (slices + 1) + slice);
+            const uint32_t c = static_cast<uint32_t>((stack + 1) * (slices + 1) + slice + 1);
+            const uint32_t d = static_cast<uint32_t>(stack * (slices + 1) + slice + 1);
+
+            mesh.indices.push_back(a);
+            mesh.indices.push_back(b);
+            mesh.indices.push_back(c);
+            mesh.indices.push_back(a);
+            mesh.indices.push_back(c);
+            mesh.indices.push_back(d);
+        }
+    }
+
+    return mesh;
+}
+
 struct TestVertex {
     float x;
     float y;
@@ -143,6 +272,9 @@ BgfxBackend::BgfxBackend(platform::Window& windowIn)
         }
         window->makeContextCurrent();
     }
+
+    brickThemeName = getBrickThemeName();
+    spdlog::info("Graphics(Bgfx): brick theme = '{}'", brickThemeName);
 
     const auto nativeInfo = getNativeWindowInfo(window);
     bgfx::PlatformData pd{};
@@ -191,22 +323,42 @@ BgfxBackend::~BgfxBackend() {
         if (bgfx::isValid(testProgram)) {
             bgfx::destroy(testProgram);
         }
+        if (bgfx::isValid(meshProgram)) {
+            bgfx::destroy(meshProgram);
+        }
+        if (bgfx::isValid(meshColorUniform)) {
+            bgfx::destroy(meshColorUniform);
+        }
+        if (bgfx::isValid(meshSamplerUniform)) {
+            bgfx::destroy(meshSamplerUniform);
+        }
+        for (auto& [id, mesh] : meshes) {
+            if (bgfx::isValid(mesh.vertexBuffer)) {
+                bgfx::destroy(mesh.vertexBuffer);
+            }
+            if (bgfx::isValid(mesh.indexBuffer)) {
+                bgfx::destroy(mesh.indexBuffer);
+            }
+        }
+        for (auto& [key, texture] : textureCache) {
+            if (bgfx::isValid(texture)) {
+                bgfx::destroy(texture);
+            }
+        }
+        if (bgfx::isValid(whiteTexture)) {
+            bgfx::destroy(whiteTexture);
+        }
+        // Flush any queued work before shutdown to avoid backend teardown races.
+        bgfx::frame();
         bgfx::shutdown();
+        initialized = false;
+        testReady = false;
     }
 }
 
 void BgfxBackend::beginFrame() {
     if (!initialized) {
         return;
-    }
-    static uint64_t frameCounter = 0;
-    if (frameCounter < 120) {
-        spdlog::info("Graphics(Bgfx): beginFrame frame={} testReady={} vb={} ib={} prog={}",
-                     frameCounter,
-                     testReady,
-                     bgfx::isValid(testVertexBuffer),
-                     bgfx::isValid(testIndexBuffer),
-                     bgfx::isValid(testProgram));
     }
     if (testReady) {
         bgfx::setViewTransform(0, nullptr, nullptr);
@@ -216,19 +368,6 @@ void BgfxBackend::beginFrame() {
         bgfx::submit(0, testProgram);
     }
     bgfx::touch(0);
-
-    const bgfx::Stats* stats = bgfx::getStats();
-    if (stats) {
-        if (frameCounter < 120) {
-            spdlog::info(
-                "Graphics(Bgfx): stats drawCalls={} gpuFrame={} gpuTime={} cpuTime={}",
-                stats->numDraw,
-                stats->gpuFrameNum,
-                stats->gpuTimeEnd - stats->gpuTimeBegin,
-                stats->cpuTimeEnd - stats->cpuTimeBegin);
-        }
-    }
-    ++frameCounter;
 }
 
 void BgfxBackend::endFrame() {
@@ -282,6 +421,116 @@ void BgfxBackend::setEntityModel(graphics::EntityId entity,
     }
     it->second.modelPath = modelPath;
     it->second.material = materialOverride;
+
+    const std::string pathKey = modelPath.string();
+    auto cacheIt = modelMeshCache.find(pathKey);
+    if (cacheIt != modelMeshCache.end()) {
+        it->second.meshes = cacheIt->second;
+        it->second.mesh = cacheIt->second.empty() ? graphics::kInvalidMesh : cacheIt->second.front();
+        return;
+    }
+
+    if (isShotModelPath(modelPath)) {
+        if (shotMeshId == graphics::kInvalidMesh) {
+            shotMeshId = createMesh(makeSphereMesh());
+        }
+        if (shotMeshId != graphics::kInvalidMesh) {
+            std::vector<graphics::MeshId> shotMeshes{shotMeshId};
+            it->second.meshes = shotMeshes;
+            it->second.mesh = shotMeshId;
+            modelMeshCache.emplace(pathKey, shotMeshes);
+            return;
+        }
+    }
+
+    const auto resolved = bz::data::Resolve(modelPath);
+    MeshLoader::LoadOptions options;
+    options.loadTextures = true;
+    auto loaded = MeshLoader::loadGLB(resolved.string(), options);
+    if (loaded.empty()) {
+        return;
+    }
+
+    std::vector<graphics::MeshId> modelMeshes;
+    modelMeshes.reserve(loaded.size());
+    for (const auto& submesh : loaded) {
+        graphics::MeshData meshData;
+        meshData.vertices = submesh.vertices;
+        meshData.indices = submesh.indices;
+        meshData.texcoords = submesh.texcoords;
+
+        const graphics::MeshId meshId = createMesh(meshData);
+        if (meshId == graphics::kInvalidMesh) {
+            continue;
+        }
+        modelMeshes.push_back(meshId);
+
+        if (submesh.albedo) {
+            auto meshIt = meshes.find(meshId);
+            if (meshIt != meshes.end()) {
+                bgfx::TextureHandle handle = BGFX_INVALID_HANDLE;
+                const bool isGrass = isLikelyGrass(*submesh.albedo);
+                const bool useBuildingTheme = isWorldModelPath(modelPath) &&
+                                              !brickThemeName.empty() &&
+                                              brickThemeName == "futuristic" &&
+                                              !isGrass;
+                const bool useGrassTheme = isWorldModelPath(modelPath) &&
+                                           brickThemeName == "classic" &&
+                                           isGrass;
+                if (isWorldModelPath(modelPath)) {
+                    spdlog::info("Graphics(Bgfx): submesh tex='{}' grass={} theme='{}' useGrass={} useBuilding={}",
+                                 submesh.albedo->key, isGrass, brickThemeName, useGrassTheme, useBuildingTheme);
+                }
+                if (useBuildingTheme || useGrassTheme) {
+                    const std::string themeKey = useGrassTheme ? "theme:grass:classic"
+                                                               : "theme:" + brickThemeName;
+                    auto themeIt = textureCache.find(themeKey);
+                    if (themeIt != textureCache.end()) {
+                        handle = themeIt->second;
+                    } else {
+                        const std::filesystem::path themePath = bz::data::Resolve(
+                            useGrassTheme ? "common/textures/themes/grass_classic.png"
+                                          : "common/textures/themes/brick_" + brickThemeName + ".png");
+                        if (std::filesystem::exists(themePath)) {
+                            handle = loadTextureFromFile(themePath);
+                            if (bgfx::isValid(handle)) {
+                                textureCache.emplace(themeKey, handle);
+                                spdlog::info("Graphics(Bgfx): loaded theme texture '{}' -> {}", themeKey, themePath.string());
+                            } else {
+                                spdlog::warn("Graphics(Bgfx): failed to load brick theme texture '{}'",
+                                             themePath.string());
+                            }
+                        } else {
+                            spdlog::warn("Graphics(Bgfx): theme '{}' not found at '{}'",
+                                         themeKey, themePath.string());
+                        }
+                    }
+                }
+
+                if (!bgfx::isValid(handle)) {
+                    auto texIt = textureCache.find(submesh.albedo->key);
+                    if (texIt != textureCache.end()) {
+                        handle = texIt->second;
+                    } else {
+                        handle = createTextureRGBA8(submesh.albedo->width,
+                                                    submesh.albedo->height,
+                                                    submesh.albedo->pixels.data());
+                        if (bgfx::isValid(handle)) {
+                            textureCache.emplace(submesh.albedo->key, handle);
+                        }
+                    }
+                }
+
+                if (bgfx::isValid(handle)) {
+                    meshIt->second.texture = handle;
+                }
+            }
+        }
+    }
+
+    it->second.meshes = modelMeshes;
+    it->second.mesh = modelMeshes.empty() ? graphics::kInvalidMesh : modelMeshes.front();
+    modelMeshCache.emplace(pathKey, std::move(modelMeshes));
 }
 
 void BgfxBackend::setEntityMesh(graphics::EntityId entity,
@@ -292,6 +541,7 @@ void BgfxBackend::setEntityMesh(graphics::EntityId entity,
         return;
     }
     it->second.mesh = mesh;
+    it->second.meshes.clear();
     it->second.material = materialOverride;
 }
 
@@ -301,12 +551,62 @@ void BgfxBackend::destroyEntity(graphics::EntityId entity) {
 
 graphics::MeshId BgfxBackend::createMesh(const graphics::MeshData& mesh) {
     const graphics::MeshId id = nextMeshId++;
-    meshes[id] = mesh;
+    if (!initialized) {
+        return id;
+    }
+    if (!meshReady) {
+        buildMeshResources();
+    }
+    if (mesh.vertices.empty()) {
+        return id;
+    }
+
+    std::vector<float> verts;
+    verts.reserve(mesh.vertices.size() * 5);
+    for (size_t i = 0; i < mesh.vertices.size(); ++i) {
+        const auto& v = mesh.vertices[i];
+        verts.push_back(v.x);
+        verts.push_back(v.y);
+        verts.push_back(v.z);
+        if (i < mesh.texcoords.size()) {
+            const auto& uv = mesh.texcoords[i];
+            verts.push_back(uv.x);
+            verts.push_back(uv.y);
+        } else {
+            verts.push_back(0.0f);
+            verts.push_back(0.0f);
+        }
+    }
+
+    MeshRecord record;
+    record.vertexBuffer = bgfx::createVertexBuffer(
+        bgfx::copy(verts.data(), static_cast<uint32_t>(verts.size() * sizeof(float))),
+        meshLayout);
+
+    if (!mesh.indices.empty()) {
+        record.indexBuffer = bgfx::createIndexBuffer(
+            bgfx::copy(mesh.indices.data(), static_cast<uint32_t>(mesh.indices.size() * sizeof(uint32_t))),
+            BGFX_BUFFER_INDEX32);
+        record.indexCount = static_cast<uint32_t>(mesh.indices.size());
+    }
+
+    record.texture = whiteTexture;
+    meshes[id] = record;
     return id;
 }
 
 void BgfxBackend::destroyMesh(graphics::MeshId mesh) {
-    meshes.erase(mesh);
+    auto it = meshes.find(mesh);
+    if (it == meshes.end()) {
+        return;
+    }
+    if (bgfx::isValid(it->second.vertexBuffer)) {
+        bgfx::destroy(it->second.vertexBuffer);
+    }
+    if (bgfx::isValid(it->second.indexBuffer)) {
+        bgfx::destroy(it->second.indexBuffer);
+    }
+    meshes.erase(it);
 }
 
 graphics::MaterialId BgfxBackend::createMaterial(const graphics::MaterialDesc& material) {
@@ -342,7 +642,104 @@ void BgfxBackend::destroyRenderTarget(graphics::RenderTargetId target) {
     renderTargets.erase(target);
 }
 
-void BgfxBackend::renderLayer(graphics::LayerId, graphics::RenderTargetId) {}
+void BgfxBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId target) {
+    if (!initialized) {
+        return;
+    }
+    if (target != graphics::kDefaultRenderTarget) {
+        return;
+    }
+    if (!meshReady) {
+        buildMeshResources();
+    }
+    if (!meshReady) {
+        return;
+    }
+
+    const glm::mat4 view = getViewMatrix();
+    const glm::mat4 proj = getProjectionMatrix();
+    const uint16_t viewId = static_cast<uint16_t>(layer);
+    bgfx::setViewTransform(viewId, glm::value_ptr(view), glm::value_ptr(proj));
+    bgfx::setViewRect(viewId, 0, 0,
+                      static_cast<uint16_t>(framebufferWidth),
+                      static_cast<uint16_t>(framebufferHeight));
+    bgfx::setViewClear(viewId, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, 0x0d1620ff, 1.0f, 0);
+
+    for (const auto& [id, entity] : entities) {
+        if (entity.layer != layer || !entity.visible) {
+            continue;
+        }
+
+        const glm::mat4 model =
+            glm::translate(glm::mat4(1.0f), entity.position) *
+            glm::mat4_cast(entity.rotation) *
+            glm::scale(glm::mat4(1.0f), entity.scale);
+
+        bgfx::setTransform(glm::value_ptr(model));
+        const bool isShot = isShotModelPath(entity.modelPath);
+        const bool transparent = entity.transparent ||
+                                 (entity.material != graphics::kInvalidMaterial &&
+                                  materials.count(entity.material) &&
+                                  materials.at(entity.material).transparent);
+        uint64_t state = BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A | BGFX_STATE_DEPTH_TEST_LESS;
+        if (isShot) {
+            state |= BGFX_STATE_BLEND_ADD;
+        } else if (transparent) {
+            state |= BGFX_STATE_BLEND_ALPHA;
+        } else {
+            state |= BGFX_STATE_WRITE_Z | BGFX_STATE_CULL_CW;
+        }
+
+        auto drawMesh = [&](graphics::MeshId meshId) {
+            if (meshId == graphics::kInvalidMesh) {
+                return;
+            }
+            auto meshIt = meshes.find(meshId);
+            if (meshIt == meshes.end()) {
+                return;
+            }
+            const MeshRecord& mesh = meshIt->second;
+            if (!bgfx::isValid(mesh.vertexBuffer)) {
+                return;
+            }
+
+            bgfx::setVertexBuffer(0, mesh.vertexBuffer);
+            if (bgfx::isValid(mesh.indexBuffer) && mesh.indexCount > 0) {
+                bgfx::setIndexBuffer(mesh.indexBuffer, 0, mesh.indexCount);
+            }
+
+            glm::vec4 color(1.0f);
+            if (entity.material != graphics::kInvalidMaterial) {
+                auto matIt = materials.find(entity.material);
+                if (matIt != materials.end()) {
+                    color = matIt->second.baseColor;
+                }
+            }
+            if (isShot) {
+                color = glm::vec4(1.0f, 0.75f, 0.25f, 1.0f);
+            }
+            bgfx::setUniform(meshColorUniform, glm::value_ptr(color));
+            bgfx::TextureHandle tex = whiteTexture;
+            if (bgfx::isValid(mesh.texture)) {
+                tex = mesh.texture;
+            }
+            if (bgfx::isValid(meshSamplerUniform) && bgfx::isValid(tex)) {
+                bgfx::setTexture(0, meshSamplerUniform, tex);
+            }
+
+            bgfx::setState(state);
+            bgfx::submit(viewId, meshProgram);
+        };
+
+        if (!entity.meshes.empty()) {
+            for (const auto meshId : entity.meshes) {
+                drawMesh(meshId);
+            }
+        } else {
+            drawMesh(entity.mesh);
+        }
+    }
+}
 
 unsigned int BgfxBackend::getRenderTargetTextureId(graphics::RenderTargetId) const {
     return 0u;
@@ -497,6 +894,49 @@ void BgfxBackend::buildTestResources() {
     if (!testReady) {
         spdlog::error("Graphics(Bgfx): failed to create test geometry");
     }
+}
+
+void BgfxBackend::buildMeshResources() {
+    if (!initialized || meshReady) {
+        return;
+    }
+
+    const std::filesystem::path vsPath = bz::data::Resolve("bgfx/shaders/bin/mesh/vs_mesh.bin");
+    const std::filesystem::path fsPath = bz::data::Resolve("bgfx/shaders/bin/mesh/fs_mesh.bin");
+    if (!std::filesystem::exists(vsPath) || !std::filesystem::exists(fsPath)) {
+        spdlog::error("Graphics(Bgfx): missing mesh shader binaries '{}', '{}'", vsPath.string(), fsPath.string());
+        return;
+    }
+
+    bgfx::ShaderHandle vsh = loadShader(vsPath);
+    bgfx::ShaderHandle fsh = loadShader(fsPath);
+    if (!bgfx::isValid(vsh) || !bgfx::isValid(fsh)) {
+        if (bgfx::isValid(vsh)) {
+            bgfx::destroy(vsh);
+        }
+        if (bgfx::isValid(fsh)) {
+            bgfx::destroy(fsh);
+        }
+        return;
+    }
+
+    meshProgram = bgfx::createProgram(vsh, fsh, true);
+    if (!bgfx::isValid(meshProgram)) {
+        spdlog::error("Graphics(Bgfx): failed to create mesh shader program");
+        return;
+    }
+
+    meshColorUniform = bgfx::createUniform("u_color", bgfx::UniformType::Vec4);
+    meshSamplerUniform = bgfx::createUniform("s_tex", bgfx::UniformType::Sampler);
+    meshLayout.begin()
+        .add(bgfx::Attrib::Position, 3, bgfx::AttribType::Float)
+        .add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float)
+        .end();
+
+    const uint32_t whitePixel = 0xffffffffu;
+    whiteTexture = createTextureRGBA8(1, 1, reinterpret_cast<const uint8_t*>(&whitePixel));
+
+    meshReady = true;
 }
 
 } // namespace graphics_backend

@@ -3,7 +3,12 @@
   "version": "0.1.0",
   "dependencies": [
     "glfw3",
-    "sdl3",
+    {
+      "name": "sdl3",
+      "features": [
+        "vulkan"
+      ]
+    },
     "glm",
     "joltphysics",
     "bullet3",

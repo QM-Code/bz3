@@ -72,8 +72,16 @@ private:
         bool visible = true;
         bool transparent = false;
         graphics::MeshId mesh = graphics::kInvalidMesh;
+        std::vector<graphics::MeshId> meshes;
         graphics::MaterialId material = graphics::kInvalidMaterial;
         std::filesystem::path modelPath;
+    };
+
+    struct MeshRecord {
+        bgfx::VertexBufferHandle vertexBuffer = BGFX_INVALID_HANDLE;
+        bgfx::IndexBufferHandle indexBuffer = BGFX_INVALID_HANDLE;
+        uint32_t indexCount = 0;
+        bgfx::TextureHandle texture = BGFX_INVALID_HANDLE;
     };
 
     struct RenderTargetRecord {
@@ -91,9 +99,10 @@ private:
     graphics::RenderTargetId nextRenderTargetId = 1;
 
     std::unordered_map<graphics::EntityId, EntityRecord> entities;
-    std::unordered_map<graphics::MeshId, graphics::MeshData> meshes;
+    std::unordered_map<graphics::MeshId, MeshRecord> meshes;
     std::unordered_map<graphics::MaterialId, graphics::MaterialDesc> materials;
     std::unordered_map<graphics::RenderTargetId, RenderTargetRecord> renderTargets;
+    std::unordered_map<std::string, std::vector<graphics::MeshId>> modelMeshCache;
 
     glm::vec3 cameraPosition{0.0f};
     glm::quat cameraRotation{1.0f, 0.0f, 0.0f, 0.0f};
@@ -113,9 +122,20 @@ private:
     bgfx::ProgramHandle testProgram = BGFX_INVALID_HANDLE;
     bool testReady = false;
 
+    bgfx::VertexLayout meshLayout{};
+    bgfx::ProgramHandle meshProgram = BGFX_INVALID_HANDLE;
+    bgfx::UniformHandle meshColorUniform = BGFX_INVALID_HANDLE;
+    bgfx::UniformHandle meshSamplerUniform = BGFX_INVALID_HANDLE;
+    bgfx::TextureHandle whiteTexture = BGFX_INVALID_HANDLE;
+    std::unordered_map<std::string, bgfx::TextureHandle> textureCache;
+    bool meshReady = false;
+    graphics::MeshId shotMeshId = graphics::kInvalidMesh;
+    std::string brickThemeName;
+
     glm::mat4 computeViewMatrix() const;
     glm::mat4 computeProjectionMatrix() const;
     void buildTestResources();
+    void buildMeshResources();
 };
 
 } // namespace graphics_backend

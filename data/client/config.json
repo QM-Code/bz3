@@ -169,13 +169,19 @@
     "ConnectionTimeout": 5,
     "MaxRetries": 3
   },
+  "platform": {
+    "SdlVideoDriver": "wayland"
+  },
   "graphics": {
     "resolution": {
       "Width": 1280,
       "Height": 720
     },
     "Fullscreen": false,
-    "VSync": true
+    "VSync": true,
+    "Bgfx": {
+      "NoGl": true
+    }
   },
   "controls": {
     "MouseSensitivity": 1.0,

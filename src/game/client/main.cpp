@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <filesystem>
 #include <initializer_list>
 #include <string>
@@ -59,6 +60,21 @@ void ConfigureLogging(spdlog::level::level_enum level, bool includeTimestamp) {
     spdlog::set_level(level);
 }
 
+void SetEnvDefault(const char *name, const std::string &value) {
+    if (!name || value.empty()) {
+        return;
+    }
+    if (std::getenv(name) != nullptr) {
+        return;
+    }
+#if defined(_WIN32)
+    _putenv_s(name, value.c_str());
+#else
+    setenv(name, value.c_str(), 0);
+#endif
+    spdlog::info("Env default set: {}={}", name, value);
+}
+
 int main(int argc, char *argv[]) {
     ConfigureLogging(spdlog::level::info, false);
 
@@ -79,6 +95,18 @@ int main(int argc, char *argv[]) {
     const uint16_t configHeight = bz::data::ReadUInt16Config({"graphics.resolution.Height"}, 720);
     const bool fullscreenEnabled = bz::data::ReadBoolConfig({"graphics.Fullscreen"}, false);
     const bool vsyncEnabled = bz::data::ReadBoolConfig({"graphics.VSync"}, true);
+
+    const std::string sdlVideoDriver = bz::data::ReadStringConfig({"platform.SdlVideoDriver"}, "");
+    if (!sdlVideoDriver.empty()) {
+        SetEnvDefault("SDL_VIDEODRIVER", sdlVideoDriver);
+    }
+
+#if defined(BZ3_RENDER_BACKEND_BGFX)
+    const bool bgfxNoGl = bz::data::ReadBoolConfig({"graphics.Bgfx.NoGl"}, false);
+    if (bgfxNoGl) {
+        SetEnvDefault("BZ3_BGFX_NO_GL", "1");
+    }
+#endif
 
     const ClientCLIOptions cliOptions = ParseClientCLIOptions(argc, argv);
     if (cliOptions.languageExplicit && !cliOptions.language.empty()) {

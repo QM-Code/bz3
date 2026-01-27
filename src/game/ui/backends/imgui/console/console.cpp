@@ -64,7 +64,14 @@ namespace ui {
 void ConsoleView::initializeFonts(ImGuiIO &io) {
     const ImVec4 defaultTextColor = ImGui::GetStyle().Colors[ImGuiCol_Text];
 #if defined(IMGUI_ENABLE_FREETYPE) && defined(ImGuiFreeTypeBuilderFlags_LoadColor)
+#if defined(BZ3_RENDER_BACKEND_BGFX)
+    const bool allowColorFonts = std::getenv("BZ3_BGFX_ALLOW_COLOR_FONTS") != nullptr;
+    if (allowColorFonts) {
+        io.Fonts->FontBuilderFlags |= ImGuiFreeTypeBuilderFlags_LoadColor;
+    }
+#else
     io.Fonts->FontBuilderFlags |= ImGuiFreeTypeBuilderFlags_LoadColor;
+#endif
 #endif
     auto addFallbackFont = [&](const char *assetKey, float size, const ImWchar *ranges, const char *label) {
         const auto fontPath = bz::data::ResolveConfiguredAsset(assetKey);
@@ -82,11 +89,12 @@ void ConsoleView::initializeFonts(ImGuiIO &io) {
     auto addFallbacksForSize = [&](float size, const std::string &language) {
         ImFontGlyphRangesBuilder builder;
         builder.AddRanges(io.Fonts->GetGlyphRangesDefault());
-        builder.AddRanges(io.Fonts->GetGlyphRangesCyrillic());
         ImVector<ImWchar> latinRanges;
         builder.BuildRanges(&latinRanges);
         addFallbackFont("hud.fonts.console.FallbackLatin.Font", size, latinRanges.Data, "FallbackLatin");
-        if (language == "ar") {
+        if (language == "ru") {
+            addFallbackFont("hud.fonts.console.FallbackLatin.Font", size, io.Fonts->GetGlyphRangesCyrillic(), "FallbackCyrillic");
+        } else if (language == "ar") {
             static const ImWchar arabicRanges[] = {
                 0x0600, 0x06FF, 0x0750, 0x077F, 0x08A0, 0x08FF, 0xFB50, 0xFDFF, 0xFE70, 0xFEFF, 0
             };
@@ -158,6 +166,12 @@ void ConsoleView::initializeFonts(ImGuiIO &io) {
 
     const auto emojiFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Emoji.Font");
     this->emojiFontSize = 0.0f;
+#if defined(BZ3_RENDER_BACKEND_BGFX)
+    const bool allowEmojiFonts = std::getenv("BZ3_BGFX_ALLOW_EMOJI_FONTS") != nullptr;
+    if (!allowEmojiFonts) {
+        return;
+    }
+#endif
     if (!emojiFontPath.empty()) {
         const std::string emojiFontPathStr = emojiFontPath.string();
         const float emojiFontSize = useThemeOverrides
