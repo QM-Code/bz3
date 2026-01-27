@@ -90,6 +90,7 @@ public:
     void present();
 
     unsigned int getRadarTextureId() const;
+    void getRadarTextureSize(int& width, int& height) const;
     unsigned int getMainTextureId() const;
     std::pair<int, int> getMainTextureSize() const;
     void setRadarShaderPath(const std::filesystem::path& vertPath,

@@ -776,7 +776,10 @@ void RmlUiBackend::update() {
     }
 
     if (renderBridge && state->hud) {
-        state->hud->setRadarTextureId(renderBridge->getRadarTextureId());
+        int radarWidth = 0;
+        int radarHeight = 0;
+        renderBridge->getRadarTextureSize(radarWidth, radarHeight);
+        state->hud->setRadarTexture(renderBridge->getRadarTextureId(), radarWidth, radarHeight);
     }
 
     int fbWidth = 0;

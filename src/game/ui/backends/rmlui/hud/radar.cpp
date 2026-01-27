@@ -14,18 +14,28 @@ void RmlUiHudRadar::bind(Rml::ElementDocument *document) {
         if (textureId == 0) {
             image->SetAttribute("src", "");
         } else {
-            image->SetAttribute("src", "texid:" + std::to_string(textureId));
+            std::string src = "texid:" + std::to_string(textureId);
+            if (textureWidth > 0 && textureHeight > 0) {
+                src += ":" + std::to_string(textureWidth) + "x" + std::to_string(textureHeight);
+            }
+            image->SetAttribute("src", src);
         }
     }
 }
 
-void RmlUiHudRadar::setTextureId(unsigned int textureIdIn) {
+void RmlUiHudRadar::setTexture(unsigned int textureIdIn, int widthIn, int heightIn) {
     textureId = textureIdIn;
+    textureWidth = widthIn;
+    textureHeight = heightIn;
     if (image) {
         if (textureId == 0) {
             image->SetAttribute("src", "");
         } else {
-            image->SetAttribute("src", "texid:" + std::to_string(textureId));
+            std::string src = "texid:" + std::to_string(textureId);
+            if (textureWidth > 0 && textureHeight > 0) {
+                src += ":" + std::to_string(textureWidth) + "x" + std::to_string(textureHeight);
+            }
+            image->SetAttribute("src", src);
         }
     }
 }

@@ -7,6 +7,14 @@
 
 namespace graphics_backend {
 
+enum class BgfxRendererPreference {
+    Auto,
+    Vulkan,
+    OpenGL,
+};
+
+void SetBgfxRendererPreference(BgfxRendererPreference preference);
+
 class BgfxBackend final : public Backend {
 public:
     explicit BgfxBackend(platform::Window& window);
@@ -86,6 +94,9 @@ private:
 
     struct RenderTargetRecord {
         graphics::RenderTargetDesc desc{};
+        bgfx::TextureHandle colorTexture = BGFX_INVALID_HANDLE;
+        bgfx::TextureHandle depthTexture = BGFX_INVALID_HANDLE;
+        bgfx::FrameBufferHandle frameBuffer = BGFX_INVALID_HANDLE;
     };
 
     platform::Window* window = nullptr;

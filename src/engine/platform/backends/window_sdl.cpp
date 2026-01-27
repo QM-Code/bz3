@@ -3,6 +3,7 @@
 #include <SDL3/SDL.h>
 #include <spdlog/spdlog.h>
 
+#include <cstdlib>
 #include <string>
 
 namespace platform {
@@ -281,12 +282,35 @@ void AppendTextInputEvents(std::vector<Event> &buffer, const char *text) {
     }
 }
 
+void SetEnvVar(const char *name, const char *value) {
+#if defined(_WIN32)
+    _putenv_s(name, value ? value : "");
+#else
+    if (value) {
+        setenv(name, value, 1);
+    } else {
+        unsetenv(name);
+    }
+#endif
+}
+
 } // namespace
 
 class WindowSdl final : public Window {
 public:
     explicit WindowSdl(const WindowConfig &config) {
-        const bool sdlInitOk = SDL_Init(SDL_INIT_VIDEO);
+        bool usedPreferredDriver = false;
+        if (!config.preferredVideoDriver.empty()) {
+            usedPreferredDriver = true;
+            SetEnvVar("SDL_VIDEODRIVER", config.preferredVideoDriver.c_str());
+        }
+
+        bool sdlInitOk = SDL_Init(SDL_INIT_VIDEO);
+        if (!sdlInitOk && usedPreferredDriver) {
+            spdlog::warn("SDL_Init failed with preferred driver '{}': {}", config.preferredVideoDriver, SDL_GetError());
+            SetEnvVar("SDL_VIDEODRIVER", nullptr);
+            sdlInitOk = SDL_Init(SDL_INIT_VIDEO);
+        }
         spdlog::info("SDL_Init(SDL_INIT_VIDEO) returned {}", sdlInitOk ? 1 : 0);
         if (!sdlInitOk) {
             spdlog::error("SDL failed to initialize: {}", SDL_GetError());
@@ -295,12 +319,22 @@ public:
         }
         spdlog::info("SDL video driver: {}", SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "(null)");
 
-        bool enableGlContext = true;
+        bool enableGlContext = config.createGlContext;
 #if defined(BZ3_RENDER_BACKEND_BGFX)
         if (const char* noGl = std::getenv("BZ3_BGFX_NO_GL"); noGl && noGl[0] != '\0') {
             enableGlContext = false;
         }
 #endif
+
+        uint32_t windowFlags = SDL_WINDOW_RESIZABLE;
+        if (!enableGlContext) {
+            windowFlags |= SDL_WINDOW_VULKAN;
+            window = SDL_CreateWindow(config.title.c_str(), config.width, config.height, windowFlags);
+            if (!window) {
+                spdlog::warn("SDL window failed to create with Vulkan flag: {}", SDL_GetError());
+                enableGlContext = true;
+            }
+        }
 
         if (enableGlContext) {
             SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, config.glMajor);
@@ -308,19 +342,7 @@ public:
             SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, config.glCoreProfile ? SDL_GL_CONTEXT_PROFILE_CORE : SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
             SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, config.samples > 0 ? 1 : 0);
             SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, config.samples);
-        }
-
-        uint32_t windowFlags = SDL_WINDOW_RESIZABLE;
-        if (enableGlContext) {
-            windowFlags |= SDL_WINDOW_OPENGL;
-        } else {
-            windowFlags |= SDL_WINDOW_VULKAN;
-        }
-
-        window = SDL_CreateWindow(config.title.c_str(), config.width, config.height, windowFlags);
-        if (!window && !enableGlContext) {
-            spdlog::warn("SDL window failed to create with Vulkan flag: {}", SDL_GetError());
-            windowFlags = SDL_WINDOW_RESIZABLE;
+            windowFlags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL;
             window = SDL_CreateWindow(config.title.c_str(), config.width, config.height, windowFlags);
         }
         if (!window) {
@@ -339,6 +361,7 @@ public:
                 return;
             }
             SDL_GL_MakeCurrent(window, glContext);
+            hasGlContextFlag = true;
         }
         SDL_StartTextInput(window);
     }
@@ -594,9 +617,14 @@ public:
         return window;
     }
 
+    bool hasGlContext() const override {
+        return hasGlContextFlag;
+    }
+
 private:
     SDL_Window *window = nullptr;
     SDL_GLContext glContext = nullptr;
+    bool hasGlContextFlag = false;
     std::vector<Event> eventsBuffer;
     bool fullscreen = false;
     bool closeRequested = false;

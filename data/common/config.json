@@ -1,7 +1,7 @@
 {
     "language": "en",
     "ui": {
-        "LanguageLiveReload": false
+        "LanguageLiveReload": true
     },
     "graphics": {
         "theme": "classic",

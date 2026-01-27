@@ -19,18 +19,21 @@ public:
     unsigned int getRadarTextureId() const override {
         return render ? render->getRadarTextureId() : 0u;
     }
+    void getRadarTextureSize(int& width, int& height) const override {
+        if (render) {
+            render->getRadarTextureSize(width, height);
+        } else {
+            width = 0;
+            height = 0;
+        }
+    }
 
 private:
     Render *render = nullptr;
 };
 
-bool ShouldUseOpenGL() {
-#if defined(BZ3_RENDER_BACKEND_BGFX)
-    if (const char* noGl = std::getenv("BZ3_BGFX_NO_GL"); noGl && noGl[0] != '\0') {
-        return false;
-    }
-#endif
-    return true;
+bool ShouldUseOpenGL(const platform::Window *window) {
+    return window && window->hasGlContext();
 }
 
 } // namespace
@@ -89,7 +92,7 @@ void ClientEngine::step(TimeUtils::duration deltaTime) {
 }
 
 void ClientEngine::lateUpdate(TimeUtils::duration deltaTime) {
-    if (ShouldUseOpenGL()) {
+    if (ShouldUseOpenGL(window)) {
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);

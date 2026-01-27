@@ -35,6 +35,10 @@ threepp::Color toThreeColor(const glm::vec4& color) {
     return threepp::Color(r, g, b);
 }
 
+bool isShotModelPath(const std::filesystem::path& path) {
+    return path.filename() == "shot.glb";
+}
+
 } // namespace
 
 namespace graphics_backend {
@@ -213,9 +217,17 @@ void ThreeppBackend::setEntityModel(graphics::EntityId entity,
         scene->remove(*it->second.object);
     }
 
+    std::filesystem::path loadPath = modelPath;
+    if (isShotModelPath(modelPath)) {
+        const auto candidate = modelPath.parent_path() / "shot_threepp.glb";
+        if (std::filesystem::exists(candidate)) {
+            loadPath = candidate;
+        }
+    }
+
     threepp::AssimpLoader loader;
     try {
-        auto model = loader.load(modelPath);
+        auto model = loader.load(loadPath);
         model->traverseType<threepp::Mesh>([&](threepp::Mesh& child) {
             child.castShadow = true;
             child.receiveShadow = true;

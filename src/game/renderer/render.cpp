@@ -456,6 +456,11 @@ unsigned int Render::getRadarTextureId() const {
     return device_->getRenderTargetTextureId(radarTarget);
 }
 
+void Render::getRadarTextureSize(int& width, int& height) const {
+    width = kRadarTexSize;
+    height = kRadarTexSize;
+}
+
 unsigned int Render::getMainTextureId() const {
 #if defined(BZ3_RENDER_BACKEND_FILAMENT)
     if (!device_ || mainTarget == graphics::kDefaultRenderTarget) {

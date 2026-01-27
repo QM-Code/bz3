@@ -10,6 +10,8 @@
 #include <bx/math.h>
 #include <algorithm>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/ext/matrix_clip_space.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <spdlog/spdlog.h>
@@ -261,6 +263,13 @@ struct TestVertex {
 } // namespace
 
 namespace graphics_backend {
+namespace {
+BgfxRendererPreference g_rendererPreference = BgfxRendererPreference::Auto;
+}
+
+void SetBgfxRendererPreference(BgfxRendererPreference preference) {
+    g_rendererPreference = preference;
+}
 
 BgfxBackend::BgfxBackend(platform::Window& windowIn)
     : window(&windowIn) {
@@ -295,7 +304,18 @@ BgfxBackend::BgfxBackend(platform::Window& windowIn)
     }
 
     bgfx::Init init{};
-    init.type = bgfx::RendererType::Vulkan;
+    switch (g_rendererPreference) {
+        case BgfxRendererPreference::OpenGL:
+            init.type = bgfx::RendererType::OpenGL;
+            break;
+        case BgfxRendererPreference::Vulkan:
+            init.type = bgfx::RendererType::Vulkan;
+            break;
+        case BgfxRendererPreference::Auto:
+        default:
+            init.type = bgfx::RendererType::Vulkan;
+            break;
+    }
     init.vendorId = BGFX_PCI_ID_NONE;
     init.platformData = pd;
     init.resolution.width = static_cast<uint32_t>(framebufferWidth);
@@ -698,20 +718,81 @@ graphics::RenderTargetId BgfxBackend::createRenderTarget(const graphics::RenderT
     const graphics::RenderTargetId id = nextRenderTargetId++;
     RenderTargetRecord record;
     record.desc = desc;
+    if (desc.width > 0 && desc.height > 0) {
+        const uint64_t colorFlags = BGFX_TEXTURE_RT | BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP;
+        record.colorTexture = bgfx::createTexture2D(
+            static_cast<uint16_t>(desc.width),
+            static_cast<uint16_t>(desc.height),
+            false,
+            1,
+            bgfx::TextureFormat::RGBA8,
+            colorFlags);
+
+        if (desc.depth || desc.stencil) {
+            bgfx::TextureFormat::Enum depthFormat = desc.stencil ? bgfx::TextureFormat::D24S8 : bgfx::TextureFormat::D24;
+            const uint64_t depthFlags = BGFX_TEXTURE_RT;
+            record.depthTexture = bgfx::createTexture2D(
+                static_cast<uint16_t>(desc.width),
+                static_cast<uint16_t>(desc.height),
+                false,
+                1,
+                depthFormat,
+                depthFlags);
+        }
+
+        bgfx::Attachment attachments[2];
+        uint8_t attachmentCount = 0;
+        if (bgfx::isValid(record.colorTexture)) {
+            attachments[attachmentCount++].init(record.colorTexture);
+        }
+        if (bgfx::isValid(record.depthTexture)) {
+            attachments[attachmentCount++].init(record.depthTexture);
+        }
+        if (attachmentCount > 0) {
+            record.frameBuffer = bgfx::createFrameBuffer(attachmentCount, attachments, false);
+        }
+    }
+    spdlog::trace("Graphics(Bgfx): created render target {} size={}x{} fb={} color={} depth={}",
+                  id, desc.width, desc.height,
+                  bgfx::isValid(record.frameBuffer),
+                  bgfx::isValid(record.colorTexture),
+                  bgfx::isValid(record.depthTexture));
     renderTargets[id] = record;
     return id;
 }
 
 void BgfxBackend::destroyRenderTarget(graphics::RenderTargetId target) {
-    renderTargets.erase(target);
+    auto it = renderTargets.find(target);
+    if (it == renderTargets.end()) {
+        return;
+    }
+    RenderTargetRecord& record = it->second;
+    if (bgfx::isValid(record.frameBuffer)) {
+        bgfx::destroy(record.frameBuffer);
+    }
+    if (bgfx::isValid(record.colorTexture)) {
+        bgfx::destroy(record.colorTexture);
+    }
+    if (bgfx::isValid(record.depthTexture)) {
+        bgfx::destroy(record.depthTexture);
+    }
+    renderTargets.erase(it);
 }
 
 void BgfxBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId target) {
     if (!initialized) {
         return;
     }
+    RenderTargetRecord* targetRecord = nullptr;
     if (target != graphics::kDefaultRenderTarget) {
-        return;
+        auto targetIt = renderTargets.find(target);
+        if (targetIt == renderTargets.end()) {
+            return;
+        }
+        targetRecord = &targetIt->second;
+        if (!bgfx::isValid(targetRecord->frameBuffer)) {
+            return;
+        }
     }
     if (!meshReady) {
         buildMeshResources();
@@ -724,12 +805,21 @@ void BgfxBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId 
     const glm::mat4 proj = getProjectionMatrix();
     const uint16_t viewId = static_cast<uint16_t>(layer);
     bgfx::setViewTransform(viewId, glm::value_ptr(view), glm::value_ptr(proj));
-    bgfx::setViewRect(viewId, 0, 0,
-                      static_cast<uint16_t>(framebufferWidth),
-                      static_cast<uint16_t>(framebufferHeight));
-    bgfx::setViewClear(viewId, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, 0x0d1620ff, 1.0f, 0);
+    if (targetRecord) {
+        bgfx::setViewFrameBuffer(viewId, targetRecord->frameBuffer);
+        bgfx::setViewRect(viewId, 0, 0,
+                          static_cast<uint16_t>(targetRecord->desc.width),
+                          static_cast<uint16_t>(targetRecord->desc.height));
+    } else {
+        bgfx::setViewRect(viewId, 0, 0,
+                          static_cast<uint16_t>(framebufferWidth),
+                          static_cast<uint16_t>(framebufferHeight));
+    }
+    const uint32_t clearColor = targetRecord ? 0xff000000 : 0x0d1620ff;
+    bgfx::setViewClear(viewId, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, clearColor, 1.0f, 0);
+    bgfx::touch(viewId);
 
-    if (skyboxReady && bgfx::isValid(skyboxProgram) && bgfx::isValid(skyboxVertexBuffer) && bgfx::isValid(skyboxTexture)) {
+    if (!targetRecord && skyboxReady && bgfx::isValid(skyboxProgram) && bgfx::isValid(skyboxVertexBuffer) && bgfx::isValid(skyboxTexture)) {
         bgfx::setViewTransform(viewId, nullptr, nullptr);
         bgfx::setTransform(glm::value_ptr(glm::mat4(1.0f)));
         bgfx::setVertexBuffer(0, skyboxVertexBuffer);
@@ -745,7 +835,6 @@ void BgfxBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId 
         if (entity.layer != layer || !entity.visible) {
             continue;
         }
-
         const glm::mat4 model =
             glm::translate(glm::mat4(1.0f), entity.position) *
             glm::mat4_cast(entity.rotation) *
@@ -753,12 +842,18 @@ void BgfxBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId 
 
         bgfx::setTransform(glm::value_ptr(model));
         const bool isShot = isShotModelPath(entity.modelPath);
+        const bool radarPass = (targetRecord != nullptr);
         const bool transparent = entity.transparent ||
                                  (entity.material != graphics::kInvalidMaterial &&
                                   materials.count(entity.material) &&
                                   materials.at(entity.material).transparent);
         uint64_t state = BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A | BGFX_STATE_DEPTH_TEST_LESS;
-        if (isShot) {
+        if (radarPass) {
+            state = BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A;
+            if (transparent) {
+                state |= BGFX_STATE_BLEND_ALPHA;
+            }
+        } else if (isShot) {
             state |= BGFX_STATE_BLEND_ADD;
         } else if (transparent) {
             state |= BGFX_STATE_BLEND_ALPHA;
@@ -820,7 +915,7 @@ void BgfxBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId 
                 bgfx::setTexture(0, meshSamplerUniform, tex);
             }
             if (bgfx::isValid(meshUnlitUniform)) {
-                const glm::vec4 unlit = isShot ? glm::vec4(1.0f) : glm::vec4(0.0f);
+                const glm::vec4 unlit = (isShot || radarPass) ? glm::vec4(1.0f) : glm::vec4(0.0f);
                 bgfx::setUniform(meshUnlitUniform, glm::value_ptr(unlit));
             }
 
@@ -838,8 +933,23 @@ void BgfxBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId 
     }
 }
 
-unsigned int BgfxBackend::getRenderTargetTextureId(graphics::RenderTargetId) const {
-    return 0u;
+unsigned int BgfxBackend::getRenderTargetTextureId(graphics::RenderTargetId target) const {
+    auto it = renderTargets.find(target);
+    if (it == renderTargets.end()) {
+        return 0u;
+    }
+    const RenderTargetRecord& record = it->second;
+    if (!bgfx::isValid(record.colorTexture)) {
+        return 0u;
+    }
+    static std::unordered_map<graphics::RenderTargetId, uint16_t> lastTextureIds;
+    const uint16_t idx = record.colorTexture.idx;
+    auto lastIt = lastTextureIds.find(target);
+    if (lastIt == lastTextureIds.end() || lastIt->second != idx) {
+        spdlog::trace("Graphics(Bgfx): render target {} texture idx={}", target, idx);
+        lastTextureIds[target] = idx;
+    }
+    return record.colorTexture.idx;
 }
 
 void BgfxBackend::setPosition(graphics::EntityId entity, const glm::vec3& position) {
@@ -918,7 +1028,7 @@ glm::mat4 BgfxBackend::computeProjectionMatrix() const {
     if (usePerspective) {
         return glm::perspective(glm::radians(fovDegrees), aspectRatio, nearPlane, farPlane);
     }
-    return glm::ortho(orthoLeft, orthoRight, orthoBottom, orthoTop, nearPlane, farPlane);
+    return glm::orthoRH_ZO(orthoLeft, orthoRight, orthoBottom, orthoTop, nearPlane, farPlane);
 }
 
 glm::mat4 BgfxBackend::getViewProjectionMatrix() const {

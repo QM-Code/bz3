@@ -17,6 +17,8 @@ struct WindowConfig {
     int glMinor = 3;
     bool glCoreProfile = true;
     int samples = 4;
+    bool createGlContext = true;
+    std::string preferredVideoDriver;
 };
 
 class Window {
@@ -47,6 +49,7 @@ public:
     virtual std::string getClipboardText() const = 0;
 
     virtual void* nativeHandle() const = 0;
+    virtual bool hasGlContext() const = 0;
 };
 
 std::unique_ptr<Window> CreateWindow(const WindowConfig &config);

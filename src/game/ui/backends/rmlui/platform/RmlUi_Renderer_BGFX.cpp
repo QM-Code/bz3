@@ -32,6 +32,7 @@
 
 #include <stb_image.h>
 
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -338,16 +339,29 @@ Rml::TextureHandle RenderInterface_BGFX::LoadTexture(Rml::Vector2i& texture_dime
         if (tex_id == 0) {
             return {};
         }
+        int width = 1;
+        int height = 1;
+        if (end_ptr && *end_ptr == ':') {
+            int parsed_w = 0;
+            int parsed_h = 0;
+            if (std::sscanf(end_ptr + 1, "%dx%d", &parsed_w, &parsed_h) == 2) {
+                if (parsed_w > 0 && parsed_h > 0) {
+                    width = parsed_w;
+                    height = parsed_h;
+                }
+            }
+        }
         TextureData entry;
         entry.handle.idx = static_cast<uint16_t>(tex_id);
-        entry.width = 1;
-        entry.height = 1;
+        entry.width = width;
+        entry.height = height;
         entry.external = true;
         const Rml::TextureHandle handle = static_cast<Rml::TextureHandle>(next_texture_id++);
         textures.emplace(handle, entry);
         texture_dimensions.x = entry.width;
         texture_dimensions.y = entry.height;
-        spdlog::trace("RmlUi(BGFX): external texture texid:{} -> handle={}", tex_id, handle);
+        spdlog::trace("RmlUi(BGFX): external texture texid:{} -> handle={} size={}x{}",
+                      tex_id, handle, entry.width, entry.height);
         return handle;
     }
 

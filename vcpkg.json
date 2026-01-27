@@ -10,7 +10,12 @@
       ]
     },
     "glm",
-    "joltphysics",
+    {
+      "name": "joltphysics",
+      "features": [
+        "rtti"
+      ]
+    },
     "bullet3",
     "assimp",
     "opengl",

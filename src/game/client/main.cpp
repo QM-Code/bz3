@@ -5,6 +5,9 @@
 #include <glad/glad.h>
 #include "spdlog/spdlog.h"
 #include "engine/client_engine.hpp"
+#if defined(BZ3_RENDER_BACKEND_BGFX)
+#include "engine/graphics/backends/bgfx/backend.hpp"
+#endif
 #include "client/game.hpp"
 #include "client/client_cli_options.hpp"
 #include "client/config_client.hpp"
@@ -60,21 +63,6 @@ void ConfigureLogging(spdlog::level::level_enum level, bool includeTimestamp) {
     spdlog::set_level(level);
 }
 
-void SetEnvDefault(const char *name, const std::string &value) {
-    if (!name || value.empty()) {
-        return;
-    }
-    if (std::getenv(name) != nullptr) {
-        return;
-    }
-#if defined(_WIN32)
-    _putenv_s(name, value.c_str());
-#else
-    setenv(name, value.c_str(), 0);
-#endif
-    spdlog::info("Env default set: {}={}", name, value);
-}
-
 void SetEnvOverride(const char *name, const std::string &value) {
     if (!name || value.empty()) {
         return;
@@ -108,18 +96,6 @@ int main(int argc, char *argv[]) {
     const bool fullscreenEnabled = bz::data::ReadBoolConfig({"graphics.Fullscreen"}, false);
     const bool vsyncEnabled = bz::data::ReadBoolConfig({"graphics.VSync"}, true);
 
-    const std::string sdlVideoDriver = bz::data::ReadStringConfig({"platform.SdlVideoDriver"}, "");
-    if (!sdlVideoDriver.empty()) {
-        SetEnvDefault("SDL_VIDEODRIVER", sdlVideoDriver);
-    }
-
-#if defined(BZ3_RENDER_BACKEND_BGFX)
-    const bool bgfxNoGl = bz::data::ReadBoolConfig({"graphics.Bgfx.NoGl"}, false);
-    if (bgfxNoGl) {
-        SetEnvDefault("BZ3_BGFX_NO_GL", "1");
-    }
-#endif
-
     const ClientCLIOptions cliOptions = ParseClientCLIOptions(argc, argv);
     if (cliOptions.languageExplicit && !cliOptions.language.empty()) {
         bz::i18n::Get().loadLanguage(cliOptions.language);
@@ -127,6 +103,21 @@ int main(int argc, char *argv[]) {
     if (cliOptions.themeExplicit && !cliOptions.theme.empty()) {
         SetEnvOverride("BZ3_BGFX_THEME", cliOptions.theme);
     }
+#if defined(BZ3_RENDER_BACKEND_BGFX)
+    if (cliOptions.forceWaylandVulkan) {
+        graphics_backend::SetBgfxRendererPreference(graphics_backend::BgfxRendererPreference::Vulkan);
+    } else if (cliOptions.forceX11OpenGL) {
+        graphics_backend::SetBgfxRendererPreference(graphics_backend::BgfxRendererPreference::OpenGL);
+    } else if (cliOptions.rendererExplicit) {
+        if (cliOptions.renderer == "opengl") {
+            graphics_backend::SetBgfxRendererPreference(graphics_backend::BgfxRendererPreference::OpenGL);
+        } else if (cliOptions.renderer == "vulkan") {
+            graphics_backend::SetBgfxRendererPreference(graphics_backend::BgfxRendererPreference::Vulkan);
+        } else {
+            graphics_backend::SetBgfxRendererPreference(graphics_backend::BgfxRendererPreference::Auto);
+        }
+    }
+#endif
     const spdlog::level::level_enum logLevel = cliOptions.logLevelExplicit
         ? ParseLogLevel(cliOptions.logLevel)
         : (cliOptions.verbose ? spdlog::level::trace : spdlog::level::info);
@@ -146,6 +137,29 @@ int main(int argc, char *argv[]) {
     windowConfig.glMajor = 3;
     windowConfig.glMinor = 3;
     windowConfig.samples = 4;
+    windowConfig.preferredVideoDriver = bz::data::ReadStringConfig({"platform.SdlVideoDriver"}, "");
+    if (cliOptions.forceWaylandVulkan) {
+        windowConfig.preferredVideoDriver = "wayland";
+    } else if (cliOptions.forceX11OpenGL) {
+        windowConfig.preferredVideoDriver = "x11";
+    } else if (cliOptions.videoDriverExplicit) {
+        windowConfig.preferredVideoDriver = (cliOptions.videoDriver == "auto") ? std::string() : cliOptions.videoDriver;
+    }
+#if defined(BZ3_RENDER_BACKEND_BGFX)
+    const bool bgfxNoGl = bz::data::ReadBoolConfig({"graphics.Bgfx.NoGl"}, true);
+    windowConfig.createGlContext = !bgfxNoGl;
+    if (cliOptions.forceWaylandVulkan) {
+        windowConfig.createGlContext = false;
+    } else if (cliOptions.forceX11OpenGL) {
+        windowConfig.createGlContext = true;
+    } else if (cliOptions.rendererExplicit) {
+        if (cliOptions.renderer == "opengl") {
+            windowConfig.createGlContext = true;
+        } else if (cliOptions.renderer == "vulkan") {
+            windowConfig.createGlContext = false;
+        }
+    }
+#endif
 
     auto window = platform::CreateWindow(windowConfig);
     if (!window || !window->nativeHandle()) {
@@ -153,14 +167,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    bool skipGlInit = false;
-#if defined(BZ3_RENDER_BACKEND_BGFX)
-    if (const char* noGl = std::getenv("BZ3_BGFX_NO_GL"); noGl && noGl[0] != '\0') {
-        skipGlInit = true;
-    }
-#endif
-
-    if (!skipGlInit) {
+    if (window->hasGlContext()) {
         if (gladLoadGL() == 0) {
             spdlog::error("Failed to load OpenGL functions");
             return 1;
@@ -178,7 +185,7 @@ int main(int argc, char *argv[]) {
         glGetIntegerv(GL_SAMPLES, &s);
         spdlog::info("GL_SAMPLE_BUFFERS={}, GL_SAMPLES={}", sb, s);
     } else {
-        spdlog::info("GL init skipped (BZ3_BGFX_NO_GL)");
+        spdlog::info("GL init skipped (no GL context)");
     }
 
     ClientEngine engine(*window);

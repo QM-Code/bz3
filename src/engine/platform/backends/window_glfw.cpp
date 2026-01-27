@@ -419,6 +419,10 @@ public:
         return window;
     }
 
+    bool hasGlContext() const override {
+        return window != nullptr;
+    }
+
 private:
     GLFWwindow *window = nullptr;
     std::vector<Event> eventsBuffer;
