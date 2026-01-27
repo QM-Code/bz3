@@ -9,6 +9,7 @@
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include <assimp/matrix3x3.h>
 
 namespace {
 struct TextureCache {
@@ -151,6 +152,89 @@ std::shared_ptr<MeshLoader::TextureData> loadMaterialTexture(const aiScene* scen
 }
 } // namespace
 
+namespace {
+void appendMeshData(const aiScene* scene,
+                    const aiMesh* mesh,
+                    const aiMatrix4x4& transform,
+                    const std::filesystem::path& baseDir,
+                    const std::filesystem::path& modelPath,
+                    const MeshLoader::LoadOptions& options,
+                    TextureCache& textureCache,
+                    std::vector<MeshLoader::MeshData>& outMeshes) {
+    if (!mesh) {
+        return;
+    }
+    MeshLoader::MeshData data;
+    data.vertices.reserve(mesh->mNumVertices);
+    data.texcoords.reserve(mesh->mNumVertices);
+    data.normals.reserve(mesh->mNumVertices);
+    aiMatrix3x3 normalMatrix = aiMatrix3x3(transform);
+    normalMatrix = normalMatrix.Inverse().Transpose();
+    for (unsigned int v = 0; v < mesh->mNumVertices; ++v) {
+        const auto &vert = mesh->mVertices[v];
+        const aiVector3D pos = transform * vert;
+        data.vertices.emplace_back(pos.x, pos.y, pos.z);
+
+        if (mesh->HasTextureCoords(0)) {
+            const auto& uv = mesh->mTextureCoords[0][v];
+            data.texcoords.emplace_back(uv.x, uv.y);
+        } else {
+            data.texcoords.emplace_back(0.0f, 0.0f);
+        }
+
+        if (mesh->HasNormals()) {
+            const auto& n = mesh->mNormals[v];
+            const aiVector3D nn = normalMatrix * n;
+            aiVector3D nnn = nn;
+            nnn.Normalize();
+            data.normals.emplace_back(nnn.x, nnn.y, nnn.z);
+        } else {
+            data.normals.emplace_back(0.0f, 1.0f, 0.0f);
+        }
+    }
+
+    for (unsigned int f = 0; f < mesh->mNumFaces; ++f) {
+        aiFace &face = mesh->mFaces[f];
+        if (face.mNumIndices != 3) continue;
+        data.indices.push_back(face.mIndices[0]);
+        data.indices.push_back(face.mIndices[1]);
+        data.indices.push_back(face.mIndices[2]);
+    }
+
+    if (options.loadTextures && mesh->mMaterialIndex < scene->mNumMaterials) {
+        const aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
+        data.albedo = loadMaterialTexture(scene, material, baseDir, modelPath, textureCache);
+    }
+
+    outMeshes.push_back(std::move(data));
+}
+
+void traverseNode(const aiScene* scene,
+                  const aiNode* node,
+                  const aiMatrix4x4& parentTransform,
+                  const std::filesystem::path& baseDir,
+                  const std::filesystem::path& modelPath,
+                  const MeshLoader::LoadOptions& options,
+                  TextureCache& textureCache,
+                  std::vector<MeshLoader::MeshData>& outMeshes) {
+    if (!node) {
+        return;
+    }
+    const aiMatrix4x4 current = parentTransform * node->mTransformation;
+
+    for (unsigned int i = 0; i < node->mNumMeshes; ++i) {
+        const unsigned int meshIndex = node->mMeshes[i];
+        if (meshIndex < scene->mNumMeshes) {
+            appendMeshData(scene, scene->mMeshes[meshIndex], current, baseDir, modelPath, options, textureCache, outMeshes);
+        }
+    }
+
+    for (unsigned int i = 0; i < node->mNumChildren; ++i) {
+        traverseNode(scene, node->mChildren[i], current, baseDir, modelPath, options, textureCache, outMeshes);
+    }
+}
+} // namespace
+
 namespace MeshLoader {
     std::vector<MeshData> loadGLB(const std::string &filename, const LoadOptions& options) {
         std::vector<MeshData> meshes;
@@ -158,7 +242,8 @@ namespace MeshLoader {
         Assimp::Importer importer;
         const aiScene* scene = importer.ReadFile(filename,
             aiProcess_Triangulate |
-            aiProcess_JoinIdenticalVertices
+            aiProcess_JoinIdenticalVertices |
+            aiProcess_GenNormals
         );
 
         if (!scene) return meshes;
@@ -167,39 +252,7 @@ namespace MeshLoader {
         const std::filesystem::path modelPath(filename);
         const std::filesystem::path baseDir = modelPath.parent_path();
 
-        for (unsigned int m = 0; m < scene->mNumMeshes; ++m) {
-            aiMesh* mesh = scene->mMeshes[m];
-            MeshData data;
-
-            data.vertices.reserve(mesh->mNumVertices);
-            data.texcoords.reserve(mesh->mNumVertices);
-            for (unsigned int v = 0; v < mesh->mNumVertices; ++v) {
-                const auto &vert = mesh->mVertices[v];
-                data.vertices.emplace_back(vert.x, vert.y, vert.z);
-
-                if (mesh->HasTextureCoords(0)) {
-                    const auto& uv = mesh->mTextureCoords[0][v];
-                    data.texcoords.emplace_back(uv.x, uv.y);
-                } else {
-                    data.texcoords.emplace_back(0.0f, 0.0f);
-                }
-            }
-
-            for (unsigned int f = 0; f < mesh->mNumFaces; ++f) {
-                aiFace &face = mesh->mFaces[f];
-                if (face.mNumIndices != 3) continue;
-                data.indices.push_back(face.mIndices[0]);
-                data.indices.push_back(face.mIndices[1]);
-                data.indices.push_back(face.mIndices[2]);
-            }
-
-            if (options.loadTextures && mesh->mMaterialIndex < scene->mNumMaterials) {
-                const aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
-                data.albedo = loadMaterialTexture(scene, material, baseDir, modelPath, textureCache);
-            }
-
-            meshes.push_back(std::move(data));
-        }
+        traverseNode(scene, scene->mRootNode, aiMatrix4x4(), baseDir, modelPath, options, textureCache, meshes);
 
         return meshes;
     }

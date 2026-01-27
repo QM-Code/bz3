@@ -21,6 +21,7 @@ namespace MeshLoader {
         std::vector<glm::vec3> vertices;
         std::vector<unsigned int> indices;
         std::vector<glm::vec2> texcoords;
+        std::vector<glm::vec3> normals;
         std::shared_ptr<TextureData> albedo;
     };
 

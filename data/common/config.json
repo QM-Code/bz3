@@ -3,6 +3,32 @@
     "ui": {
         "LanguageLiveReload": false
     },
+    "graphics": {
+        "theme": "classic",
+        "skybox": {
+            "Mode": "cubemap",
+            "Cubemap": {
+                "Name": "classic"
+            }
+        },
+        "lighting": {
+            "SunDirection": [
+                -0.4,
+                -1.0,
+                -0.2
+            ],
+            "SunColor": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "AmbientColor": [
+                0.2,
+                0.2,
+                0.2
+            ]
+        }
+    },
     "assets": {
         "models": {
             "playerModel": "models/tank_final.glb",

@@ -126,16 +126,27 @@ private:
     bgfx::ProgramHandle meshProgram = BGFX_INVALID_HANDLE;
     bgfx::UniformHandle meshColorUniform = BGFX_INVALID_HANDLE;
     bgfx::UniformHandle meshSamplerUniform = BGFX_INVALID_HANDLE;
+    bgfx::UniformHandle meshLightDirUniform = BGFX_INVALID_HANDLE;
+    bgfx::UniformHandle meshLightColorUniform = BGFX_INVALID_HANDLE;
+    bgfx::UniformHandle meshAmbientColorUniform = BGFX_INVALID_HANDLE;
+    bgfx::UniformHandle meshUnlitUniform = BGFX_INVALID_HANDLE;
     bgfx::TextureHandle whiteTexture = BGFX_INVALID_HANDLE;
     std::unordered_map<std::string, bgfx::TextureHandle> textureCache;
     bool meshReady = false;
-    graphics::MeshId shotMeshId = graphics::kInvalidMesh;
-    std::string brickThemeName;
+    std::string themeName;
+
+    bgfx::VertexLayout skyboxLayout{};
+    bgfx::VertexBufferHandle skyboxVertexBuffer = BGFX_INVALID_HANDLE;
+    bgfx::ProgramHandle skyboxProgram = BGFX_INVALID_HANDLE;
+    bgfx::UniformHandle skyboxSamplerUniform = BGFX_INVALID_HANDLE;
+    bgfx::TextureHandle skyboxTexture = BGFX_INVALID_HANDLE;
+    bool skyboxReady = false;
 
     glm::mat4 computeViewMatrix() const;
     glm::mat4 computeProjectionMatrix() const;
     void buildTestResources();
     void buildMeshResources();
+    void buildSkyboxResources();
 };
 
 } // namespace graphics_backend

@@ -61,6 +61,8 @@ ClientCLIOptions ParseClientCLIOptions(int argc, char *argv[]) {
     options.add_options()
         ("language", "Language override (e.g., en, es, fr)", cxxopts::value<std::string>());
     options.add_options()
+        ("theme", "Render theme (overrides graphics.theme)", cxxopts::value<std::string>());
+    options.add_options()
         ("v,verbose", "Enable verbose logging (alias for --log-level trace)")
         ("L,log-level", "Logging level (trace, debug, info, warn, err, critical, off)", cxxopts::value<std::string>());
     options.add_options()
@@ -90,11 +92,13 @@ ClientCLIOptions ParseClientCLIOptions(int argc, char *argv[]) {
     parsed.dataDir = result.count("data-dir") ? result["data-dir"].as<std::string>() : std::string();
     parsed.userConfigPath = result.count("config") ? result["config"].as<std::string>() : std::string();
     parsed.language = result.count("language") ? result["language"].as<std::string>() : std::string();
+    parsed.theme = result.count("theme") ? result["theme"].as<std::string>() : std::string();
     parsed.addrExplicit = result.count("addr") > 0;
     parsed.worldExplicit = result.count("world") > 0;
     parsed.dataDirExplicit = result.count("data-dir") > 0;
     parsed.userConfigExplicit = result.count("config") > 0;
     parsed.languageExplicit = result.count("language") > 0;
+    parsed.themeExplicit = result.count("theme") > 0;
     parsed.verbose = result.count("verbose") > 0;
     parsed.logLevel = result.count("log-level") ? result["log-level"].as<std::string>() : std::string();
     parsed.logLevelExplicit = result.count("log-level") > 0;

@@ -75,6 +75,18 @@ void SetEnvDefault(const char *name, const std::string &value) {
     spdlog::info("Env default set: {}={}", name, value);
 }
 
+void SetEnvOverride(const char *name, const std::string &value) {
+    if (!name || value.empty()) {
+        return;
+    }
+#if defined(_WIN32)
+    _putenv_s(name, value.c_str());
+#else
+    setenv(name, value.c_str(), 1);
+#endif
+    spdlog::info("Env override set: {}={}", name, value);
+}
+
 int main(int argc, char *argv[]) {
     ConfigureLogging(spdlog::level::info, false);
 
@@ -111,6 +123,9 @@ int main(int argc, char *argv[]) {
     const ClientCLIOptions cliOptions = ParseClientCLIOptions(argc, argv);
     if (cliOptions.languageExplicit && !cliOptions.language.empty()) {
         bz::i18n::Get().loadLanguage(cliOptions.language);
+    }
+    if (cliOptions.themeExplicit && !cliOptions.theme.empty()) {
+        SetEnvOverride("BZ3_BGFX_THEME", cliOptions.theme);
     }
     const spdlog::level::level_enum logLevel = cliOptions.logLevelExplicit
         ? ParseLogLevel(cliOptions.logLevel)
