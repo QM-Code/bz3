@@ -16,7 +16,11 @@
 #include <chrono>
 #include <cmath>
 
+#if defined(BZ3_RENDER_BACKEND_BGFX)
+#include "ui/backends/rmlui/platform/RmlUi_Renderer_BGFX.h"
+#else
 #include "ui/backends/rmlui/platform/RmlUi_Renderer_GL3.h"
+#endif
 #include "ui/backends/rmlui/console/emoji_utils.hpp"
 #include "ui/backends/rmlui/translate.hpp"
 #include "platform/window.hpp"
@@ -453,7 +457,11 @@ std::string escapeRmlText(const std::string &text) {
 
 struct RmlUiBackend::RmlUiState {
     SystemInterface_Platform systemInterface;
+#if defined(BZ3_RENDER_BACKEND_BGFX)
+    RenderInterface_BGFX renderInterface;
+#else
     RenderInterface_GL3 renderInterface;
+#endif
     Rml::Context *context = nullptr;
     Rml::ElementDocument *document = nullptr;
     Rml::Element *bodyElement = nullptr;
@@ -492,12 +500,20 @@ RmlUiBackend::RmlUiBackend(platform::Window &windowRefIn) : windowRef(&windowRef
 
     Rml::SetSystemInterface(&state->systemInterface);
     Rml::SetRenderInterface(&state->renderInterface);
+#if defined(BZ3_RENDER_BACKEND_BGFX)
+    if (!state->renderInterface) {
+        spdlog::error("RmlUi: failed to initialize bgfx renderer.");
+        return;
+    }
+    spdlog::info("RmlUi: bgfx renderer initialized.");
+#else
     Rml::String renderer_message;
     if (!RmlGL3::Initialize(&renderer_message)) {
         spdlog::error("RmlUi: failed to initialize GL3 renderer.");
         return;
     }
     spdlog::info("RmlUi: {}", renderer_message.c_str());
+#endif
 
     if (!Rml::Initialise()) {
         spdlog::error("RmlUi: initialization failed.");
@@ -615,7 +631,9 @@ RmlUiBackend::~RmlUiBackend() {
         state->context = nullptr;
     }
     Rml::Shutdown();
+#if !defined(BZ3_RENDER_BACKEND_BGFX)
     RmlGL3::Shutdown();
+#endif
 }
 
 ui::ConsoleInterface &RmlUiBackend::console() {

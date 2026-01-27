@@ -235,8 +235,18 @@ if(BZ3_RENDER_BACKEND STREQUAL "bgfx")
     bz3_bgfx_compile_shader("${BGFX_SKYBOX_VS_BIN}" vertex "${BGFX_SHADER_PROFILE}" "${BGFX_SKYBOX_SHADER_DIR}/vs_skybox.sc" "${BGFX_SKYBOX_SHADER_DIR}/varying.def.sc")
     bz3_bgfx_compile_shader("${BGFX_SKYBOX_FS_BIN}" fragment "${BGFX_SHADER_PROFILE}" "${BGFX_SKYBOX_SHADER_DIR}/fs_skybox.sc" "${BGFX_SKYBOX_SHADER_DIR}/varying.def.sc")
 
+    set(BGFX_RMLUI_SHADER_DIR "${BGFX_SHADER_DIR}/rmlui")
+    set(BGFX_RMLUI_BIN_DIR "${BGFX_SHADER_BIN_DIR}/rmlui")
+    file(MAKE_DIRECTORY "${BGFX_RMLUI_BIN_DIR}")
+    set(BGFX_RMLUI_VS_BIN "${BGFX_RMLUI_BIN_DIR}/vs_rmlui.bin")
+    set(BGFX_RMLUI_FS_TEX_BIN "${BGFX_RMLUI_BIN_DIR}/fs_rmlui_texture.bin")
+    set(BGFX_RMLUI_FS_COLOR_BIN "${BGFX_RMLUI_BIN_DIR}/fs_rmlui_color.bin")
+    bz3_bgfx_compile_shader("${BGFX_RMLUI_VS_BIN}" vertex "${BGFX_SHADER_PROFILE}" "${BGFX_RMLUI_SHADER_DIR}/vs_rmlui.sc" "${BGFX_RMLUI_SHADER_DIR}/varying.def.sc")
+    bz3_bgfx_compile_shader("${BGFX_RMLUI_FS_TEX_BIN}" fragment "${BGFX_SHADER_PROFILE}" "${BGFX_RMLUI_SHADER_DIR}/fs_rmlui_texture.sc" "${BGFX_RMLUI_SHADER_DIR}/varying.def.sc")
+    bz3_bgfx_compile_shader("${BGFX_RMLUI_FS_COLOR_BIN}" fragment "${BGFX_SHADER_PROFILE}" "${BGFX_RMLUI_SHADER_DIR}/fs_rmlui_color.sc" "${BGFX_RMLUI_SHADER_DIR}/varying.def.sc")
+
     if(BGFX_SHADERC_EXECUTABLE)
-        add_custom_target(bz3_bgfx_shaders ALL DEPENDS "${BGFX_VS_BIN}" "${BGFX_FS_BIN}" "${BGFX_IMGUI_VS_BIN}" "${BGFX_IMGUI_FS_BIN}" "${BGFX_MESH_VS_BIN}" "${BGFX_MESH_FS_BIN}" "${BGFX_SKYBOX_VS_BIN}" "${BGFX_SKYBOX_FS_BIN}")
+        add_custom_target(bz3_bgfx_shaders ALL DEPENDS "${BGFX_VS_BIN}" "${BGFX_FS_BIN}" "${BGFX_IMGUI_VS_BIN}" "${BGFX_IMGUI_FS_BIN}" "${BGFX_MESH_VS_BIN}" "${BGFX_MESH_FS_BIN}" "${BGFX_SKYBOX_VS_BIN}" "${BGFX_SKYBOX_FS_BIN}" "${BGFX_RMLUI_VS_BIN}" "${BGFX_RMLUI_FS_TEX_BIN}" "${BGFX_RMLUI_FS_COLOR_BIN}")
     else()
         add_custom_target(bz3_bgfx_shaders ALL)
     endif()
@@ -337,7 +347,6 @@ if(BZ3_UI_BACKEND STREQUAL "imgui")
 elseif(BZ3_UI_BACKEND STREQUAL "rmlui")
     list(APPEND ENGINE_CLIENT_SOURCES
         ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/backend.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/platform/RmlUi_Renderer_GL3.cpp
         ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/console/emoji_utils.cpp
         ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/console/console.cpp
         ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/console/modal_dialog.cpp
@@ -354,6 +363,15 @@ elseif(BZ3_UI_BACKEND STREQUAL "rmlui")
         ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/console/panels/panel_start_server.cpp
         ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/console/panels/panel_themes.cpp
     )
+    if(BZ3_RENDER_BACKEND STREQUAL "bgfx")
+        list(APPEND ENGINE_CLIENT_SOURCES
+            ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/platform/RmlUi_Renderer_BGFX.cpp
+        )
+    else()
+        list(APPEND ENGINE_CLIENT_SOURCES
+            ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/platform/RmlUi_Renderer_GL3.cpp
+        )
+    endif()
 endif()
 
 if(NOT BZ3_RENDER_BACKEND STREQUAL "threepp")
