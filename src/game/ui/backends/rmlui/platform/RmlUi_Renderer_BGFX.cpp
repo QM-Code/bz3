@@ -87,7 +87,20 @@ RenderInterface_BGFX::RenderInterface_BGFX() {
     uniform_translate = bgfx::createUniform("u_translate", bgfx::UniformType::Vec4);
     uniform_sampler = bgfx::createUniform("s_tex", bgfx::UniformType::Sampler);
 
-    const auto shader_dir = bz::data::Resolve("bgfx/shaders/bin/rmlui");
+    const std::filesystem::path shader_dir = []() {
+        std::filesystem::path base = bz::data::Resolve("bgfx/shaders/bin");
+        const bgfx::RendererType::Enum renderer = bgfx::getRendererType();
+        switch (renderer) {
+            case bgfx::RendererType::OpenGL:
+            case bgfx::RendererType::OpenGLES:
+                base /= "gl";
+                break;
+            default:
+                base /= "vk";
+                break;
+        }
+        return base / "rmlui";
+    }();
     const auto vs_path = shader_dir / "vs_rmlui.bin";
     const auto fs_tex_path = shader_dir / "fs_rmlui_texture.bin";
     const auto fs_color_path = shader_dir / "fs_rmlui_color.bin";

@@ -304,7 +304,6 @@ public:
             usedPreferredDriver = true;
             SetEnvVar("SDL_VIDEODRIVER", config.preferredVideoDriver.c_str());
         }
-
         bool sdlInitOk = SDL_Init(SDL_INIT_VIDEO);
         if (!sdlInitOk && usedPreferredDriver) {
             spdlog::warn("SDL_Init failed with preferred driver '{}': {}", config.preferredVideoDriver, SDL_GetError());

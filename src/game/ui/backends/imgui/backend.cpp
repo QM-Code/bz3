@@ -455,7 +455,20 @@ void ImGuiBackend::initBgfxRenderer() {
     imguiTexture = bgfx::createUniform("s_tex", bgfx::UniformType::Sampler);
     imguiScaleBias = bgfx::createUniform("u_scaleBias", bgfx::UniformType::Vec4);
 
-    const auto shaderDir = bz::data::Resolve("bgfx/shaders/bin/imgui");
+    const std::filesystem::path shaderDir = []() {
+        std::filesystem::path base = bz::data::Resolve("bgfx/shaders/bin");
+        const bgfx::RendererType::Enum renderer = bgfx::getRendererType();
+        switch (renderer) {
+            case bgfx::RendererType::OpenGL:
+            case bgfx::RendererType::OpenGLES:
+                base /= "gl";
+                break;
+            default:
+                base /= "vk";
+                break;
+        }
+        return base / "imgui";
+    }();
     const auto vsPath = shaderDir / "vs_imgui.bin";
     const auto fsPath = shaderDir / "fs_imgui.bin";
 

@@ -104,14 +104,14 @@ int main(int argc, char *argv[]) {
         SetEnvOverride("BZ3_BGFX_THEME", cliOptions.theme);
     }
 #if defined(BZ3_RENDER_BACKEND_BGFX)
+    if (cliOptions.forceX11OpenGL || (cliOptions.rendererExplicit && cliOptions.renderer == "opengl")) {
+        spdlog::error("bgfx backend does not support --x11-opengl / renderer=opengl on Linux; use --wayland-vulkan.");
+        return 1;
+    }
     if (cliOptions.forceWaylandVulkan) {
         graphics_backend::SetBgfxRendererPreference(graphics_backend::BgfxRendererPreference::Vulkan);
-    } else if (cliOptions.forceX11OpenGL) {
-        graphics_backend::SetBgfxRendererPreference(graphics_backend::BgfxRendererPreference::OpenGL);
     } else if (cliOptions.rendererExplicit) {
-        if (cliOptions.renderer == "opengl") {
-            graphics_backend::SetBgfxRendererPreference(graphics_backend::BgfxRendererPreference::OpenGL);
-        } else if (cliOptions.renderer == "vulkan") {
+        if (cliOptions.renderer == "vulkan") {
             graphics_backend::SetBgfxRendererPreference(graphics_backend::BgfxRendererPreference::Vulkan);
         } else {
             graphics_backend::SetBgfxRendererPreference(graphics_backend::BgfxRendererPreference::Auto);
@@ -150,12 +150,8 @@ int main(int argc, char *argv[]) {
     windowConfig.createGlContext = !bgfxNoGl;
     if (cliOptions.forceWaylandVulkan) {
         windowConfig.createGlContext = false;
-    } else if (cliOptions.forceX11OpenGL) {
-        windowConfig.createGlContext = true;
     } else if (cliOptions.rendererExplicit) {
-        if (cliOptions.renderer == "opengl") {
-            windowConfig.createGlContext = true;
-        } else if (cliOptions.renderer == "vulkan") {
+        if (cliOptions.renderer == "vulkan") {
             windowConfig.createGlContext = false;
         }
     }

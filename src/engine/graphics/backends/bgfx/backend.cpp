@@ -51,6 +51,9 @@ NativeWindowInfo getNativeWindowInfo(platform::Window* window) {
     }
     NativeWindowInfo info{};
     const SDL_PropertiesID props = SDL_GetWindowProperties(sdlWindow);
+    if (props == 0) {
+        spdlog::warn("Graphics(Bgfx): SDL_GetWindowProperties failed: {}", SDL_GetError());
+    }
     if (props != 0) {
         if (void* wlDisplay = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WAYLAND_DISPLAY_POINTER, nullptr)) {
             info.ndt = wlDisplay;
@@ -72,10 +75,6 @@ NativeWindowInfo getNativeWindowInfo(platform::Window* window) {
             }
             spdlog::info("Graphics(Bgfx): Wayland display found but no surface/egl_window");
             return {};
-        }
-        if (const Sint64 x11Window = SDL_GetNumberProperty(props, SDL_PROP_WINDOW_X11_WINDOW_NUMBER, 0)) {
-            info.nwh = reinterpret_cast<void*>(static_cast<uintptr_t>(x11Window));
-            return info;
         }
     }
     return {};
@@ -125,6 +124,24 @@ bgfx::ShaderHandle loadShader(const std::filesystem::path& path) {
     }
     const bgfx::Memory* mem = bgfx::copy(bytes.data(), static_cast<uint32_t>(bytes.size()));
     return bgfx::createShader(mem);
+}
+
+std::filesystem::path getBgfxShaderDir(std::string_view subdir = {}) {
+    std::filesystem::path base = bz::data::Resolve("bgfx/shaders/bin");
+    const bgfx::RendererType::Enum renderer = bgfx::getRendererType();
+    switch (renderer) {
+        case bgfx::RendererType::OpenGL:
+        case bgfx::RendererType::OpenGLES:
+            base /= "gl";
+            break;
+        default:
+            base /= "vk";
+            break;
+    }
+    if (!subdir.empty()) {
+        base /= subdir;
+    }
+    return base;
 }
 
 bgfx::TextureHandle createTextureRGBA8(int width, int height, const uint8_t* pixels) {
@@ -292,7 +309,7 @@ BgfxBackend::BgfxBackend(platform::Window& windowIn)
     bgfx::PlatformData pd{};
     pd.ndt = nativeInfo.ndt;
     pd.nwh = nativeInfo.nwh;
-    pd.context = nullptr;
+    pd.context = nativeInfo.context;
 #if defined(BZ3_WINDOW_BACKEND_SDL)
     pd.type = nativeInfo.handleType;
 #endif
@@ -316,6 +333,7 @@ BgfxBackend::BgfxBackend(platform::Window& windowIn)
             init.type = bgfx::RendererType::Vulkan;
             break;
     }
+    spdlog::info("Graphics(Bgfx): requested renderer {}", static_cast<int>(init.type));
     init.vendorId = BGFX_PCI_ID_NONE;
     init.platformData = pd;
     init.resolution.width = static_cast<uint32_t>(framebufferWidth);
@@ -718,6 +736,12 @@ graphics::RenderTargetId BgfxBackend::createRenderTarget(const graphics::RenderT
     const graphics::RenderTargetId id = nextRenderTargetId++;
     RenderTargetRecord record;
     record.desc = desc;
+    if (!initialized) {
+        spdlog::trace("Graphics(Bgfx): created render target {} size={}x{} fb=false color=false depth=false (bgfx not initialized)",
+                      id, desc.width, desc.height);
+        renderTargets[id] = record;
+        return id;
+    }
     if (desc.width > 0 && desc.height > 0) {
         const uint64_t colorFlags = BGFX_TEXTURE_RT | BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP;
         record.colorTexture = bgfx::createTexture2D(
@@ -767,6 +791,10 @@ void BgfxBackend::destroyRenderTarget(graphics::RenderTargetId target) {
         return;
     }
     RenderTargetRecord& record = it->second;
+    if (!initialized) {
+        renderTargets.erase(it);
+        return;
+    }
     if (bgfx::isValid(record.frameBuffer)) {
         bgfx::destroy(record.frameBuffer);
     }
@@ -934,6 +962,9 @@ void BgfxBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId 
 }
 
 unsigned int BgfxBackend::getRenderTargetTextureId(graphics::RenderTargetId target) const {
+    if (!initialized) {
+        return 0u;
+    }
     auto it = renderTargets.find(target);
     if (it == renderTargets.end()) {
         return 0u;
@@ -1057,8 +1088,9 @@ void BgfxBackend::buildTestResources() {
         return;
     }
 
-    const std::filesystem::path vsPath = bz::data::Resolve("bgfx/shaders/bin/vs_triangle.bin");
-    const std::filesystem::path fsPath = bz::data::Resolve("bgfx/shaders/bin/fs_triangle.bin");
+    const std::filesystem::path shaderDir = getBgfxShaderDir();
+    const std::filesystem::path vsPath = shaderDir / "vs_triangle.bin";
+    const std::filesystem::path fsPath = shaderDir / "fs_triangle.bin";
 
     if (!std::filesystem::exists(vsPath) || !std::filesystem::exists(fsPath)) {
         spdlog::error("Graphics(Bgfx): missing shader binaries '{}', '{}'", vsPath.string(), fsPath.string());
@@ -1108,8 +1140,9 @@ void BgfxBackend::buildMeshResources() {
         return;
     }
 
-    const std::filesystem::path vsPath = bz::data::Resolve("bgfx/shaders/bin/mesh/vs_mesh.bin");
-    const std::filesystem::path fsPath = bz::data::Resolve("bgfx/shaders/bin/mesh/fs_mesh.bin");
+    const std::filesystem::path shaderDir = getBgfxShaderDir("mesh");
+    const std::filesystem::path vsPath = shaderDir / "vs_mesh.bin";
+    const std::filesystem::path fsPath = shaderDir / "fs_mesh.bin";
     if (!std::filesystem::exists(vsPath) || !std::filesystem::exists(fsPath)) {
         spdlog::error("Graphics(Bgfx): missing mesh shader binaries '{}', '{}'", vsPath.string(), fsPath.string());
         return;
@@ -1203,8 +1236,9 @@ void BgfxBackend::buildSkyboxResources() {
     }
     spdlog::info("Graphics(Bgfx): skybox cubemap created {}x{}", faceWidth, faceHeight);
 
-    const std::filesystem::path vsPath = bz::data::Resolve("bgfx/shaders/bin/skybox/vs_skybox.bin");
-    const std::filesystem::path fsPath = bz::data::Resolve("bgfx/shaders/bin/skybox/fs_skybox.bin");
+    const std::filesystem::path shaderDir = getBgfxShaderDir("skybox");
+    const std::filesystem::path vsPath = shaderDir / "vs_skybox.bin";
+    const std::filesystem::path fsPath = shaderDir / "fs_skybox.bin";
     if (!std::filesystem::exists(vsPath) || !std::filesystem::exists(fsPath)) {
         spdlog::error("Graphics(Bgfx): missing skybox shader binaries '{}', '{}'", vsPath.string(), fsPath.string());
         return;
