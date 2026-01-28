@@ -16,6 +16,10 @@
 #include <gltfio/TextureProvider.h>
 #include <gltfio/materials/uberarchive.h>
 #include <ktxreader/Ktx1Reader.h>
+#define FILAMENT_SUPPORTS_WAYLAND 1
+#include <bluevk/BlueVK.h>
+#include <backend/platforms/VulkanPlatform.h>
+#include <wayland-client-core.h>
 #include <math/mat4.h>
 #include <math/vec4.h>
 #include <glad/glad.h>
@@ -27,18 +31,14 @@
 #include <fstream>
 #include <vector>
 
-#if defined(BZ3_WINDOW_BACKEND_GLFW)
-#define GLFW_EXPOSE_NATIVE_X11
-#define GLFW_EXPOSE_NATIVE_GLX
-#include <GLFW/glfw3.h>
-#include <GLFW/glfw3native.h>
-#elif defined(BZ3_WINDOW_BACKEND_SDL)
+#if defined(BZ3_WINDOW_BACKEND_SDL3)
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_properties.h>
 #include <SDL3/SDL_video.h>
 #endif
 
 namespace {
+using graphics_backend::filament_backend_detail::WaylandNativeWindow;
 filament::math::mat4f toFilamentMat4(const glm::mat4& m) {
     filament::math::mat4f out;
     for (int c = 0; c < 4; ++c) {
@@ -204,13 +204,13 @@ filament::Texture* loadKtx1Texture(filament::Engine* engine, const std::filesyst
     return texture;
 }
 
-void* getNativeWindowHandle(platform::Window* window) {
+void* getNativeWindowHandle(platform::Window* window, bool preferWaylandSurface) {
     if (!window) {
         return nullptr;
     }
 
     void* handle = window->nativeHandle();
-#if defined(BZ3_WINDOW_BACKEND_SDL)
+#if defined(BZ3_WINDOW_BACKEND_SDL3)
     auto* sdlWindow = static_cast<SDL_Window*>(handle);
     if (!sdlWindow) {
         return nullptr;
@@ -218,6 +218,13 @@ void* getNativeWindowHandle(platform::Window* window) {
 
     const SDL_PropertiesID props = SDL_GetWindowProperties(sdlWindow);
     if (props != 0) {
+        if (preferWaylandSurface) {
+            if (void* wlSurface = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WAYLAND_SURFACE_POINTER, nullptr)) {
+                return wlSurface;
+            }
+            return nullptr;
+        }
+
         const Sint64 x11Window = SDL_GetNumberProperty(props, SDL_PROP_WINDOW_X11_WINDOW_NUMBER, 0);
         if (x11Window != 0) {
             return reinterpret_cast<void*>(static_cast<uintptr_t>(x11Window));
@@ -233,16 +240,6 @@ void* getNativeWindowHandle(platform::Window* window) {
     }
 
     return sdlWindow;
-#elif defined(BZ3_WINDOW_BACKEND_GLFW)
-    auto* glfwWindow = static_cast<GLFWwindow*>(handle);
-    if (!glfwWindow) {
-        return nullptr;
-    }
-    const auto x11Window = glfwGetX11Window(glfwWindow);
-    if (x11Window != 0) {
-        return reinterpret_cast<void*>(static_cast<uintptr_t>(x11Window));
-    }
-    return glfwWindow;
 #else
     return handle;
 #endif
@@ -253,22 +250,83 @@ void* getSharedContextHandle(platform::Window* window) {
         return nullptr;
     }
 
-#if defined(BZ3_WINDOW_BACKEND_SDL)
+#if defined(BZ3_WINDOW_BACKEND_SDL3)
     return SDL_GL_GetCurrentContext();
-#elif defined(BZ3_WINDOW_BACKEND_GLFW)
-    auto* glfwWindow = static_cast<GLFWwindow*>(window->nativeHandle());
-    if (!glfwWindow) {
-        return nullptr;
-    }
-    if (!glfwGetCurrentContext()) {
-        glfwMakeContextCurrent(glfwWindow);
-    }
-    return glfwGetGLXContext(glfwWindow);
 #else
     return nullptr;
 #endif
 }
+
+WaylandNativeWindow* createWaylandNativeWindow(platform::Window* window, int width, int height) {
+    if (!window) {
+        return nullptr;
+    }
+#if defined(BZ3_WINDOW_BACKEND_SDL3)
+    auto* sdlWindow = static_cast<SDL_Window*>(window->nativeHandle());
+    if (!sdlWindow) {
+        return nullptr;
+    }
+    const SDL_PropertiesID props = SDL_GetWindowProperties(sdlWindow);
+    if (props == 0) {
+        return nullptr;
+    }
+    auto* display = static_cast<wl_display*>(SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WAYLAND_DISPLAY_POINTER, nullptr));
+    auto* surface = static_cast<wl_surface*>(SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WAYLAND_SURFACE_POINTER, nullptr));
+    if (!display || !surface) {
+        return nullptr;
+    }
+    auto* out = new WaylandNativeWindow();
+    out->display = display;
+    out->surface = surface;
+    out->width = static_cast<uint32_t>(std::max(1, width));
+    out->height = static_cast<uint32_t>(std::max(1, height));
+    return out;
+#else
+    (void)width;
+    (void)height;
+    return nullptr;
+#endif
+}
+
+class WaylandVulkanPlatform final : public filament::backend::VulkanPlatform {
+public:
+    ExtensionSet getSwapchainInstanceExtensions() const override {
+        ExtensionSet exts;
+        exts.emplace("VK_KHR_surface");
+        exts.emplace("VK_KHR_wayland_surface");
+        return exts;
+    }
+
+    SurfaceBundle createVkSurfaceKHR(void* nativeWindow, VkInstance instance,
+            uint64_t /*flags*/) const noexcept override {
+        if (!nativeWindow || instance == VK_NULL_HANDLE) {
+            return {VK_NULL_HANDLE, VkExtent2D{0, 0}};
+        }
+        auto* wnd = static_cast<WaylandNativeWindow*>(nativeWindow);
+        if (!wnd->display || !wnd->surface) {
+            return {VK_NULL_HANDLE, VkExtent2D{0, 0}};
+        }
+        VkWaylandSurfaceCreateInfoKHR info{};
+        info.sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR;
+        info.display = wnd->display;
+        info.surface = wnd->surface;
+        VkSurfaceKHR surface = VK_NULL_HANDLE;
+        VkResult res = bluevk::vkCreateWaylandSurfaceKHR(instance, &info, nullptr, &surface);
+        if (res != VK_SUCCESS) {
+            return {VK_NULL_HANDLE, VkExtent2D{0, 0}};
+        }
+        return {surface, VkExtent2D{wnd->width, wnd->height}};
+    }
+};
+graphics_backend::FilamentBackendPreference g_filamentPreference = graphics_backend::FilamentBackendPreference::OpenGL;
 } // namespace
+
+namespace graphics_backend {
+
+void SetFilamentBackendPreference(FilamentBackendPreference preference) {
+    g_filamentPreference = preference;
+}
+} // namespace graphics_backend
 
 namespace graphics_backend {
 
@@ -284,8 +342,25 @@ FilamentBackend::FilamentBackend(platform::Window& windowIn)
         }
     }
 
-    void* sharedContext = getSharedContextHandle(window);
-    engine = filament::Engine::create(filament::Engine::Backend::OPENGL, nullptr, sharedContext);
+    filament::Engine::Backend backend = filament::Engine::Backend::OPENGL;
+    if (g_filamentPreference == FilamentBackendPreference::Vulkan) {
+        backend = filament::Engine::Backend::VULKAN;
+    }
+    spdlog::info("Graphics(Filament): backend = {}", backend == filament::Engine::Backend::VULKAN ? "Vulkan" : "OpenGL");
+
+    void* sharedContext = nullptr;
+    if (backend == filament::Engine::Backend::OPENGL) {
+        sharedContext = getSharedContextHandle(window);
+    } else {
+        waylandWindow = createWaylandNativeWindow(window, framebufferWidth, framebufferHeight);
+        if (!waylandWindow) {
+            spdlog::error("Graphics(Filament): Vulkan Wayland surface missing");
+            return;
+        }
+        customPlatform = new WaylandVulkanPlatform();
+    }
+
+    engine = filament::Engine::create(backend, customPlatform, sharedContext);
     if (!engine) {
         spdlog::error("Graphics(Filament): Engine::create failed");
         return;
@@ -302,9 +377,15 @@ FilamentBackend::FilamentBackend(platform::Window& windowIn)
     cameraEntity = utils::EntityManager::get().create();
     camera = engine->createCamera(cameraEntity);
 
-    swapChain = engine->createSwapChain(static_cast<uint32_t>(framebufferWidth),
-                                        static_cast<uint32_t>(framebufferHeight));
-    swapChainIsNative = false;
+    if (backend == filament::Engine::Backend::VULKAN) {
+        nativeSwapChainHandle = waylandWindow;
+        swapChain = engine->createSwapChain(nativeSwapChainHandle);
+        swapChainIsNative = true;
+    } else {
+        swapChain = engine->createSwapChain(static_cast<uint32_t>(framebufferWidth),
+                                            static_cast<uint32_t>(framebufferHeight));
+        swapChainIsNative = false;
+    }
     if (!swapChain) {
         spdlog::error("Graphics(Filament): createSwapChain failed");
     }
@@ -534,6 +615,14 @@ FilamentBackend::~FilamentBackend() {
     }
 
     filament::Engine::destroy(&engine);
+    if (customPlatform) {
+        delete customPlatform;
+        customPlatform = nullptr;
+    }
+    if (waylandWindow) {
+        delete waylandWindow;
+        waylandWindow = nullptr;
+    }
 }
 
 void FilamentBackend::beginFrame() {
@@ -573,10 +662,18 @@ void FilamentBackend::resize(int width, int height) {
     framebufferWidth = width;
     framebufferHeight = height;
 
-    if (engine && swapChain && sizeChanged && !swapChainIsNative) {
+    if (waylandWindow && sizeChanged) {
+        waylandWindow->width = static_cast<uint32_t>(std::max(1, framebufferWidth));
+        waylandWindow->height = static_cast<uint32_t>(std::max(1, framebufferHeight));
+    }
+    if (engine && swapChain && sizeChanged) {
         engine->destroy(swapChain);
-        swapChain = engine->createSwapChain(static_cast<uint32_t>(framebufferWidth),
-                                            static_cast<uint32_t>(framebufferHeight));
+        if (swapChainIsNative && nativeSwapChainHandle) {
+            swapChain = engine->createSwapChain(nativeSwapChainHandle);
+        } else {
+            swapChain = engine->createSwapChain(static_cast<uint32_t>(framebufferWidth),
+                                                static_cast<uint32_t>(framebufferHeight));
+        }
     }
 
     for (auto& [layer, state] : layers) {
@@ -1065,12 +1162,12 @@ unsigned int FilamentBackend::getRenderTargetTextureId(graphics::RenderTargetId 
     return it->second.colorTextureId;
 }
 
-void FilamentBackend::setUiOverlayTexture(unsigned int textureId, int width, int height) {
+void FilamentBackend::setUiOverlayTexture(const graphics::TextureHandle& texture) {
     if (!engine || !uiMaterialInstance) {
         return;
     }
 
-    if (textureId == 0 || width <= 0 || height <= 0) {
+    if (!texture.valid()) {
         uiTextureId = 0;
         uiTextureWidth = 0;
         uiTextureHeight = 0;
@@ -1081,6 +1178,9 @@ void FilamentBackend::setUiOverlayTexture(unsigned int textureId, int width, int
         return;
     }
 
+    const auto textureId = static_cast<unsigned int>(texture.id);
+    const int width = static_cast<int>(texture.width);
+    const int height = static_cast<int>(texture.height);
     if (textureId == uiTextureId && width == uiTextureWidth && height == uiTextureHeight) {
         return;
     }

@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "engine/graphics/texture_handle.hpp"
+
 struct ScoreboardEntry {
     std::string name;
     int score;
@@ -13,12 +15,11 @@ struct ScoreboardEntry {
 namespace ui {
 
 struct RenderOutput {
-    unsigned int textureId = 0;
-    int width = 0;
-    int height = 0;
+    graphics::TextureHandle texture{};
+    bool visible = true;
 
     bool valid() const {
-        return textureId != 0 && width > 0 && height > 0;
+        return visible && texture.valid();
     }
 };
 

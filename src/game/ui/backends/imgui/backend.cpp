@@ -1,11 +1,11 @@
 #include "ui/backends/imgui/backend.hpp"
 
-#include <imgui_impl_opengl3.h>
-
 #if defined(BZ3_RENDER_BACKEND_BGFX)
 #include <bgfx/bgfx.h>
 #include <bgfx/platform.h>
 #include <bx/math.h>
+#else
+#include <imgui_impl_opengl3.h>
 #endif
 
 #include "common/data_path_resolver.hpp"
@@ -290,7 +290,7 @@ void ImGuiBackend::update() {
         reloadFonts();
     }
     if (renderBridge) {
-        hud.setRadarTextureId(renderBridge->getRadarTextureId());
+        hud.setRadarTexture(renderBridge->getRadarTexture());
     }
 
     ImGuiIO &io = ImGui::GetIO();

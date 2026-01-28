@@ -18,6 +18,8 @@
 
 #if defined(BZ3_RENDER_BACKEND_BGFX)
 #include "ui/backends/rmlui/platform/RmlUi_Renderer_BGFX.h"
+#elif defined(BZ3_RENDER_BACKEND_DILIGENT)
+#include "ui/backends/rmlui/platform/RmlUi_Renderer_Diligent.h"
 #else
 #include "ui/backends/rmlui/platform/RmlUi_Renderer_GL3.h"
 #endif
@@ -459,6 +461,8 @@ struct RmlUiBackend::RmlUiState {
     SystemInterface_Platform systemInterface;
 #if defined(BZ3_RENDER_BACKEND_BGFX)
     RenderInterface_BGFX renderInterface;
+#elif defined(BZ3_RENDER_BACKEND_DILIGENT)
+    RenderInterface_Diligent renderInterface;
 #else
     RenderInterface_GL3 renderInterface;
 #endif
@@ -506,6 +510,12 @@ RmlUiBackend::RmlUiBackend(platform::Window &windowRefIn) : windowRef(&windowRef
         return;
     }
     spdlog::info("RmlUi: bgfx renderer initialized.");
+#elif defined(BZ3_RENDER_BACKEND_DILIGENT)
+    if (!state->renderInterface) {
+        spdlog::error("RmlUi: failed to initialize Diligent renderer.");
+        return;
+    }
+    spdlog::info("RmlUi: Diligent renderer initialized.");
 #else
     Rml::String renderer_message;
     if (!RmlGL3::Initialize(&renderer_message)) {
@@ -627,7 +637,7 @@ RmlUiBackend::~RmlUiBackend() {
         state->context = nullptr;
     }
     Rml::Shutdown();
-#if !defined(BZ3_RENDER_BACKEND_BGFX)
+#if !defined(BZ3_RENDER_BACKEND_BGFX) && !defined(BZ3_RENDER_BACKEND_DILIGENT)
     RmlGL3::Shutdown();
 #endif
 }
@@ -772,10 +782,7 @@ void RmlUiBackend::update() {
     }
 
     if (renderBridge && state->hud) {
-        int radarWidth = 0;
-        int radarHeight = 0;
-        renderBridge->getRadarTextureSize(radarWidth, radarHeight);
-        state->hud->setRadarTexture(renderBridge->getRadarTextureId(), radarWidth, radarHeight);
+        state->hud->setRadarTexture(renderBridge->getRadarTexture());
     }
 
     int fbWidth = 0;
@@ -953,9 +960,12 @@ ui::RenderOutput RmlUiBackend::getRenderOutput() const {
         return {};
     }
     ui::RenderOutput out;
-    out.textureId = state->renderInterface.GetOutputTextureId();
-    out.width = state->renderInterface.GetOutputWidth();
-    out.height = state->renderInterface.GetOutputHeight();
+    out.texture.id = static_cast<uint64_t>(state->renderInterface.GetOutputTextureId());
+    const int outputWidth = state->renderInterface.GetOutputWidth();
+    const int outputHeight = state->renderInterface.GetOutputHeight();
+    out.texture.width = outputWidth > 0 ? static_cast<uint32_t>(outputWidth) : 0u;
+    out.texture.height = outputHeight > 0 ? static_cast<uint32_t>(outputHeight) : 0u;
+    out.visible = state->outputVisible;
     return out;
 }
 

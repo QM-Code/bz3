@@ -2,7 +2,19 @@
 
 #include "engine/graphics/backend.hpp"
 
+#include <DiligentCore/Common/interface/RefCntAutoPtr.hpp>
 #include <unordered_map>
+
+namespace Diligent {
+class IRenderDevice;
+class IDeviceContext;
+class ISwapChain;
+class IPipelineState;
+class IShaderResourceBinding;
+class IBuffer;
+class ITexture;
+class ITextureView;
+} // namespace Diligent
 
 namespace graphics_backend {
 
@@ -73,15 +85,31 @@ private:
         graphics::MeshId mesh = graphics::kInvalidMesh;
         graphics::MaterialId material = graphics::kInvalidMaterial;
         std::filesystem::path modelPath;
+        std::vector<graphics::MeshId> meshes;
+    };
+
+    struct MeshRecord {
+        Diligent::RefCntAutoPtr<Diligent::IBuffer> vertexBuffer;
+        Diligent::RefCntAutoPtr<Diligent::IBuffer> indexBuffer;
+        uint32_t indexCount = 0;
+        Diligent::RefCntAutoPtr<Diligent::ITexture> texture;
+        Diligent::ITextureView* srv = nullptr;
     };
 
     struct RenderTargetRecord {
         graphics::RenderTargetDesc desc{};
+        Diligent::RefCntAutoPtr<Diligent::ITexture> colorTexture;
+        Diligent::RefCntAutoPtr<Diligent::ITexture> depthTexture;
+        Diligent::ITextureView* rtv = nullptr;
+        Diligent::ITextureView* dsv = nullptr;
+        Diligent::ITextureView* srv = nullptr;
+        uint64_t srvToken = 0;
     };
 
     platform::Window* window = nullptr;
     int framebufferWidth = 0;
     int framebufferHeight = 0;
+    bool initialized = false;
 
     graphics::EntityId nextEntityId = 1;
     graphics::MeshId nextMeshId = 1;
@@ -89,9 +117,28 @@ private:
     graphics::RenderTargetId nextRenderTargetId = 1;
 
     std::unordered_map<graphics::EntityId, EntityRecord> entities;
-    std::unordered_map<graphics::MeshId, graphics::MeshData> meshes;
+    std::unordered_map<graphics::MeshId, MeshRecord> meshes;
     std::unordered_map<graphics::MaterialId, graphics::MaterialDesc> materials;
     std::unordered_map<graphics::RenderTargetId, RenderTargetRecord> renderTargets;
+    std::unordered_map<std::string, std::vector<graphics::MeshId>> modelMeshCache;
+    std::unordered_map<std::string, Diligent::RefCntAutoPtr<Diligent::ITexture>> textureCache;
+    Diligent::RefCntAutoPtr<Diligent::ITexture> whiteTexture_;
+    Diligent::ITextureView* whiteTextureView_ = nullptr;
+    std::string themeName;
+
+    Diligent::RefCntAutoPtr<Diligent::IRenderDevice> device_;
+    Diligent::RefCntAutoPtr<Diligent::IDeviceContext> context_;
+    Diligent::RefCntAutoPtr<Diligent::ISwapChain> swapChain_;
+    Diligent::RefCntAutoPtr<Diligent::IPipelineState> pipeline_;
+    Diligent::RefCntAutoPtr<Diligent::IShaderResourceBinding> shaderBinding_;
+    Diligent::RefCntAutoPtr<Diligent::IBuffer> constantBuffer_;
+    Diligent::RefCntAutoPtr<Diligent::IPipelineState> skyboxPipeline_;
+    Diligent::RefCntAutoPtr<Diligent::IShaderResourceBinding> skyboxBinding_;
+    Diligent::RefCntAutoPtr<Diligent::IBuffer> skyboxConstantBuffer_;
+    Diligent::RefCntAutoPtr<Diligent::IBuffer> skyboxVertexBuffer_;
+    Diligent::RefCntAutoPtr<Diligent::ITexture> skyboxTexture_;
+    Diligent::ITextureView* skyboxSrv_ = nullptr;
+    bool skyboxReady = false;
 
     glm::vec3 cameraPosition{0.0f};
     glm::quat cameraRotation{1.0f, 0.0f, 0.0f, 0.0f};
@@ -104,6 +151,12 @@ private:
     float orthoRight = 1.0f;
     float orthoTop = 1.0f;
     float orthoBottom = -1.0f;
+
+    void initDiligent();
+    void ensurePipeline();
+    void updateSwapChain(int width, int height);
+    void buildSkyboxResources();
+    void renderToTargets(Diligent::ITextureView* rtv, Diligent::ITextureView* dsv, graphics::LayerId layer);
 
     glm::mat4 computeViewMatrix() const;
     glm::mat4 computeProjectionMatrix() const;

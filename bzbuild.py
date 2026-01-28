@@ -58,11 +58,11 @@ world = ""
 build_dir = ""
 
 if not args:
-    window = prompt_choice("Platform (sdl/glfw)", "sdl", ["sdl", "glfw"])
+    window = prompt_choice("Platform (sdl3/sdl2)", "sdl3", ["sdl3", "sdl2"])
     ui = prompt_choice("UI (rmlui/imgui)", "rmlui", ["rmlui", "imgui"])
     physics = prompt_choice("Physics (jolt/bullet)", "jolt", ["jolt", "bullet"])
     audio = prompt_choice("Audio (miniaudio/sdlaudio)", "sdlaudio", ["miniaudio", "sdlaudio"])
-    render = prompt_choice("Renderer (threepp/filament/diligent/bgfx)", "threepp", ["threepp", "filament", "diligent", "bgfx"])
+    render = prompt_choice("Renderer (filament/diligent/bgfx)", "bgfx", ["filament", "diligent", "bgfx"])
     network = prompt_choice("Network (enet)", "enet", ["enet"])
     world = prompt_choice("World (fs)", "fs", ["fs"])
     build_dir = f"build-{window}-{ui}-{physics}-{audio}-{render}-{network}-{world}"
@@ -76,7 +76,7 @@ else:
     parts = name.split("-") if name else []
 
     for part in parts:
-        if part in ("glfw", "sdl"):
+        if part in ("sdl3", "sdl2"):
             if not window:
                 window = part
         elif part in ("imgui", "rmlui"):
@@ -85,7 +85,7 @@ else:
             physics = part
         elif part in ("miniaudio", "sdlaudio"):
             audio = part
-        elif part in ("threepp", "filament", "diligent", "bgfx"):
+        elif part in ("filament", "diligent", "bgfx"):
             render = part
         elif part == "enet":
             network = part
@@ -124,4 +124,4 @@ else:
 if run_configure:
     run(["cmake", "-S", ".", "-B", build_dir, *cmake_args])
 
-run(["cmake", "--build", build_dir, "-j"])
+run(["cmake", "--build", build_dir, "-j4"])

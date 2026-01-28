@@ -7,5 +7,7 @@ build/
 build-*/
 _deps/
 vcpkg/
+third_party/
+libs/
 __pycache__/
 *.pyc

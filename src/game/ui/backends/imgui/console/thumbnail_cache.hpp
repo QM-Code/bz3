@@ -9,12 +9,12 @@
 #include <unordered_set>
 #include <vector>
 
+#include "engine/graphics/texture_handle.hpp"
+
 namespace ui {
 
 struct ThumbnailTexture {
-    unsigned int textureId = 0;
-    int width = 0;
-    int height = 0;
+    graphics::TextureHandle texture{};
     bool failed = false;
     bool loading = false;
 };

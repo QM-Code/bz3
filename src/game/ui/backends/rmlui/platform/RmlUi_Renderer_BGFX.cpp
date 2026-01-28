@@ -348,10 +348,11 @@ Rml::TextureHandle RenderInterface_BGFX::LoadTexture(Rml::Vector2i& texture_dime
     if (source.rfind(tex_prefix, 0) == 0) {
         const char* id_str = source.c_str() + tex_prefix.size();
         char* end_ptr = nullptr;
-        const unsigned long tex_id = std::strtoul(id_str, &end_ptr, 10);
-        if (tex_id == 0) {
+        const unsigned long tex_token = std::strtoul(id_str, &end_ptr, 10);
+        if (tex_token == 0) {
             return {};
         }
+        const unsigned long tex_id = tex_token - 1;
         int width = 1;
         int height = 1;
         if (end_ptr && *end_ptr == ':') {
@@ -374,7 +375,7 @@ Rml::TextureHandle RenderInterface_BGFX::LoadTexture(Rml::Vector2i& texture_dime
         texture_dimensions.x = entry.width;
         texture_dimensions.y = entry.height;
         spdlog::trace("RmlUi(BGFX): external texture texid:{} -> handle={} size={}x{}",
-                      tex_id, handle, entry.width, entry.height);
+                      tex_token, handle, entry.width, entry.height);
         return handle;
     }
 

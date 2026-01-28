@@ -45,7 +45,7 @@ public:
 
     unsigned int getRenderTargetTextureId(RenderTargetId target) const;
 
-    void setUiOverlayTexture(unsigned int textureId, int width, int height);
+    void setUiOverlayTexture(const TextureHandle& texture);
     void setUiOverlayVisible(bool visible);
     void renderUiOverlay();
     void setBrightness(float brightness);

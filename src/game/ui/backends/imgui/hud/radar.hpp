@@ -2,15 +2,17 @@
 
 struct ImVec2;
 
+#include "engine/graphics/texture_handle.hpp"
+
 namespace ui {
 
 class ImGuiHudRadar {
 public:
-    void setTextureId(unsigned int textureId);
+    void setTexture(const graphics::TextureHandle& texture);
     void draw(const ImVec2 &pos, const ImVec2 &size);
 
 private:
-    unsigned int radarTextureId = 0;
+    graphics::TextureHandle radarTexture{};
 };
 
 } // namespace ui

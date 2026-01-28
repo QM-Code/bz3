@@ -1,5 +1,6 @@
 #pragma once
 
+#include "engine/graphics/texture_handle.hpp"
 #include "engine/graphics/types.hpp"
 
 #include <filesystem>
@@ -54,7 +55,7 @@ public:
 
     virtual unsigned int getRenderTargetTextureId(graphics::RenderTargetId target) const = 0;
 
-    virtual void setUiOverlayTexture(unsigned int textureId, int width, int height) { (void)textureId; (void)width; (void)height; }
+    virtual void setUiOverlayTexture(const graphics::TextureHandle& texture) { (void)texture; }
     virtual void setUiOverlayVisible(bool visible) { (void)visible; }
     virtual void renderUiOverlay() {}
     virtual void setBrightness(float brightness) { (void)brightness; }

@@ -8,6 +8,9 @@
 #if defined(BZ3_RENDER_BACKEND_BGFX)
 #include "engine/graphics/backends/bgfx/backend.hpp"
 #endif
+#if defined(BZ3_RENDER_BACKEND_FILAMENT)
+#include "engine/graphics/backends/filament/backend.hpp"
+#endif
 #include "client/game.hpp"
 #include "client/client_cli_options.hpp"
 #include "client/config_client.hpp"
@@ -118,6 +121,13 @@ int main(int argc, char *argv[]) {
         }
     }
 #endif
+#if defined(BZ3_RENDER_BACKEND_FILAMENT)
+    if (cliOptions.forceWaylandVulkan || (cliOptions.rendererExplicit && cliOptions.renderer == "vulkan")) {
+        graphics_backend::SetFilamentBackendPreference(graphics_backend::FilamentBackendPreference::Vulkan);
+    } else {
+        graphics_backend::SetFilamentBackendPreference(graphics_backend::FilamentBackendPreference::OpenGL);
+    }
+#endif
     const spdlog::level::level_enum logLevel = cliOptions.logLevelExplicit
         ? ParseLogLevel(cliOptions.logLevel)
         : (cliOptions.verbose ? spdlog::level::trace : spdlog::level::info);
@@ -156,12 +166,32 @@ int main(int argc, char *argv[]) {
         }
     }
 #endif
+#if defined(BZ3_RENDER_BACKEND_FILAMENT)
+    windowConfig.createGlContext = true;
+    if (cliOptions.forceWaylandVulkan) {
+        windowConfig.createGlContext = false;
+    } else if (cliOptions.rendererExplicit && cliOptions.renderer == "vulkan") {
+        windowConfig.createGlContext = false;
+    }
+#endif
+#if defined(BZ3_RENDER_BACKEND_DILIGENT)
+    windowConfig.createGlContext = false;
+#endif
 
     auto window = platform::CreateWindow(windowConfig);
     if (!window || !window->nativeHandle()) {
         spdlog::error("Window failed to create");
         return 1;
     }
+#if defined(BZ3_RENDER_BACKEND_FILAMENT)
+    if (cliOptions.forceWaylandVulkan || (cliOptions.rendererExplicit && cliOptions.renderer == "vulkan")) {
+        const std::string driver = window->getVideoDriver();
+        if (driver != "wayland") {
+            spdlog::error("Filament Vulkan requires Wayland; SDL video driver is '{}'", driver.empty() ? "(null)" : driver);
+            return 1;
+        }
+    }
+#endif
 
     if (window->hasGlContext()) {
         if (gladLoadGL() == 0) {

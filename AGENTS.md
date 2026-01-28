@@ -62,3 +62,11 @@ Prompt files live in `docs/agent-prompts/`. Ask to use one by name (title) or fi
 ## Tests
 - None automated in this repo (manual run is typical).
 - If `python` is missing, prefer `python3` for scripts/tools.
+
+## Filament SDK (Wayland/Vulkan)
+- Filament Vulkan on Wayland requires rebuilding the Filament SDK (clang + libstdc++).
+- Use `scripts/build_filament.sh` to clone/build/install into `libs/filament-sdk`.
+- If you need a specific Filament version, set `FILAMENT_REF` before running the script.
+- Clean rebuild (recommended when changing Filament versions or toolchains):
+  `CLEAN_INSTALL=1 ./scripts/build_filament.sh`
+ - The build script forces `USE_STATIC_LIBCXX=OFF` to keep ABI compatibility with libstdc++.

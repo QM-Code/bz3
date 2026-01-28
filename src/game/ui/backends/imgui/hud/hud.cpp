@@ -17,8 +17,8 @@ void ImGuiHud::displayDeathScreen(bool show) {
     spawnHint.setVisible(show);
 }
 
-void ImGuiHud::setRadarTextureId(unsigned int textureId) {
-    radar.setTextureId(textureId);
+void ImGuiHud::setRadarTexture(const graphics::TextureHandle& texture) {
+    radar.setTexture(texture);
 }
 
 void ImGuiHud::addConsoleLine(const std::string &playerName, const std::string &line) {

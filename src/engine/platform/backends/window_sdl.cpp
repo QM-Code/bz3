@@ -620,6 +620,11 @@ public:
         return hasGlContextFlag;
     }
 
+    std::string getVideoDriver() const override {
+        const char* driver = SDL_GetCurrentVideoDriver();
+        return driver ? std::string(driver) : std::string();
+    }
+
 private:
     SDL_Window *window = nullptr;
     SDL_GLContext glContext = nullptr;
@@ -637,7 +642,7 @@ private:
 
 namespace platform {
 
-std::unique_ptr<Window> CreateSdlWindow(const WindowConfig &config) {
+std::unique_ptr<Window> CreateSdl3Window(const WindowConfig &config) {
     return std::make_unique<WindowSdl>(config);
 }
 

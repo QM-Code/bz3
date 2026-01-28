@@ -292,7 +292,6 @@ void Render::update() {
     device_->renderUiOverlay();
 #endif
 
-    device_->endFrame();
 }
 
 render_id Render::create() {
@@ -449,16 +448,16 @@ void Render::setCameraRotation(const glm::quat &rotation) {
     updateRadarFovLines();
 }
 
-unsigned int Render::getRadarTextureId() const {
+graphics::TextureHandle Render::getRadarTexture() const {
+    graphics::TextureHandle handle{};
     if (!device_) {
-        return 0;
+        return handle;
     }
-    return device_->getRenderTargetTextureId(radarTarget);
-}
-
-void Render::getRadarTextureSize(int& width, int& height) const {
-    width = kRadarTexSize;
-    height = kRadarTexSize;
+    const unsigned int textureId = device_->getRenderTargetTextureId(radarTarget);
+    handle.id = static_cast<uint64_t>(textureId);
+    handle.width = static_cast<uint32_t>(kRadarTexSize);
+    handle.height = static_cast<uint32_t>(kRadarTexSize);
+    return handle;
 }
 
 unsigned int Render::getMainTextureId() const {
@@ -484,7 +483,7 @@ void Render::setUiOverlayTexture(const ui::RenderOutput& output) {
     if (!device_) {
         return;
     }
-    device_->setUiOverlayTexture(output.textureId, output.width, output.height);
+    device_->setUiOverlayTexture(output.texture);
     device_->setUiOverlayVisible(output.valid());
 }
 
@@ -496,8 +495,12 @@ void Render::setBrightness(float brightness) {
 }
 
 void Render::present() {
+    if (!device_) {
+        return;
+    }
+    device_->endFrame();
 #if defined(BZ3_RENDER_BACKEND_FILAMENT)
-    if (!device_ || !window) {
+    if (!window) {
         return;
     }
     const unsigned int mainTex = getMainTextureId();

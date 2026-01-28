@@ -3,10 +3,12 @@
 #include <imgui.h>
 #include <cstdint>
 
+#include "ui/backends/imgui/texture_utils.hpp"
+
 namespace ui {
 
-void ImGuiHudRadar::setTextureId(unsigned int textureId) {
-    radarTextureId = textureId;
+void ImGuiHudRadar::setTexture(const graphics::TextureHandle& texture) {
+    radarTexture = texture;
 }
 
 void ImGuiHudRadar::draw(const ImVec2 &pos, const ImVec2 &size) {
@@ -26,10 +28,10 @@ void ImGuiHudRadar::draw(const ImVec2 &pos, const ImVec2 &size) {
         ImGuiWindowFlags_NoSavedSettings
     );
 
-    if (radarTextureId != 0) {
+    if (radarTexture.valid()) {
         ImGui::SetCursorPos(ImVec2(0.0f, 0.0f));
         const ImVec2 imageSize = ImGui::GetContentRegionAvail();
-        ImTextureID tex = (ImTextureID)(intptr_t)radarTextureId;
+        ImTextureID tex = ui::ToImGuiTextureId(radarTexture);
         ImGui::Image(tex, imageSize, ImVec2(0, 1), ImVec2(1, 0));
     } else {
         ImGui::TextUnformatted("Radar");

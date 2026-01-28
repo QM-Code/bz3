@@ -20,12 +20,7 @@
 #include <stb_image.h>
 #include <array>
 
-#if defined(BZ3_WINDOW_BACKEND_GLFW)
-#define GLFW_EXPOSE_NATIVE_X11
-#define GLFW_EXPOSE_NATIVE_GLX
-#include <GLFW/glfw3.h>
-#include <GLFW/glfw3native.h>
-#elif defined(BZ3_WINDOW_BACKEND_SDL)
+#if defined(BZ3_WINDOW_BACKEND_SDL3)
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_properties.h>
 #include <SDL3/SDL_video.h>
@@ -44,7 +39,7 @@ NativeWindowInfo getNativeWindowInfo(platform::Window* window) {
         return {};
     }
     void* handle = window->nativeHandle();
-#if defined(BZ3_WINDOW_BACKEND_SDL)
+#if defined(BZ3_WINDOW_BACKEND_SDL3)
     auto* sdlWindow = static_cast<SDL_Window*>(handle);
     if (!sdlWindow) {
         return {};
@@ -78,21 +73,6 @@ NativeWindowInfo getNativeWindowInfo(platform::Window* window) {
         }
     }
     return {};
-#elif defined(BZ3_WINDOW_BACKEND_GLFW)
-    auto* glfwWindow = static_cast<GLFWwindow*>(handle);
-    if (!glfwWindow) {
-        return {};
-    }
-    NativeWindowInfo info{};
-    info.ndt = glfwGetX11Display();
-    const auto x11Window = glfwGetX11Window(glfwWindow);
-    if (x11Window != 0) {
-        info.nwh = reinterpret_cast<void*>(static_cast<uintptr_t>(x11Window));
-    } else {
-        info.nwh = glfwWindow;
-    }
-    info.context = glfwGetGLXContext(glfwWindow);
-    return info;
 #else
     return {handle, nullptr, nullptr};
 #endif
@@ -310,7 +290,7 @@ BgfxBackend::BgfxBackend(platform::Window& windowIn)
     pd.ndt = nativeInfo.ndt;
     pd.nwh = nativeInfo.nwh;
     pd.context = nativeInfo.context;
-#if defined(BZ3_WINDOW_BACKEND_SDL)
+#if defined(BZ3_WINDOW_BACKEND_SDL3)
     pd.type = nativeInfo.handleType;
 #endif
     spdlog::info("Graphics(Bgfx): platform nwh={} ndt={} ctx={}", pd.nwh, pd.ndt, pd.context);
@@ -980,7 +960,7 @@ unsigned int BgfxBackend::getRenderTargetTextureId(graphics::RenderTargetId targ
         spdlog::trace("Graphics(Bgfx): render target {} texture idx={}", target, idx);
         lastTextureIds[target] = idx;
     }
-    return record.colorTexture.idx;
+    return static_cast<unsigned int>(idx + 1);
 }
 
 void BgfxBackend::setPosition(graphics::EntityId entity, const glm::vec3& position) {

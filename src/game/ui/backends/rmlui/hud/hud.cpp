@@ -101,8 +101,8 @@ void RmlUiHud::handleChatInputEvent(Rml::Event &event) {
     chat.handleInputEvent(event);
 }
 
-void RmlUiHud::setRadarTexture(unsigned int textureId, int width, int height) {
-    radar.setTexture(textureId, width, height);
+void RmlUiHud::setRadarTexture(const graphics::TextureHandle& texture) {
+    radar.setTexture(texture);
 }
 
 void RmlUiHud::setScoreboardEntries(const std::vector<ScoreboardEntry> &entries) {

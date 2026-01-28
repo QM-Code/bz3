@@ -11,29 +11,27 @@ void RmlUiHudRadar::bind(Rml::ElementDocument *document) {
     }
     image = document->GetElementById("hud-radar-image");
     if (image) {
-        if (textureId == 0) {
+        if (!texture.valid()) {
             image->SetAttribute("src", "");
         } else {
-            std::string src = "texid:" + std::to_string(textureId);
-            if (textureWidth > 0 && textureHeight > 0) {
-                src += ":" + std::to_string(textureWidth) + "x" + std::to_string(textureHeight);
+            std::string src = "texid:" + std::to_string(texture.id);
+            if (texture.width > 0 && texture.height > 0) {
+                src += ":" + std::to_string(texture.width) + "x" + std::to_string(texture.height);
             }
             image->SetAttribute("src", src);
         }
     }
 }
 
-void RmlUiHudRadar::setTexture(unsigned int textureIdIn, int widthIn, int heightIn) {
-    textureId = textureIdIn;
-    textureWidth = widthIn;
-    textureHeight = heightIn;
+void RmlUiHudRadar::setTexture(const graphics::TextureHandle& textureIn) {
+    texture = textureIn;
     if (image) {
-        if (textureId == 0) {
+        if (!texture.valid()) {
             image->SetAttribute("src", "");
         } else {
-            std::string src = "texid:" + std::to_string(textureId);
-            if (textureWidth > 0 && textureHeight > 0) {
-                src += ":" + std::to_string(textureWidth) + "x" + std::to_string(textureHeight);
+            std::string src = "texid:" + std::to_string(texture.id);
+            if (texture.width > 0 && texture.height > 0) {
+                src += ":" + std::to_string(texture.width) + "x" + std::to_string(texture.height);
             }
             image->SetAttribute("src", src);
         }

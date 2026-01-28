@@ -56,7 +56,7 @@ private:
     const ui::RenderBridge *renderBridge = nullptr;
     bool languageReloadArmed = false;
     std::optional<std::string> pendingLanguage;
-    void drawTexture(unsigned int textureId);
+    void drawTexture(const graphics::TextureHandle& texture);
 
 #if defined(BZ3_RENDER_BACKEND_BGFX)
     bgfx::ProgramHandle imguiProgram = BGFX_INVALID_HANDLE;

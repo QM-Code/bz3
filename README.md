@@ -70,9 +70,11 @@ After building:
 ## Overview (Libraries in Use)
 
 Rendering and windowing
-- **threepp** (renderer/scene graph)
+- **bgfx** (renderer backend, default)
+- **Diligent** (renderer backend, optional)
 - **Filament** (renderer/scene graph, optional)
-- **OpenGL** + **GLFW** (window + context)
+- **SDL3** (windowing, default)
+- **SDL2** (windowing stub)
 - **Assimp** (model loading)
 
 UI
@@ -98,7 +100,7 @@ Other
 ## Notes
 
 - Most dependencies are provided by vcpkg (see `vcpkg.json`).
-- Some libraries are fetched via CMake FetchContent (notably `threepp`, `enet`, `pybind11`).
+- Some libraries are fetched via CMake FetchContent (notably `enet`, `pybind11`).
 - Python plugin bytecode is redirected to a writable cache: set `BZ3_PY_CACHE_DIR` to choose the location (defaults to `/tmp/bz3-pycache`). If the directory cannot be created, bytecode writing is disabled. Current behavior is acceptable for now; we may revisit a dedicated cache path later.
 
 ## Engine vs game
@@ -134,10 +136,10 @@ Backend factories (compile-time selection)
 
 Backend layouts (examples)
 - `src/engine/audio/backends/miniaudio/` and `src/engine/audio/backends/sdl/`
-- `src/engine/platform/backends/glfw/` and `src/engine/platform/backends/sdl/`
+- `src/engine/platform/backends/` (currently `sdl3`, with an `sdl2` stub)
 - `src/game/ui/backends/imgui/` and `src/game/ui/backends/rmlui/`
 - `src/engine/physics/backends/jolt/` and `src/engine/physics/backends/bullet/`
-- `src/engine/graphics/backends/threepp/` (future: ogre, wicked, etc.)
+- `src/engine/graphics/backends/bgfx/`, `src/engine/graphics/backends/diligent/`, `src/engine/graphics/backends/filament/`
 - `src/game/net/backends/enet/` (future: steam, webrtc, etc.)
 - `src/engine/world/backends/fs/` (future: zip, remote, etc.)
 - `src/engine/input/mapping/` (action-agnostic mapping: bindings, maps, mapper)
@@ -148,25 +150,25 @@ Backend layouts (examples)
 These CMake cache variables select backends at build time:
 
 - `BZ3_UI_BACKEND=imgui|rmlui`
-- `BZ3_WINDOW_BACKEND=glfw|sdl`
+- `BZ3_WINDOW_BACKEND=sdl3|sdl2`
 - `BZ3_PHYSICS_BACKEND=jolt|bullet`
 - `BZ3_AUDIO_BACKEND=miniaudio|sdlaudio`
-- `BZ3_RENDER_BACKEND=threepp|filament`
+- `BZ3_RENDER_BACKEND=bgfx|diligent|filament`
 - `BZ3_NETWORK_BACKEND=enet`
 - `BZ3_WORLD_BACKEND=fs`
 
 Example:
 
 ```bash
-cmake -S . -B build-sdl-rmlui-bullet-sdlaudio-threepp-enet-fs \
-  -DBZ3_WINDOW_BACKEND=sdl \
+cmake -S . -B build-sdl3-rmlui-bullet-sdlaudio-bgfx-enet-fs \
+  -DBZ3_WINDOW_BACKEND=sdl3 \
   -DBZ3_UI_BACKEND=rmlui \
   -DBZ3_PHYSICS_BACKEND=bullet \
   -DBZ3_AUDIO_BACKEND=sdlaudio \
-  -DBZ3_RENDER_BACKEND=threepp \
+  -DBZ3_RENDER_BACKEND=bgfx \
   -DBZ3_NETWORK_BACKEND=enet \
   -DBZ3_WORLD_BACKEND=fs
-cmake --build build-sdl-rmlui-bullet-sdlaudio-threepp-enet-fs
+cmake --build build-sdl3-rmlui-bullet-sdlaudio-bgfx-enet-fs
 ```
 
 ## Input bindings

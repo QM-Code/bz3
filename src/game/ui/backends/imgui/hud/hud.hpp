@@ -20,7 +20,7 @@ public:
     void setScoreboardEntries(const std::vector<ScoreboardEntry> &entries);
     void setSpawnHint(const std::string &hint);
     void displayDeathScreen(bool show);
-    void setRadarTextureId(unsigned int textureId);
+    void setRadarTexture(const graphics::TextureHandle& texture);
 
     void addConsoleLine(const std::string &playerName, const std::string &line);
     std::string getChatInputBuffer() const;

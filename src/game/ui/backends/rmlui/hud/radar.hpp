@@ -4,6 +4,8 @@
 
 #include <RmlUi/Core/Element.h>
 
+#include "engine/graphics/texture_handle.hpp"
+
 namespace Rml {
 class ElementDocument;
 }
@@ -13,13 +15,11 @@ namespace ui {
 class RmlUiHudRadar {
 public:
     void bind(Rml::ElementDocument *document);
-    void setTexture(unsigned int textureId, int width, int height);
+    void setTexture(const graphics::TextureHandle& texture);
 
 private:
     Rml::Element *image = nullptr;
-    unsigned int textureId = 0;
-    int textureWidth = 0;
-    int textureHeight = 0;
+    graphics::TextureHandle texture{};
 };
 
 } // namespace ui

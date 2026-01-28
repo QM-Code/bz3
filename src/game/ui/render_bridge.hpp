@@ -1,12 +1,13 @@
 #pragma once
 
+#include "engine/graphics/texture_handle.hpp"
+
 namespace ui {
 
 class RenderBridge {
 public:
     virtual ~RenderBridge() = default;
-    virtual unsigned int getRadarTextureId() const = 0;
-    virtual void getRadarTextureSize(int& width, int& height) const = 0;
+    virtual graphics::TextureHandle getRadarTexture() const = 0;
 };
 
 } // namespace ui

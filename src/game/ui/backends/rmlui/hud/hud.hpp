@@ -45,7 +45,7 @@ public:
     bool consumeSuppressNextChatChar();
     void handleChatInputEvent(Rml::Event &event);
 
-    void setRadarTexture(unsigned int textureId, int width, int height);
+    void setRadarTexture(const graphics::TextureHandle& texture);
     void setScoreboardEntries(const std::vector<ScoreboardEntry> &entries);
     void setFpsVisible(bool visible);
     void setFpsValue(float fps);

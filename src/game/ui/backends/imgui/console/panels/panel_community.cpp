@@ -1,4 +1,5 @@
 #include "ui/backends/imgui/console/console.hpp"
+#include "ui/backends/imgui/texture_utils.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -1047,7 +1048,7 @@ void ConsoleView::drawCommunityPanel(const MessageColors &messageColors) {
             std::string thumbnailUrl = hostBase + "/uploads/" + selectedEntry->screenshotId + "_thumb.jpg";
 
             if (auto *thumb = getOrLoadThumbnail(thumbnailUrl)) {
-                if (thumb->textureId != 0 && thumb->width > 0 && thumb->height > 0) {
+                if (thumb->texture.valid()) {
                     ImGui::Spacing();
                     ImGui::Separator();
                     ImGui::PushStyleColor(ImGuiCol_Text, headingColor);
@@ -1057,17 +1058,17 @@ void ConsoleView::drawCommunityPanel(const MessageColors &messageColors) {
                     const float maxWidth = ImGui::GetContentRegionAvail().x;
                     const float maxHeight = 220.0f;
                     float scale = 1.0f;
-                    scale = std::min(scale, maxWidth / static_cast<float>(thumb->width));
-                    scale = std::min(scale, maxHeight / static_cast<float>(thumb->height));
+                    scale = std::min(scale, maxWidth / static_cast<float>(thumb->texture.width));
+                    scale = std::min(scale, maxHeight / static_cast<float>(thumb->texture.height));
                     if (scale <= 0.0f) {
                         scale = 1.0f;
                     }
 
                     ImVec2 imageSize(
-                        static_cast<float>(thumb->width) * scale,
-                        static_cast<float>(thumb->height) * scale);
+                        static_cast<float>(thumb->texture.width) * scale,
+                        static_cast<float>(thumb->texture.height) * scale);
 
-                    ImGui::Image(static_cast<ImTextureID>(static_cast<intptr_t>(thumb->textureId)), imageSize);
+                    ImGui::Image(ui::ToImGuiTextureId(thumb->texture), imageSize);
                 } else if (thumb->failed) {
                     ImGui::Spacing();
                     ImGui::Separator();

@@ -1,8 +1,13 @@
 #include "ui/backends/imgui/console/thumbnail_cache.hpp"
 
 #include <curl/curl.h>
-#include <imgui_impl_opengl3_loader.h>
 #include <spdlog/spdlog.h>
+
+#if defined(BZ3_RENDER_BACKEND_BGFX)
+#include <bgfx/bgfx.h>
+#else
+#include <imgui_impl_opengl3_loader.h>
+#endif
 
 #include "common/curl_global.hpp"
 
@@ -34,13 +39,13 @@ ThumbnailTexture *ThumbnailCache::getOrLoad(const std::string &url) {
 
     auto it = cache.find(url);
     if (it != cache.end()) {
-        if (it->second.textureId != 0 || it->second.failed || it->second.loading) {
+        if (it->second.texture.valid() || it->second.failed || it->second.loading) {
             return &it->second;
         }
     }
 
     ThumbnailTexture &entry = cache[url];
-    if (!entry.loading && entry.textureId == 0 && !entry.failed) {
+    if (!entry.loading && !entry.texture.valid() && !entry.failed) {
         entry.loading = true;
         queueRequest(url);
     }
@@ -68,6 +73,27 @@ void ThumbnailCache::processUploads() {
             continue;
         }
 
+#if defined(BZ3_RENDER_BACKEND_BGFX)
+        const bgfx::Memory* mem = bgfx::copy(payload.pixels.data(),
+                                             static_cast<uint32_t>(payload.width * payload.height * 4));
+        const uint64_t flags = BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP |
+                               BGFX_SAMPLER_MIN_POINT | BGFX_SAMPLER_MAG_POINT;
+        bgfx::TextureHandle handle = bgfx::createTexture2D(
+            static_cast<uint16_t>(payload.width),
+            static_cast<uint16_t>(payload.height),
+            false,
+            1,
+            bgfx::TextureFormat::RGBA8,
+            flags,
+            mem);
+        if (!bgfx::isValid(handle)) {
+            entry.failed = true;
+            continue;
+        }
+        entry.texture.id = static_cast<uint64_t>(handle.idx + 1);
+        entry.texture.width = static_cast<uint32_t>(payload.width);
+        entry.texture.height = static_cast<uint32_t>(payload.height);
+#else
         GLuint textureId = 0;
         glGenTextures(1, &textureId);
         glBindTexture(GL_TEXTURE_2D, textureId);
@@ -77,10 +103,11 @@ void ThumbnailCache::processUploads() {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, payload.width, payload.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, payload.pixels.data());
         glBindTexture(GL_TEXTURE_2D, 0);
-
-        entry.textureId = textureId;
-        entry.width = payload.width;
-        entry.height = payload.height;
+        entry.texture.id = static_cast<uint64_t>(textureId);
+        entry.texture.width = static_cast<uint32_t>(payload.width);
+        entry.texture.height = static_cast<uint32_t>(payload.height);
+#endif
+        entry.texture.format = graphics::TextureFormat::RGBA8_UNORM;
         entry.failed = false;
     }
 }
@@ -92,9 +119,21 @@ void ThumbnailCache::shutdown() {
 
 void ThumbnailCache::clearTextures() {
     for (auto &[url, thumb] : cache) {
-        if (thumb.textureId != 0) {
-            glDeleteTextures(1, &thumb.textureId);
+        if (!thumb.texture.valid()) {
+            continue;
         }
+#if defined(BZ3_RENDER_BACKEND_BGFX)
+        const uint64_t token = thumb.texture.id;
+        if (token > 0) {
+            bgfx::TextureHandle handle{static_cast<uint16_t>(token - 1)};
+            if (bgfx::isValid(handle)) {
+                bgfx::destroy(handle);
+            }
+        }
+#else
+        GLuint textureId = static_cast<GLuint>(thumb.texture.id);
+        glDeleteTextures(1, &textureId);
+#endif
     }
     cache.clear();
 }

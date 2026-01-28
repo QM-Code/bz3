@@ -50,10 +50,11 @@ public:
 
     virtual void* nativeHandle() const = 0;
     virtual bool hasGlContext() const = 0;
+    virtual std::string getVideoDriver() const = 0;
 };
 
 std::unique_ptr<Window> CreateWindow(const WindowConfig &config);
-std::unique_ptr<Window> CreateGlfwWindow(const WindowConfig &config);
-std::unique_ptr<Window> CreateSdlWindow(const WindowConfig &config);
+std::unique_ptr<Window> CreateSdl3Window(const WindowConfig &config);
+std::unique_ptr<Window> CreateSdl2Window(const WindowConfig &config);
 
 } // namespace platform

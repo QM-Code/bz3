@@ -30,7 +30,30 @@
 #include <memory>
 #include <unordered_map>
 
+struct wl_display;
+struct wl_surface;
+
+namespace filament::backend {
+class Platform;
+}
+
 namespace graphics_backend {
+
+enum class FilamentBackendPreference {
+    OpenGL,
+    Vulkan,
+};
+
+void SetFilamentBackendPreference(FilamentBackendPreference preference);
+
+namespace filament_backend_detail {
+struct WaylandNativeWindow {
+    wl_display* display = nullptr;
+    wl_surface* surface = nullptr;
+    uint32_t width = 0;
+    uint32_t height = 0;
+};
+}
 
 class FilamentBackend final : public Backend {
 public:
@@ -70,7 +93,7 @@ public:
     void renderLayer(graphics::LayerId layer, graphics::RenderTargetId target) override;
 
     unsigned int getRenderTargetTextureId(graphics::RenderTargetId target) const override;
-    void setUiOverlayTexture(unsigned int textureId, int width, int height) override;
+    void setUiOverlayTexture(const graphics::TextureHandle& texture) override;
     void setUiOverlayVisible(bool visible) override;
     void renderUiOverlay() override;
     void setBrightness(float brightness) override;
@@ -142,6 +165,9 @@ private:
     bool uiVisible = false;
     bool uiInScene = false;
     filament::SwapChain* swapChain = nullptr;
+    void* nativeSwapChainHandle = nullptr;
+    filament_backend_detail::WaylandNativeWindow* waylandWindow = nullptr;
+    filament::backend::Platform* customPlatform = nullptr;
     bool swapChainIsNative = false;
     filament::Camera* camera = nullptr;
     utils::Entity cameraEntity;

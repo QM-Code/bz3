@@ -114,9 +114,9 @@ unsigned int GraphicsDevice::getRenderTargetTextureId(RenderTargetId target) con
     return backend_ ? backend_->getRenderTargetTextureId(target) : 0u;
 }
 
-void GraphicsDevice::setUiOverlayTexture(unsigned int textureId, int width, int height) {
+void GraphicsDevice::setUiOverlayTexture(const TextureHandle& texture) {
     if (backend_) {
-        backend_->setUiOverlayTexture(textureId, width, height);
+        backend_->setUiOverlayTexture(texture);
     }
 }
 

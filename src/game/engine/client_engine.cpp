@@ -16,16 +16,8 @@ class RenderBridgeImpl final : public ui::RenderBridge {
 public:
     explicit RenderBridgeImpl(Render *renderIn) : render(renderIn) {}
 
-    unsigned int getRadarTextureId() const override {
-        return render ? render->getRadarTextureId() : 0u;
-    }
-    void getRadarTextureSize(int& width, int& height) const override {
-        if (render) {
-            render->getRadarTextureSize(width, height);
-        } else {
-            width = 0;
-            height = 0;
-        }
+    graphics::TextureHandle getRadarTexture() const override {
+        return render ? render->getRadarTexture() : graphics::TextureHandle{};
     }
 
 private:
@@ -100,9 +92,8 @@ void ClientEngine::lateUpdate(TimeUtils::duration deltaTime) {
     }
 
     render->update();
-    render->present();
-
     ui->update();
+    render->present();
 
     render->setBrightness(ui->getRenderBrightness());
 

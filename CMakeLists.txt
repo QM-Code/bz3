@@ -22,19 +22,14 @@ else()
     message(FATAL_ERROR "Unknown BZ3_UI_BACKEND value: ${BZ3_UI_BACKEND}")
 endif()
 
-set(BZ3_WINDOW_BACKEND "glfw" CACHE STRING "Window backend (glfw or sdl)")
-set_property(CACHE BZ3_WINDOW_BACKEND PROPERTY STRINGS glfw sdl)
-if(BZ3_WINDOW_BACKEND STREQUAL "glfw")
-    add_compile_definitions(BZ3_WINDOW_BACKEND_GLFW)
-    find_package(glfw3 REQUIRED)
-    if(TARGET glfw3::glfw)
-        set(WINDOW_TARGET glfw3::glfw)
-    else()
-        set(WINDOW_TARGET glfw)
-    endif()
-elseif(BZ3_WINDOW_BACKEND STREQUAL "sdl")
-    add_compile_definitions(BZ3_WINDOW_BACKEND_SDL)
+set(BZ3_WINDOW_BACKEND "sdl3" CACHE STRING "Window backend (sdl3 or sdl2)")
+set_property(CACHE BZ3_WINDOW_BACKEND PROPERTY STRINGS sdl3 sdl2)
+if(BZ3_WINDOW_BACKEND STREQUAL "sdl3")
+    add_compile_definitions(BZ3_WINDOW_BACKEND_SDL3)
     set(WINDOW_TARGET SDL3::SDL3)
+elseif(BZ3_WINDOW_BACKEND STREQUAL "sdl2")
+    add_compile_definitions(BZ3_WINDOW_BACKEND_SDL2)
+    set(WINDOW_TARGET "")
 else()
     message(FATAL_ERROR "Unknown BZ3_WINDOW_BACKEND value: ${BZ3_WINDOW_BACKEND}")
 endif()
@@ -75,11 +70,9 @@ else()
     message(FATAL_ERROR "Unknown BZ3_WORLD_BACKEND value: ${BZ3_WORLD_BACKEND}")
 endif()
 
-set(BZ3_RENDER_BACKEND "threepp" CACHE STRING "Render backend (threepp|filament|diligent|bgfx)")
-set_property(CACHE BZ3_RENDER_BACKEND PROPERTY STRINGS threepp filament diligent bgfx)
-if(BZ3_RENDER_BACKEND STREQUAL "threepp")
-    add_compile_definitions(BZ3_RENDER_BACKEND_THREEPP)
-elseif(BZ3_RENDER_BACKEND STREQUAL "filament")
+set(BZ3_RENDER_BACKEND "bgfx" CACHE STRING "Render backend (filament|diligent|bgfx)")
+set_property(CACHE BZ3_RENDER_BACKEND PROPERTY STRINGS filament diligent bgfx)
+if(BZ3_RENDER_BACKEND STREQUAL "filament")
     add_compile_definitions(BZ3_RENDER_BACKEND_FILAMENT)
 elseif(BZ3_RENDER_BACKEND STREQUAL "diligent")
     add_compile_definitions(BZ3_RENDER_BACKEND_DILIGENT)
@@ -103,19 +96,42 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(pybind11)
 
-if(BZ3_RENDER_BACKEND STREQUAL "threepp")
-    FetchContent_Declare(
-        threepp
-        GIT_REPOSITORY https://github.com/markaren/threepp.git
-        GIT_TAG master
-    )
-    set(THREEPP_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-    set(THREEPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-    set(THREEPP_WITH_AUDIO OFF CACHE BOOL "" FORCE)
-    set(THREEPP_USE_EXTERNAL_GLFW ON CACHE BOOL "" FORCE)
-    set(THREEPP_FETCH_ASSIMP OFF CACHE BOOL "" FORCE)
+if(BZ3_RENDER_BACKEND STREQUAL "diligent")
+    set(DILIGENT_BUILD_SAMPLES OFF CACHE BOOL "" FORCE)
+    set(DILIGENT_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+    set(DILIGENT_BUILD_FX OFF CACHE BOOL "" FORCE)
+    set(DILIGENT_NO_ARCHIVER ON CACHE BOOL "" FORCE)
+    set(DILIGENT_NO_DIRECT3D11 ON CACHE BOOL "" FORCE)
+    set(DILIGENT_NO_DIRECT3D12 ON CACHE BOOL "" FORCE)
+    set(DILIGENT_NO_OPENGL ON CACHE BOOL "" FORCE)
+    set(DILIGENT_NO_GLES ON CACHE BOOL "" FORCE)
+    set(DILIGENT_NO_METAL ON CACHE BOOL "" FORCE)
+    set(DILIGENT_NO_WEBGPU ON CACHE BOOL "" FORCE)
+    set(DILIGENT_NO_GLSLANG OFF CACHE BOOL "" FORCE)
+    set(DILIGENT_NO_HLSL OFF CACHE BOOL "" FORCE)
 
-    FetchContent_MakeAvailable(threepp)
+    FetchContent_Declare(
+        DiligentEngine
+        GIT_REPOSITORY https://github.com/DiligentGraphics/DiligentEngine.git
+        GIT_TAG v2.5.6
+        GIT_SUBMODULES "DiligentCore;DiligentTools;DiligentFX;DiligentSamples"
+        GIT_SUBMODULES_RECURSE ON
+        PATCH_COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/cmake/diligent_wayland_apply.py
+    )
+    FetchContent_MakeAvailable(DiligentEngine)
+
+    if(TARGET Diligent-GraphicsEngineVk-shared)
+        target_link_libraries(Diligent-GraphicsEngineVk-shared
+        PRIVATE
+            Diligent-GraphicsEngine
+            Diligent-GraphicsEngineNextGenBase
+            Diligent-Common
+            Diligent-GraphicsAccessories
+            Diligent-ShaderTools
+            Diligent-PlatformInterface
+            Diligent-TargetPlatform
+        )
+    endif()
 endif()
 
 FetchContent_Declare(
@@ -146,7 +162,7 @@ elseif(BZ3_UI_BACKEND STREQUAL "rmlui")
     find_package(RmlUi CONFIG REQUIRED)
     find_package(md4c REQUIRED)
 endif()
-if(BZ3_WINDOW_BACKEND STREQUAL "sdl" OR BZ3_AUDIO_BACKEND STREQUAL "sdlaudio")
+if(BZ3_WINDOW_BACKEND STREQUAL "sdl3" OR BZ3_AUDIO_BACKEND STREQUAL "sdlaudio")
     find_package(SDL3 CONFIG REQUIRED)
 endif()
 find_package(spdlog REQUIRED)
@@ -361,10 +377,10 @@ set(ENGINE_CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/engine/audio/audio.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/audio/backend_factory.cpp
 )
-if(BZ3_WINDOW_BACKEND STREQUAL "glfw")
-    list(APPEND ENGINE_CLIENT_SOURCES ${PROJECT_SOURCE_DIR}/src/engine/platform/backends/window_glfw.cpp)
-elseif(BZ3_WINDOW_BACKEND STREQUAL "sdl")
+if(BZ3_WINDOW_BACKEND STREQUAL "sdl3")
     list(APPEND ENGINE_CLIENT_SOURCES ${PROJECT_SOURCE_DIR}/src/engine/platform/backends/window_sdl.cpp)
+elseif(BZ3_WINDOW_BACKEND STREQUAL "sdl2")
+    list(APPEND ENGINE_CLIENT_SOURCES ${PROJECT_SOURCE_DIR}/src/engine/platform/backends/window_sdl2_stub.cpp)
 endif()
 
 
@@ -409,6 +425,10 @@ elseif(BZ3_UI_BACKEND STREQUAL "rmlui")
         list(APPEND ENGINE_CLIENT_SOURCES
             ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/platform/RmlUi_Renderer_BGFX.cpp
         )
+    elseif(BZ3_RENDER_BACKEND STREQUAL "diligent")
+        list(APPEND ENGINE_CLIENT_SOURCES
+            ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/platform/RmlUi_Renderer_Diligent.cpp
+        )
     else()
         list(APPEND ENGINE_CLIENT_SOURCES
             ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/platform/RmlUi_Renderer_GL3.cpp
@@ -416,11 +436,9 @@ elseif(BZ3_UI_BACKEND STREQUAL "rmlui")
     endif()
 endif()
 
-if(NOT BZ3_RENDER_BACKEND STREQUAL "threepp")
-    list(APPEND ENGINE_CLIENT_SOURCES
-        ${PROJECT_SOURCE_DIR}/src/game/ui/third_party/stb_image_impl.cpp
-    )
-endif()
+list(APPEND ENGINE_CLIENT_SOURCES
+    ${PROJECT_SOURCE_DIR}/src/game/ui/third_party/stb_image_impl.cpp
+)
 set(ENGINE_SERVER_SOURCES
     ${PROJECT_SOURCE_DIR}/src/game/engine/server_engine.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/geometry/mesh_loader.cpp
@@ -478,17 +496,14 @@ elseif(BZ3_AUDIO_BACKEND STREQUAL "sdlaudio")
     )
 endif()
 
-if(BZ3_RENDER_BACKEND STREQUAL "threepp")
-    list(APPEND ENGINE_CLIENT_SOURCES
-        ${PROJECT_SOURCE_DIR}/src/engine/graphics/backends/threepp/backend.cpp
-    )
-elseif(BZ3_RENDER_BACKEND STREQUAL "filament")
+if(BZ3_RENDER_BACKEND STREQUAL "filament")
     list(APPEND ENGINE_CLIENT_SOURCES
         ${PROJECT_SOURCE_DIR}/src/engine/graphics/backends/filament/backend.cpp
     )
 elseif(BZ3_RENDER_BACKEND STREQUAL "diligent")
     list(APPEND ENGINE_CLIENT_SOURCES
         ${PROJECT_SOURCE_DIR}/src/engine/graphics/backends/diligent/backend.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/graphics/backends/diligent/ui_bridge.cpp
     )
 elseif(BZ3_RENDER_BACKEND STREQUAL "bgfx")
     list(APPEND ENGINE_CLIENT_SOURCES
@@ -509,10 +524,10 @@ elseif(TARGET OpenGL::OpenGL)
 else()
     set(OPENGL_TARGET ${OPENGL_LIBRARIES})
 endif()
-if(BZ3_WINDOW_BACKEND STREQUAL "glfw")
-    list(APPEND ENGINE_CLIENT_SOURCES ${PROJECT_SOURCE_DIR}/src/engine/platform/backends/window_glfw.cpp)
-elseif(BZ3_WINDOW_BACKEND STREQUAL "sdl")
+if(BZ3_WINDOW_BACKEND STREQUAL "sdl3")
     list(APPEND ENGINE_CLIENT_SOURCES ${PROJECT_SOURCE_DIR}/src/engine/platform/backends/window_sdl.cpp)
+elseif(BZ3_WINDOW_BACKEND STREQUAL "sdl2")
+    list(APPEND ENGINE_CLIENT_SOURCES ${PROJECT_SOURCE_DIR}/src/engine/platform/backends/window_sdl2_stub.cpp)
 endif()
 
 
@@ -539,9 +554,6 @@ target_include_directories(bz3 PRIVATE
     ${enet_SOURCE_DIR}/include
 )
 
-if(DEFINED threepp_SOURCE_DIR)
-    target_include_directories(bz3 PRIVATE ${threepp_SOURCE_DIR}/src/external/glad)
-endif()
 target_include_directories(bz3-server PRIVATE
     ${PROJECT_SOURCE_DIR}/src
     ${PROJECT_SOURCE_DIR}/src/engine
@@ -565,10 +577,9 @@ target_link_libraries(bz3 PRIVATE
     CURL::libcurl
     OpenSSL::Crypto
 )
-if(BZ3_RENDER_BACKEND STREQUAL "threepp")
-    target_link_libraries(bz3 PRIVATE threepp::threepp)
-elseif(BZ3_RENDER_BACKEND STREQUAL "filament")
+if(BZ3_RENDER_BACKEND STREQUAL "filament")
     set(FILAMENT_SDK_DIR "${PROJECT_SOURCE_DIR}/libs/filament-sdk" CACHE PATH "Filament SDK root directory")
+    option(FILAMENT_SDK_USE_LIBCXX "Link Filament SDK against libc++/libc++abi" OFF)
     set(FILAMENT_SDK_INCLUDE_DIR "${FILAMENT_SDK_DIR}/include")
     set(FILAMENT_SDK_LIB_DIR "${FILAMENT_SDK_DIR}/lib/x86_64")
 
@@ -581,10 +592,12 @@ elseif(BZ3_RENDER_BACKEND STREQUAL "filament")
         message(FATAL_ERROR "Filament SDK libraries not found in ${FILAMENT_SDK_LIB_DIR}.")
     endif()
 
-    find_library(LIBCXX_LIBRARY NAMES c++ libc++)
-    find_library(LIBCXXABI_LIBRARY NAMES c++abi)
-    if(NOT LIBCXX_LIBRARY OR NOT LIBCXXABI_LIBRARY)
-        message(FATAL_ERROR "Filament SDK requires libc++ and libc++abi. Install libc++-dev and libc++abi-dev, or use a Filament build that targets libstdc++.")
+    if(FILAMENT_SDK_USE_LIBCXX)
+        find_library(LIBCXX_LIBRARY NAMES c++ libc++)
+        find_library(LIBCXXABI_LIBRARY NAMES c++abi)
+        if(NOT LIBCXX_LIBRARY OR NOT LIBCXXABI_LIBRARY)
+            message(FATAL_ERROR "Filament SDK requires libc++ and libc++abi. Install libc++-dev and libc++abi-dev, or rebuild the SDK with libstdc++ (USE_STATIC_LIBCXX=OFF).")
+        endif()
     endif()
 
     target_include_directories(bz3 PRIVATE ${FILAMENT_SDK_INCLUDE_DIR})
@@ -592,14 +605,43 @@ elseif(BZ3_RENDER_BACKEND STREQUAL "filament")
         -Wl,--start-group
         ${FILAMENT_SDK_LIBS}
         -Wl,--end-group
-        ${LIBCXX_LIBRARY}
-        ${LIBCXXABI_LIBRARY}
+        $<$<BOOL:${FILAMENT_SDK_USE_LIBCXX}>:${LIBCXX_LIBRARY}>
+        $<$<BOOL:${FILAMENT_SDK_USE_LIBCXX}>:${LIBCXXABI_LIBRARY}>
         pthread
         dl
         m
     )
 elseif(BZ3_RENDER_BACKEND STREQUAL "diligent")
-    message(STATUS "Diligent backend selected: add DiligentCore/DiligentTools linkage when ready.")
+    target_link_libraries(bz3 PRIVATE Diligent-GraphicsEngineVk-static)
+    if(TARGET Diligent-Common)
+        target_link_libraries(bz3 PRIVATE Diligent-Common)
+    endif()
+    if(TARGET Diligent-GraphicsEngine)
+        target_link_libraries(bz3 PRIVATE Diligent-GraphicsEngine)
+    endif()
+    if(TARGET Diligent-GraphicsEngineNextGenBase)
+        target_link_libraries(bz3 PRIVATE Diligent-GraphicsEngineNextGenBase)
+    endif()
+    if(TARGET Diligent-GraphicsAccessories)
+        target_link_libraries(bz3 PRIVATE Diligent-GraphicsAccessories)
+    endif()
+    if(TARGET Diligent-ShaderTools)
+        target_link_libraries(bz3 PRIVATE Diligent-ShaderTools)
+    endif()
+    if(TARGET Diligent-PlatformInterface)
+        target_link_libraries(bz3 PRIVATE Diligent-PlatformInterface)
+    endif()
+    if(TARGET Diligent-TargetPlatform)
+        target_link_libraries(bz3 PRIVATE Diligent-TargetPlatform)
+    endif()
+    if(DEFINED DiligentEngine_SOURCE_DIR)
+        target_include_directories(bz3 PRIVATE ${DiligentEngine_SOURCE_DIR})
+        target_include_directories(bz3 PRIVATE ${DiligentEngine_SOURCE_DIR}/DiligentCore)
+        target_include_directories(bz3 PRIVATE ${DiligentEngine_SOURCE_DIR}/DiligentTools)
+    endif()
+    if(UNIX AND NOT APPLE)
+        target_compile_definitions(bz3 PRIVATE PLATFORM_LINUX=1)
+    endif()
 elseif(BZ3_RENDER_BACKEND STREQUAL "bgfx")
     target_link_libraries(bz3 PRIVATE bgfx::bgfx)
     add_dependencies(bz3 bz3_bgfx_shaders)
@@ -714,10 +756,10 @@ set(CPACK_PACKAGE_INSTALL_DIRECTORY "bz3")
 if(UNIX AND NOT APPLE)
     set(CPACK_GENERATOR "DEB;RPM;TGZ")
     set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Quinn Carmack <quinncarmack@gmail.com>")
-    if(BZ3_WINDOW_BACKEND STREQUAL "glfw")
-        set(CPACK_DEBIAN_PACKAGE_DEPENDS "libgl1, libglfw3")
-    else()
+    if(BZ3_WINDOW_BACKEND STREQUAL "sdl3")
         set(CPACK_DEBIAN_PACKAGE_DEPENDS "libgl1, libsdl3")
+    else()
+        set(CPACK_DEBIAN_PACKAGE_DEPENDS "libgl1")
     endif()
     set(CPACK_RPM_PACKAGE_LICENSE "MIT")
 elseif(APPLE)
