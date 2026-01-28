@@ -5,7 +5,6 @@
 #include "game/input/state.hpp"
 #include "spdlog/spdlog.h"
 #include "ui/render_bridge.hpp"
-#include <glad/glad.h>
 #include <cstdint>
 #include <vector>
 #include <utility>
@@ -20,13 +19,13 @@ public:
         return render ? render->getRadarTexture() : graphics::TextureHandle{};
     }
 
+    graphics_backend::UiBridge* getUiBridge() const override {
+        return render ? render->getUiBridge() : nullptr;
+    }
+
 private:
     Render *render = nullptr;
 };
-
-bool ShouldUseOpenGL(const platform::Window *window) {
-    return window && window->hasGlContext();
-}
 
 } // namespace
 
@@ -84,13 +83,6 @@ void ClientEngine::step(TimeUtils::duration deltaTime) {
 }
 
 void ClientEngine::lateUpdate(TimeUtils::duration deltaTime) {
-    if (ShouldUseOpenGL(window)) {
-        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glEnable(GL_DEPTH_TEST);
-        glDepthMask(GL_TRUE);
-    }
-
     render->update();
     ui->update();
     render->present();

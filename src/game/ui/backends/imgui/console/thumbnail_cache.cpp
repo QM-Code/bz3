@@ -5,8 +5,6 @@
 
 #if defined(BZ3_RENDER_BACKEND_BGFX)
 #include <bgfx/bgfx.h>
-#else
-#include <imgui_impl_opengl3_loader.h>
 #endif
 
 #include "common/curl_global.hpp"
@@ -94,18 +92,8 @@ void ThumbnailCache::processUploads() {
         entry.texture.width = static_cast<uint32_t>(payload.width);
         entry.texture.height = static_cast<uint32_t>(payload.height);
 #else
-        GLuint textureId = 0;
-        glGenTextures(1, &textureId);
-        glBindTexture(GL_TEXTURE_2D, textureId);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, payload.width, payload.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, payload.pixels.data());
-        glBindTexture(GL_TEXTURE_2D, 0);
-        entry.texture.id = static_cast<uint64_t>(textureId);
-        entry.texture.width = static_cast<uint32_t>(payload.width);
-        entry.texture.height = static_cast<uint32_t>(payload.height);
+        entry.failed = true;
+        continue;
 #endif
         entry.texture.format = graphics::TextureFormat::RGBA8_UNORM;
         entry.failed = false;
@@ -130,9 +118,6 @@ void ThumbnailCache::clearTextures() {
                 bgfx::destroy(handle);
             }
         }
-#else
-        GLuint textureId = static_cast<GLuint>(thumb.texture.id);
-        glDeleteTextures(1, &textureId);
 #endif
     }
     cache.clear();

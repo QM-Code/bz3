@@ -40,7 +40,6 @@ class Platform;
 namespace graphics_backend {
 
 enum class FilamentBackendPreference {
-    OpenGL,
     Vulkan,
 };
 

@@ -49,6 +49,7 @@ public:
     void setUiOverlayVisible(bool visible);
     void renderUiOverlay();
     void setBrightness(float brightness);
+    graphics_backend::UiBridge* getUiBridge() const;
 
     void setPosition(EntityId entity, const glm::vec3& position);
     void setRotation(EntityId entity, const glm::quat& rotation);

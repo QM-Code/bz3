@@ -21,7 +21,7 @@
 #elif defined(BZ3_RENDER_BACKEND_DILIGENT)
 #include "ui/backends/rmlui/platform/RmlUi_Renderer_Diligent.h"
 #else
-#include "ui/backends/rmlui/platform/RmlUi_Renderer_GL3.h"
+#error "RmlUi backend requires BGFX or Diligent renderer."
 #endif
 #include "ui/backends/rmlui/console/emoji_utils.hpp"
 #include "ui/backends/rmlui/translate.hpp"
@@ -463,8 +463,6 @@ struct RmlUiBackend::RmlUiState {
     RenderInterface_BGFX renderInterface;
 #elif defined(BZ3_RENDER_BACKEND_DILIGENT)
     RenderInterface_Diligent renderInterface;
-#else
-    RenderInterface_GL3 renderInterface;
 #endif
     Rml::Context *context = nullptr;
     Rml::ElementDocument *document = nullptr;
@@ -516,13 +514,6 @@ RmlUiBackend::RmlUiBackend(platform::Window &windowRefIn) : windowRef(&windowRef
         return;
     }
     spdlog::info("RmlUi: Diligent renderer initialized.");
-#else
-    Rml::String renderer_message;
-    if (!RmlGL3::Initialize(&renderer_message)) {
-        spdlog::error("RmlUi: failed to initialize GL3 renderer.");
-        return;
-    }
-    spdlog::info("RmlUi: {}", renderer_message.c_str());
 #endif
 
     if (!Rml::Initialise()) {
@@ -637,9 +628,6 @@ RmlUiBackend::~RmlUiBackend() {
         state->context = nullptr;
     }
     Rml::Shutdown();
-#if !defined(BZ3_RENDER_BACKEND_BGFX) && !defined(BZ3_RENDER_BACKEND_DILIGENT)
-    RmlGL3::Shutdown();
-#endif
 }
 
 ui::ConsoleInterface &RmlUiBackend::console() {

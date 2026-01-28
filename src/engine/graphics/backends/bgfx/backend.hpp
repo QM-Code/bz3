@@ -1,6 +1,9 @@
 #pragma once
 
 #include "engine/graphics/backend.hpp"
+#if defined(BZ3_UI_BACKEND_IMGUI)
+#include "engine/graphics/backends/bgfx/ui_bridge.hpp"
+#endif
 
 #include <bgfx/bgfx.h>
 #include <unordered_map>
@@ -10,7 +13,6 @@ namespace graphics_backend {
 enum class BgfxRendererPreference {
     Auto,
     Vulkan,
-    OpenGL,
 };
 
 void SetBgfxRendererPreference(BgfxRendererPreference preference);
@@ -70,6 +72,8 @@ public:
     glm::mat4 getProjectionMatrix() const override;
     glm::vec3 getCameraPosition() const override;
     glm::vec3 getCameraForward() const override;
+    UiBridge* getUiBridge() override { return uiBridge_.get(); }
+    const UiBridge* getUiBridge() const override { return uiBridge_.get(); }
 
 private:
     struct EntityRecord {
@@ -158,6 +162,8 @@ private:
     void buildTestResources();
     void buildMeshResources();
     void buildSkyboxResources();
+
+    std::unique_ptr<UiBridge> uiBridge_;
 };
 
 } // namespace graphics_backend

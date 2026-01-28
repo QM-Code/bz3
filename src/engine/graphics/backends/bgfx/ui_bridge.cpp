@@ -1,0 +1,256 @@
+#include "engine/graphics/backends/bgfx/ui_bridge.hpp"
+
+#include <imgui.h>
+
+#include "common/data_path_resolver.hpp"
+#include "spdlog/spdlog.h"
+
+#include <algorithm>
+#include <cstring>
+#include <fstream>
+
+namespace graphics_backend {
+namespace {
+constexpr bgfx::ViewId kImGuiView = 255;
+
+ImTextureID toImTextureId(uint64_t value) {
+    ImTextureID out{};
+    std::memcpy(&out, &value, sizeof(ImTextureID));
+    return out;
+}
+
+uint64_t fromImTextureId(ImTextureID textureId) {
+    uint64_t value = 0;
+    std::memcpy(&value, &textureId, sizeof(ImTextureID));
+    return value;
+}
+}
+
+BgfxUiBridge::BgfxUiBridge() {
+    if (!bgfx::getCaps()) {
+        return;
+    }
+
+    sampler_ = bgfx::createUniform("s_tex", bgfx::UniformType::Sampler);
+    scaleBias_ = bgfx::createUniform("u_scaleBias", bgfx::UniformType::Vec4);
+
+    const std::filesystem::path shaderDir = bz::data::Resolve("bgfx/shaders/bin/vk/imgui");
+
+    const auto vsPath = shaderDir / "vs_imgui.bin";
+    const auto fsPath = shaderDir / "fs_imgui.bin";
+
+    auto vsBytes = readFileBytes(vsPath);
+    auto fsBytes = readFileBytes(fsPath);
+    if (vsBytes.empty() || fsBytes.empty()) {
+        spdlog::error("UiSystem: missing ImGui bgfx shaders '{}', '{}'", vsPath.string(), fsPath.string());
+        destroyResources();
+        return;
+    }
+
+    const bgfx::Memory* vsMem = bgfx::copy(vsBytes.data(), static_cast<uint32_t>(vsBytes.size()));
+    const bgfx::Memory* fsMem = bgfx::copy(fsBytes.data(), static_cast<uint32_t>(fsBytes.size()));
+    bgfx::ShaderHandle vsh = bgfx::createShader(vsMem);
+    bgfx::ShaderHandle fsh = bgfx::createShader(fsMem);
+    program_ = bgfx::createProgram(vsh, fsh, true);
+    if (!bgfx::isValid(program_)) {
+        spdlog::error("UiSystem: failed to create ImGui bgfx shader program");
+        destroyResources();
+        return;
+    }
+
+    layout_.begin()
+        .add(bgfx::Attrib::Position, 2, bgfx::AttribType::Float)
+        .add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float)
+        .add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true)
+        .end();
+
+    ready_ = true;
+}
+
+BgfxUiBridge::~BgfxUiBridge() {
+    destroyResources();
+}
+
+void* BgfxUiBridge::toImGuiTextureId(const graphics::TextureHandle& texture) const {
+    if (!texture.valid()) {
+        return nullptr;
+    }
+    return reinterpret_cast<void*>(static_cast<uintptr_t>(texture.id));
+}
+
+bool BgfxUiBridge::isImGuiReady() const {
+    return ready_ && fontsReady_;
+}
+
+void BgfxUiBridge::rebuildImGuiFonts(ImFontAtlas* atlas) {
+    if (!ready_ || !atlas) {
+        return;
+    }
+    unsigned char* pixels = nullptr;
+    int width = 0;
+    int height = 0;
+    atlas->GetTexDataAsRGBA32(&pixels, &width, &height);
+    if (!pixels || width <= 0 || height <= 0) {
+        spdlog::error("UiSystem: ImGui font texture build failed");
+        return;
+    }
+
+    if (bgfx::isValid(fontTexture_)) {
+        bgfx::destroy(fontTexture_);
+        fontTexture_ = BGFX_INVALID_HANDLE;
+    }
+
+    const bgfx::Memory* mem = bgfx::copy(pixels, static_cast<uint32_t>(width * height * 4));
+    fontTexture_ = bgfx::createTexture2D(
+        static_cast<uint16_t>(width),
+        static_cast<uint16_t>(height),
+        false,
+        1,
+        bgfx::TextureFormat::RGBA8,
+        0,
+        mem);
+
+    if (!bgfx::isValid(fontTexture_)) {
+        spdlog::error("UiSystem: failed to create ImGui font texture");
+        return;
+    }
+
+    const uint64_t texId = static_cast<uint64_t>(fontTexture_.idx + 1);
+    atlas->SetTexID(toImTextureId(texId));
+    fontsReady_ = true;
+}
+
+void BgfxUiBridge::renderImGuiDrawData(ImDrawData* drawData) {
+    if (!drawData || !ready_ || !bgfx::isValid(program_) || !bgfx::isValid(fontTexture_)) {
+        return;
+    }
+
+    const ImGuiIO& io = ImGui::GetIO();
+    const int fbWidth = static_cast<int>(io.DisplaySize.x * io.DisplayFramebufferScale.x);
+    const int fbHeight = static_cast<int>(io.DisplaySize.y * io.DisplayFramebufferScale.y);
+    if (fbWidth <= 0 || fbHeight <= 0) {
+        return;
+    }
+
+    drawData->ScaleClipRects(io.DisplayFramebufferScale);
+
+    const float scaleBias[4] = { 2.0f / io.DisplaySize.x, -2.0f / io.DisplaySize.y, -1.0f, 1.0f };
+    bgfx::setViewTransform(kImGuiView, nullptr, nullptr);
+    bgfx::setViewRect(kImGuiView, 0, 0, static_cast<uint16_t>(fbWidth), static_cast<uint16_t>(fbHeight));
+    bgfx::setUniform(scaleBias_, scaleBias);
+
+    for (int n = 0; n < drawData->CmdListsCount; n++) {
+        const ImDrawList* cmdList = drawData->CmdLists[n];
+        const ImDrawVert* vtxBuffer = cmdList->VtxBuffer.Data;
+        const ImDrawIdx* idxBuffer = cmdList->IdxBuffer.Data;
+
+        bgfx::TransientVertexBuffer tvb;
+        bgfx::TransientIndexBuffer tib;
+        const uint32_t availVb = bgfx::getAvailTransientVertexBuffer(cmdList->VtxBuffer.Size, layout_);
+        const uint32_t availIb = bgfx::getAvailTransientIndexBuffer(cmdList->IdxBuffer.Size, sizeof(ImDrawIdx) == 4);
+        if (availVb < static_cast<uint32_t>(cmdList->VtxBuffer.Size)
+            || availIb < static_cast<uint32_t>(cmdList->IdxBuffer.Size)) {
+            continue;
+        }
+        bgfx::allocTransientVertexBuffer(&tvb, cmdList->VtxBuffer.Size, layout_);
+        bgfx::allocTransientIndexBuffer(&tib, cmdList->IdxBuffer.Size, sizeof(ImDrawIdx) == 4);
+
+        auto* verts = reinterpret_cast<ImGuiVertex*>(tvb.data);
+        for (int i = 0; i < cmdList->VtxBuffer.Size; ++i) {
+            verts[i].x = vtxBuffer[i].pos.x;
+            verts[i].y = vtxBuffer[i].pos.y;
+            verts[i].u = vtxBuffer[i].uv.x;
+            verts[i].v = vtxBuffer[i].uv.y;
+            verts[i].abgr = vtxBuffer[i].col;
+        }
+        std::memcpy(tib.data, idxBuffer, static_cast<size_t>(cmdList->IdxBuffer.Size) * sizeof(ImDrawIdx));
+
+        uint32_t vtxOffset = 0;
+        uint32_t idxOffset = 0;
+        for (int cmdIdx = 0; cmdIdx < cmdList->CmdBuffer.Size; cmdIdx++) {
+            const ImDrawCmd* pcmd = &cmdList->CmdBuffer[cmdIdx];
+            if (pcmd->UserCallback) {
+                pcmd->UserCallback(cmdList, pcmd);
+            } else {
+                const ImVec4 clip = pcmd->ClipRect;
+                const uint16_t cx = static_cast<uint16_t>(std::max(0.0f, clip.x));
+                const uint16_t cy = static_cast<uint16_t>(std::max(0.0f, clip.y));
+                const uint16_t cw = static_cast<uint16_t>(std::min(clip.z, io.DisplaySize.x) - clip.x);
+                const uint16_t ch = static_cast<uint16_t>(std::min(clip.w, io.DisplaySize.y) - clip.y);
+                if (cw == 0 || ch == 0) {
+                    idxOffset += pcmd->ElemCount;
+                    continue;
+                }
+
+                bgfx::setScissor(cx, cy, cw, ch);
+                bgfx::setState(BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A | BGFX_STATE_MSAA |
+                               BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA));
+
+                bgfx::TextureHandle textureHandle = fontTexture_;
+                if (pcmd->TextureId) {
+                    const uint16_t idx = toTextureHandle(fromImTextureId(pcmd->TextureId));
+                    textureHandle.idx = idx;
+                }
+                bgfx::setTexture(0, sampler_, textureHandle);
+
+                bgfx::setVertexBuffer(0, &tvb, vtxOffset, cmdList->VtxBuffer.Size);
+                bgfx::setIndexBuffer(&tib, idxOffset, pcmd->ElemCount);
+                bgfx::submit(kImGuiView, program_);
+            }
+            idxOffset += pcmd->ElemCount;
+        }
+    }
+}
+
+void BgfxUiBridge::destroyResources() {
+    if (!bgfx::getCaps()) {
+        ready_ = false;
+        fontsReady_ = false;
+        return;
+    }
+    if (bgfx::isValid(fontTexture_)) {
+        bgfx::destroy(fontTexture_);
+        fontTexture_ = BGFX_INVALID_HANDLE;
+    }
+    if (bgfx::isValid(program_)) {
+        bgfx::destroy(program_);
+        program_ = BGFX_INVALID_HANDLE;
+    }
+    if (bgfx::isValid(sampler_)) {
+        bgfx::destroy(sampler_);
+        sampler_ = BGFX_INVALID_HANDLE;
+    }
+    if (bgfx::isValid(scaleBias_)) {
+        bgfx::destroy(scaleBias_);
+        scaleBias_ = BGFX_INVALID_HANDLE;
+    }
+    ready_ = false;
+    fontsReady_ = false;
+}
+
+std::vector<uint8_t> BgfxUiBridge::readFileBytes(const std::filesystem::path& path) const {
+    std::ifstream file(path, std::ios::binary);
+    if (!file.is_open()) {
+        return {};
+    }
+    file.seekg(0, std::ios::end);
+    const std::streamsize size = file.tellg();
+    if (size <= 0) {
+        return {};
+    }
+    file.seekg(0, std::ios::beg);
+    std::vector<uint8_t> buffer(static_cast<size_t>(size));
+    file.read(reinterpret_cast<char*>(buffer.data()), size);
+    return buffer;
+}
+
+uint16_t BgfxUiBridge::toTextureHandle(uint64_t textureId) {
+    const uint64_t value = textureId;
+    if (value == 0) {
+        return bgfx::kInvalidHandle;
+    }
+    return static_cast<uint16_t>(value - 1);
+}
+
+
+} // namespace graphics_backend

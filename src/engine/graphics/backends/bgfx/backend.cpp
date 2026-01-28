@@ -1,4 +1,7 @@
 #include "engine/graphics/backends/bgfx/backend.hpp"
+#if defined(BZ3_UI_BACKEND_IMGUI)
+#include "engine/graphics/backends/bgfx/ui_bridge.hpp"
+#endif
 
 #include "engine/common/data_path_resolver.hpp"
 #include "engine/common/config_helpers.hpp"
@@ -53,22 +56,14 @@ NativeWindowInfo getNativeWindowInfo(platform::Window* window) {
         if (void* wlDisplay = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WAYLAND_DISPLAY_POINTER, nullptr)) {
             info.ndt = wlDisplay;
             void* wlSurface = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WAYLAND_SURFACE_POINTER, nullptr);
-            void* wlEglWindow = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WAYLAND_EGL_WINDOW_POINTER, nullptr);
-            spdlog::info("Graphics(Bgfx): Wayland handles display={} surface={} egl_window={}",
-                         info.ndt, wlSurface, wlEglWindow);
+            spdlog::info("Graphics(Bgfx): Wayland handles display={} surface={}", info.ndt, wlSurface);
             if (wlSurface) {
                 info.nwh = wlSurface;
                 info.handleType = bgfx::NativeWindowHandleType::Wayland;
                 spdlog::info("Graphics(Bgfx): using Wayland surface handle");
                 return info;
             }
-            if (wlEglWindow) {
-                info.nwh = wlEglWindow;
-                info.handleType = bgfx::NativeWindowHandleType::Default;
-                spdlog::info("Graphics(Bgfx): using Wayland egl_window handle (fallback)");
-                return info;
-            }
-            spdlog::info("Graphics(Bgfx): Wayland display found but no surface/egl_window");
+            spdlog::info("Graphics(Bgfx): Wayland display found but no surface");
             return {};
         }
     }
@@ -108,16 +103,7 @@ bgfx::ShaderHandle loadShader(const std::filesystem::path& path) {
 
 std::filesystem::path getBgfxShaderDir(std::string_view subdir = {}) {
     std::filesystem::path base = bz::data::Resolve("bgfx/shaders/bin");
-    const bgfx::RendererType::Enum renderer = bgfx::getRendererType();
-    switch (renderer) {
-        case bgfx::RendererType::OpenGL:
-        case bgfx::RendererType::OpenGLES:
-            base /= "gl";
-            break;
-        default:
-            base /= "vk";
-            break;
-    }
+    base /= "vk";
     if (!subdir.empty()) {
         base /= subdir;
     }
@@ -279,7 +265,6 @@ BgfxBackend::BgfxBackend(platform::Window& windowIn)
         if (framebufferHeight <= 0) {
             framebufferHeight = 1;
         }
-        window->makeContextCurrent();
     }
 
     themeName = getThemeName();
@@ -302,9 +287,6 @@ BgfxBackend::BgfxBackend(platform::Window& windowIn)
 
     bgfx::Init init{};
     switch (g_rendererPreference) {
-        case BgfxRendererPreference::OpenGL:
-            init.type = bgfx::RendererType::OpenGL;
-            break;
         case BgfxRendererPreference::Vulkan:
             init.type = bgfx::RendererType::Vulkan;
             break;
@@ -328,6 +310,9 @@ BgfxBackend::BgfxBackend(platform::Window& windowIn)
         bgfx::setViewTransform(0, nullptr, nullptr);
         buildTestResources();
         buildSkyboxResources();
+#if defined(BZ3_UI_BACKEND_IMGUI)
+        uiBridge_ = std::make_unique<BgfxUiBridge>();
+#endif
         spdlog::info("Graphics(Bgfx): init ok renderer={} testReady={}",
                      static_cast<int>(bgfx::getRendererType()),
                      testReady);

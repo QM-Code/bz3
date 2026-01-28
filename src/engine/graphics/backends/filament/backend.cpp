@@ -22,7 +22,6 @@
 #include <wayland-client-core.h>
 #include <math/mat4.h>
 #include <math/vec4.h>
-#include <glad/glad.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
@@ -230,10 +229,6 @@ void* getNativeWindowHandle(platform::Window* window, bool preferWaylandSurface)
             return reinterpret_cast<void*>(static_cast<uintptr_t>(x11Window));
         }
 
-        if (void* wlEglWindow = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WAYLAND_EGL_WINDOW_POINTER, nullptr)) {
-            return wlEglWindow;
-        }
-
         if (void* wlSurface = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WAYLAND_SURFACE_POINTER, nullptr)) {
             return wlSurface;
         }
@@ -242,18 +237,6 @@ void* getNativeWindowHandle(platform::Window* window, bool preferWaylandSurface)
     return sdlWindow;
 #else
     return handle;
-#endif
-}
-
-void* getSharedContextHandle(platform::Window* window) {
-    if (!window) {
-        return nullptr;
-    }
-
-#if defined(BZ3_WINDOW_BACKEND_SDL3)
-    return SDL_GL_GetCurrentContext();
-#else
-    return nullptr;
 #endif
 }
 
@@ -318,7 +301,7 @@ public:
         return {surface, VkExtent2D{wnd->width, wnd->height}};
     }
 };
-graphics_backend::FilamentBackendPreference g_filamentPreference = graphics_backend::FilamentBackendPreference::OpenGL;
+graphics_backend::FilamentBackendPreference g_filamentPreference = graphics_backend::FilamentBackendPreference::Vulkan;
 } // namespace
 
 namespace graphics_backend {
@@ -342,25 +325,17 @@ FilamentBackend::FilamentBackend(platform::Window& windowIn)
         }
     }
 
-    filament::Engine::Backend backend = filament::Engine::Backend::OPENGL;
-    if (g_filamentPreference == FilamentBackendPreference::Vulkan) {
-        backend = filament::Engine::Backend::VULKAN;
-    }
-    spdlog::info("Graphics(Filament): backend = {}", backend == filament::Engine::Backend::VULKAN ? "Vulkan" : "OpenGL");
+    filament::Engine::Backend backend = filament::Engine::Backend::VULKAN;
+    spdlog::info("Graphics(Filament): backend = Vulkan");
 
-    void* sharedContext = nullptr;
-    if (backend == filament::Engine::Backend::OPENGL) {
-        sharedContext = getSharedContextHandle(window);
-    } else {
-        waylandWindow = createWaylandNativeWindow(window, framebufferWidth, framebufferHeight);
-        if (!waylandWindow) {
-            spdlog::error("Graphics(Filament): Vulkan Wayland surface missing");
-            return;
-        }
-        customPlatform = new WaylandVulkanPlatform();
+    waylandWindow = createWaylandNativeWindow(window, framebufferWidth, framebufferHeight);
+    if (!waylandWindow) {
+        spdlog::error("Graphics(Filament): Vulkan Wayland surface missing");
+        return;
     }
+    customPlatform = new WaylandVulkanPlatform();
 
-    engine = filament::Engine::create(backend, customPlatform, sharedContext);
+    engine = filament::Engine::create(backend, customPlatform, nullptr);
     if (!engine) {
         spdlog::error("Graphics(Filament): Engine::create failed");
         return;
@@ -635,7 +610,6 @@ void FilamentBackend::beginFrame() {
         return;
     }
     if (window) {
-        window->makeContextCurrent();
     }
     frameActive = renderer->beginFrame(swapChain);
 }
@@ -1039,15 +1013,6 @@ graphics::RenderTargetId FilamentBackend::createRenderTarget(const graphics::Ren
     const int width = std::max(1, desc.width);
     const int height = std::max(1, desc.height);
 
-    glGenTextures(1, &record.colorTextureId);
-    glBindTexture(GL_TEXTURE_2D, record.colorTextureId);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-    glBindTexture(GL_TEXTURE_2D, 0);
-
     record.colorTexture = filament::Texture::Builder()
         .width(static_cast<uint32_t>(width))
         .height(static_cast<uint32_t>(height))
@@ -1055,25 +1020,9 @@ graphics::RenderTargetId FilamentBackend::createRenderTarget(const graphics::Ren
         .sampler(filament::Texture::Sampler::SAMPLER_2D)
         .format(filament::Texture::InternalFormat::RGBA8)
         .usage(filament::Texture::Usage::COLOR_ATTACHMENT | filament::Texture::Usage::SAMPLEABLE)
-        .import(static_cast<intptr_t>(record.colorTextureId))
         .build(*engine);
 
     if (desc.depth) {
-        glGenTextures(1, &record.depthTextureId);
-        glBindTexture(GL_TEXTURE_2D, record.depthTextureId);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        if (desc.stencil) {
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, width, height, 0,
-                         GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, nullptr);
-        } else {
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, width, height, 0,
-                         GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, nullptr);
-        }
-        glBindTexture(GL_TEXTURE_2D, 0);
-
         const auto depthFormat = desc.stencil
             ? filament::Texture::InternalFormat::DEPTH24_STENCIL8
             : filament::Texture::InternalFormat::DEPTH24;
@@ -1084,7 +1033,6 @@ graphics::RenderTargetId FilamentBackend::createRenderTarget(const graphics::Ren
             .sampler(filament::Texture::Sampler::SAMPLER_2D)
             .format(depthFormat)
             .usage(filament::Texture::Usage::DEPTH_ATTACHMENT | filament::Texture::Usage::SAMPLEABLE)
-            .import(static_cast<intptr_t>(record.depthTextureId))
             .build(*engine);
     }
 
@@ -1117,14 +1065,6 @@ void FilamentBackend::destroyRenderTarget(graphics::RenderTargetId target) {
     if (record.depthTexture) {
         engine->destroy(record.depthTexture);
         record.depthTexture = nullptr;
-    }
-    if (record.colorTextureId) {
-        glDeleteTextures(1, &record.colorTextureId);
-        record.colorTextureId = 0;
-    }
-    if (record.depthTextureId) {
-        glDeleteTextures(1, &record.depthTextureId);
-        record.depthTextureId = 0;
     }
     renderTargets.erase(it);
 }

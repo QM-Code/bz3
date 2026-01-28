@@ -2,7 +2,6 @@
 #include <filesystem>
 #include <initializer_list>
 #include <string>
-#include <glad/glad.h>
 #include "spdlog/spdlog.h"
 #include "engine/client_engine.hpp"
 #if defined(BZ3_RENDER_BACKEND_BGFX)
@@ -107,26 +106,16 @@ int main(int argc, char *argv[]) {
         SetEnvOverride("BZ3_BGFX_THEME", cliOptions.theme);
     }
 #if defined(BZ3_RENDER_BACKEND_BGFX)
-    if (cliOptions.forceX11OpenGL || (cliOptions.rendererExplicit && cliOptions.renderer == "opengl")) {
-        spdlog::error("bgfx backend does not support --x11-opengl / renderer=opengl on Linux; use --wayland-vulkan.");
-        return 1;
-    }
     if (cliOptions.forceWaylandVulkan) {
         graphics_backend::SetBgfxRendererPreference(graphics_backend::BgfxRendererPreference::Vulkan);
     } else if (cliOptions.rendererExplicit) {
         if (cliOptions.renderer == "vulkan") {
             graphics_backend::SetBgfxRendererPreference(graphics_backend::BgfxRendererPreference::Vulkan);
-        } else {
-            graphics_backend::SetBgfxRendererPreference(graphics_backend::BgfxRendererPreference::Auto);
         }
     }
 #endif
 #if defined(BZ3_RENDER_BACKEND_FILAMENT)
-    if (cliOptions.forceWaylandVulkan || (cliOptions.rendererExplicit && cliOptions.renderer == "vulkan")) {
-        graphics_backend::SetFilamentBackendPreference(graphics_backend::FilamentBackendPreference::Vulkan);
-    } else {
-        graphics_backend::SetFilamentBackendPreference(graphics_backend::FilamentBackendPreference::OpenGL);
-    }
+    graphics_backend::SetFilamentBackendPreference(graphics_backend::FilamentBackendPreference::Vulkan);
 #endif
     const spdlog::level::level_enum logLevel = cliOptions.logLevelExplicit
         ? ParseLogLevel(cliOptions.logLevel)
@@ -144,40 +133,12 @@ int main(int argc, char *argv[]) {
     windowConfig.width = configWidth;
     windowConfig.height = configHeight;
     windowConfig.title = "BZFlag v3";
-    windowConfig.glMajor = 3;
-    windowConfig.glMinor = 3;
-    windowConfig.samples = 4;
     windowConfig.preferredVideoDriver = bz::data::ReadStringConfig({"platform.SdlVideoDriver"}, "");
     if (cliOptions.forceWaylandVulkan) {
         windowConfig.preferredVideoDriver = "wayland";
-    } else if (cliOptions.forceX11OpenGL) {
-        windowConfig.preferredVideoDriver = "x11";
     } else if (cliOptions.videoDriverExplicit) {
         windowConfig.preferredVideoDriver = (cliOptions.videoDriver == "auto") ? std::string() : cliOptions.videoDriver;
     }
-#if defined(BZ3_RENDER_BACKEND_BGFX)
-    const bool bgfxNoGl = bz::data::ReadBoolConfig({"graphics.Bgfx.NoGl"}, true);
-    windowConfig.createGlContext = !bgfxNoGl;
-    if (cliOptions.forceWaylandVulkan) {
-        windowConfig.createGlContext = false;
-    } else if (cliOptions.rendererExplicit) {
-        if (cliOptions.renderer == "vulkan") {
-            windowConfig.createGlContext = false;
-        }
-    }
-#endif
-#if defined(BZ3_RENDER_BACKEND_FILAMENT)
-    windowConfig.createGlContext = true;
-    if (cliOptions.forceWaylandVulkan) {
-        windowConfig.createGlContext = false;
-    } else if (cliOptions.rendererExplicit && cliOptions.renderer == "vulkan") {
-        windowConfig.createGlContext = false;
-    }
-#endif
-#if defined(BZ3_RENDER_BACKEND_DILIGENT)
-    windowConfig.createGlContext = false;
-#endif
-
     auto window = platform::CreateWindow(windowConfig);
     if (!window || !window->nativeHandle()) {
         spdlog::error("Window failed to create");
@@ -193,26 +154,7 @@ int main(int argc, char *argv[]) {
     }
 #endif
 
-    if (window->hasGlContext()) {
-        if (gladLoadGL() == 0) {
-            spdlog::error("Failed to load OpenGL functions");
-            return 1;
-        }
-
-        glEnable(GL_MULTISAMPLE);
-        window->setVsync(vsyncEnabled);
-
-        spdlog::info("GL_VENDOR   = {}", (const char*)glGetString(GL_VENDOR));
-        spdlog::info("GL_RENDERER = {}", (const char*)glGetString(GL_RENDERER));
-        spdlog::info("GL_VERSION  = {}", (const char*)glGetString(GL_VERSION));
-
-        int sb = 0, s = 0;
-        glGetIntegerv(GL_SAMPLE_BUFFERS, &sb);
-        glGetIntegerv(GL_SAMPLES, &s);
-        spdlog::info("GL_SAMPLE_BUFFERS={}, GL_SAMPLES={}", sb, s);
-    } else {
-        spdlog::info("GL init skipped (no GL context)");
-    }
+    window->setVsync(vsyncEnabled);
 
     ClientEngine engine(*window);
     spdlog::trace("ClientEngine initialized successfully");
@@ -287,7 +229,6 @@ int main(int argc, char *argv[]) {
         engine.step(deltaTime);
         engine.lateUpdate(deltaTime);
 
-        window->swapBuffers();
     }
 
     return 0;

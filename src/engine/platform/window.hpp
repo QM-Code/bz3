@@ -13,11 +13,6 @@ struct WindowConfig {
     int width = 1280;
     int height = 720;
     std::string title = "BZ3";
-    int glMajor = 3;
-    int glMinor = 3;
-    bool glCoreProfile = true;
-    int samples = 4;
-    bool createGlContext = true;
     std::string preferredVideoDriver;
 };
 
@@ -32,8 +27,6 @@ public:
     virtual bool shouldClose() const = 0;
     virtual void requestClose() = 0;
 
-    virtual void swapBuffers() = 0;
-    virtual void makeContextCurrent() = 0;
     virtual void setVsync(bool enabled) = 0;
     virtual void setFullscreen(bool enabled) = 0;
     virtual bool isFullscreen() const = 0;
@@ -49,7 +42,6 @@ public:
     virtual std::string getClipboardText() const = 0;
 
     virtual void* nativeHandle() const = 0;
-    virtual bool hasGlContext() const = 0;
     virtual std::string getVideoDriver() const = 0;
 };
 

@@ -55,7 +55,7 @@ bool IsValidVideoDriver(std::string value) {
 
 bool IsValidRenderer(std::string value) {
     value = NormalizeLower(std::move(value));
-    return value == "auto" || value == "vulkan" || value == "opengl";
+    return value == "auto" || value == "vulkan";
 }
 
 } // namespace
@@ -81,11 +81,9 @@ ClientCLIOptions ParseClientCLIOptions(int argc, char *argv[]) {
     options.add_options()
         ("video-driver", "Video driver override (auto, wayland, x11)", cxxopts::value<std::string>());
     options.add_options()
-        ("renderer", "Renderer override for bgfx (auto, vulkan, opengl)", cxxopts::value<std::string>());
+        ("renderer", "Renderer override for bgfx (auto, vulkan)", cxxopts::value<std::string>());
     options.add_options()
         ("wayland-vulkan", "Force Wayland video driver + Vulkan renderer");
-    options.add_options()
-        ("x11-opengl", "Force X11 video driver + OpenGL renderer");
     options.add_options()
         ("v,verbose", "Enable verbose logging (alias for --log-level trace)")
         ("L,log-level", "Logging level (trace, debug, info, warn, err, critical, off)", cxxopts::value<std::string>());
@@ -128,7 +126,6 @@ ClientCLIOptions ParseClientCLIOptions(int argc, char *argv[]) {
     parsed.videoDriverExplicit = result.count("video-driver") > 0;
     parsed.rendererExplicit = result.count("renderer") > 0;
     parsed.forceWaylandVulkan = result.count("wayland-vulkan") > 0;
-    parsed.forceX11OpenGL = result.count("x11-opengl") > 0;
     parsed.verbose = result.count("verbose") > 0;
     parsed.logLevel = result.count("log-level") ? result["log-level"].as<std::string>() : std::string();
     parsed.logLevelExplicit = result.count("log-level") > 0;
@@ -156,11 +153,6 @@ ClientCLIOptions ParseClientCLIOptions(int argc, char *argv[]) {
             std::cerr << options.help() << std::endl;
             std::exit(1);
         }
-    }
-    if (parsed.forceWaylandVulkan && parsed.forceX11OpenGL) {
-        std::cerr << "Error: --wayland-vulkan and --x11-opengl cannot be used together.\n";
-        std::cerr << options.help() << std::endl;
-        std::exit(1);
     }
     return parsed;
 }

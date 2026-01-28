@@ -69,4 +69,5 @@ Prompt files live in `docs/agent-prompts/`. Ask to use one by name (title) or fi
 - If you need a specific Filament version, set `FILAMENT_REF` before running the script.
 - Clean rebuild (recommended when changing Filament versions or toolchains):
   `CLEAN_INSTALL=1 ./scripts/build_filament.sh`
- - The build script forces `USE_STATIC_LIBCXX=OFF` to keep ABI compatibility with libstdc++.
+- The build script forces `USE_STATIC_LIBCXX=OFF` to keep ABI compatibility with libstdc++.
+ - If the host toolchain causes build issues, use Docker: `scripts/build_filament_docker.sh`.

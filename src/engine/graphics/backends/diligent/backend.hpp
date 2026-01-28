@@ -73,6 +73,8 @@ public:
     glm::mat4 getProjectionMatrix() const override;
     glm::vec3 getCameraPosition() const override;
     glm::vec3 getCameraForward() const override;
+    UiBridge* getUiBridge() override { return uiBridge_.get(); }
+    const UiBridge* getUiBridge() const override { return uiBridge_.get(); }
 
 private:
     struct EntityRecord {
@@ -139,6 +141,8 @@ private:
     Diligent::RefCntAutoPtr<Diligent::ITexture> skyboxTexture_;
     Diligent::ITextureView* skyboxSrv_ = nullptr;
     bool skyboxReady = false;
+
+    std::unique_ptr<UiBridge> uiBridge_;
 
     glm::vec3 cameraPosition{0.0f};
     glm::quat cameraRotation{1.0f, 0.0f, 0.0f, 0.0f};

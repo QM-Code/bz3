@@ -318,49 +318,12 @@ public:
         }
         spdlog::info("SDL video driver: {}", SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "(null)");
 
-        bool enableGlContext = config.createGlContext;
-#if defined(BZ3_RENDER_BACKEND_BGFX)
-        if (const char* noGl = std::getenv("BZ3_BGFX_NO_GL"); noGl && noGl[0] != '\0') {
-            enableGlContext = false;
-        }
-#endif
-
-        uint32_t windowFlags = SDL_WINDOW_RESIZABLE;
-        if (!enableGlContext) {
-            windowFlags |= SDL_WINDOW_VULKAN;
-            window = SDL_CreateWindow(config.title.c_str(), config.width, config.height, windowFlags);
-            if (!window) {
-                spdlog::warn("SDL window failed to create with Vulkan flag: {}", SDL_GetError());
-                enableGlContext = true;
-            }
-        }
-
-        if (enableGlContext) {
-            SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, config.glMajor);
-            SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, config.glMinor);
-            SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, config.glCoreProfile ? SDL_GL_CONTEXT_PROFILE_CORE : SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
-            SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, config.samples > 0 ? 1 : 0);
-            SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, config.samples);
-            windowFlags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL;
-            window = SDL_CreateWindow(config.title.c_str(), config.width, config.height, windowFlags);
-        }
+        uint32_t windowFlags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_VULKAN;
+        window = SDL_CreateWindow(config.title.c_str(), config.width, config.height, windowFlags);
         if (!window) {
             spdlog::error("SDL window failed to create: {}", SDL_GetError());
             SDL_Quit();
             return;
-        }
-
-        if (enableGlContext) {
-            glContext = SDL_GL_CreateContext(window);
-            if (!glContext) {
-                spdlog::error("SDL GL context failed to create: {}", SDL_GetError());
-                SDL_DestroyWindow(window);
-                window = nullptr;
-                SDL_Quit();
-                return;
-            }
-            SDL_GL_MakeCurrent(window, glContext);
-            hasGlContextFlag = true;
         }
         SDL_StartTextInput(window);
     }
@@ -368,10 +331,6 @@ public:
     ~WindowSdl() override {
         if (window) {
             SDL_StopTextInput(window);
-        }
-        if (glContext) {
-            SDL_GL_DestroyContext(glContext);
-            glContext = nullptr;
         }
         if (window) {
             SDL_DestroyWindow(window);
@@ -493,26 +452,8 @@ public:
         }
     }
 
-    void swapBuffers() override {
-        if (window
-#if defined(BZ3_RENDER_BACKEND_BGFX)
-            && glContext
-#endif
-        ) {
-            SDL_GL_SwapWindow(window);
-        }
-    }
-
-    void makeContextCurrent() override {
-        if (window && glContext) {
-            SDL_GL_MakeCurrent(window, glContext);
-        }
-    }
-
     void setVsync(bool enabled) override {
-        if (glContext) {
-            SDL_GL_SetSwapInterval(enabled ? 1 : 0);
-        }
+        (void)enabled;
     }
 
     void setFullscreen(bool enabled) override {
@@ -616,10 +557,6 @@ public:
         return window;
     }
 
-    bool hasGlContext() const override {
-        return hasGlContextFlag;
-    }
-
     std::string getVideoDriver() const override {
         const char* driver = SDL_GetCurrentVideoDriver();
         return driver ? std::string(driver) : std::string();
@@ -627,8 +564,6 @@ public:
 
 private:
     SDL_Window *window = nullptr;
-    SDL_GLContext glContext = nullptr;
-    bool hasGlContextFlag = false;
     std::vector<Event> eventsBuffer;
     bool fullscreen = false;
     bool closeRequested = false;

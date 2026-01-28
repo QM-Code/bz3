@@ -154,7 +154,6 @@ elseif(BZ3_PHYSICS_BACKEND STREQUAL "bullet")
     find_package(Bullet CONFIG REQUIRED)
 endif()
 find_package(assimp REQUIRED)
-find_package(OpenGL REQUIRED)
 find_package(cxxopts REQUIRED)
 if(BZ3_UI_BACKEND STREQUAL "imgui")
     find_package(imgui REQUIRED)
@@ -176,9 +175,7 @@ if(BZ3_RENDER_BACKEND STREQUAL "bgfx")
     set(BGFX_SHADER_DIR "${PROJECT_SOURCE_DIR}/data/bgfx/shaders")
     set(BGFX_SHADER_BIN_DIR "${PROJECT_SOURCE_DIR}/data/bgfx/shaders/bin")
     set(BGFX_SHADER_BIN_DIR_VK "${BGFX_SHADER_BIN_DIR}/vk")
-    set(BGFX_SHADER_BIN_DIR_GL "${BGFX_SHADER_BIN_DIR}/gl")
     file(MAKE_DIRECTORY "${BGFX_SHADER_BIN_DIR_VK}")
-    file(MAKE_DIRECTORY "${BGFX_SHADER_BIN_DIR_GL}")
 
     if(DEFINED VCPKG_INSTALLED_DIR AND DEFINED VCPKG_HOST_TRIPLET)
         set(_BGFX_SHADERC_HINT "${VCPKG_INSTALLED_DIR}/${VCPKG_HOST_TRIPLET}/tools/bgfx")
@@ -196,7 +193,6 @@ if(BZ3_RENDER_BACKEND STREQUAL "bgfx")
     endif()
 
     set(BGFX_SHADER_PROFILE_VK "spirv")
-    set(BGFX_SHADER_PROFILE_GL "150")
     set(BGFX_SHADER_RAW "")
 
     function(bz3_bgfx_compile_shader out_file type profile input varying)
@@ -231,79 +227,47 @@ if(BZ3_RENDER_BACKEND STREQUAL "bgfx")
     bz3_bgfx_compile_shader("${BGFX_VS_BIN_VK}" vertex "${BGFX_SHADER_PROFILE_VK}" "${BGFX_SHADER_DIR}/vs_triangle.sc" "${BGFX_SHADER_DIR}/varying.def.sc")
     bz3_bgfx_compile_shader("${BGFX_FS_BIN_VK}" fragment "${BGFX_SHADER_PROFILE_VK}" "${BGFX_SHADER_DIR}/fs_triangle.sc" "${BGFX_SHADER_DIR}/varying.def.sc")
 
-    set(BGFX_VS_BIN_GL "${BGFX_SHADER_BIN_DIR_GL}/vs_triangle.bin")
-    set(BGFX_FS_BIN_GL "${BGFX_SHADER_BIN_DIR_GL}/fs_triangle.bin")
-    bz3_bgfx_compile_shader("${BGFX_VS_BIN_GL}" vertex "${BGFX_SHADER_PROFILE_GL}" "${BGFX_SHADER_DIR}/vs_triangle.sc" "${BGFX_SHADER_DIR}/varying.def.sc")
-    bz3_bgfx_compile_shader("${BGFX_FS_BIN_GL}" fragment "${BGFX_SHADER_PROFILE_GL}" "${BGFX_SHADER_DIR}/fs_triangle.sc" "${BGFX_SHADER_DIR}/varying.def.sc")
-
     set(BGFX_IMGUI_SHADER_DIR "${BGFX_SHADER_DIR}/imgui")
     set(BGFX_IMGUI_BIN_DIR_VK "${BGFX_SHADER_BIN_DIR_VK}/imgui")
-    set(BGFX_IMGUI_BIN_DIR_GL "${BGFX_SHADER_BIN_DIR_GL}/imgui")
     file(MAKE_DIRECTORY "${BGFX_IMGUI_BIN_DIR_VK}")
-    file(MAKE_DIRECTORY "${BGFX_IMGUI_BIN_DIR_GL}")
     set(BGFX_IMGUI_VS_BIN_VK "${BGFX_IMGUI_BIN_DIR_VK}/vs_imgui.bin")
     set(BGFX_IMGUI_FS_BIN_VK "${BGFX_IMGUI_BIN_DIR_VK}/fs_imgui.bin")
     bz3_bgfx_compile_shader("${BGFX_IMGUI_VS_BIN_VK}" vertex "${BGFX_SHADER_PROFILE_VK}" "${BGFX_IMGUI_SHADER_DIR}/vs_imgui.sc" "${BGFX_IMGUI_SHADER_DIR}/varying.def.sc")
     bz3_bgfx_compile_shader("${BGFX_IMGUI_FS_BIN_VK}" fragment "${BGFX_SHADER_PROFILE_VK}" "${BGFX_IMGUI_SHADER_DIR}/fs_imgui.sc" "${BGFX_IMGUI_SHADER_DIR}/varying.def.sc")
-    set(BGFX_IMGUI_VS_BIN_GL "${BGFX_IMGUI_BIN_DIR_GL}/vs_imgui.bin")
-    set(BGFX_IMGUI_FS_BIN_GL "${BGFX_IMGUI_BIN_DIR_GL}/fs_imgui.bin")
-    bz3_bgfx_compile_shader("${BGFX_IMGUI_VS_BIN_GL}" vertex "${BGFX_SHADER_PROFILE_GL}" "${BGFX_IMGUI_SHADER_DIR}/vs_imgui.sc" "${BGFX_IMGUI_SHADER_DIR}/varying.def.sc")
-    bz3_bgfx_compile_shader("${BGFX_IMGUI_FS_BIN_GL}" fragment "${BGFX_SHADER_PROFILE_GL}" "${BGFX_IMGUI_SHADER_DIR}/fs_imgui.sc" "${BGFX_IMGUI_SHADER_DIR}/varying.def.sc")
 
     set(BGFX_MESH_SHADER_DIR "${BGFX_SHADER_DIR}/mesh")
     set(BGFX_MESH_BIN_DIR_VK "${BGFX_SHADER_BIN_DIR_VK}/mesh")
-    set(BGFX_MESH_BIN_DIR_GL "${BGFX_SHADER_BIN_DIR_GL}/mesh")
     file(MAKE_DIRECTORY "${BGFX_MESH_BIN_DIR_VK}")
-    file(MAKE_DIRECTORY "${BGFX_MESH_BIN_DIR_GL}")
     set(BGFX_MESH_VS_BIN_VK "${BGFX_MESH_BIN_DIR_VK}/vs_mesh.bin")
     set(BGFX_MESH_FS_BIN_VK "${BGFX_MESH_BIN_DIR_VK}/fs_mesh.bin")
     bz3_bgfx_compile_shader("${BGFX_MESH_VS_BIN_VK}" vertex "${BGFX_SHADER_PROFILE_VK}" "${BGFX_MESH_SHADER_DIR}/vs_mesh.sc" "${BGFX_MESH_SHADER_DIR}/varying.def.sc")
     bz3_bgfx_compile_shader("${BGFX_MESH_FS_BIN_VK}" fragment "${BGFX_SHADER_PROFILE_VK}" "${BGFX_MESH_SHADER_DIR}/fs_mesh.sc" "${BGFX_MESH_SHADER_DIR}/varying.def.sc")
-    set(BGFX_MESH_VS_BIN_GL "${BGFX_MESH_BIN_DIR_GL}/vs_mesh.bin")
-    set(BGFX_MESH_FS_BIN_GL "${BGFX_MESH_BIN_DIR_GL}/fs_mesh.bin")
-    bz3_bgfx_compile_shader("${BGFX_MESH_VS_BIN_GL}" vertex "${BGFX_SHADER_PROFILE_GL}" "${BGFX_MESH_SHADER_DIR}/vs_mesh.sc" "${BGFX_MESH_SHADER_DIR}/varying.def.sc")
-    bz3_bgfx_compile_shader("${BGFX_MESH_FS_BIN_GL}" fragment "${BGFX_SHADER_PROFILE_GL}" "${BGFX_MESH_SHADER_DIR}/fs_mesh.sc" "${BGFX_MESH_SHADER_DIR}/varying.def.sc")
 
     set(BGFX_SKYBOX_SHADER_DIR "${BGFX_SHADER_DIR}/skybox")
     set(BGFX_SKYBOX_BIN_DIR_VK "${BGFX_SHADER_BIN_DIR_VK}/skybox")
-    set(BGFX_SKYBOX_BIN_DIR_GL "${BGFX_SHADER_BIN_DIR_GL}/skybox")
     file(MAKE_DIRECTORY "${BGFX_SKYBOX_BIN_DIR_VK}")
-    file(MAKE_DIRECTORY "${BGFX_SKYBOX_BIN_DIR_GL}")
     set(BGFX_SKYBOX_VS_BIN_VK "${BGFX_SKYBOX_BIN_DIR_VK}/vs_skybox.bin")
     set(BGFX_SKYBOX_FS_BIN_VK "${BGFX_SKYBOX_BIN_DIR_VK}/fs_skybox.bin")
     bz3_bgfx_compile_shader("${BGFX_SKYBOX_VS_BIN_VK}" vertex "${BGFX_SHADER_PROFILE_VK}" "${BGFX_SKYBOX_SHADER_DIR}/vs_skybox.sc" "${BGFX_SKYBOX_SHADER_DIR}/varying.def.sc")
     bz3_bgfx_compile_shader("${BGFX_SKYBOX_FS_BIN_VK}" fragment "${BGFX_SHADER_PROFILE_VK}" "${BGFX_SKYBOX_SHADER_DIR}/fs_skybox.sc" "${BGFX_SKYBOX_SHADER_DIR}/varying.def.sc")
-    set(BGFX_SKYBOX_VS_BIN_GL "${BGFX_SKYBOX_BIN_DIR_GL}/vs_skybox.bin")
-    set(BGFX_SKYBOX_FS_BIN_GL "${BGFX_SKYBOX_BIN_DIR_GL}/fs_skybox.bin")
-    bz3_bgfx_compile_shader("${BGFX_SKYBOX_VS_BIN_GL}" vertex "${BGFX_SHADER_PROFILE_GL}" "${BGFX_SKYBOX_SHADER_DIR}/vs_skybox.sc" "${BGFX_SKYBOX_SHADER_DIR}/varying.def.sc")
-    bz3_bgfx_compile_shader("${BGFX_SKYBOX_FS_BIN_GL}" fragment "${BGFX_SHADER_PROFILE_GL}" "${BGFX_SKYBOX_SHADER_DIR}/fs_skybox.sc" "${BGFX_SKYBOX_SHADER_DIR}/varying.def.sc")
 
     set(BGFX_RMLUI_SHADER_DIR "${BGFX_SHADER_DIR}/rmlui")
     set(BGFX_RMLUI_BIN_DIR_VK "${BGFX_SHADER_BIN_DIR_VK}/rmlui")
-    set(BGFX_RMLUI_BIN_DIR_GL "${BGFX_SHADER_BIN_DIR_GL}/rmlui")
     file(MAKE_DIRECTORY "${BGFX_RMLUI_BIN_DIR_VK}")
-    file(MAKE_DIRECTORY "${BGFX_RMLUI_BIN_DIR_GL}")
     set(BGFX_RMLUI_VS_BIN_VK "${BGFX_RMLUI_BIN_DIR_VK}/vs_rmlui.bin")
     set(BGFX_RMLUI_FS_TEX_BIN_VK "${BGFX_RMLUI_BIN_DIR_VK}/fs_rmlui_texture.bin")
     set(BGFX_RMLUI_FS_COLOR_BIN_VK "${BGFX_RMLUI_BIN_DIR_VK}/fs_rmlui_color.bin")
     bz3_bgfx_compile_shader("${BGFX_RMLUI_VS_BIN_VK}" vertex "${BGFX_SHADER_PROFILE_VK}" "${BGFX_RMLUI_SHADER_DIR}/vs_rmlui.sc" "${BGFX_RMLUI_SHADER_DIR}/varying.def.sc")
     bz3_bgfx_compile_shader("${BGFX_RMLUI_FS_TEX_BIN_VK}" fragment "${BGFX_SHADER_PROFILE_VK}" "${BGFX_RMLUI_SHADER_DIR}/fs_rmlui_texture.sc" "${BGFX_RMLUI_SHADER_DIR}/varying.def.sc")
     bz3_bgfx_compile_shader("${BGFX_RMLUI_FS_COLOR_BIN_VK}" fragment "${BGFX_SHADER_PROFILE_VK}" "${BGFX_RMLUI_SHADER_DIR}/fs_rmlui_color.sc" "${BGFX_RMLUI_SHADER_DIR}/varying.def.sc")
-    set(BGFX_RMLUI_VS_BIN_GL "${BGFX_RMLUI_BIN_DIR_GL}/vs_rmlui.bin")
-    set(BGFX_RMLUI_FS_TEX_BIN_GL "${BGFX_RMLUI_BIN_DIR_GL}/fs_rmlui_texture.bin")
-    set(BGFX_RMLUI_FS_COLOR_BIN_GL "${BGFX_RMLUI_BIN_DIR_GL}/fs_rmlui_color.bin")
-    bz3_bgfx_compile_shader("${BGFX_RMLUI_VS_BIN_GL}" vertex "${BGFX_SHADER_PROFILE_GL}" "${BGFX_RMLUI_SHADER_DIR}/vs_rmlui.sc" "${BGFX_RMLUI_SHADER_DIR}/varying.def.sc")
-    bz3_bgfx_compile_shader("${BGFX_RMLUI_FS_TEX_BIN_GL}" fragment "${BGFX_SHADER_PROFILE_GL}" "${BGFX_RMLUI_SHADER_DIR}/fs_rmlui_texture.sc" "${BGFX_RMLUI_SHADER_DIR}/varying.def.sc")
-    bz3_bgfx_compile_shader("${BGFX_RMLUI_FS_COLOR_BIN_GL}" fragment "${BGFX_SHADER_PROFILE_GL}" "${BGFX_RMLUI_SHADER_DIR}/fs_rmlui_color.sc" "${BGFX_RMLUI_SHADER_DIR}/varying.def.sc")
 
     if(BGFX_SHADERC_EXECUTABLE)
         add_custom_target(bz3_bgfx_shaders ALL DEPENDS
-            "${BGFX_VS_BIN_VK}" "${BGFX_FS_BIN_VK}" "${BGFX_VS_BIN_GL}" "${BGFX_FS_BIN_GL}"
-            "${BGFX_IMGUI_VS_BIN_VK}" "${BGFX_IMGUI_FS_BIN_VK}" "${BGFX_IMGUI_VS_BIN_GL}" "${BGFX_IMGUI_FS_BIN_GL}"
-            "${BGFX_MESH_VS_BIN_VK}" "${BGFX_MESH_FS_BIN_VK}" "${BGFX_MESH_VS_BIN_GL}" "${BGFX_MESH_FS_BIN_GL}"
-            "${BGFX_SKYBOX_VS_BIN_VK}" "${BGFX_SKYBOX_FS_BIN_VK}" "${BGFX_SKYBOX_VS_BIN_GL}" "${BGFX_SKYBOX_FS_BIN_GL}"
+            "${BGFX_VS_BIN_VK}" "${BGFX_FS_BIN_VK}"
+            "${BGFX_IMGUI_VS_BIN_VK}" "${BGFX_IMGUI_FS_BIN_VK}"
+            "${BGFX_MESH_VS_BIN_VK}" "${BGFX_MESH_FS_BIN_VK}"
+            "${BGFX_SKYBOX_VS_BIN_VK}" "${BGFX_SKYBOX_FS_BIN_VK}"
             "${BGFX_RMLUI_VS_BIN_VK}" "${BGFX_RMLUI_FS_TEX_BIN_VK}" "${BGFX_RMLUI_FS_COLOR_BIN_VK}"
-            "${BGFX_RMLUI_VS_BIN_GL}" "${BGFX_RMLUI_FS_TEX_BIN_GL}" "${BGFX_RMLUI_FS_COLOR_BIN_GL}"
         )
     else()
         add_custom_target(bz3_bgfx_shaders ALL)
@@ -429,10 +393,6 @@ elseif(BZ3_UI_BACKEND STREQUAL "rmlui")
         list(APPEND ENGINE_CLIENT_SOURCES
             ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/platform/RmlUi_Renderer_Diligent.cpp
         )
-    else()
-        list(APPEND ENGINE_CLIENT_SOURCES
-            ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/platform/RmlUi_Renderer_GL3.cpp
-        )
     endif()
 endif()
 
@@ -505,10 +465,20 @@ elseif(BZ3_RENDER_BACKEND STREQUAL "diligent")
         ${PROJECT_SOURCE_DIR}/src/engine/graphics/backends/diligent/backend.cpp
         ${PROJECT_SOURCE_DIR}/src/engine/graphics/backends/diligent/ui_bridge.cpp
     )
+    if(BZ3_UI_BACKEND STREQUAL "imgui")
+        list(APPEND ENGINE_CLIENT_SOURCES
+            ${PROJECT_SOURCE_DIR}/src/engine/graphics/backends/diligent/imgui_bridge.cpp
+        )
+    endif()
 elseif(BZ3_RENDER_BACKEND STREQUAL "bgfx")
     list(APPEND ENGINE_CLIENT_SOURCES
         ${PROJECT_SOURCE_DIR}/src/engine/graphics/backends/bgfx/backend.cpp
     )
+    if(BZ3_UI_BACKEND STREQUAL "imgui")
+        list(APPEND ENGINE_CLIENT_SOURCES
+            ${PROJECT_SOURCE_DIR}/src/engine/graphics/backends/bgfx/ui_bridge.cpp
+        )
+    endif()
 endif()
 
 # Create executables
@@ -516,14 +486,6 @@ set(MACOSX_BUNDLE_ICON_FILE "") # Set to your .icns file if you have one
 add_executable(bz3 MACOSX_BUNDLE ${CLIENT_SOURCES} ${ENGINE_CLIENT_SOURCES})
 
 
-# Handle OpenGL target for portability
-if(TARGET OpenGL::GL)
-    set(OPENGL_TARGET OpenGL::GL)
-elseif(TARGET OpenGL::OpenGL)
-    set(OPENGL_TARGET OpenGL::OpenGL)
-else()
-    set(OPENGL_TARGET ${OPENGL_LIBRARIES})
-endif()
 if(BZ3_WINDOW_BACKEND STREQUAL "sdl3")
     list(APPEND ENGINE_CLIENT_SOURCES ${PROJECT_SOURCE_DIR}/src/engine/platform/backends/window_sdl.cpp)
 elseif(BZ3_WINDOW_BACKEND STREQUAL "sdl2")
@@ -542,7 +504,6 @@ find_package(PkgConfig REQUIRED)
 if(BZ3_UI_BACKEND STREQUAL "imgui")
     pkg_check_modules(LIBRSVG REQUIRED IMPORTED_TARGET librsvg-2.0)
 endif()
-find_package(glad CONFIG REQUIRED)
 
 add_executable(bz3-server ${SERVER_SOURCES} ${ENGINE_SERVER_SOURCES})
 
@@ -567,8 +528,6 @@ target_link_libraries(bz3 PRIVATE
     glm::glm
     enet_static
     assimp::assimp
-    ${OPENGL_TARGET}
-    glad::glad
     cxxopts::cxxopts
     spdlog::spdlog
     miniz::miniz
@@ -680,7 +639,6 @@ endif()
 
 if(BZ3_UI_BACKEND STREQUAL "rmlui")
     target_link_libraries(bz3 PRIVATE RmlUi::RmlUi md4c::md4c)
-    target_compile_definitions(bz3 PRIVATE RMLUI_GL3_CUSTOM_LOADER)
 endif()
 
 if(BZ3_AUDIO_BACKEND STREQUAL "sdlaudio")

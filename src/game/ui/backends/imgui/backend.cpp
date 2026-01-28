@@ -1,22 +1,12 @@
 #include "ui/backends/imgui/backend.hpp"
 
-#if defined(BZ3_RENDER_BACKEND_BGFX)
-#include <bgfx/bgfx.h>
-#include <bgfx/platform.h>
-#include <bx/math.h>
-#else
-#include <imgui_impl_opengl3.h>
-#endif
-
 #include "common/data_path_resolver.hpp"
 #include "common/config_helpers.hpp"
 #include "common/i18n.hpp"
+#include "engine/graphics/ui_bridge.hpp"
 #include "platform/window.hpp"
 #include "spdlog/spdlog.h"
 
-#include <algorithm>
-#include <cstring>
-#include <fstream>
 
 namespace ui_backend {
 namespace {
@@ -174,13 +164,7 @@ ImGuiBackend::ImGuiBackend(platform::Window &windowRef) : window(&windowRef) {
 
     ImGui::StyleColorsDark();
 
-#if defined(BZ3_RENDER_BACKEND_BGFX)
-    io.BackendRendererName = "bz3-imgui-bgfx";
-    spdlog::info("UiSystem: ImGui bgfx renderer init start");
-    initBgfxRenderer();
-#else
-    ImGui_ImplOpenGL3_Init("#version 330");
-#endif
+    io.BackendRendererName = "bz3-imgui";
 
     spdlog::info("UiSystem: ImGui add default font");
     io.Fonts->AddFontDefault();
@@ -215,24 +199,12 @@ ImGuiBackend::ImGuiBackend(platform::Window &windowRef) : window(&windowRef) {
     });
 
     spdlog::info("UiSystem: ImGui font atlas build start");
-#if defined(BZ3_RENDER_BACKEND_BGFX)
     io.Fonts->Build();
     spdlog::info("UiSystem: ImGui font atlas build done");
-    spdlog::info("UiSystem: ImGui bgfx font build start");
-    buildBgfxFonts();
-    io.FontDefault = io.Fonts->Fonts.empty() ? nullptr : io.Fonts->Fonts[0];
-#else
-    io.Fonts->Build();
-    spdlog::info("UiSystem: ImGui font atlas build done");
-#endif
+    fontsDirty = true;
 }
 
 ImGuiBackend::~ImGuiBackend() {
-#if defined(BZ3_RENDER_BACKEND_BGFX)
-    shutdownBgfxRenderer();
-#else
-    ImGui_ImplOpenGL3_Shutdown();
-#endif
     ImGui::DestroyContext();
 }
 
@@ -317,12 +289,11 @@ void ImGuiBackend::update() {
         window->setCursorVisible(!io.MouseDrawCursor);
     }
 
-#if defined(BZ3_RENDER_BACKEND_BGFX)
-    ImGuiIO &ioRef = ImGui::GetIO();
-    ioRef.BackendRendererName = "bz3-imgui-bgfx";
-#else
-    ImGui_ImplOpenGL3_NewFrame();
-#endif
+    if (uiBridge && fontsDirty) {
+        uiBridge->rebuildImGuiFonts(io.Fonts);
+        io.FontDefault = io.Fonts->Fonts.empty() ? nullptr : io.Fonts->Fonts[0];
+        fontsDirty = false;
+    }
     io.FontGlobalScale = 1.0f;
     ImGui::NewFrame();
 
@@ -333,19 +304,10 @@ void ImGuiBackend::update() {
         hud.draw(io, bigFont);
     }
 
-#if defined(BZ3_RENDER_BACKEND_BGFX)
-    if (!imguiFontsReady) {
-        ImGui::EndFrame();
-        return;
-    }
-#endif
-
     ImGui::Render();
-#if defined(BZ3_RENDER_BACKEND_BGFX)
-    renderBgfxDrawData(ImGui::GetDrawData());
-#else
-    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-#endif
+    if (uiBridge) {
+        uiBridge->renderImGuiDrawData(ImGui::GetDrawData());
+    }
 }
 
 void ImGuiBackend::reloadFonts() {
@@ -366,13 +328,12 @@ void ImGuiBackend::reloadFonts() {
 
     consoleView.initializeFonts(io);
     io.Fonts->Build();
-#if defined(BZ3_RENDER_BACKEND_BGFX)
-    buildBgfxFonts();
-    io.FontDefault = io.Fonts->Fonts.empty() ? nullptr : io.Fonts->Fonts[0];
-#else
-    ImGui_ImplOpenGL3_DestroyFontsTexture();
-    ImGui_ImplOpenGL3_CreateFontsTexture();
-#endif
+    fontsDirty = true;
+    if (uiBridge) {
+        uiBridge->rebuildImGuiFonts(io.Fonts);
+        io.FontDefault = io.Fonts->Fonts.empty() ? nullptr : io.Fonts->Fonts[0];
+        fontsDirty = false;
+    }
 }
 
 void ImGuiBackend::setScoreboardEntries(const std::vector<ScoreboardEntry> &entries) {
@@ -413,6 +374,12 @@ bool ImGuiBackend::consumeKeybindingsReloadRequest() {
 
 void ImGuiBackend::setRenderBridge(const ui::RenderBridge *bridge) {
     renderBridge = bridge;
+    uiBridge = renderBridge ? renderBridge->getUiBridge() : nullptr;
+    if (uiBridge) {
+        ImGuiIO &io = ImGui::GetIO();
+        io.BackendRendererName = "bz3-imgui-bridge";
+        fontsDirty = true;
+    }
 }
 
 ui::RenderOutput ImGuiBackend::getRenderOutput() const {
@@ -426,240 +393,5 @@ ui::ConsoleInterface &ImGuiBackend::console() {
 const ui::ConsoleInterface &ImGuiBackend::console() const {
     return consoleView;
 }
-
-#if defined(BZ3_RENDER_BACKEND_BGFX)
-namespace {
-
-struct ImGuiVertex {
-    float x;
-    float y;
-    float u;
-    float v;
-    uint32_t abgr;
-};
-
-static uint16_t ToTextureHandle(ImTextureID textureId) {
-    if (textureId == 0) {
-        return bgfx::kInvalidHandle;
-    }
-    const uint64_t value = static_cast<uint64_t>(textureId);
-    if (value == 0) {
-        return bgfx::kInvalidHandle;
-    }
-    return static_cast<uint16_t>(value - 1);
-}
-
-} // namespace
-
-void ImGuiBackend::initBgfxRenderer() {
-    imguiTexture = bgfx::createUniform("s_tex", bgfx::UniformType::Sampler);
-    imguiScaleBias = bgfx::createUniform("u_scaleBias", bgfx::UniformType::Vec4);
-
-    const std::filesystem::path shaderDir = []() {
-        std::filesystem::path base = bz::data::Resolve("bgfx/shaders/bin");
-        const bgfx::RendererType::Enum renderer = bgfx::getRendererType();
-        switch (renderer) {
-            case bgfx::RendererType::OpenGL:
-            case bgfx::RendererType::OpenGLES:
-                base /= "gl";
-                break;
-            default:
-                base /= "vk";
-                break;
-        }
-        return base / "imgui";
-    }();
-    const auto vsPath = shaderDir / "vs_imgui.bin";
-    const auto fsPath = shaderDir / "fs_imgui.bin";
-
-    auto readBytes = [](const std::filesystem::path& path) -> std::vector<uint8_t> {
-        std::ifstream file(path, std::ios::binary);
-        if (!file.is_open()) {
-            return {};
-        }
-        file.seekg(0, std::ios::end);
-        const std::streamsize size = file.tellg();
-        if (size <= 0) {
-            return {};
-        }
-        file.seekg(0, std::ios::beg);
-        std::vector<uint8_t> buffer(static_cast<size_t>(size));
-        file.read(reinterpret_cast<char*>(buffer.data()), size);
-        return buffer;
-    };
-
-    auto vsBytes = readBytes(vsPath);
-    auto fsBytes = readBytes(fsPath);
-    if (vsBytes.empty() || fsBytes.empty()) {
-        spdlog::error("UiSystem: missing ImGui bgfx shaders '{}', '{}'", vsPath.string(), fsPath.string());
-        return;
-    }
-
-    const bgfx::Memory* vsMem = bgfx::copy(vsBytes.data(), static_cast<uint32_t>(vsBytes.size()));
-    const bgfx::Memory* fsMem = bgfx::copy(fsBytes.data(), static_cast<uint32_t>(fsBytes.size()));
-    bgfx::ShaderHandle vsh = bgfx::createShader(vsMem);
-    bgfx::ShaderHandle fsh = bgfx::createShader(fsMem);
-    imguiProgram = bgfx::createProgram(vsh, fsh, true);
-    if (!bgfx::isValid(imguiProgram)) {
-        spdlog::error("UiSystem: failed to create ImGui bgfx shader program");
-        return;
-    }
-
-    imguiLayout.begin()
-        .add(bgfx::Attrib::Position, 2, bgfx::AttribType::Float)
-        .add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float)
-        .add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true)
-        .end();
-
-    imguiBgfxReady = true;
-    spdlog::info("UiSystem: ImGui bgfx renderer init done");
-}
-
-void ImGuiBackend::shutdownBgfxRenderer() {
-    if (!bgfx::getCaps()) {
-        imguiBgfxReady = false;
-        return;
-    }
-    if (bgfx::isValid(imguiFontTexture)) {
-        bgfx::destroy(imguiFontTexture);
-        imguiFontTexture = BGFX_INVALID_HANDLE;
-    }
-    if (bgfx::isValid(imguiProgram)) {
-        bgfx::destroy(imguiProgram);
-        imguiProgram = BGFX_INVALID_HANDLE;
-    }
-    if (bgfx::isValid(imguiTexture)) {
-        bgfx::destroy(imguiTexture);
-        imguiTexture = BGFX_INVALID_HANDLE;
-    }
-    if (bgfx::isValid(imguiScaleBias)) {
-        bgfx::destroy(imguiScaleBias);
-        imguiScaleBias = BGFX_INVALID_HANDLE;
-    }
-    imguiBgfxReady = false;
-}
-
-void ImGuiBackend::buildBgfxFonts() {
-    if (!imguiBgfxReady) {
-        spdlog::warn("UiSystem: ImGui bgfx renderer not ready; skipping font texture build");
-        return;
-    }
-    spdlog::info("UiSystem: ImGui bgfx font build enter");
-    ImGuiIO &io = ImGui::GetIO();
-    unsigned char* pixels = nullptr;
-    int width = 0;
-    int height = 0;
-    io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
-    if (!pixels || width == 0 || height == 0) {
-        spdlog::error("UiSystem: ImGui font texture build failed");
-        return;
-    }
-
-    if (bgfx::isValid(imguiFontTexture)) {
-        bgfx::destroy(imguiFontTexture);
-    }
-
-    const bgfx::Memory* mem = bgfx::copy(pixels, static_cast<uint32_t>(width * height * 4));
-    imguiFontTexture = bgfx::createTexture2D(
-        static_cast<uint16_t>(width),
-        static_cast<uint16_t>(height),
-        false,
-        1,
-        bgfx::TextureFormat::RGBA8,
-        0,
-        mem);
-
-    if (!bgfx::isValid(imguiFontTexture)) {
-        spdlog::error("UiSystem: failed to create ImGui font texture");
-        return;
-    }
-
-    io.Fonts->SetTexID(static_cast<ImTextureID>(static_cast<uint64_t>(imguiFontTexture.idx + 1)));
-    imguiFontsReady = true;
-    spdlog::info("UiSystem: ImGui bgfx font build done");
-}
-
-void ImGuiBackend::renderBgfxDrawData(ImDrawData* drawData) {
-    if (!drawData || !imguiBgfxReady || !bgfx::isValid(imguiProgram) || !bgfx::isValid(imguiFontTexture)) {
-        return;
-    }
-
-    const ImGuiIO &io = ImGui::GetIO();
-    const int fbWidth = static_cast<int>(io.DisplaySize.x * io.DisplayFramebufferScale.x);
-    const int fbHeight = static_cast<int>(io.DisplaySize.y * io.DisplayFramebufferScale.y);
-    if (fbWidth <= 0 || fbHeight <= 0) {
-        return;
-    }
-
-    drawData->ScaleClipRects(io.DisplayFramebufferScale);
-
-    const float scaleBias[4] = { 2.0f / io.DisplaySize.x, -2.0f / io.DisplaySize.y, -1.0f, 1.0f };
-    bgfx::setViewTransform(255, nullptr, nullptr);
-    bgfx::setViewRect(255, 0, 0, static_cast<uint16_t>(fbWidth), static_cast<uint16_t>(fbHeight));
-    bgfx::setUniform(imguiScaleBias, scaleBias);
-
-    for (int n = 0; n < drawData->CmdListsCount; n++) {
-        const ImDrawList* cmdList = drawData->CmdLists[n];
-        const ImDrawVert* vtxBuffer = cmdList->VtxBuffer.Data;
-        const ImDrawIdx* idxBuffer = cmdList->IdxBuffer.Data;
-
-        bgfx::TransientVertexBuffer tvb;
-        bgfx::TransientIndexBuffer tib;
-        const uint32_t availVb = bgfx::getAvailTransientVertexBuffer(cmdList->VtxBuffer.Size, imguiLayout);
-        const uint32_t availIb = bgfx::getAvailTransientIndexBuffer(cmdList->IdxBuffer.Size, sizeof(ImDrawIdx) == 4);
-        if (availVb < static_cast<uint32_t>(cmdList->VtxBuffer.Size)
-            || availIb < static_cast<uint32_t>(cmdList->IdxBuffer.Size)) {
-            continue;
-        }
-        bgfx::allocTransientVertexBuffer(&tvb, cmdList->VtxBuffer.Size, imguiLayout);
-        bgfx::allocTransientIndexBuffer(&tib, cmdList->IdxBuffer.Size, sizeof(ImDrawIdx) == 4);
-
-        auto* verts = reinterpret_cast<ImGuiVertex*>(tvb.data);
-        for (int i = 0; i < cmdList->VtxBuffer.Size; ++i) {
-            verts[i].x = vtxBuffer[i].pos.x;
-            verts[i].y = vtxBuffer[i].pos.y;
-            verts[i].u = vtxBuffer[i].uv.x;
-            verts[i].v = vtxBuffer[i].uv.y;
-            verts[i].abgr = vtxBuffer[i].col;
-        }
-        std::memcpy(tib.data, idxBuffer, static_cast<size_t>(cmdList->IdxBuffer.Size) * sizeof(ImDrawIdx));
-
-        uint32_t vtxOffset = 0;
-        uint32_t idxOffset = 0;
-        for (int cmdIdx = 0; cmdIdx < cmdList->CmdBuffer.Size; cmdIdx++) {
-            const ImDrawCmd* pcmd = &cmdList->CmdBuffer[cmdIdx];
-            if (pcmd->UserCallback) {
-                pcmd->UserCallback(cmdList, pcmd);
-            } else {
-                const ImVec4 clip = pcmd->ClipRect;
-                const uint16_t cx = static_cast<uint16_t>(std::max(0.0f, clip.x));
-                const uint16_t cy = static_cast<uint16_t>(std::max(0.0f, clip.y));
-                const uint16_t cw = static_cast<uint16_t>(std::min(clip.z, io.DisplaySize.x) - clip.x);
-                const uint16_t ch = static_cast<uint16_t>(std::min(clip.w, io.DisplaySize.y) - clip.y);
-                if (cw == 0 || ch == 0) {
-                    idxOffset += pcmd->ElemCount;
-                    continue;
-                }
-
-                bgfx::setScissor(cx, cy, cw, ch);
-                bgfx::setState(BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A | BGFX_STATE_MSAA |
-                               BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA));
-
-                bgfx::TextureHandle textureHandle = imguiFontTexture;
-                if (pcmd->TextureId) {
-                    const uint16_t idx = ToTextureHandle(pcmd->TextureId);
-                    textureHandle.idx = idx;
-                }
-                bgfx::setTexture(0, imguiTexture, textureHandle);
-
-                bgfx::setVertexBuffer(0, &tvb, vtxOffset, cmdList->VtxBuffer.Size);
-                bgfx::setIndexBuffer(&tib, idxOffset, pcmd->ElemCount);
-                bgfx::submit(255, imguiProgram);
-            }
-            idxOffset += pcmd->ElemCount;
-        }
-    }
-}
-#endif
 
 } // namespace ui_backend

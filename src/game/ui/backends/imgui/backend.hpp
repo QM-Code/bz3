@@ -12,9 +12,9 @@
 #include "ui/backends/imgui/console/console.hpp"
 #include "ui/backend.hpp"
 
-#if defined(BZ3_RENDER_BACKEND_BGFX)
-#include <bgfx/bgfx.h>
-#endif
+namespace graphics_backend {
+class UiBridge;
+}
 
 namespace platform {
 class Window;
@@ -54,24 +54,11 @@ private:
     ui::ImGuiHud hud;
     bool showFPS = false;
     const ui::RenderBridge *renderBridge = nullptr;
+    graphics_backend::UiBridge* uiBridge = nullptr;
     bool languageReloadArmed = false;
     std::optional<std::string> pendingLanguage;
+    bool fontsDirty = false;
     void drawTexture(const graphics::TextureHandle& texture);
-
-#if defined(BZ3_RENDER_BACKEND_BGFX)
-    bgfx::ProgramHandle imguiProgram = BGFX_INVALID_HANDLE;
-    bgfx::UniformHandle imguiTexture = BGFX_INVALID_HANDLE;
-    bgfx::UniformHandle imguiScaleBias = BGFX_INVALID_HANDLE;
-    bgfx::TextureHandle imguiFontTexture = BGFX_INVALID_HANDLE;
-    bgfx::VertexLayout imguiLayout;
-    bool imguiBgfxReady = false;
-    bool imguiFontsReady = false;
-
-    void initBgfxRenderer();
-    void shutdownBgfxRenderer();
-    void buildBgfxFonts();
-    void renderBgfxDrawData(ImDrawData* drawData);
-#endif
 };
 
 } // namespace ui_backend

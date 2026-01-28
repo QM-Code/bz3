@@ -1,5 +1,8 @@
 #include "engine/graphics/backends/diligent/backend.hpp"
 #include "engine/graphics/backends/diligent/ui_bridge.hpp"
+#if defined(BZ3_UI_BACKEND_IMGUI)
+#include "engine/graphics/backends/diligent/imgui_bridge.hpp"
+#endif
 
 #include "engine/common/data_path_resolver.hpp"
 #include "engine/common/config_helpers.hpp"
@@ -215,6 +218,7 @@ DiligentBackend::DiligentBackend(platform::Window& windowIn)
 }
 
 DiligentBackend::~DiligentBackend() {
+    uiBridge_.reset();
     for (auto& [id, target] : renderTargets) {
         if (target.srvToken != 0) {
             graphics_backend::diligent_ui::UnregisterExternalTexture(target.srvToken);
@@ -715,6 +719,11 @@ void DiligentBackend::initDiligent() {
 
     initialized = true;
     graphics_backend::diligent_ui::SetContext(device_, context_, swapChain_, framebufferWidth, framebufferHeight);
+#if defined(BZ3_UI_BACKEND_IMGUI)
+    if (!uiBridge_) {
+        uiBridge_ = std::make_unique<DiligentImGuiBridge>();
+    }
+#endif
     spdlog::info("Graphics(Diligent): Vulkan initialized");
 }
 

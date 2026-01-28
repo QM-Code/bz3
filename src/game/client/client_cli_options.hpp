@@ -23,7 +23,6 @@ struct ClientCLIOptions {
     bool videoDriverExplicit = false;
     bool rendererExplicit = false;
     bool forceWaylandVulkan = false;
-    bool forceX11OpenGL = false;
     bool verbose = false;
     std::string logLevel;
     bool logLevelExplicit = false;

@@ -144,7 +144,7 @@ int main(int argc, char *argv[]) {
         port = cliOptions.hostPort;
     }
 
-    std::string serverName = bz::data::ReadStringConfig("serverName", "BZ OpenGL Server");
+    std::string serverName = bz::data::ReadStringConfig("serverName", "BZ Server");
     std::string worldName = bz::data::ReadStringConfig("worldName", worldDirPath.filename().string());
     ServerEngine engine(port);
     g_engine = &engine;
