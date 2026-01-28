@@ -38,7 +38,6 @@ public:
     struct ThemeConfig {
         std::string name;
     ThemeFontConfig regular;
-    ThemeFontConfig emoji;
     ThemeFontConfig title;
     ThemeFontConfig heading;
     ThemeFontConfig button;
@@ -136,7 +135,6 @@ private:
 
     bool visible = false;
     ImFont *regularFont = nullptr;
-    ImFont *emojiFont = nullptr;
     ImFont *titleFont = nullptr;
     ImFont *headingFont = nullptr;
     ImFont *buttonFont = nullptr;
@@ -145,7 +143,6 @@ private:
     ImVec4 headingColor{};
     ImVec4 buttonColor{};
     float regularFontSize = 0.0f;
-    float emojiFontSize = 0.0f;
     float titleFontSize = 0.0f;
     float headingFontSize = 0.0f;
     bool fontReloadRequested = false;

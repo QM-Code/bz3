@@ -556,10 +556,6 @@ RmlUiBackend::RmlUiBackend(platform::Window &windowRefIn) : windowRef(&windowRef
         if (!state) {
             return;
         }
-        const bool liveReload = bz::data::ReadBoolConfig({"ui.LanguageLiveReload"}, false);
-        if (!liveReload) {
-            return;
-        }
         state->pendingLanguage = language;
         state->reloadRequested = false;
         state->reloadArmed = true;

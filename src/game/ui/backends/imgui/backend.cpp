@@ -178,12 +178,6 @@ ImGuiBackend::ImGuiBackend(platform::Window &windowRef) : window(&windowRef) {
     io.BackendRendererName = "bz3-imgui-bgfx";
     spdlog::info("UiSystem: ImGui bgfx renderer init start");
     initBgfxRenderer();
-    if (const char* simpleFonts = std::getenv("BZ3_BGFX_SIMPLE_FONTS"); simpleFonts && simpleFonts[0] != '\0') {
-        imguiSimpleFonts = (simpleFonts[0] == '1');
-        if (imguiSimpleFonts) {
-            spdlog::warn("UiSystem: ImGui using simple font atlas for bgfx (set BZ3_BGFX_SIMPLE_FONTS=0 to disable)");
-        }
-    }
 #else
     ImGui_ImplOpenGL3_Init("#version 330");
 #endif
@@ -191,41 +185,30 @@ ImGuiBackend::ImGuiBackend(platform::Window &windowRef) : window(&windowRef) {
     spdlog::info("UiSystem: ImGui add default font");
     io.Fonts->AddFontDefault();
 
-    if (!imguiSimpleFonts) {
-        const auto bigFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Regular.Font");
-        const std::string bigFontPathStr = bigFontPath.string();
-        spdlog::info("UiSystem: ImGui add big font from {}", bigFontPathStr);
-        bigFont = io.Fonts->AddFontFromFileTTF(
-            bigFontPathStr.c_str(),
-            100.0f
-        );
+    const auto bigFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Regular.Font");
+    const std::string bigFontPathStr = bigFontPath.string();
+    spdlog::info("UiSystem: ImGui add big font from {}", bigFontPathStr);
+    bigFont = io.Fonts->AddFontFromFileTTF(
+        bigFontPathStr.c_str(),
+        100.0f
+    );
 
-        if (!bigFont) {
-            spdlog::warn("UiSystem: Failed to load font at {}", bigFontPathStr);
-        }
-
-        spdlog::info("UiSystem: ImGui console font init start");
-        consoleView.initializeFonts(io);
-        spdlog::info("UiSystem: ImGui console font init done");
-    } else {
-        bigFont = io.Fonts->Fonts.empty() ? nullptr : io.Fonts->Fonts[0];
+    if (!bigFont) {
+        spdlog::warn("UiSystem: Failed to load font at {}", bigFontPathStr);
     }
+
+    spdlog::info("UiSystem: ImGui console font init start");
+    consoleView.initializeFonts(io);
+    spdlog::info("UiSystem: ImGui console font init done");
 
     showFPS = bz::data::ReadBoolConfig({"debug.ShowFPS"}, false);
     hud.setShowFps(showFPS);
 
     consoleView.setLanguageCallback([this](const std::string &language) {
-        const bool liveReload = bz::data::ReadBoolConfig({"ui.LanguageLiveReload"}, false);
 #if defined(BZ3_RENDER_BACKEND_BGFX)
-        if (!liveReload) {
-            return;
-        }
-        spdlog::warn("UiSystem: bgfx language changes require restart; live reload disabled");
-        return;
+        pendingLanguage = language;
+        languageReloadArmed = true;
 #else
-        if (!liveReload) {
-            return;
-        }
         pendingLanguage = language;
         languageReloadArmed = true;
 #endif
@@ -370,22 +353,18 @@ void ImGuiBackend::reloadFonts() {
     io.Fonts->Clear();
     io.Fonts->AddFontDefault();
 
-    if (!imguiSimpleFonts) {
-        const auto bigFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Regular.Font");
-        const std::string bigFontPathStr = bigFontPath.string();
-        bigFont = io.Fonts->AddFontFromFileTTF(
-            bigFontPathStr.c_str(),
-            100.0f
-        );
+    const auto bigFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Regular.Font");
+    const std::string bigFontPathStr = bigFontPath.string();
+    bigFont = io.Fonts->AddFontFromFileTTF(
+        bigFontPathStr.c_str(),
+        100.0f
+    );
 
-        if (!bigFont) {
-            spdlog::warn("UiSystem: Failed to load font at {}", bigFontPathStr);
-        }
-
-        consoleView.initializeFonts(io);
-    } else {
-        bigFont = io.Fonts->Fonts.empty() ? nullptr : io.Fonts->Fonts[0];
+    if (!bigFont) {
+        spdlog::warn("UiSystem: Failed to load font at {}", bigFontPathStr);
     }
+
+    consoleView.initializeFonts(io);
     io.Fonts->Build();
 #if defined(BZ3_RENDER_BACKEND_BGFX)
     buildBgfxFonts();

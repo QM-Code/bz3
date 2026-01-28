@@ -5,9 +5,6 @@
 #include <cstdio>
 #include <imgui.h>
 #include <imgui_internal.h>
-#if defined(IMGUI_ENABLE_FREETYPE) && __has_include("imgui_freetype.h")
-#include <imgui_freetype.h>
-#endif
 #include <spdlog/spdlog.h>
 #include <string>
 #include <vector>
@@ -63,16 +60,6 @@ namespace ui {
 
 void ConsoleView::initializeFonts(ImGuiIO &io) {
     const ImVec4 defaultTextColor = ImGui::GetStyle().Colors[ImGuiCol_Text];
-#if defined(IMGUI_ENABLE_FREETYPE) && defined(ImGuiFreeTypeBuilderFlags_LoadColor)
-#if defined(BZ3_RENDER_BACKEND_BGFX)
-    const bool allowColorFonts = std::getenv("BZ3_BGFX_ALLOW_COLOR_FONTS") != nullptr;
-    if (allowColorFonts) {
-        io.Fonts->FontBuilderFlags |= ImGuiFreeTypeBuilderFlags_LoadColor;
-    }
-#else
-    io.Fonts->FontBuilderFlags |= ImGuiFreeTypeBuilderFlags_LoadColor;
-#endif
-#endif
     auto addFallbackFont = [&](const char *assetKey, float size, const ImWchar *ranges, const char *label) {
         const auto fontPath = bz::data::ResolveConfiguredAsset(assetKey);
         if (fontPath.empty()) {
@@ -87,11 +74,8 @@ void ConsoleView::initializeFonts(ImGuiIO &io) {
         }
     };
     auto addFallbacksForSize = [&](float size, const std::string &language) {
-        ImFontGlyphRangesBuilder builder;
-        builder.AddRanges(io.Fonts->GetGlyphRangesDefault());
-        ImVector<ImWchar> latinRanges;
-        builder.BuildRanges(&latinRanges);
-        addFallbackFont("hud.fonts.console.FallbackLatin.Font", size, latinRanges.Data, "FallbackLatin");
+        const ImWchar *latinRanges = io.Fonts->GetGlyphRangesDefault();
+        addFallbackFont("hud.fonts.console.FallbackLatin.Font", size, latinRanges, "FallbackLatin");
         if (language == "ru") {
             addFallbackFont("hud.fonts.console.FallbackLatin.Font", size, io.Fonts->GetGlyphRangesCyrillic(), "FallbackCyrillic");
         } else if (language == "ar") {
@@ -164,44 +148,7 @@ void ConsoleView::initializeFonts(ImGuiIO &io) {
         spdlog::warn("Failed to load console regular font for community browser ({}).", regularFontPathStr);
     }
 
-    const auto emojiFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Emoji.Font");
-    this->emojiFontSize = 0.0f;
-#if defined(BZ3_RENDER_BACKEND_BGFX)
-    const bool allowEmojiFonts = std::getenv("BZ3_BGFX_ALLOW_EMOJI_FONTS") != nullptr;
-    if (!allowEmojiFonts) {
-        return;
-    }
-#endif
-    if (!emojiFontPath.empty()) {
-        const std::string emojiFontPathStr = emojiFontPath.string();
-        const float emojiFontSize = useThemeOverrides
-            ? currentTheme.emoji.size
-            : bz::data::ReadFloatConfig({"assets.hud.fonts.console.Emoji.Size"}, regularFontSize);
-        this->emojiFontSize = emojiFontSize;
-        ImFontConfig emojiConfig;
-        emojiConfig.MergeMode = true;
-        emojiConfig.PixelSnapH = true;
-        emojiConfig.OversampleH = 1;
-        emojiConfig.OversampleV = 1;
-#if defined(IMGUI_ENABLE_FREETYPE) && defined(ImGuiFreeTypeBuilderFlags_LoadColor)
-        emojiConfig.FontBuilderFlags |= ImGuiFreeTypeBuilderFlags_LoadColor;
-#endif
-#ifdef IMGUI_USE_WCHAR32
-        static const ImWchar emojiRanges[] = { 0x1, 0x1FFFF, 0 };
-#else
-        static const ImWchar emojiRanges[] = { 0x1, 0xFFFF, 0 };
-        spdlog::warn("Emoji font loaded without IMGUI_USE_WCHAR32; codepoints above U+FFFF will not render.");
-#endif
-        emojiFont = io.Fonts->AddFontFromFileTTF(
-            emojiFontPathStr.c_str(),
-            emojiFontSize,
-            &emojiConfig,
-            emojiRanges
-        );
-        if (!emojiFont) {
-            spdlog::warn("Failed to load emoji font for community browser ({}).", emojiFontPathStr);
-        }
-    }
+
 
     const auto titleFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Title.Font");
     const std::string titleFontPathStr = titleFontPath.string();

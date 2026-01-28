@@ -56,7 +56,6 @@ private:
     const ui::RenderBridge *renderBridge = nullptr;
     bool languageReloadArmed = false;
     std::optional<std::string> pendingLanguage;
-    bool imguiSimpleFonts = false;
     void drawTexture(unsigned int textureId);
 
 #if defined(BZ3_RENDER_BACKEND_BGFX)
