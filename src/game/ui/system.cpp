@@ -3,7 +3,7 @@
 #include "ui/backend.hpp"
 #include "platform/window.hpp"
 #include "common/i18n.hpp"
-#include "ui/frontends/imgui/render_bridge.hpp"
+#include "ui/bridges/imgui_render_bridge.hpp"
 
 UiSystem::UiSystem(platform::Window &window) {
     backend = ui_backend::CreateUiBackend(window);

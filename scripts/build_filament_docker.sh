@@ -93,6 +93,7 @@ export CXX=clang++-15
 export CLEAN_INSTALL
 export FILAMENT_REF
 export BUILD_TYPE
+export FILAMENT_LINUX_IS_MOBILE=0
 ./scripts/build_filament.sh
 
 git -C /work/third_party/filament checkout -- filament/backend/CMakeLists.txt || true

@@ -10,7 +10,7 @@
 
 #include "ui/frontends/imgui/hud/hud.hpp"
 #include "ui/frontends/imgui/console/console.hpp"
-#include "ui/frontends/imgui/render_bridge.hpp"
+#include "ui/bridges/imgui_render_bridge.hpp"
 #include "ui/backend.hpp"
 
 namespace platform {
@@ -53,7 +53,7 @@ private:
     bool showFPS = false;
     const ui::RenderBridge *renderBridge = nullptr;
     const ui::ImGuiRenderBridge* imguiBridge = nullptr;
-    graphics_backend::ImGuiBridge* uiBridge = nullptr;
+    graphics_backend::UiRenderTargetBridge* uiBridge = nullptr;
     bool languageReloadArmed = false;
     std::optional<std::string> pendingLanguage;
     bool fontsDirty = false;

@@ -127,6 +127,21 @@ void Player::earlyUpdate() {
 
                 glm::vec3 shotVelocity = getForwardVector() * getParameter("shotSpeed") + getVelocity();
 
+                const glm::vec3 playerHitCenter = state.position + glm::vec3(0.0f, 1.0f, 0.0f);
+                const glm::vec3 toShot = shotPosition - playerHitCenter;
+                constexpr float minSelfShotDistance = 1.1f;
+                const float distSq = glm::dot(toShot, toShot);
+                if (distSq < minSelfShotDistance * minSelfShotDistance) {
+                    glm::vec3 fwd = getForwardVector();
+                    const float fwdLenSq = glm::dot(fwd, fwd);
+                    if (fwdLenSq > 1e-6f) {
+                        fwd *= (1.0f / std::sqrt(fwdLenSq));
+                    } else {
+                        fwd = glm::vec3(0.0f, 0.0f, -1.0f);
+                    }
+                    shotPosition = playerHitCenter + fwd * minSelfShotDistance;
+                }
+
                 auto shot = std::make_unique<Shot>(game, shotPosition, shotVelocity);
                 game.addShot(std::move(shot));
             }

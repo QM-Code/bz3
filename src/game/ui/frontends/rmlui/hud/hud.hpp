@@ -8,6 +8,7 @@
 
 #include "ui/types.hpp"
 #include "ui/frontends/rmlui/hud/chat.hpp"
+#include "ui/frontends/rmlui/hud/crosshair.hpp"
 #include "ui/frontends/rmlui/hud/dialog.hpp"
 #include "ui/frontends/rmlui/hud/radar.hpp"
 #include "ui/frontends/rmlui/hud/scoreboard.hpp"
@@ -58,6 +59,7 @@ private:
 
     RmlUiHudDialog dialog;
     RmlUiHudChat chat;
+    RmlUiHudCrosshair crosshair;
     RmlUiHudRadar radar;
     RmlUiHudScoreboard scoreboard;
     Rml::Element *fpsElement = nullptr;

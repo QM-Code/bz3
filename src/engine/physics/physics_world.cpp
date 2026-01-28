@@ -8,11 +8,11 @@ PhysicsWorld::PhysicsWorld()
 PhysicsWorld::~PhysicsWorld() = default;
 
 void PhysicsWorld::update(float deltaTime) {
-    if (backend_) {
-        backend_->update(deltaTime);
-    }
     if (playerController_) {
         playerController_->update(deltaTime);
+    }
+    if (backend_) {
+        backend_->update(deltaTime);
     }
 }
 

@@ -6,7 +6,7 @@
 
 #include "platform/events.hpp"
 #include "ui/types.hpp"
-#include "ui/render_bridge.hpp"
+#include "ui/bridges/render_bridge.hpp"
 #include "ui/console/console_interface.hpp"
 
 namespace platform {

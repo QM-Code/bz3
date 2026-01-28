@@ -2,7 +2,7 @@
 
 #include "engine/graphics/backend.hpp"
 #if defined(BZ3_UI_BACKEND_IMGUI)
-#include "engine/graphics/backends/bgfx/ui_bridge.hpp"
+#include "ui/frontends/imgui/platform/renderer_bgfx.hpp"
 #endif
 
 #include <bgfx/bgfx.h>
@@ -75,8 +75,8 @@ public:
     glm::mat4 getProjectionMatrix() const override;
     glm::vec3 getCameraPosition() const override;
     glm::vec3 getCameraForward() const override;
-    ImGuiBridge* getImGuiBridge() override { return uiBridge_.get(); }
-    const ImGuiBridge* getImGuiBridge() const override { return uiBridge_.get(); }
+    UiRenderTargetBridge* getUiRenderTargetBridge() override { return uiBridge_.get(); }
+    const UiRenderTargetBridge* getUiRenderTargetBridge() const override { return uiBridge_.get(); }
 
 private:
     struct EntityRecord {
@@ -174,7 +174,7 @@ private:
     void ensureUiOverlayResources();
     static uint16_t toTextureHandle(uint64_t textureId);
 
-    std::unique_ptr<ImGuiBridge> uiBridge_;
+    std::unique_ptr<UiRenderTargetBridge> uiBridge_;
 };
 
 } // namespace graphics_backend

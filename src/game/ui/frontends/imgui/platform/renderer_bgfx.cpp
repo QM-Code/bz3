@@ -1,4 +1,4 @@
-#include "engine/graphics/backends/bgfx/ui_bridge.hpp"
+#include "ui/frontends/imgui/platform/renderer_bgfx.hpp"
 
 #include <imgui.h>
 
@@ -26,7 +26,7 @@ uint64_t fromImTextureId(ImTextureID textureId) {
 }
 }
 
-BgfxUiBridge::BgfxUiBridge() {
+BgfxRenderer::BgfxRenderer() {
     if (!bgfx::getCaps()) {
         return;
     }
@@ -67,22 +67,22 @@ BgfxUiBridge::BgfxUiBridge() {
     ready_ = true;
 }
 
-BgfxUiBridge::~BgfxUiBridge() {
+BgfxRenderer::~BgfxRenderer() {
     destroyResources();
 }
 
-void* BgfxUiBridge::toImGuiTextureId(const graphics::TextureHandle& texture) const {
+void* BgfxRenderer::toImGuiTextureId(const graphics::TextureHandle& texture) const {
     if (!texture.valid()) {
         return nullptr;
     }
     return reinterpret_cast<void*>(static_cast<uintptr_t>(texture.id));
 }
 
-bool BgfxUiBridge::isImGuiReady() const {
+bool BgfxRenderer::isImGuiReady() const {
     return ready_ && fontsReady_;
 }
 
-void BgfxUiBridge::ensureImGuiRenderTarget(int width, int height) {
+void BgfxRenderer::ensureImGuiRenderTarget(int width, int height) {
     if (!ready_) {
         return;
     }
@@ -130,7 +130,7 @@ void BgfxUiBridge::ensureImGuiRenderTarget(int width, int height) {
     uiHeight_ = height;
 }
 
-graphics::TextureHandle BgfxUiBridge::getImGuiRenderTarget() const {
+graphics::TextureHandle BgfxRenderer::getImGuiRenderTarget() const {
     graphics::TextureHandle handle{};
     if (!bgfx::isValid(uiTargetTexture_)) {
         return handle;
@@ -138,10 +138,11 @@ graphics::TextureHandle BgfxUiBridge::getImGuiRenderTarget() const {
     handle.id = static_cast<uint64_t>(uiTargetTexture_.idx + 1);
     handle.width = static_cast<uint32_t>(uiWidth_);
     handle.height = static_cast<uint32_t>(uiHeight_);
+    handle.format = graphics::TextureFormat::RGBA8_UNORM;
     return handle;
 }
 
-void BgfxUiBridge::rebuildImGuiFonts(ImFontAtlas* atlas) {
+void BgfxRenderer::rebuildImGuiFonts(ImFontAtlas* atlas) {
     if (!ready_ || !atlas) {
         return;
     }
@@ -179,7 +180,7 @@ void BgfxUiBridge::rebuildImGuiFonts(ImFontAtlas* atlas) {
     fontsReady_ = true;
 }
 
-void BgfxUiBridge::renderImGuiToTarget(ImDrawData* drawData) {
+void BgfxRenderer::renderImGuiToTarget(ImDrawData* drawData) {
     if (!drawData || !ready_ || !bgfx::isValid(program_) || !bgfx::isValid(fontTexture_)) {
         return;
     }
@@ -267,7 +268,7 @@ void BgfxUiBridge::renderImGuiToTarget(ImDrawData* drawData) {
     }
 }
 
-void BgfxUiBridge::destroyResources() {
+void BgfxRenderer::destroyResources() {
     if (!bgfx::getCaps()) {
         ready_ = false;
         fontsReady_ = false;
@@ -303,7 +304,7 @@ void BgfxUiBridge::destroyResources() {
     fontsReady_ = false;
 }
 
-std::vector<uint8_t> BgfxUiBridge::readFileBytes(const std::filesystem::path& path) const {
+std::vector<uint8_t> BgfxRenderer::readFileBytes(const std::filesystem::path& path) const {
     std::ifstream file(path, std::ios::binary);
     if (!file.is_open()) {
         return {};
@@ -319,7 +320,7 @@ std::vector<uint8_t> BgfxUiBridge::readFileBytes(const std::filesystem::path& pa
     return buffer;
 }
 
-uint16_t BgfxUiBridge::toTextureHandle(uint64_t textureId) {
+uint16_t BgfxRenderer::toTextureHandle(uint64_t textureId) {
     const uint64_t value = textureId;
     if (value == 0) {
         return bgfx::kInvalidHandle;

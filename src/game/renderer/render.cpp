@@ -458,8 +458,8 @@ graphics::TextureHandle Render::getRadarTexture() const {
     return handle;
 }
 
-graphics_backend::ImGuiBridge* Render::getImGuiBridge() const {
-    return device_ ? device_->getImGuiBridge() : nullptr;
+graphics_backend::UiRenderTargetBridge* Render::getUiRenderTargetBridge() const {
+    return device_ ? device_->getUiRenderTargetBridge() : nullptr;
 }
 
 unsigned int Render::getMainTextureId() const {

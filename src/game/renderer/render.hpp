@@ -91,7 +91,7 @@ public:
     void present();
 
     graphics::TextureHandle getRadarTexture() const;
-    graphics_backend::ImGuiBridge* getImGuiBridge() const;
+    graphics_backend::UiRenderTargetBridge* getUiRenderTargetBridge() const;
     unsigned int getMainTextureId() const;
     std::pair<int, int> getMainTextureSize() const;
     void setRadarShaderPath(const std::filesystem::path& vertPath,

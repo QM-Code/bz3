@@ -1,0 +1,57 @@
+ -------------------------------------------------------------------------------
+                Memory leak report 01/28/2026 12:41:58:                  
+                bz3.memleaks                  
+ -------------------------------------------------------------------------------
+2 memory leaks found:
+
+Alloc.        Addr           Size           Addr           Size                        BreakOn BreakOn
+Number      Reported       Reported        Actual         Actual     Unused    Method  Dealloc Realloc  Allocated by
+------ ------------------ ---------- ------------------ ---------- ---------- -------- ------- ------- ---------------------------------------------------
+   115 0x0000620E1E178F40 0x000000C0 0x0000620E1E178F10 0x00000120 0x00000000 calloc      N       N    Vulkan.c(05870)::addRenderTarget
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(addRenderTarget+0x93) [0x620deac524f3]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_ZN16graphics_backend12ForgeBackend18createRenderTargetERKN8graphics16RenderTargetDescE+0x240) [0x620dea4cdca0]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_ZN6Render20ensureRadarResourcesEv+0xd0) [0x620dea444f00]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_ZN6RenderC1ERN8platform6WindowE+0x1b2) [0x620dea446922]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_ZN12ClientEngineC1ERN8platform6WindowE+0x11c) [0x620dea426f3c]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(main+0x609) [0x620dea3712f9]
+	/lib/x86_64-linux-gnu/libc.so.6(+0x2a1ca) [0x7bf202e2a1ca]
+	/lib/x86_64-linux-gnu/libc.so.6(__libc_start_main+0x8b) [0x7bf202e2a28b]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_start+0x25) [0x620dea378ff5]
+   116 0x0000620E1E179080 0x00000040 0x0000620E1E179040 0x000000A0 0x00000000 calloc      N       N    Vulkan.c(05599)::addTexture
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(addTexture+0x7d) [0x620deac4505d]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(addRenderTarget+0x1a4) [0x620deac52604]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_ZN16graphics_backend12ForgeBackend18createRenderTargetERKN8graphics16RenderTargetDescE+0x240) [0x620dea4cdca0]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_ZN6Render20ensureRadarResourcesEv+0xd0) [0x620dea444f00]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_ZN6RenderC1ERN8platform6WindowE+0x1b2) [0x620dea446922]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_ZN12ClientEngineC1ERN8platform6WindowE+0x11c) [0x620dea426f3c]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(main+0x609) [0x620dea3712f9]
+	/lib/x86_64-linux-gnu/libc.so.6(+0x2a1ca) [0x7bf202e2a1ca]
+	/lib/x86_64-linux-gnu/libc.so.6(__libc_start_main+0x8b) [0x7bf202e2a28b]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_start+0x25) [0x620dea378ff5]
+--------------------------------------------------------------------------------
+
+This file contains a log of all memory operations performed during the last run.
+
+Interrogate this file to track errors or to help track down memory-related
+issues. You can do this by tracing the allocations performed by a specific owner
+or by tracking a specific address through a series of allocations and
+reallocations.
+
+There is a lot of useful information here which, when used creatively, can be
+extremely helpful.
+
+Note that the following guides are used throughout this file:
+
+   [!] - Error
+   [+] - Allocation
+   [~] - Reallocation
+   [-] - Deallocation
+   [I] - Generic information
+   [F] - Failure induced for the purpose of stress-testing your application
+   [D] - Information used for debugging this memory manager
+
+...so, to find all errors in the file, search for "[!]"
+
+--------------------------------------------------------------------------------
+----All Allocations and Deallocations----
+

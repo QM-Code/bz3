@@ -22,7 +22,7 @@
  * THE SOFTWARE.
  */
 
-#include "ui/frontends/rmlui/platform/RmlUi_Renderer_BGFX.h"
+#include "ui/frontends/rmlui/platform/renderer_bgfx.hpp"
 
 #include <RmlUi/Core/Core.h>
 #include <RmlUi/Core/FileInterface.h>

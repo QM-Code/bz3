@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/graphics/ui_bridge.hpp"
+#include "engine/graphics/ui_render_target_bridge.hpp"
 
 #include <bgfx/bgfx.h>
 #include <cstdint>
@@ -10,10 +10,10 @@
 
 namespace graphics_backend {
 
-class BgfxUiBridge final : public ImGuiBridge {
+class BgfxRenderer final : public UiRenderTargetBridge {
 public:
-    BgfxUiBridge();
-    ~BgfxUiBridge() override;
+    BgfxRenderer();
+    ~BgfxRenderer() override;
 
     void* toImGuiTextureId(const graphics::TextureHandle& texture) const override;
     void rebuildImGuiFonts(ImFontAtlas* atlas) override;

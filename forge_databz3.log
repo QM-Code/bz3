@@ -1,0 +1,22 @@
+date       time     [thread name/id ]                   file:line    v |
+2026-01-28 11:00:08 [MainThread     ]                   Log.c:193   INFO| Opened log file bz3.log
+2026-01-28 11:00:08 [MainThread     ]      GraphicsConfig.cpp:902    ERR| Failed to open gpu.data file. Function ioUnixFsOpen failed with error: Filesystem Not Found error. File or directory not found
+2026-01-28 11:00:08 [MainThread     ]      GraphicsConfig.cpp:904   WARN| Setting preset will be set to Low as a default.
+2026-01-28 11:00:08 [MainThread     ]      GraphicsConfig.cpp:1054   ERR| Failed to open gpu.cfg file. Function ioUnixFsOpen failed with error: Filesystem Not Found error. File or directory not found
+2026-01-28 11:00:08 [MainThread     ]      GraphicsConfig.cpp:1056  WARN| Setting first gpu found as active gpu.
+2026-01-28 11:00:08 [MainThread     ]                Vulkan.c:3523  INFO| Creating VkInstance with 0 enabled instance layers:
+2026-01-28 11:00:08 [MainThread     ]                Vulkan.c:4226  INFO| GPU[0] detected. Vendor ID: 0x10de, Model ID: 0x13c2, Preset: , GPU Name: NVIDIA GeForce GTX 970
+2026-01-28 11:00:08 [MainThread     ]                Vulkan.c:3668  INFO| GPU[0] is selected as default GPU
+2026-01-28 11:00:08 [MainThread     ]                Vulkan.c:3669  INFO| Name of selected gpu: NVIDIA GeForce GTX 970
+2026-01-28 11:00:08 [MainThread     ]                Vulkan.c:3670  INFO| Vendor id of selected gpu: 0x10de
+2026-01-28 11:00:08 [MainThread     ]                Vulkan.c:3671  INFO| Model id of selected gpu: 0x13c2
+2026-01-28 11:00:08 [MainThread     ]                Vulkan.c:3672  INFO| Preset of selected gpu: 
+2026-01-28 11:00:08 [MainThread     ]                Vulkan.c:4002  INFO| Successfully loaded Dedicated Allocation extension
+2026-01-28 11:00:08 [MainThread     ]                Vulkan.c:4016  INFO| Successfully loaded Draw Indirect extension
+2026-01-28 11:00:08 [MainThread     ]                Vulkan.c:4037  INFO| Successfully loaded Descriptor Indexing extension
+2026-01-28 11:00:08 [MainThread     ]                Vulkan.c:4052  INFO| Successfully loaded 64 bit Shader Atomic extension
+2026-01-28 11:00:08 [MainThread     ]                Vulkan.c:4057  INFO| Successfully loaded Dynamic Rendering extension
+2026-01-28 11:00:08 [MainThread     ]                Vulkan.c:4062  INFO| Successfully loaded Device Fault extension
+2026-01-28 11:00:08 [MainThread     ]                Vulkan.c:4357   ERR| Selected GPU has an Office Preset in gpu.cfg.
+2026-01-28 11:00:08 [MainThread     ]                Vulkan.c:4358   ERR| Office preset is not supported by The Forge.
+2026-01-28 11:01:25 [MainThread     ]                   Log.c:153   INFO| Shutting down log system.

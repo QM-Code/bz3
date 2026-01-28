@@ -17,17 +17,20 @@
 #include <cmath>
 
 #if defined(BZ3_RENDER_BACKEND_BGFX)
-#include "ui/frontends/rmlui/platform/RmlUi_Renderer_BGFX.h"
+#include "ui/frontends/rmlui/platform/renderer_bgfx.hpp"
 #elif defined(BZ3_RENDER_BACKEND_DILIGENT)
-#include "ui/frontends/rmlui/platform/RmlUi_Renderer_Diligent.h"
+#include "ui/frontends/rmlui/platform/renderer_diligent.hpp"
+#elif defined(BZ3_RENDER_BACKEND_FORGE)
+#include "ui/frontends/rmlui/platform/renderer_forge.hpp"
 #else
-#error "RmlUi backend requires BGFX or Diligent renderer."
+#error "RmlUi backend requires BGFX, Diligent, or Forge renderer."
 #endif
 #include "ui/frontends/rmlui/console/emoji_utils.hpp"
 #include "ui/frontends/rmlui/translate.hpp"
 #include "platform/window.hpp"
 #include "common/config_helpers.hpp"
 #include "common/i18n.hpp"
+#include "ui/config.hpp"
 #include "ui/frontends/rmlui/hud/hud.hpp"
 #include "ui/frontends/rmlui/console/console.hpp"
 #include "ui/frontends/rmlui/console/panels/panel_community.hpp"
@@ -37,6 +40,7 @@
 #include "ui/frontends/rmlui/console/panels/panel_themes.hpp"
 #include "common/data_path_resolver.hpp"
 #include "spdlog/spdlog.h"
+#include "ui/render_scale.hpp"
 
 namespace ui_backend {
 namespace {
@@ -463,6 +467,8 @@ struct RmlUiBackend::RmlUiState {
     RenderInterface_BGFX renderInterface;
 #elif defined(BZ3_RENDER_BACKEND_DILIGENT)
     RenderInterface_Diligent renderInterface;
+#elif defined(BZ3_RENDER_BACKEND_FORGE)
+    RenderInterface_Forge renderInterface;
 #endif
     Rml::Context *context = nullptr;
     Rml::ElementDocument *document = nullptr;
@@ -514,6 +520,12 @@ RmlUiBackend::RmlUiBackend(platform::Window &windowRefIn) : windowRef(&windowRef
         return;
     }
     spdlog::info("RmlUi: Diligent renderer initialized.");
+#elif defined(BZ3_RENDER_BACKEND_FORGE)
+    if (!state->renderInterface) {
+        spdlog::error("RmlUi: failed to initialize Forge renderer.");
+        return;
+    }
+    spdlog::info("RmlUi: Forge renderer initialized.");
 #endif
 
     if (!Rml::Initialise()) {
@@ -524,11 +536,14 @@ RmlUiBackend::RmlUiBackend(platform::Window &windowRefIn) : windowRef(&windowRef
     int fbWidth = 0;
     int fbHeight = 0;
     if (windowRef) { windowRef->getFramebufferSize(fbWidth, fbHeight); }
-    state->lastWidth = fbWidth;
-    state->lastHeight = fbHeight;
-    state->renderInterface.SetViewport(fbWidth, fbHeight);
+    const float renderScale = ui::GetUiRenderScale();
+    const int targetWidth = std::max(1, static_cast<int>(std::lround(fbWidth * renderScale)));
+    const int targetHeight = std::max(1, static_cast<int>(std::lround(fbHeight * renderScale)));
+    state->lastWidth = targetWidth;
+    state->lastHeight = targetHeight;
+    state->renderInterface.SetViewport(targetWidth, targetHeight);
 
-    state->context = Rml::CreateContext("bz3", Rml::Vector2i(fbWidth, fbHeight));
+    state->context = Rml::CreateContext("bz3", Rml::Vector2i(targetWidth, targetHeight));
     if (!state->context) {
         spdlog::error("RmlUi: failed to create context.");
         return;
@@ -536,15 +551,16 @@ RmlUiBackend::RmlUiBackend(platform::Window &windowRefIn) : windowRef(&windowRef
 
     float dpRatio = 1.0f;
     if (windowRef) { dpRatio = windowRef->getContentScale(); }
-    state->lastDpRatio = dpRatio;
-    state->context->SetDensityIndependentPixelRatio(dpRatio);
+    const float scaledDpRatio = dpRatio / std::max(renderScale, 0.0001f);
+    state->lastDpRatio = scaledDpRatio;
+    state->context->SetDensityIndependentPixelRatio(scaledDpRatio);
 
     loadConfiguredFonts(bz::i18n::Get().language());
 
     state->consolePath = bz::data::Resolve("client/ui/console.rml").string();
     state->hudPath = bz::data::Resolve("client/ui/hud.rml").string();
     state->hud = std::make_unique<ui::RmlUiHud>();
-    state->showFps = bz::data::ReadBoolConfig({"debug.ShowFPS"}, false);
+    state->showFps = ui::config::GetRequiredBool("debug.ShowFPS");
     state->fpsLastTime = state->systemInterface.GetElapsedTime();
     auto communityPanel = std::make_unique<ui::RmlUiPanelCommunity>();
     auto *communityPanelPtr = communityPanel.get();
@@ -643,6 +659,7 @@ void RmlUiBackend::handleEvents(const std::vector<platform::Event> &events) {
         return;
     }
 
+    const float renderScale = ui::GetUiRenderScale();
     const bool consoleVisible = consoleView && consoleView->isVisible();
     const bool hudVisible = state->hud && state->hud->isVisible();
 
@@ -718,8 +735,8 @@ void RmlUiBackend::handleEvents(const std::vector<platform::Event> &events) {
                 if (mods == 0) {
                     mods = currentRmlMods(windowRef);
                 }
-                const int x = static_cast<int>(std::lround(event.x));
-                const int y = static_cast<int>(std::lround(event.y));
+                const int x = static_cast<int>(std::lround(event.x * renderScale));
+                const int y = static_cast<int>(std::lround(event.y * renderScale));
                 state->context->ProcessMouseMove(x, y, mods);
                 break;
             }
@@ -741,10 +758,12 @@ void RmlUiBackend::handleEvents(const std::vector<platform::Event> &events) {
                 break;
             }
             case platform::EventType::WindowResize: {
-                state->lastWidth = event.width;
-                state->lastHeight = event.height;
-                state->renderInterface.SetViewport(event.width, event.height);
-                state->context->SetDimensions(Rml::Vector2i(event.width, event.height));
+                const int targetWidth = std::max(1, static_cast<int>(std::lround(event.width * renderScale)));
+                const int targetHeight = std::max(1, static_cast<int>(std::lround(event.height * renderScale)));
+                state->lastWidth = targetWidth;
+                state->lastHeight = targetHeight;
+                state->renderInterface.SetViewport(targetWidth, targetHeight);
+                state->context->SetDimensions(Rml::Vector2i(targetWidth, targetHeight));
                 break;
             }
             case platform::EventType::WindowClose: {
@@ -776,20 +795,24 @@ void RmlUiBackend::update() {
     int fbWidth = 0;
     int fbHeight = 0;
     if (windowRef) { windowRef->getFramebufferSize(fbWidth, fbHeight); }
-    if (fbWidth != state->lastWidth || fbHeight != state->lastHeight) {
-        state->lastWidth = fbWidth;
-        state->lastHeight = fbHeight;
-        state->renderInterface.SetViewport(fbWidth, fbHeight);
-        state->context->SetDimensions(Rml::Vector2i(fbWidth, fbHeight));
+    const float renderScale = ui::GetUiRenderScale();
+    const int targetWidth = std::max(1, static_cast<int>(std::lround(fbWidth * renderScale)));
+    const int targetHeight = std::max(1, static_cast<int>(std::lround(fbHeight * renderScale)));
+    if (targetWidth != state->lastWidth || targetHeight != state->lastHeight) {
+        state->lastWidth = targetWidth;
+        state->lastHeight = targetHeight;
+        state->renderInterface.SetViewport(targetWidth, targetHeight);
+        state->context->SetDimensions(Rml::Vector2i(targetWidth, targetHeight));
     }
 
     float dpRatio = 1.0f;
     if (windowRef) {
         dpRatio = windowRef->getContentScale();
     }
-    if (dpRatio != state->lastDpRatio) {
-        state->lastDpRatio = dpRatio;
-        state->context->SetDensityIndependentPixelRatio(dpRatio);
+    const float scaledDpRatio = dpRatio / std::max(renderScale, 0.0001f);
+    if (scaledDpRatio != state->lastDpRatio) {
+        state->lastDpRatio = scaledDpRatio;
+        state->context->SetDensityIndependentPixelRatio(scaledDpRatio);
     }
 
     const bool consoleVisible = consoleView && consoleView->isVisible();
@@ -953,6 +976,7 @@ ui::RenderOutput RmlUiBackend::getRenderOutput() const {
     const int outputHeight = state->renderInterface.GetOutputHeight();
     out.texture.width = outputWidth > 0 ? static_cast<uint32_t>(outputWidth) : 0u;
     out.texture.height = outputHeight > 0 ? static_cast<uint32_t>(outputHeight) : 0u;
+    out.texture.format = graphics::TextureFormat::RGBA8_UNORM;
     out.visible = state->outputVisible;
     return out;
 }

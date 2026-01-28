@@ -8,6 +8,7 @@ FILAMENT_REF="${FILAMENT_REF:-main}"
 INSTALL_DIR="${INSTALL_DIR:-$ROOT_DIR/libs/filament-sdk}"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
 CLEAN_INSTALL="${CLEAN_INSTALL:-0}"
+FILAMENT_LINUX_IS_MOBILE="${FILAMENT_LINUX_IS_MOBILE:-1}"
 
 case "${BUILD_TYPE,,}" in
   release|debug)
@@ -54,14 +55,41 @@ if [ "$CLEAN_INSTALL" = "1" ] && [ -d "$INSTALL_DIR" ]; then
 fi
 echo "Building Filament..."
 
+# Ensure __GLIBC__ is defined in Filament's getopt header so it defers to the
+# system <getopt.h> and avoids C++ exception spec mismatches.
+python3 - <<'PY'
+from pathlib import Path
+
+path = Path(r"""'"$FILAMENT_DIR"'/third_party/getopt/include/getopt/getopt.h""")
+if path.exists():
+    data = path.read_text()
+    if "#include <features.h>" not in data:
+        lines = data.splitlines()
+        out = []
+        inserted = False
+        for i, line in enumerate(lines):
+            out.append(line)
+            if line.strip() == "#define _GETOPT_H" and not inserted:
+                out.append("")
+                out.append("#include <features.h>")
+                inserted = True
+        if inserted:
+            path.write_text("\n".join(out) + "\n")
+PY
+
 BUILD_DIR="$FILAMENT_DIR/out/cmake-${BUILD_TYPE_LOWER}"
 INSTALL_PREFIX="$FILAMENT_DIR/out/${BUILD_TYPE_LOWER}/filament"
+PREBUILT_DIR="$FILAMENT_DIR/prebuilt"
 
 if [ "$CLEAN_INSTALL" = "1" ]; then
   rm -rf "$BUILD_DIR"
 fi
 
 mkdir -p "$BUILD_DIR"
+if [ "$FILAMENT_LINUX_IS_MOBILE" = "1" ]; then
+  mkdir -p "$PREBUILT_DIR"
+  touch "$PREBUILT_DIR/ImportExecutables-Prebuilt.cmake"
+fi
 
 GENERATOR="Unix Makefiles"
 if command -v ninja >/dev/null 2>&1; then
@@ -73,11 +101,13 @@ fi
   cmake -S . -B "$BUILD_DIR" -G "$GENERATOR" \
     -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
     -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
+    $( [ "$FILAMENT_LINUX_IS_MOBILE" = "1" ] && echo "-DFILAMENT_IMPORT_PREBUILT_EXECUTABLES_DIR=prebuilt" ) \
     -DFILAMENT_SUPPORTS_VULKAN=ON \
     -DFILAMENT_SUPPORTS_WAYLAND=ON \
     -DFILAMENT_SUPPORTS_OPENGL=OFF \
     -DFILAMENT_SUPPORTS_XLIB=OFF \
     -DFILAMENT_SUPPORTS_XCB=OFF \
+    -DFILAMENT_LINUX_IS_MOBILE=$FILAMENT_LINUX_IS_MOBILE \
     -DUSE_STATIC_LIBCXX=OFF
   cmake --build "$BUILD_DIR"
   cmake --build "$BUILD_DIR" --target install

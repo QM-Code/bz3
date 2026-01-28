@@ -16,6 +16,9 @@
       "clientRadius": 1
     }
   },
+  "ui": {
+    "RenderScale": 1.0
+  },
   "keybindings": {
     "fire": [
       "ENTER",

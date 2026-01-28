@@ -1,4 +1,4 @@
-#include "engine/graphics/backends/diligent/imgui_bridge.hpp"
+#include "ui/frontends/imgui/platform/renderer_diligent.hpp"
 
 #include <imgui.h>
 
@@ -19,7 +19,6 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
-#include <unordered_set>
 
 namespace graphics_backend {
 namespace {
@@ -50,9 +49,9 @@ ImTextureID textureIdToImTexture(uint64_t value) {
 
 } // namespace
 
-DiligentImGuiBridge::DiligentImGuiBridge() = default;
+DiligentRenderer::DiligentRenderer() = default;
 
-DiligentImGuiBridge::~DiligentImGuiBridge() {
+DiligentRenderer::~DiligentRenderer() {
     if (fontToken_ != 0) {
         graphics_backend::diligent_ui::UnregisterExternalTexture(fontToken_);
         fontToken_ = 0;
@@ -73,18 +72,18 @@ DiligentImGuiBridge::~DiligentImGuiBridge() {
     ready_ = false;
 }
 
-void* DiligentImGuiBridge::toImGuiTextureId(const graphics::TextureHandle& texture) const {
+void* DiligentRenderer::toImGuiTextureId(const graphics::TextureHandle& texture) const {
     if (!texture.valid()) {
         return nullptr;
     }
     return reinterpret_cast<void*>(static_cast<uintptr_t>(texture.id));
 }
 
-bool DiligentImGuiBridge::isImGuiReady() const {
+bool DiligentRenderer::isImGuiReady() const {
     return ready_ && fontSrv_;
 }
 
-void DiligentImGuiBridge::ensureImGuiRenderTarget(int width, int height) {
+void DiligentRenderer::ensureImGuiRenderTarget(int width, int height) {
     auto ctx = graphics_backend::diligent_ui::GetContext();
     if (!ctx.device || !ctx.swapChain) {
         return;
@@ -139,7 +138,7 @@ void DiligentImGuiBridge::ensureImGuiRenderTarget(int width, int height) {
     uiHeight_ = height;
 }
 
-graphics::TextureHandle DiligentImGuiBridge::getImGuiRenderTarget() const {
+graphics::TextureHandle DiligentRenderer::getImGuiRenderTarget() const {
     graphics::TextureHandle handle{};
     if (uiToken_ == 0) {
         return handle;
@@ -147,10 +146,11 @@ graphics::TextureHandle DiligentImGuiBridge::getImGuiRenderTarget() const {
     handle.id = uiToken_;
     handle.width = static_cast<uint32_t>(uiWidth_);
     handle.height = static_cast<uint32_t>(uiHeight_);
+    handle.format = graphics::TextureFormat::RGBA8_UNORM;
     return handle;
 }
 
-void DiligentImGuiBridge::ensurePipeline() {
+void DiligentRenderer::ensurePipeline() {
     if (pipeline_) {
         return;
     }
@@ -295,7 +295,7 @@ float4 main(PSInput In) : SV_Target
     ready_ = pipeline_ && shaderBinding_ && constantBuffer_;
 }
 
-void DiligentImGuiBridge::ensureBuffers(std::size_t vertexBytes, std::size_t indexBytes) {
+void DiligentRenderer::ensureBuffers(std::size_t vertexBytes, std::size_t indexBytes) {
     auto ctx = graphics_backend::diligent_ui::GetContext();
     if (!ctx.device) {
         return;
@@ -324,7 +324,7 @@ void DiligentImGuiBridge::ensureBuffers(std::size_t vertexBytes, std::size_t ind
     }
 }
 
-void DiligentImGuiBridge::rebuildImGuiFonts(ImFontAtlas* atlas) {
+void DiligentRenderer::rebuildImGuiFonts(ImFontAtlas* atlas) {
     if (!atlas) {
         return;
     }
@@ -382,7 +382,7 @@ void DiligentImGuiBridge::rebuildImGuiFonts(ImFontAtlas* atlas) {
     atlas->SetTexID(textureIdToImTexture(fontToken_));
 }
 
-void DiligentImGuiBridge::renderImGuiToTarget(ImDrawData* drawData) {
+void DiligentRenderer::renderImGuiToTarget(ImDrawData* drawData) {
     if (!drawData) {
         return;
     }
@@ -477,9 +477,6 @@ void DiligentImGuiBridge::renderImGuiToTarget(ImDrawData* drawData) {
 
     ctx.context->SetPipelineState(pipeline_);
 
-    static std::unordered_set<uint64_t> loggedMissing;
-    static std::unordered_set<uint64_t> loggedResolved;
-
     int globalVtxOffset = 0;
     int globalIdxOffset = 0;
     for (int n = 0; n < drawData->CmdListsCount; n++) {
@@ -508,15 +505,7 @@ void DiligentImGuiBridge::renderImGuiToTarget(ImDrawData* drawData) {
             }
             auto* srv = graphics_backend::diligent_ui::ResolveExternalTexture(token);
             if (!srv) {
-                if (loggedMissing.insert(token).second) {
-                    spdlog::warn("ImGui(Diligent): missing texture token {}", token);
-                }
                 continue;
-            }
-            if (token != fontToken_) {
-                if (loggedResolved.insert(token).second) {
-                    spdlog::info("ImGui(Diligent): resolved texture token {} -> {}", token, static_cast<void*>(srv));
-                }
             }
             if (auto* var = shaderBinding_->GetVariableByName(Diligent::SHADER_TYPE_PIXEL, "g_Texture")) {
                 var->Set(srv);

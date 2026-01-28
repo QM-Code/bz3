@@ -1,0 +1,84 @@
+ -------------------------------------------------------------------------------
+                Memory leak report 01/28/2026 11:01:25:                  
+                bz3.memleaks                  
+ -------------------------------------------------------------------------------
+4 memory leaks found:
+
+Alloc.        Addr           Size           Addr           Size                        BreakOn BreakOn
+Number      Reported       Reported        Actual         Actual     Unused    Method  Dealloc Realloc  Allocated by
+------ ------------------ ---------- ------------------ ---------- ---------- -------- ------- ------- ---------------------------------------------------
+    15 0x00005D3BAA8A03C0 0x00000008 0x00005D3BAA8A03B0 0x00000038 0x00000000 malloc      N       N    Vulkan.c(03930)::AddDevice
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(+0xc1f3b3) [0x5d3b7e97b3b3]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(initRenderer+0xe4) [0x5d3b7e990094]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_ZN16graphics_backend12ForgeBackendC1ERN8platform6WindowE+0x3fe) [0x5d3b7e206ede]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_ZN16graphics_backend21CreateGraphicsBackendERN8platform6WindowE+0x80) [0x5d3b7e188fb0]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_ZN8graphics14GraphicsDeviceC2ERN8platform6WindowE+0x2c) [0x5d3b7e1887cc]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_ZN6RenderC1ERN8platform6WindowE+0x18a) [0x5d3b7e185e5a]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_ZN12ClientEngineC1ERN8platform6WindowE+0x11c) [0x5d3b7e16649c]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(main+0x609) [0x5d3b7e0b0a19]
+	/lib/x86_64-linux-gnu/libc.so.6(+0x2a1ca) [0x7d7a55c2a1ca]
+	/lib/x86_64-linux-gnu/libc.so.6(__libc_start_main+0x8b) [0x7d7a55c2a28b]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_start+0x25) [0x5d3b7e0b8715]
+    14 0x00005D3BAA996810 0x00000008 0x00005D3BAA996800 0x00000038 0x00000000 malloc      N       N    Vulkan.c(03929)::AddDevice
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(+0xc1f38c) [0x5d3b7e97b38c]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(initRenderer+0xe4) [0x5d3b7e990094]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_ZN16graphics_backend12ForgeBackendC1ERN8platform6WindowE+0x3fe) [0x5d3b7e206ede]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_ZN16graphics_backend21CreateGraphicsBackendERN8platform6WindowE+0x80) [0x5d3b7e188fb0]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_ZN8graphics14GraphicsDeviceC2ERN8platform6WindowE+0x2c) [0x5d3b7e1887cc]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_ZN6RenderC1ERN8platform6WindowE+0x18a) [0x5d3b7e185e5a]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_ZN12ClientEngineC1ERN8platform6WindowE+0x11c) [0x5d3b7e16649c]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(main+0x609) [0x5d3b7e0b0a19]
+	/lib/x86_64-linux-gnu/libc.so.6(+0x2a1ca) [0x7d7a55c2a1ca]
+	/lib/x86_64-linux-gnu/libc.so.6(__libc_start_main+0x8b) [0x7d7a55c2a28b]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_start+0x25) [0x5d3b7e0b8715]
+    16 0x00005D3BAA98C7C0 0x00000030 0x00005D3BAA98C7B0 0x00000060 0x00000000 calloc      N       N    Vulkan.c(03933)::AddDevice
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(+0xc1f427) [0x5d3b7e97b427]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(initRenderer+0xe4) [0x5d3b7e990094]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_ZN16graphics_backend12ForgeBackendC1ERN8platform6WindowE+0x3fe) [0x5d3b7e206ede]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_ZN16graphics_backend21CreateGraphicsBackendERN8platform6WindowE+0x80) [0x5d3b7e188fb0]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_ZN8graphics14GraphicsDeviceC2ERN8platform6WindowE+0x2c) [0x5d3b7e1887cc]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_ZN6RenderC1ERN8platform6WindowE+0x18a) [0x5d3b7e185e5a]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_ZN12ClientEngineC1ERN8platform6WindowE+0x11c) [0x5d3b7e16649c]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(main+0x609) [0x5d3b7e0b0a19]
+	/lib/x86_64-linux-gnu/libc.so.6(+0x2a1ca) [0x7d7a55c2a1ca]
+	/lib/x86_64-linux-gnu/libc.so.6(__libc_start_main+0x8b) [0x7d7a55c2a28b]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_start+0x25) [0x5d3b7e0b8715]
+    17 0x00005D3BAA98CBD0 0x00000030 0x00005D3BAA98CBC0 0x00000060 0x00000000 calloc      N       N    Vulkan.c(03934)::AddDevice
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(+0xc1f450) [0x5d3b7e97b450]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(initRenderer+0xe4) [0x5d3b7e990094]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_ZN16graphics_backend12ForgeBackendC1ERN8platform6WindowE+0x3fe) [0x5d3b7e206ede]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_ZN16graphics_backend21CreateGraphicsBackendERN8platform6WindowE+0x80) [0x5d3b7e188fb0]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_ZN8graphics14GraphicsDeviceC2ERN8platform6WindowE+0x2c) [0x5d3b7e1887cc]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_ZN6RenderC1ERN8platform6WindowE+0x18a) [0x5d3b7e185e5a]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_ZN12ClientEngineC1ERN8platform6WindowE+0x11c) [0x5d3b7e16649c]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(main+0x609) [0x5d3b7e0b0a19]
+	/lib/x86_64-linux-gnu/libc.so.6(+0x2a1ca) [0x7d7a55c2a1ca]
+	/lib/x86_64-linux-gnu/libc.so.6(__libc_start_main+0x8b) [0x7d7a55c2a28b]
+	./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3(_start+0x25) [0x5d3b7e0b8715]
+--------------------------------------------------------------------------------
+
+This file contains a log of all memory operations performed during the last run.
+
+Interrogate this file to track errors or to help track down memory-related
+issues. You can do this by tracing the allocations performed by a specific owner
+or by tracking a specific address through a series of allocations and
+reallocations.
+
+There is a lot of useful information here which, when used creatively, can be
+extremely helpful.
+
+Note that the following guides are used throughout this file:
+
+   [!] - Error
+   [+] - Allocation
+   [~] - Reallocation
+   [-] - Deallocation
+   [I] - Generic information
+   [F] - Failure induced for the purpose of stress-testing your application
+   [D] - Information used for debugging this memory manager
+
+...so, to find all errors in the file, search for "[!]"
+
+--------------------------------------------------------------------------------
+----All Allocations and Deallocations----
+

@@ -87,7 +87,25 @@ bool PhysicsWorldBullet::raycast(const glm::vec3& from,
 
     btVector3 btFrom(from.x, from.y, from.z);
     btVector3 btTo(to.x, to.y, to.z);
-    btCollisionWorld::ClosestRayResultCallback callback(btFrom, btTo);
+    struct RayCallback final : btCollisionWorld::ClosestRayResultCallback {
+        RayCallback(const btVector3& from, const btVector3& to)
+            : btCollisionWorld::ClosestRayResultCallback(from, to) {}
+
+        bool needsCollision(btBroadphaseProxy* proxy0) const override {
+            if (!btCollisionWorld::ClosestRayResultCallback::needsCollision(proxy0)) {
+                return false;
+            }
+            const btCollisionObject* obj = static_cast<const btCollisionObject*>(proxy0->m_clientObject);
+            if (obj && (obj->getCollisionFlags() & btCollisionObject::CF_CHARACTER_OBJECT)) {
+                return false;
+            }
+            return true;
+        }
+    };
+
+    RayCallback callback(btFrom, btTo);
+    callback.m_collisionFilterGroup = btBroadphaseProxy::DefaultFilter;
+    callback.m_collisionFilterMask = btBroadphaseProxy::StaticFilter | btBroadphaseProxy::DefaultFilter;
     dynamicsWorld_->rayTest(btFrom, btTo, callback);
     if (!callback.hasHit()) {
         return false;

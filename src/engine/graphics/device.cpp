@@ -139,8 +139,8 @@ void GraphicsDevice::setBrightness(float brightness) {
     }
 }
 
-graphics_backend::ImGuiBridge* GraphicsDevice::getImGuiBridge() const {
-    return backend_ ? backend_->getImGuiBridge() : nullptr;
+graphics_backend::UiRenderTargetBridge* GraphicsDevice::getUiRenderTargetBridge() const {
+    return backend_ ? backend_->getUiRenderTargetBridge() : nullptr;
 }
 
 void GraphicsDevice::setPosition(EntityId entity, const glm::vec3& position) {

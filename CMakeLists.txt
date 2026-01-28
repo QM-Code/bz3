@@ -11,6 +11,15 @@ project(bz3)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+enable_language(ASM)
+
+set(THE_FORGE_DIR "${PROJECT_SOURCE_DIR}/third_party/the-forge" CACHE PATH "The Forge root directory")
+if(EXISTS "${THE_FORGE_DIR}/Common_3")
+    add_library(the_forge_headers INTERFACE)
+    target_include_directories(the_forge_headers INTERFACE "${THE_FORGE_DIR}")
+else()
+    message(STATUS "The Forge not found at ${THE_FORGE_DIR}; clone it to enable Forge integration.")
+endif()
 
 set(BZ3_UI_BACKEND "imgui" CACHE STRING "UI backend (imgui or rmlui)")
 set_property(CACHE BZ3_UI_BACKEND PROPERTY STRINGS imgui rmlui)
@@ -34,12 +43,14 @@ else()
     message(FATAL_ERROR "Unknown BZ3_WINDOW_BACKEND value: ${BZ3_WINDOW_BACKEND}")
 endif()
 
-set(BZ3_PHYSICS_BACKEND "jolt" CACHE STRING "Physics backend (jolt or bullet)")
-set_property(CACHE BZ3_PHYSICS_BACKEND PROPERTY STRINGS jolt bullet)
+set(BZ3_PHYSICS_BACKEND "jolt" CACHE STRING "Physics backend (jolt or bullet or physx)")
+set_property(CACHE BZ3_PHYSICS_BACKEND PROPERTY STRINGS jolt bullet physx)
 if(BZ3_PHYSICS_BACKEND STREQUAL "jolt")
     add_compile_definitions(BZ3_PHYSICS_BACKEND_JOLT)
 elseif(BZ3_PHYSICS_BACKEND STREQUAL "bullet")
     add_compile_definitions(BZ3_PHYSICS_BACKEND_BULLET)
+elseif(BZ3_PHYSICS_BACKEND STREQUAL "physx")
+    add_compile_definitions(BZ3_PHYSICS_BACKEND_PHYSX)
 else()
     message(FATAL_ERROR "Unknown BZ3_PHYSICS_BACKEND value: ${BZ3_PHYSICS_BACKEND}")
 endif()
@@ -70,16 +81,84 @@ else()
     message(FATAL_ERROR "Unknown BZ3_WORLD_BACKEND value: ${BZ3_WORLD_BACKEND}")
 endif()
 
-set(BZ3_RENDER_BACKEND "bgfx" CACHE STRING "Render backend (filament|diligent|bgfx)")
-set_property(CACHE BZ3_RENDER_BACKEND PROPERTY STRINGS filament diligent bgfx)
+set(BZ3_RENDER_BACKEND "bgfx" CACHE STRING "Render backend (filament|diligent|bgfx|forge)")
+set_property(CACHE BZ3_RENDER_BACKEND PROPERTY STRINGS filament diligent bgfx forge)
 if(BZ3_RENDER_BACKEND STREQUAL "filament")
     add_compile_definitions(BZ3_RENDER_BACKEND_FILAMENT)
 elseif(BZ3_RENDER_BACKEND STREQUAL "diligent")
     add_compile_definitions(BZ3_RENDER_BACKEND_DILIGENT)
 elseif(BZ3_RENDER_BACKEND STREQUAL "bgfx")
     add_compile_definitions(BZ3_RENDER_BACKEND_BGFX)
+elseif(BZ3_RENDER_BACKEND STREQUAL "forge")
+    add_compile_definitions(BZ3_RENDER_BACKEND_FORGE)
 else()
     message(FATAL_ERROR "Unknown BZ3_RENDER_BACKEND value: ${BZ3_RENDER_BACKEND}")
+endif()
+
+if(BZ3_RENDER_BACKEND STREQUAL "forge")
+    if(NOT EXISTS "${THE_FORGE_DIR}/Common_3")
+        message(FATAL_ERROR "The Forge not found at ${THE_FORGE_DIR}. Clone https://github.com/ConfettiFX/The-Forge.git into third_party/the-forge.")
+    endif()
+    set(THE_FORGE_GRAPHICS_SOURCES
+        ${THE_FORGE_DIR}/Common_3/Graphics/GraphicsConfig.cpp
+        ${THE_FORGE_DIR}/Common_3/Graphics/Vulkan/Vulkan.c
+        ${THE_FORGE_DIR}/Common_3/Graphics/Vulkan/Vulkan_cxx.cpp
+        ${THE_FORGE_DIR}/Common_3/Graphics/Vulkan/VulkanRaytracing.c
+        ${THE_FORGE_DIR}/Common_3/Graphics/ThirdParty/OpenSource/volk/volk.c
+    )
+    set(THE_FORGE_OS_SOURCES
+        ${THE_FORGE_DIR}/Common_3/OS/Linux/LinuxLog.c
+        ${THE_FORGE_DIR}/Common_3/OS/Linux/LinuxThread.c
+        ${THE_FORGE_DIR}/Common_3/OS/Linux/LinuxTime.c
+        ${THE_FORGE_DIR}/Common_3/OS/Linux/LinuxFileSystem.c
+        ${THE_FORGE_DIR}/Common_3/OS/Linux/LinuxToolsFileSystem.c
+    )
+    set(THE_FORGE_UTIL_SOURCES
+        ${THE_FORGE_DIR}/Common_3/Utilities/Log/Log.c
+        ${THE_FORGE_DIR}/Common_3/Utilities/FileSystem/FileSystem.c
+        ${THE_FORGE_DIR}/Common_3/Utilities/FileSystem/ToolFileSystem.c
+        ${THE_FORGE_DIR}/Common_3/Utilities/FileSystem/UnixFileSystem.c
+        ${THE_FORGE_DIR}/Common_3/Utilities/Threading/ThreadSystem.c
+        ${THE_FORGE_DIR}/Common_3/Utilities/Timer.c
+        ${THE_FORGE_DIR}/Common_3/Utilities/MemoryTracking/MemoryTracking.c
+        ${THE_FORGE_DIR}/Common_3/Utilities/Math/Algorithms.c
+        ${THE_FORGE_DIR}/Common_3/Utilities/Math/StbDs.c
+        ${THE_FORGE_DIR}/Common_3/Resources/ResourceLoader/ResourceLoader.cpp
+        ${THE_FORGE_DIR}/Common_3/Utilities/ThirdParty/OpenSource/lz4/lz4.c
+        ${THE_FORGE_DIR}/Common_3/Utilities/ThirdParty/OpenSource/lz4/lz4hc.c
+        ${THE_FORGE_DIR}/Common_3/Utilities/ThirdParty/OpenSource/bstrlib/bstrlib.c
+        ${THE_FORGE_DIR}/Common_3/Utilities/ThirdParty/OpenSource/bstrlib/buniutil.c
+        ${THE_FORGE_DIR}/Common_3/Utilities/ThirdParty/OpenSource/bstrlib/utf8util.c
+        ${THE_FORGE_DIR}/Common_3/Utilities/ThirdParty/OpenSource/FluidStudios/MemoryManager/mmgr.c
+    )
+    file(GLOB THE_FORGE_ZSTD_COMMON_SOURCES
+        ${THE_FORGE_DIR}/Common_3/Utilities/ThirdParty/OpenSource/zstd/common/*.c
+    )
+    file(GLOB THE_FORGE_ZSTD_COMPRESS_SOURCES
+        ${THE_FORGE_DIR}/Common_3/Utilities/ThirdParty/OpenSource/zstd/compress/*.c
+    )
+    file(GLOB THE_FORGE_ZSTD_DECOMPRESS_SOURCES
+        ${THE_FORGE_DIR}/Common_3/Utilities/ThirdParty/OpenSource/zstd/decompress/*.c
+    )
+    set(THE_FORGE_ZSTD_ASM_SOURCES
+        ${THE_FORGE_DIR}/Common_3/Utilities/ThirdParty/OpenSource/zstd/decompress/huf_decompress_amd64.S
+    )
+    set_source_files_properties(${THE_FORGE_ZSTD_ASM_SOURCES} PROPERTIES LANGUAGE ASM)
+    add_library(the_forge STATIC
+        ${THE_FORGE_GRAPHICS_SOURCES}
+        ${THE_FORGE_OS_SOURCES}
+        ${THE_FORGE_UTIL_SOURCES}
+        ${THE_FORGE_ZSTD_COMMON_SOURCES}
+        ${THE_FORGE_ZSTD_COMPRESS_SOURCES}
+        ${THE_FORGE_ZSTD_DECOMPRESS_SOURCES}
+        ${THE_FORGE_ZSTD_ASM_SOURCES}
+    )
+    target_include_directories(the_forge PUBLIC "${THE_FORGE_DIR}")
+    target_compile_definitions(the_forge PRIVATE
+        FORGE_EXPLICIT_RENDERER_API
+        FORGE_EXPLICIT_RENDERER_API_VULKAN
+        ENABLE_MEMORY_TRACKING
+    )
 endif()
 
 set(CMAKE_BUILD_TYPE Release)
@@ -152,6 +231,8 @@ if(BZ3_PHYSICS_BACKEND STREQUAL "jolt")
     find_package(Jolt REQUIRED)
 elseif(BZ3_PHYSICS_BACKEND STREQUAL "bullet")
     find_package(Bullet CONFIG REQUIRED)
+elseif(BZ3_PHYSICS_BACKEND STREQUAL "physx")
+    find_package(unofficial-omniverse-physx-sdk CONFIG REQUIRED)
 endif()
 find_package(assimp REQUIRED)
 find_package(cxxopts REQUIRED)
@@ -337,7 +418,9 @@ set(ENGINE_CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/engine/platform/window_factory.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/system.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/backend_factory.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/config.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/render_settings.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/render_scale.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/audio/audio.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/audio/backend_factory.cpp
 )
@@ -366,6 +449,19 @@ if(BZ3_UI_BACKEND STREQUAL "imgui")
         ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/hud/scoreboard.cpp
         ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/hud/spawn_hint.cpp
     )
+    if(BZ3_RENDER_BACKEND STREQUAL "bgfx")
+        list(APPEND ENGINE_CLIENT_SOURCES
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/platform/renderer_bgfx.cpp
+        )
+    elseif(BZ3_RENDER_BACKEND STREQUAL "diligent")
+        list(APPEND ENGINE_CLIENT_SOURCES
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/platform/renderer_diligent.cpp
+        )
+    elseif(BZ3_RENDER_BACKEND STREQUAL "forge")
+        list(APPEND ENGINE_CLIENT_SOURCES
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/platform/renderer_forge.cpp
+        )
+    endif()
 elseif(BZ3_UI_BACKEND STREQUAL "rmlui")
     list(APPEND ENGINE_CLIENT_SOURCES
         ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/backend.cpp
@@ -374,6 +470,7 @@ elseif(BZ3_UI_BACKEND STREQUAL "rmlui")
         ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/console/modal_dialog.cpp
         ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/hud/hud.cpp
         ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/hud/chat.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/hud/crosshair.cpp
         ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/hud/dialog.cpp
         ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/hud/radar.cpp
         ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/hud/scoreboard.cpp
@@ -387,11 +484,15 @@ elseif(BZ3_UI_BACKEND STREQUAL "rmlui")
     )
     if(BZ3_RENDER_BACKEND STREQUAL "bgfx")
         list(APPEND ENGINE_CLIENT_SOURCES
-            ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/platform/RmlUi_Renderer_BGFX.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/platform/renderer_bgfx.cpp
         )
     elseif(BZ3_RENDER_BACKEND STREQUAL "diligent")
         list(APPEND ENGINE_CLIENT_SOURCES
-            ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/platform/RmlUi_Renderer_Diligent.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/platform/renderer_diligent.cpp
+        )
+    elseif(BZ3_RENDER_BACKEND STREQUAL "forge")
+        list(APPEND ENGINE_CLIENT_SOURCES
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/platform/renderer_forge.cpp
         )
     endif()
 endif()
@@ -439,6 +540,13 @@ elseif(BZ3_PHYSICS_BACKEND STREQUAL "bullet")
         ${PROJECT_SOURCE_DIR}/src/engine/physics/backends/bullet/static_body_bullet.cpp
         ${PROJECT_SOURCE_DIR}/src/engine/physics/backends/bullet/player_controller_bullet.cpp
     )
+elseif(BZ3_PHYSICS_BACKEND STREQUAL "physx")
+    list(APPEND PHYSICS_SOURCES
+        ${PROJECT_SOURCE_DIR}/src/engine/physics/backends/physx/physics_world_physx.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/physics/backends/physx/rigid_body_physx.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/physics/backends/physx/static_body_physx.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/physics/backends/physx/player_controller_physx.cpp
+    )
 endif()
 
 list(APPEND ENGINE_CLIENT_SOURCES ${PHYSICS_SOURCES})
@@ -467,7 +575,6 @@ elseif(BZ3_RENDER_BACKEND STREQUAL "diligent")
     )
     if(BZ3_UI_BACKEND STREQUAL "imgui")
         list(APPEND ENGINE_CLIENT_SOURCES
-            ${PROJECT_SOURCE_DIR}/src/engine/graphics/backends/diligent/imgui_bridge.cpp
         )
     endif()
 elseif(BZ3_RENDER_BACKEND STREQUAL "bgfx")
@@ -476,9 +583,14 @@ elseif(BZ3_RENDER_BACKEND STREQUAL "bgfx")
     )
     if(BZ3_UI_BACKEND STREQUAL "imgui")
         list(APPEND ENGINE_CLIENT_SOURCES
-            ${PROJECT_SOURCE_DIR}/src/engine/graphics/backends/bgfx/ui_bridge.cpp
         )
     endif()
+elseif(BZ3_RENDER_BACKEND STREQUAL "forge")
+    list(APPEND ENGINE_CLIENT_SOURCES
+        ${PROJECT_SOURCE_DIR}/src/engine/graphics/backends/forge/backend.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/graphics/backends/forge/ui_bridge.cpp
+        ${PROJECT_SOURCE_DIR}/src/engine/graphics/backends/forge/reload_stubs.cpp
+    )
 endif()
 
 # Create executables
@@ -536,6 +648,9 @@ target_link_libraries(bz3 PRIVATE
     CURL::libcurl
     OpenSSL::Crypto
 )
+if(TARGET the_forge_headers)
+    target_link_libraries(bz3 PRIVATE the_forge_headers)
+endif()
 if(BZ3_RENDER_BACKEND STREQUAL "filament")
     set(FILAMENT_SDK_DIR "${PROJECT_SOURCE_DIR}/libs/filament-sdk" CACHE PATH "Filament SDK root directory")
     option(FILAMENT_SDK_USE_LIBCXX "Link Filament SDK against libc++/libc++abi" OFF)
@@ -551,6 +666,41 @@ if(BZ3_RENDER_BACKEND STREQUAL "filament")
         message(FATAL_ERROR "Filament SDK libraries not found in ${FILAMENT_SDK_LIB_DIR}.")
     endif()
 
+    # Detect whether the SDK was built with libc++ (std::__1).
+    if(NOT FILAMENT_SDK_USE_LIBCXX)
+        set(FILAMENT_LIB "${FILAMENT_SDK_LIB_DIR}/libfilament.a")
+        if(EXISTS "${FILAMENT_LIB}")
+            find_program(NM_EXECUTABLE nm)
+            if(NM_EXECUTABLE)
+                execute_process(
+                    COMMAND ${NM_EXECUTABLE} -g "${FILAMENT_LIB}"
+                    OUTPUT_VARIABLE FILAMENT_NM_OUTPUT
+                    ERROR_QUIET
+                )
+                if(FILAMENT_NM_OUTPUT MATCHES "std::__1")
+                    set(FILAMENT_SDK_USE_LIBCXX ON)
+                endif()
+            endif()
+        endif()
+    endif()
+
+    # Detect whether BlueVK in the SDK provides Wayland surface entry points.
+    set(BZ3_FILAMENT_BLUEVK_HAS_WAYLAND OFF)
+    set(BLUEVK_LIB "${FILAMENT_SDK_LIB_DIR}/libbluevk.a")
+    if(EXISTS "${BLUEVK_LIB}")
+        find_program(NM_EXECUTABLE nm)
+        if(NM_EXECUTABLE)
+            execute_process(
+                COMMAND ${NM_EXECUTABLE} -g "${BLUEVK_LIB}"
+                OUTPUT_VARIABLE BLUEVK_NM_OUTPUT
+                ERROR_QUIET
+            )
+            if(BLUEVK_NM_OUTPUT MATCHES "vkCreateWaylandSurfaceKHR")
+                set(BZ3_FILAMENT_BLUEVK_HAS_WAYLAND ON)
+            endif()
+        endif()
+    endif()
+
     if(FILAMENT_SDK_USE_LIBCXX)
         find_library(LIBCXX_LIBRARY NAMES c++ libc++)
         find_library(LIBCXXABI_LIBRARY NAMES c++abi)
@@ -560,6 +710,9 @@ if(BZ3_RENDER_BACKEND STREQUAL "filament")
     endif()
 
     target_include_directories(bz3 PRIVATE ${FILAMENT_SDK_INCLUDE_DIR})
+    target_compile_definitions(bz3 PRIVATE
+        $<$<BOOL:${BZ3_FILAMENT_BLUEVK_HAS_WAYLAND}>:BZ3_FILAMENT_BLUEVK_HAS_WAYLAND=1>
+    )
     target_link_libraries(bz3 PRIVATE
         -Wl,--start-group
         ${FILAMENT_SDK_LIBS}
@@ -604,6 +757,8 @@ elseif(BZ3_RENDER_BACKEND STREQUAL "diligent")
 elseif(BZ3_RENDER_BACKEND STREQUAL "bgfx")
     target_link_libraries(bz3 PRIVATE bgfx::bgfx)
     add_dependencies(bz3 bz3_bgfx_shaders)
+elseif(BZ3_RENDER_BACKEND STREQUAL "forge")
+    target_link_libraries(bz3 PRIVATE the_forge)
 endif()
 if(BZ3_PHYSICS_BACKEND STREQUAL "jolt")
     target_link_libraries(bz3 PRIVATE Jolt::Jolt)
@@ -616,6 +771,13 @@ elseif(BZ3_PHYSICS_BACKEND STREQUAL "bullet")
     if(DEFINED BULLET_INCLUDE_DIRS)
         target_include_directories(bz3 PRIVATE ${BULLET_INCLUDE_DIRS})
     endif()
+elseif(BZ3_PHYSICS_BACKEND STREQUAL "physx")
+    target_link_libraries(bz3 PRIVATE unofficial::omniverse-physx-sdk::sdk)
+    # Ensure static lib link order resolves PhysX character controller deps.
+    target_link_libraries(bz3 PRIVATE
+        unofficial::omniverse-physx-sdk::PhysXCharacterKinematic
+        unofficial::omniverse-physx-sdk::PhysXExtensions
+    )
 endif()
 if(BZ3_UI_BACKEND STREQUAL "imgui")
     target_link_libraries(bz3 PRIVATE
@@ -668,6 +830,13 @@ elseif(BZ3_PHYSICS_BACKEND STREQUAL "bullet")
     if(DEFINED BULLET_INCLUDE_DIRS)
         target_include_directories(bz3-server PRIVATE ${BULLET_INCLUDE_DIRS})
     endif()
+elseif(BZ3_PHYSICS_BACKEND STREQUAL "physx")
+    target_link_libraries(bz3-server PRIVATE unofficial::omniverse-physx-sdk::sdk)
+    # Ensure static lib link order resolves PhysX character controller deps.
+    target_link_libraries(bz3-server PRIVATE
+        unofficial::omniverse-physx-sdk::PhysXCharacterKinematic
+        unofficial::omniverse-physx-sdk::PhysXExtensions
+    )
 endif()
 
 # System libraries (platform-specific)

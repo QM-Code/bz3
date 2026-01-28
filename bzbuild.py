@@ -60,9 +60,9 @@ build_dir = ""
 if not args:
     window = prompt_choice("Platform (sdl3/sdl2)", "sdl3", ["sdl3", "sdl2"])
     ui = prompt_choice("UI (rmlui/imgui)", "rmlui", ["rmlui", "imgui"])
-    physics = prompt_choice("Physics (jolt/bullet)", "jolt", ["jolt", "bullet"])
+    physics = prompt_choice("Physics (jolt/bullet/physx)", "jolt", ["jolt", "bullet", "physx"])
     audio = prompt_choice("Audio (miniaudio/sdlaudio)", "sdlaudio", ["miniaudio", "sdlaudio"])
-    render = prompt_choice("Renderer (filament/diligent/bgfx)", "bgfx", ["filament", "diligent", "bgfx"])
+    render = prompt_choice("Renderer (filament/diligent/bgfx/forge)", "bgfx", ["filament", "diligent", "bgfx", "forge"])
     network = prompt_choice("Network (enet)", "enet", ["enet"])
     world = prompt_choice("World (fs)", "fs", ["fs"])
     build_dir = f"build-{window}-{ui}-{physics}-{audio}-{render}-{network}-{world}"
@@ -81,11 +81,11 @@ else:
                 window = part
         elif part in ("imgui", "rmlui"):
             ui = part
-        elif part in ("jolt", "bullet"):
+        elif part in ("jolt", "bullet", "physx"):
             physics = part
         elif part in ("miniaudio", "sdlaudio"):
             audio = part
-        elif part in ("filament", "diligent", "bgfx"):
+        elif part in ("filament", "diligent", "bgfx", "forge"):
             render = part
         elif part == "enet":
             network = part
@@ -123,5 +123,12 @@ else:
 
 if run_configure:
     run(["cmake", "-S", ".", "-B", build_dir, *cmake_args])
+
+if render == "forge":
+    script_path = os.path.join(os.path.dirname(__file__), "scripts", "build_forge_shaders.sh")
+    if os.path.isfile(script_path):
+        run([script_path])
+    else:
+        print(f"Warning: forge shader build script not found at {script_path}", file=sys.stderr)
 
 run(["cmake", "--build", build_dir, "-j4"])

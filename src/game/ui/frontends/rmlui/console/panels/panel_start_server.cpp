@@ -18,8 +18,8 @@
 #include "common/json.hpp"
 #include <spdlog/spdlog.h>
 
-#include "common/config_helpers.hpp"
 #include "common/data_path_resolver.hpp"
+#include "ui/config.hpp"
 
 #if !defined(_WIN32)
 #include <arpa/inet.h>
@@ -853,7 +853,7 @@ bool RmlUiPanelStartServer::ensureAdvertiseHost() {
     if (!advertiseHostValue.empty()) {
         return true;
     }
-    std::string advertiseHost = bz::data::ReadStringConfig("network.ServerAdvertiseHost", "");
+    std::string advertiseHost = ui::config::GetRequiredString("network.ServerAdvertiseHost");
     if (advertiseHost.empty()) {
         advertiseHost = guessLocalIpAddress();
     }

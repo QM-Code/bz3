@@ -14,9 +14,9 @@
 #include <spdlog/spdlog.h>
 #include <optional>
 
-#include "common/config_helpers.hpp"
 #include "common/data_path_resolver.hpp"
 #include "common/i18n.hpp"
+#include "ui/config.hpp"
 
 #if !defined(_WIN32)
 #include <arpa/inet.h>
@@ -461,7 +461,7 @@ void ConsoleView::drawStartServerPanel(const MessageColors &colors) {
     ImGui::Spacing();
 
     if (serverAdvertiseHostBuffer[0] == '\0') {
-        std::string advertiseHost = bz::data::ReadStringConfig("network.ServerAdvertiseHost", "");
+        std::string advertiseHost = ui::config::GetRequiredString("network.ServerAdvertiseHost");
         if (advertiseHost.empty()) {
             advertiseHost = guessLocalIpAddress();
         }

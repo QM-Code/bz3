@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/graphics/ui_bridge.hpp"
+#include "engine/graphics/ui_render_target_bridge.hpp"
 
 #include <DiligentCore/Common/interface/RefCntAutoPtr.hpp>
 
@@ -17,10 +17,10 @@ class ITextureView;
 
 namespace graphics_backend {
 
-class DiligentImGuiBridge final : public ImGuiBridge {
+class DiligentRenderer final : public UiRenderTargetBridge {
 public:
-    DiligentImGuiBridge();
-    ~DiligentImGuiBridge() override;
+    DiligentRenderer();
+    ~DiligentRenderer() override;
 
     void* toImGuiTextureId(const graphics::TextureHandle& texture) const override;
     void rebuildImGuiFonts(ImFontAtlas* atlas) override;

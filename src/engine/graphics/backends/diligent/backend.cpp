@@ -1,7 +1,7 @@
 #include "engine/graphics/backends/diligent/backend.hpp"
 #include "engine/graphics/backends/diligent/ui_bridge.hpp"
 #if defined(BZ3_UI_BACKEND_IMGUI)
-#include "engine/graphics/backends/diligent/imgui_bridge.hpp"
+#include "ui/frontends/imgui/platform/renderer_diligent.hpp"
 #endif
 
 #include "engine/common/data_path_resolver.hpp"
@@ -571,13 +571,6 @@ graphics::RenderTargetId DiligentBackend::createRenderTarget(const graphics::Ren
             record.rtv = record.colorTexture->GetDefaultView(Diligent::TEXTURE_VIEW_RENDER_TARGET);
             record.srv = record.colorTexture->GetDefaultView(Diligent::TEXTURE_VIEW_SHADER_RESOURCE);
             record.srvToken = graphics_backend::diligent_ui::RegisterExternalTexture(record.srv);
-            spdlog::info("Graphics(Diligent): RT {} color={} srv={} token={} size={}x{}",
-                         id,
-                         static_cast<void*>(record.rtv),
-                         static_cast<void*>(record.srv),
-                         record.srvToken,
-                         desc.width,
-                         desc.height);
         }
 
         if (desc.depth) {
@@ -658,13 +651,6 @@ unsigned int DiligentBackend::getRenderTargetTextureId(graphics::RenderTargetId 
     }
     if (it->second.srvToken == 0) {
         return 0u;
-    }
-    static std::unordered_map<graphics::RenderTargetId, uint64_t> lastTokens;
-    const uint64_t token = it->second.srvToken;
-    auto& last = lastTokens[target];
-    if (last != token) {
-        spdlog::debug("Graphics(Diligent): RT {} token={}", target, token);
-        last = token;
     }
     return static_cast<unsigned int>(it->second.srvToken);
 }
@@ -809,7 +795,7 @@ void DiligentBackend::initDiligent() {
     graphics_backend::diligent_ui::SetContext(device_, context_, swapChain_, framebufferWidth, framebufferHeight);
 #if defined(BZ3_UI_BACKEND_IMGUI)
     if (!uiBridge_) {
-        uiBridge_ = std::make_unique<DiligentImGuiBridge>();
+        uiBridge_ = std::make_unique<DiligentRenderer>();
     }
 #endif
     spdlog::info("Graphics(Diligent): Vulkan initialized");
@@ -1397,12 +1383,7 @@ void DiligentBackend::renderToTargets(Diligent::ITextureView* rtv,
     }
 
     const bool useSwapchain = (swapChain_ && rtv == swapChain_->GetCurrentBackBufferRTV());
-    const float clearColor[4] = {
-        useSwapchain ? 0.02f : 1.0f,
-        useSwapchain ? 0.02f : 0.0f,
-        useSwapchain ? 0.02f : 1.0f,
-        1.0f
-    };
+    const float clearColor[4] = {0.02f, 0.02f, 0.02f, 1.0f};
     if (rtv) {
         context_->ClearRenderTarget(rtv, clearColor, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
     }
@@ -1441,7 +1422,6 @@ void DiligentBackend::renderToTargets(Diligent::ITextureView* rtv,
     }
     context_->SetPipelineState(pipeline);
 
-    int drawCalls = 0;
     const glm::mat4 viewProj = getViewProjectionMatrix();
     for (const auto& [id, entity] : entities) {
         if (entity.layer != layer || !entity.visible) {
@@ -1493,7 +1473,6 @@ void DiligentBackend::renderToTargets(Diligent::ITextureView* rtv,
             drawAttrs.NumIndices = mesh.indexCount;
             drawAttrs.Flags = Diligent::DRAW_FLAG_VERIFY_ALL;
             context_->DrawIndexed(drawAttrs);
-            ++drawCalls;
         };
 
         if (!entity.meshes.empty()) {
@@ -1505,17 +1484,7 @@ void DiligentBackend::renderToTargets(Diligent::ITextureView* rtv,
         }
     }
 
-    if (!useSwapchain) {
-        static int frameCounter = 0;
-        if ((frameCounter++ % 120) == 0) {
-            spdlog::info("Graphics(Diligent): offscreen render rtv={} dsv={} size={}x{} draws={}",
-                         static_cast<void*>(rtv),
-                         static_cast<void*>(dsv),
-                         targetWidth,
-                         targetHeight,
-                         drawCalls);
-        }
-    }
+    (void)useSwapchain;
 }
 
 void DiligentBackend::setPosition(graphics::EntityId entity, const glm::vec3& position) {
@@ -1592,9 +1561,9 @@ glm::mat4 DiligentBackend::computeViewMatrix() const {
 
 glm::mat4 DiligentBackend::computeProjectionMatrix() const {
     if (usePerspective) {
-        return glm::perspective(glm::radians(fovDegrees), aspectRatio, nearPlane, farPlane);
+        return glm::perspectiveRH_ZO(glm::radians(fovDegrees), aspectRatio, nearPlane, farPlane);
     }
-    return glm::ortho(orthoLeft, orthoRight, orthoBottom, orthoTop, nearPlane, farPlane);
+    return glm::orthoRH_ZO(orthoLeft, orthoRight, orthoBottom, orthoTop, nearPlane, farPlane);
 }
 
 glm::mat4 DiligentBackend::getViewProjectionMatrix() const {

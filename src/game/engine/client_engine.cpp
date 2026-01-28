@@ -4,9 +4,9 @@
 #include "game/input/bindings.hpp"
 #include "game/input/state.hpp"
 #include "spdlog/spdlog.h"
-#include "ui/render_bridge.hpp"
+#include "ui/bridges/render_bridge.hpp"
 #if defined(BZ3_UI_BACKEND_IMGUI)
-#include "ui/frontends/imgui/render_bridge.hpp"
+#include "ui/bridges/imgui_render_bridge.hpp"
 #endif
 #include <cstdint>
 #include <vector>
@@ -27,8 +27,8 @@ public:
     }
 
 #if defined(BZ3_UI_BACKEND_IMGUI)
-    graphics_backend::ImGuiBridge* getImGuiBridge() const override {
-        return render ? render->getImGuiBridge() : nullptr;
+    graphics_backend::UiRenderTargetBridge* getUiRenderTargetBridge() const override {
+        return render ? render->getUiRenderTargetBridge() : nullptr;
     }
 #endif
 

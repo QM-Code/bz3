@@ -16,10 +16,12 @@
 #include <gltfio/TextureProvider.h>
 #include <gltfio/materials/uberarchive.h>
 #include <ktxreader/Ktx1Reader.h>
-#define FILAMENT_SUPPORTS_WAYLAND 1
 #include <bluevk/BlueVK.h>
 #include <backend/platforms/VulkanPlatform.h>
+#if defined(BZ3_FILAMENT_BLUEVK_HAS_WAYLAND)
+#define FILAMENT_SUPPORTS_WAYLAND 1
 #include <wayland-client-core.h>
+#endif
 #include <math/mat4.h>
 #include <math/vec4.h>
 #include <glm/gtc/matrix_transform.hpp>
@@ -34,10 +36,12 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_properties.h>
 #include <SDL3/SDL_video.h>
+#include <X11/Xlib.h>
 #endif
 
 namespace {
 using graphics_backend::filament_backend_detail::WaylandNativeWindow;
+using graphics_backend::filament_backend_detail::X11NativeWindow;
 filament::math::mat4f toFilamentMat4(const glm::mat4& m) {
     filament::math::mat4f out;
     for (int c = 0; c < 4; ++c) {
@@ -241,6 +245,7 @@ void* getNativeWindowHandle(platform::Window* window, bool preferWaylandSurface)
 }
 
 WaylandNativeWindow* createWaylandNativeWindow(platform::Window* window, int width, int height) {
+#if defined(BZ3_FILAMENT_BLUEVK_HAS_WAYLAND)
     if (!window) {
         return nullptr;
     }
@@ -269,8 +274,49 @@ WaylandNativeWindow* createWaylandNativeWindow(platform::Window* window, int wid
     (void)height;
     return nullptr;
 #endif
+#else
+    (void)window;
+    (void)width;
+    (void)height;
+    return nullptr;
+#endif
 }
 
+#if defined(BZ3_WINDOW_BACKEND_SDL3)
+X11NativeWindow* createX11NativeWindow(platform::Window* window, int width, int height) {
+    if (!window) {
+        return nullptr;
+    }
+    auto* sdlWindow = static_cast<SDL_Window*>(window->nativeHandle());
+    if (!sdlWindow) {
+        return nullptr;
+    }
+    const SDL_PropertiesID props = SDL_GetWindowProperties(sdlWindow);
+    if (props == 0) {
+        return nullptr;
+    }
+    auto* display = static_cast<Display*>(SDL_GetPointerProperty(props, SDL_PROP_WINDOW_X11_DISPLAY_POINTER, nullptr));
+    const Sint64 x11Window = SDL_GetNumberProperty(props, SDL_PROP_WINDOW_X11_WINDOW_NUMBER, 0);
+    if (!display || x11Window == 0) {
+        return nullptr;
+    }
+    auto* out = new X11NativeWindow();
+    out->display = display;
+    out->window = static_cast<unsigned long>(x11Window);
+    out->width = static_cast<uint32_t>(std::max(1, width));
+    out->height = static_cast<uint32_t>(std::max(1, height));
+    return out;
+}
+#else
+X11NativeWindow* createX11NativeWindow(platform::Window* window, int width, int height) {
+    (void)window;
+    (void)width;
+    (void)height;
+    return nullptr;
+}
+#endif
+
+#if defined(BZ3_FILAMENT_BLUEVK_HAS_WAYLAND)
 class WaylandVulkanPlatform final : public filament::backend::VulkanPlatform {
 public:
     ExtensionSet getSwapchainInstanceExtensions() const override {
@@ -295,6 +341,38 @@ public:
         info.surface = wnd->surface;
         VkSurfaceKHR surface = VK_NULL_HANDLE;
         VkResult res = bluevk::vkCreateWaylandSurfaceKHR(instance, &info, nullptr, &surface);
+        if (res != VK_SUCCESS) {
+            return {VK_NULL_HANDLE, VkExtent2D{0, 0}};
+        }
+        return {surface, VkExtent2D{wnd->width, wnd->height}};
+    }
+};
+#endif
+
+class X11VulkanPlatform final : public filament::backend::VulkanPlatform {
+public:
+    ExtensionSet getSwapchainInstanceExtensions() const override {
+        ExtensionSet exts;
+        exts.emplace("VK_KHR_surface");
+        exts.emplace("VK_KHR_xlib_surface");
+        return exts;
+    }
+
+    SurfaceBundle createVkSurfaceKHR(void* nativeWindow, VkInstance instance,
+            uint64_t /*flags*/) const noexcept override {
+        if (!nativeWindow || instance == VK_NULL_HANDLE) {
+            return {VK_NULL_HANDLE, VkExtent2D{0, 0}};
+        }
+        auto* wnd = static_cast<X11NativeWindow*>(nativeWindow);
+        if (!wnd->display || wnd->window == 0) {
+            return {VK_NULL_HANDLE, VkExtent2D{0, 0}};
+        }
+        VkXlibSurfaceCreateInfoKHR info{};
+        info.sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
+        info.dpy = wnd->display;
+        info.window = static_cast<Window>(wnd->window);
+        VkSurfaceKHR surface = VK_NULL_HANDLE;
+        VkResult res = bluevk::vkCreateXlibSurfaceKHR(instance, &info, nullptr, &surface);
         if (res != VK_SUCCESS) {
             return {VK_NULL_HANDLE, VkExtent2D{0, 0}};
         }
@@ -329,11 +407,23 @@ FilamentBackend::FilamentBackend(platform::Window& windowIn)
     spdlog::info("Graphics(Filament): backend = Vulkan");
 
     waylandWindow = createWaylandNativeWindow(window, framebufferWidth, framebufferHeight);
-    if (!waylandWindow) {
-        spdlog::error("Graphics(Filament): Vulkan Wayland surface missing");
-        return;
+#if defined(BZ3_FILAMENT_BLUEVK_HAS_WAYLAND)
+    if (waylandWindow) {
+        customPlatform = new WaylandVulkanPlatform();
+        nativeSwapChainHandle = waylandWindow;
+        swapChainIsNative = true;
     }
-    customPlatform = new WaylandVulkanPlatform();
+#endif
+    if (!customPlatform) {
+        x11Window = createX11NativeWindow(window, framebufferWidth, framebufferHeight);
+        if (!x11Window) {
+            spdlog::error("Graphics(Filament): no Vulkan surface available (Wayland unsupported and X11 missing).");
+            return;
+        }
+        customPlatform = new X11VulkanPlatform();
+        nativeSwapChainHandle = x11Window;
+        swapChainIsNative = true;
+    }
 
     engine = filament::Engine::create(backend, customPlatform, nullptr);
     if (!engine) {
@@ -353,9 +443,7 @@ FilamentBackend::FilamentBackend(platform::Window& windowIn)
     camera = engine->createCamera(cameraEntity);
 
     if (backend == filament::Engine::Backend::VULKAN) {
-        nativeSwapChainHandle = waylandWindow;
         swapChain = engine->createSwapChain(nativeSwapChainHandle);
-        swapChainIsNative = true;
     } else {
         swapChain = engine->createSwapChain(static_cast<uint32_t>(framebufferWidth),
                                             static_cast<uint32_t>(framebufferHeight));
@@ -598,6 +686,10 @@ FilamentBackend::~FilamentBackend() {
         delete waylandWindow;
         waylandWindow = nullptr;
     }
+    if (x11Window) {
+        delete x11Window;
+        x11Window = nullptr;
+    }
 }
 
 void FilamentBackend::beginFrame() {
@@ -639,6 +731,10 @@ void FilamentBackend::resize(int width, int height) {
     if (waylandWindow && sizeChanged) {
         waylandWindow->width = static_cast<uint32_t>(std::max(1, framebufferWidth));
         waylandWindow->height = static_cast<uint32_t>(std::max(1, framebufferHeight));
+    }
+    if (x11Window && sizeChanged) {
+        x11Window->width = static_cast<uint32_t>(std::max(1, framebufferWidth));
+        x11Window->height = static_cast<uint32_t>(std::max(1, framebufferHeight));
     }
     if (engine && swapChain && sizeChanged) {
         engine->destroy(swapChain);

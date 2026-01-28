@@ -1,15 +1,20 @@
 #include "ui/frontends/imgui/backend.hpp"
 
 #include "common/data_path_resolver.hpp"
-#include "common/config_helpers.hpp"
 #include "common/i18n.hpp"
-#include "engine/graphics/ui_bridge.hpp"
+#include "engine/graphics/ui_render_target_bridge.hpp"
 #include "platform/window.hpp"
 #include "spdlog/spdlog.h"
+#include "ui/config.hpp"
+#include "ui/render_scale.hpp"
 
+#include <cmath>
 
 namespace ui_backend {
 namespace {
+bool hasOutputDrawData(const ImDrawData* drawData) {
+    return drawData && drawData->TotalVtxCount > 0;
+}
 
 ImGuiKey toImGuiKey(platform::Key key) {
     switch (key) {
@@ -185,7 +190,7 @@ ImGuiBackend::ImGuiBackend(platform::Window &windowRef) : window(&windowRef) {
     consoleView.initializeFonts(io);
     spdlog::info("UiSystem: ImGui console font init done");
 
-    showFPS = bz::data::ReadBoolConfig({"debug.ShowFPS"}, false);
+    showFPS = ui::config::GetRequiredBool("debug.ShowFPS");
     hud.setShowFps(showFPS);
 
     consoleView.setLanguageCallback([this](const std::string &language) {
@@ -281,15 +286,18 @@ void ImGuiBackend::update() {
     if (window) {
         window->getFramebufferSize(fbWidth, fbHeight);
     }
+    const float renderScale = ui::GetUiRenderScale();
+    const int targetWidth = std::max(1, static_cast<int>(std::lround(fbWidth * renderScale)));
+    const int targetHeight = std::max(1, static_cast<int>(std::lround(fbHeight * renderScale)));
     io.DisplaySize = ImVec2(static_cast<float>(fbWidth), static_cast<float>(fbHeight));
-    io.DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
+    io.DisplayFramebufferScale = ImVec2(renderScale, renderScale);
 
     UpdateModifiers(io, window);
     if (window) {
         window->setCursorVisible(!io.MouseDrawCursor);
     }
     if (uiBridge) {
-        uiBridge->ensureImGuiRenderTarget(fbWidth, fbHeight);
+        uiBridge->ensureImGuiRenderTarget(targetWidth, targetHeight);
     }
 
     if (uiBridge && fontsDirty) {
@@ -309,8 +317,10 @@ void ImGuiBackend::update() {
 
     ImGui::Render();
     ImDrawData* drawData = ImGui::GetDrawData();
-    outputVisible = (drawData && drawData->TotalVtxCount > 0);
-    if (uiBridge) {
+    const bool consoleVisible = consoleView.isVisible();
+    const bool hudVisible = !consoleVisible;
+    outputVisible = (consoleVisible || hudVisible) && hasOutputDrawData(drawData);
+    if (uiBridge && outputVisible) {
         uiBridge->renderImGuiToTarget(drawData);
     }
 }
@@ -383,7 +393,7 @@ void ImGuiBackend::setRenderBridge(const ui::RenderBridge *bridge) {
 
 void ImGuiBackend::setImGuiRenderBridge(const ui::ImGuiRenderBridge *bridge) {
     imguiBridge = bridge;
-    uiBridge = imguiBridge ? imguiBridge->getImGuiBridge() : nullptr;
+    uiBridge = imguiBridge ? imguiBridge->getUiRenderTargetBridge() : nullptr;
     if (uiBridge) {
         ImGuiIO &io = ImGui::GetIO();
         io.BackendRendererName = "bz3-imgui-bridge";

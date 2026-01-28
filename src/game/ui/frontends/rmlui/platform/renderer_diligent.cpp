@@ -2,7 +2,7 @@
  * RmlUi Diligent renderer stub for BZ3.
  * TODO: Implement actual Diligent rendering.
  */
-#include "ui/frontends/rmlui/platform/RmlUi_Renderer_Diligent.h"
+#include "ui/frontends/rmlui/platform/renderer_diligent.hpp"
 
 #include "engine/graphics/backends/diligent/ui_bridge.hpp"
 

@@ -34,6 +34,7 @@ public:
 
 private:
     void rebuildController(const glm::vec3& centerPosition);
+    bool probeGround(float probeDepth, glm::vec3* outNormal) const;
 
     PhysicsWorldBullet* world_ = nullptr;
     std::unique_ptr<btPairCachingGhostObject> ghost_;
@@ -42,11 +43,19 @@ private:
     glm::vec3 halfExtents{0.5f, 1.0f, 0.5f};
     glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
     glm::vec3 desiredVelocity{0.0f};
-    glm::vec3 actualVelocity{0.0f};
+    glm::vec3 velocity{0.0f};
     glm::vec3 angularVelocity{0.0f};
     glm::vec3 lastPosition{0.0f};
+    glm::vec3 lastGroundNormal{0.0f, 1.0f, 0.0f};
+    bool groundedState = false;
+    bool jumpQueued = false;
+    bool wasJumping = false;
+    int groundScore = 0;
+    static constexpr int kGroundScoreMax = 3;
+    static constexpr int kGroundScoreThreshold = 2;
+    float capsuleHalfHeight = 1.0f;
     float gravityMagnitude = 9.8f;
-    float stepHeight = 0.35f;
+    float stepHeight = 0.2f;
 };
 
 } // namespace physics_backend

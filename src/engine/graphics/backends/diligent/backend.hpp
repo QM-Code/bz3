@@ -1,6 +1,9 @@
 #pragma once
 
 #include "engine/graphics/backend.hpp"
+#if defined(BZ3_UI_BACKEND_IMGUI)
+#include "ui/frontends/imgui/platform/renderer_diligent.hpp"
+#endif
 
 #include <DiligentCore/Common/interface/RefCntAutoPtr.hpp>
 #include <unordered_map>
@@ -76,8 +79,8 @@ public:
     glm::mat4 getProjectionMatrix() const override;
     glm::vec3 getCameraPosition() const override;
     glm::vec3 getCameraForward() const override;
-    ImGuiBridge* getImGuiBridge() override { return uiBridge_.get(); }
-    const ImGuiBridge* getImGuiBridge() const override { return uiBridge_.get(); }
+    UiRenderTargetBridge* getUiRenderTargetBridge() override { return uiBridge_.get(); }
+    const UiRenderTargetBridge* getUiRenderTargetBridge() const override { return uiBridge_.get(); }
 
 private:
     struct EntityRecord {
@@ -152,7 +155,7 @@ private:
     uint64_t uiOverlayToken_ = 0;
     bool uiOverlayVisible_ = false;
 
-    std::unique_ptr<ImGuiBridge> uiBridge_;
+    std::unique_ptr<UiRenderTargetBridge> uiBridge_;
 
     glm::vec3 cameraPosition{0.0f};
     glm::quat cameraRotation{1.0f, 0.0f, 0.0f, 0.0f};

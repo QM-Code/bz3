@@ -139,6 +139,7 @@ void RmlUiHud::bindElements() {
     }
     dialog.bind(document, emojiMarkup);
     chat.bind(document, emojiMarkup);
+    crosshair.bind(document);
     radar.bind(document);
     scoreboard.bind(document, emojiMarkup);
     fpsElement = document->GetElementById("hud-fps");

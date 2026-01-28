@@ -7,9 +7,9 @@ struct ImFontAtlas;
 
 namespace graphics_backend {
 
-class ImGuiBridge {
+class UiRenderTargetBridge {
 public:
-    virtual ~ImGuiBridge() = default;
+    virtual ~UiRenderTargetBridge() = default;
 
     virtual void* toImGuiTextureId(const graphics::TextureHandle& texture) const = 0;
     virtual void rebuildImGuiFonts(ImFontAtlas* atlas) = 0;

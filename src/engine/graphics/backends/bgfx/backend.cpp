@@ -1,6 +1,6 @@
 #include "engine/graphics/backends/bgfx/backend.hpp"
 #if defined(BZ3_UI_BACKEND_IMGUI)
-#include "engine/graphics/backends/bgfx/ui_bridge.hpp"
+#include "ui/frontends/imgui/platform/renderer_bgfx.hpp"
 #endif
 
 #include "engine/common/data_path_resolver.hpp"
@@ -315,7 +315,7 @@ BgfxBackend::BgfxBackend(platform::Window& windowIn)
         buildTestResources();
         buildSkyboxResources();
 #if defined(BZ3_UI_BACKEND_IMGUI)
-        uiBridge_ = std::make_unique<BgfxUiBridge>();
+        uiBridge_ = std::make_unique<BgfxRenderer>();
 #endif
         spdlog::info("Graphics(Bgfx): init ok renderer={} testReady={}",
                      static_cast<int>(bgfx::getRendererType()),

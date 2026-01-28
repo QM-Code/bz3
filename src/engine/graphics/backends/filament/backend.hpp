@@ -32,6 +32,7 @@
 
 struct wl_display;
 struct wl_surface;
+struct _XDisplay;
 
 namespace filament::backend {
 class Platform;
@@ -49,6 +50,13 @@ namespace filament_backend_detail {
 struct WaylandNativeWindow {
     wl_display* display = nullptr;
     wl_surface* surface = nullptr;
+    uint32_t width = 0;
+    uint32_t height = 0;
+};
+
+struct X11NativeWindow {
+    _XDisplay* display = nullptr;
+    unsigned long window = 0;
     uint32_t width = 0;
     uint32_t height = 0;
 };
@@ -166,6 +174,7 @@ private:
     filament::SwapChain* swapChain = nullptr;
     void* nativeSwapChainHandle = nullptr;
     filament_backend_detail::WaylandNativeWindow* waylandWindow = nullptr;
+    filament_backend_detail::X11NativeWindow* x11Window = nullptr;
     filament::backend::Platform* customPlatform = nullptr;
     bool swapChainIsNative = false;
     filament::Camera* camera = nullptr;

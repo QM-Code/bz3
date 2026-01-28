@@ -151,7 +151,7 @@ These CMake cache variables select backends at build time:
 
 - `BZ3_UI_BACKEND=imgui|rmlui`
 - `BZ3_WINDOW_BACKEND=sdl3|sdl2`
-- `BZ3_PHYSICS_BACKEND=jolt|bullet`
+- `BZ3_PHYSICS_BACKEND=jolt|bullet|physx`
 - `BZ3_AUDIO_BACKEND=miniaudio|sdlaudio`
 - `BZ3_RENDER_BACKEND=bgfx|diligent|filament`
 - `BZ3_NETWORK_BACKEND=enet`

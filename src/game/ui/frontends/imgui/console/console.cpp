@@ -5,13 +5,13 @@
 #include <cstdio>
 #include <imgui.h>
 #include <imgui_internal.h>
-#include <spdlog/spdlog.h>
 #include <string>
 #include <vector>
 
-#include "common/config_helpers.hpp"
 #include "common/data_path_resolver.hpp"
 #include "common/i18n.hpp"
+#include "spdlog/spdlog.h"
+#include "ui/config.hpp"
 
 namespace {
 std::string trimCopy(const std::string &value) {
@@ -131,7 +131,7 @@ void ConsoleView::initializeFonts(ImGuiIO &io) {
     }
     const float regularFontSize = useThemeOverrides
         ? currentTheme.regular.size
-        : bz::data::ReadFloatConfig({"assets.hud.fonts.console.Regular.Size"}, 20.0f);
+        : ui::config::GetRequiredFloat("assets.hud.fonts.console.Regular.Size");
     this->regularFontSize = regularFontSize;
     regularFont = io.Fonts->AddFontFromFileTTF(
         regularFontPathStr.c_str(),
@@ -154,7 +154,7 @@ void ConsoleView::initializeFonts(ImGuiIO &io) {
     const std::string titleFontPathStr = titleFontPath.string();
     const float titleFontSize = useThemeOverrides
         ? currentTheme.title.size
-        : bz::data::ReadFloatConfig({"assets.hud.fonts.console.Title.Size"}, 30.0f);
+        : ui::config::GetRequiredFloat("assets.hud.fonts.console.Title.Size");
     this->titleFontSize = titleFontSize;
     titleFont = io.Fonts->AddFontFromFileTTF(
         titleFontPathStr.c_str(),
@@ -170,7 +170,7 @@ void ConsoleView::initializeFonts(ImGuiIO &io) {
     const std::string headingFontPathStr = headingFontPath.string();
     const float headingFontSize = useThemeOverrides
         ? currentTheme.heading.size
-        : bz::data::ReadFloatConfig({"assets.hud.fonts.console.Heading.Size"}, 28.0f);
+        : ui::config::GetRequiredFloat("assets.hud.fonts.console.Heading.Size");
     this->headingFontSize = headingFontSize;
     headingFont = io.Fonts->AddFontFromFileTTF(
         headingFontPathStr.c_str(),
@@ -186,7 +186,7 @@ void ConsoleView::initializeFonts(ImGuiIO &io) {
     const std::string buttonFontPathStr = buttonFontPath.string();
     const float buttonFontSize = useThemeOverrides
         ? currentTheme.button.size
-        : bz::data::ReadFloatConfig({"assets.hud.fonts.console.Button.Size"}, 18.0f);
+        : ui::config::GetRequiredFloat("assets.hud.fonts.console.Button.Size");
     buttonFont = io.Fonts->AddFontFromFileTTF(
         buttonFontPathStr.c_str(),
         buttonFontSize
