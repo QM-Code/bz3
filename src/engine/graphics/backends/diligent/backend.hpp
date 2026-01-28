@@ -56,6 +56,9 @@ public:
     void renderLayer(graphics::LayerId layer, graphics::RenderTargetId target) override;
 
     unsigned int getRenderTargetTextureId(graphics::RenderTargetId target) const override;
+    void setUiOverlayTexture(const graphics::TextureHandle& texture) override;
+    void setUiOverlayVisible(bool visible) override;
+    void renderUiOverlay() override;
 
     void setPosition(graphics::EntityId entity, const glm::vec3& position) override;
     void setRotation(graphics::EntityId entity, const glm::quat& rotation) override;
@@ -73,8 +76,8 @@ public:
     glm::mat4 getProjectionMatrix() const override;
     glm::vec3 getCameraPosition() const override;
     glm::vec3 getCameraForward() const override;
-    UiBridge* getUiBridge() override { return uiBridge_.get(); }
-    const UiBridge* getUiBridge() const override { return uiBridge_.get(); }
+    ImGuiBridge* getImGuiBridge() override { return uiBridge_.get(); }
+    const ImGuiBridge* getImGuiBridge() const override { return uiBridge_.get(); }
 
 private:
     struct EntityRecord {
@@ -133,6 +136,8 @@ private:
     Diligent::RefCntAutoPtr<Diligent::ISwapChain> swapChain_;
     Diligent::RefCntAutoPtr<Diligent::IPipelineState> pipeline_;
     Diligent::RefCntAutoPtr<Diligent::IShaderResourceBinding> shaderBinding_;
+    Diligent::RefCntAutoPtr<Diligent::IPipelineState> pipelineOffscreen_;
+    Diligent::RefCntAutoPtr<Diligent::IShaderResourceBinding> shaderBindingOffscreen_;
     Diligent::RefCntAutoPtr<Diligent::IBuffer> constantBuffer_;
     Diligent::RefCntAutoPtr<Diligent::IPipelineState> skyboxPipeline_;
     Diligent::RefCntAutoPtr<Diligent::IShaderResourceBinding> skyboxBinding_;
@@ -141,8 +146,13 @@ private:
     Diligent::RefCntAutoPtr<Diligent::ITexture> skyboxTexture_;
     Diligent::ITextureView* skyboxSrv_ = nullptr;
     bool skyboxReady = false;
+    Diligent::RefCntAutoPtr<Diligent::IPipelineState> uiOverlayPipeline_;
+    Diligent::RefCntAutoPtr<Diligent::IShaderResourceBinding> uiOverlayBinding_;
+    Diligent::RefCntAutoPtr<Diligent::IBuffer> uiOverlayVertexBuffer_;
+    uint64_t uiOverlayToken_ = 0;
+    bool uiOverlayVisible_ = false;
 
-    std::unique_ptr<UiBridge> uiBridge_;
+    std::unique_ptr<ImGuiBridge> uiBridge_;
 
     glm::vec3 cameraPosition{0.0f};
     glm::quat cameraRotation{1.0f, 0.0f, 0.0f, 0.0f};
@@ -160,7 +170,12 @@ private:
     void ensurePipeline();
     void updateSwapChain(int width, int height);
     void buildSkyboxResources();
-    void renderToTargets(Diligent::ITextureView* rtv, Diligent::ITextureView* dsv, graphics::LayerId layer);
+    void ensureUiOverlayPipeline();
+    void renderToTargets(Diligent::ITextureView* rtv,
+                         Diligent::ITextureView* dsv,
+                         graphics::LayerId layer,
+                         int targetWidth,
+                         int targetHeight);
 
     glm::mat4 computeViewMatrix() const;
     glm::mat4 computeProjectionMatrix() const;

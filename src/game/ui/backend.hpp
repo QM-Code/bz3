@@ -13,6 +13,10 @@ namespace platform {
 class Window;
 }
 
+namespace ui {
+class ImGuiRenderBridge;
+}
+
 namespace ui_backend {
 
 class Backend {
@@ -35,6 +39,7 @@ public:
     virtual void displayDeathScreen(bool show) = 0;
     virtual bool consumeKeybindingsReloadRequest() = 0;
     virtual void setRenderBridge(const ui::RenderBridge *bridge) = 0;
+    virtual void setImGuiRenderBridge(const ui::ImGuiRenderBridge *bridge) { (void)bridge; }
 
     virtual ui::RenderOutput getRenderOutput() const { return {}; }
     virtual float getRenderBrightness() const { return 1.0f; }

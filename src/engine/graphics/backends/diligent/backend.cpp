@@ -219,6 +219,10 @@ DiligentBackend::DiligentBackend(platform::Window& windowIn)
 
 DiligentBackend::~DiligentBackend() {
     uiBridge_.reset();
+    if (uiOverlayToken_ != 0) {
+        graphics_backend::diligent_ui::UnregisterExternalTexture(uiOverlayToken_);
+        uiOverlayToken_ = 0;
+    }
     for (auto& [id, target] : renderTargets) {
         if (target.srvToken != 0) {
             graphics_backend::diligent_ui::UnregisterExternalTexture(target.srvToken);
@@ -567,6 +571,13 @@ graphics::RenderTargetId DiligentBackend::createRenderTarget(const graphics::Ren
             record.rtv = record.colorTexture->GetDefaultView(Diligent::TEXTURE_VIEW_RENDER_TARGET);
             record.srv = record.colorTexture->GetDefaultView(Diligent::TEXTURE_VIEW_SHADER_RESOURCE);
             record.srvToken = graphics_backend::diligent_ui::RegisterExternalTexture(record.srv);
+            spdlog::info("Graphics(Diligent): RT {} color={} srv={} token={} size={}x{}",
+                         id,
+                         static_cast<void*>(record.rtv),
+                         static_cast<void*>(record.srv),
+                         record.srvToken,
+                         desc.width,
+                         desc.height);
         }
 
         if (desc.depth) {
@@ -605,12 +616,14 @@ void DiligentBackend::renderLayer(graphics::LayerId layer, graphics::RenderTarge
         return;
     }
     ensurePipeline();
-    if (!pipeline_) {
+    if (!pipeline_ || !pipelineOffscreen_) {
         return;
     }
 
     Diligent::ITextureView* rtv = nullptr;
     Diligent::ITextureView* dsv = nullptr;
+    int targetWidth = 0;
+    int targetHeight = 0;
     if (target == graphics::kDefaultRenderTarget) {
         if (!swapChain_) {
             return;
@@ -621,6 +634,9 @@ void DiligentBackend::renderLayer(graphics::LayerId layer, graphics::RenderTarge
             spdlog::warn("Graphics(Diligent): swapchain RTV is null in renderLayer");
             return;
         }
+        const auto& scDesc = swapChain_->GetDesc();
+        targetWidth = static_cast<int>(scDesc.Width);
+        targetHeight = static_cast<int>(scDesc.Height);
     } else {
         auto it = renderTargets.find(target);
         if (it == renderTargets.end()) {
@@ -628,9 +644,11 @@ void DiligentBackend::renderLayer(graphics::LayerId layer, graphics::RenderTarge
         }
         rtv = it->second.rtv;
         dsv = it->second.dsv;
+        targetWidth = it->second.desc.width;
+        targetHeight = it->second.desc.height;
     }
 
-    renderToTargets(rtv, dsv, layer);
+    renderToTargets(rtv, dsv, layer, targetWidth, targetHeight);
 }
 
 unsigned int DiligentBackend::getRenderTargetTextureId(graphics::RenderTargetId target) const {
@@ -641,7 +659,77 @@ unsigned int DiligentBackend::getRenderTargetTextureId(graphics::RenderTargetId 
     if (it->second.srvToken == 0) {
         return 0u;
     }
+    static std::unordered_map<graphics::RenderTargetId, uint64_t> lastTokens;
+    const uint64_t token = it->second.srvToken;
+    auto& last = lastTokens[target];
+    if (last != token) {
+        spdlog::debug("Graphics(Diligent): RT {} token={}", target, token);
+        last = token;
+    }
     return static_cast<unsigned int>(it->second.srvToken);
+}
+
+void DiligentBackend::setUiOverlayTexture(const graphics::TextureHandle& texture) {
+    if (!texture.valid()) {
+        uiOverlayToken_ = 0;
+        return;
+    }
+    uiOverlayToken_ = texture.id;
+}
+
+void DiligentBackend::setUiOverlayVisible(bool visible) {
+    uiOverlayVisible_ = visible;
+}
+
+void DiligentBackend::renderUiOverlay() {
+    if (!initialized || !context_ || !swapChain_) {
+        return;
+    }
+    if (!uiOverlayVisible_ || uiOverlayToken_ == 0) {
+        return;
+    }
+
+    ensureUiOverlayPipeline();
+    if (!uiOverlayPipeline_ || !uiOverlayBinding_ || !uiOverlayVertexBuffer_) {
+        return;
+    }
+
+    auto* textureView = graphics_backend::diligent_ui::ResolveExternalTexture(uiOverlayToken_);
+    if (!textureView) {
+        return;
+    }
+    if (auto* var = uiOverlayBinding_->GetVariableByName(Diligent::SHADER_TYPE_PIXEL, "g_Texture")) {
+        var->Set(textureView);
+    }
+
+    auto* rtv = swapChain_->GetCurrentBackBufferRTV();
+    if (!rtv) {
+        return;
+    }
+    context_->SetRenderTargets(1, &rtv, nullptr, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+
+    const auto& scDesc = swapChain_->GetDesc();
+    Diligent::Viewport vp{};
+    vp.TopLeftX = 0.0f;
+    vp.TopLeftY = 0.0f;
+    vp.Width = static_cast<float>(scDesc.Width);
+    vp.Height = static_cast<float>(scDesc.Height);
+    vp.MinDepth = 0.0f;
+    vp.MaxDepth = 1.0f;
+    context_->SetViewports(1, &vp, 0, 0);
+
+    const Diligent::Uint64 offset = 0;
+    Diligent::IBuffer* vbs[] = {uiOverlayVertexBuffer_};
+    context_->SetVertexBuffers(0, 1, vbs, &offset, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION,
+                               Diligent::SET_VERTEX_BUFFERS_FLAG_RESET);
+
+    context_->SetPipelineState(uiOverlayPipeline_);
+    context_->CommitShaderResources(uiOverlayBinding_, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+
+    Diligent::DrawAttribs drawAttrs;
+    drawAttrs.NumVertices = 4;
+    drawAttrs.Flags = Diligent::DRAW_FLAG_VERIFY_ALL;
+    context_->Draw(drawAttrs);
 }
 
 void DiligentBackend::initDiligent() {
@@ -728,7 +816,10 @@ void DiligentBackend::initDiligent() {
 }
 
 void DiligentBackend::ensurePipeline() {
-    if (!initialized || !device_ || pipeline_) {
+    if (!initialized || !device_) {
+        return;
+    }
+    if (pipeline_ && pipelineOffscreen_) {
         return;
     }
 
@@ -800,77 +891,122 @@ float4 main(PSInput In) : SV_Target
         return;
     }
 
-    Diligent::GraphicsPipelineStateCreateInfo psoCI;
-    psoCI.PSODesc.Name = "BZ3 Diligent PSO";
-    psoCI.PSODesc.PipelineType = Diligent::PIPELINE_TYPE_GRAPHICS;
-    psoCI.pVS = vs;
-    psoCI.pPS = ps;
-    psoCI.GraphicsPipeline.PrimitiveTopology = Diligent::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-    psoCI.GraphicsPipeline.RasterizerDesc.CullMode = Diligent::CULL_MODE_NONE;
-    psoCI.GraphicsPipeline.DepthStencilDesc.DepthEnable = true;
-    psoCI.GraphicsPipeline.DepthStencilDesc.DepthWriteEnable = true;
-    psoCI.GraphicsPipeline.DepthStencilDesc.DepthFunc = Diligent::COMPARISON_FUNC_LESS_EQUAL;
-    psoCI.GraphicsPipeline.NumRenderTargets = 1;
+    if (!constantBuffer_) {
+        Diligent::BufferDesc cbDesc;
+        cbDesc.Name = "BZ3 Diligent CB";
+        cbDesc.Size = sizeof(Constants);
+        cbDesc.Usage = Diligent::USAGE_DYNAMIC;
+        cbDesc.BindFlags = Diligent::BIND_UNIFORM_BUFFER;
+        cbDesc.CPUAccessFlags = Diligent::CPU_ACCESS_WRITE;
+        device_->CreateBuffer(cbDesc, nullptr, &constantBuffer_);
+    }
+
+    auto buildPipeline = [&](Diligent::TEXTURE_FORMAT rtvFormat,
+                             Diligent::TEXTURE_FORMAT dsvFormat,
+                             bool depthEnable,
+                             bool depthWrite,
+                             bool blendEnable,
+                             Diligent::RefCntAutoPtr<Diligent::IPipelineState>& pipeline,
+                             Diligent::RefCntAutoPtr<Diligent::IShaderResourceBinding>& binding,
+                             const char* name) {
+        if (pipeline) {
+            return;
+        }
+        Diligent::GraphicsPipelineStateCreateInfo psoCI;
+        psoCI.PSODesc.Name = name;
+        psoCI.PSODesc.PipelineType = Diligent::PIPELINE_TYPE_GRAPHICS;
+        psoCI.pVS = vs;
+        psoCI.pPS = ps;
+        psoCI.GraphicsPipeline.PrimitiveTopology = Diligent::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        psoCI.GraphicsPipeline.RasterizerDesc.CullMode = Diligent::CULL_MODE_NONE;
+        psoCI.GraphicsPipeline.DepthStencilDesc.DepthEnable = depthEnable;
+        psoCI.GraphicsPipeline.DepthStencilDesc.DepthWriteEnable = depthWrite;
+        psoCI.GraphicsPipeline.DepthStencilDesc.DepthFunc = Diligent::COMPARISON_FUNC_LESS_EQUAL;
+        psoCI.GraphicsPipeline.NumRenderTargets = 1;
+        psoCI.GraphicsPipeline.RTVFormats[0] = rtvFormat;
+        psoCI.GraphicsPipeline.DSVFormat = dsvFormat;
+
+        Diligent::LayoutElement layout[] = {
+            {0, 0, 3, Diligent::VT_FLOAT32, false},
+            {1, 0, 3, Diligent::VT_FLOAT32, false},
+            {2, 0, 2, Diligent::VT_FLOAT32, false}
+        };
+        psoCI.GraphicsPipeline.InputLayout.LayoutElements = layout;
+        psoCI.GraphicsPipeline.InputLayout.NumElements = static_cast<Diligent::Uint32>(std::size(layout));
+
+        Diligent::ShaderResourceVariableDesc vars[] = {
+            {Diligent::SHADER_TYPE_PIXEL, "g_Texture", Diligent::SHADER_RESOURCE_VARIABLE_TYPE_DYNAMIC}
+        };
+        psoCI.PSODesc.ResourceLayout.Variables = vars;
+        psoCI.PSODesc.ResourceLayout.NumVariables = static_cast<Diligent::Uint32>(std::size(vars));
+
+        Diligent::SamplerDesc samplerDesc;
+        samplerDesc.MinFilter = Diligent::FILTER_TYPE_LINEAR;
+        samplerDesc.MagFilter = Diligent::FILTER_TYPE_LINEAR;
+        samplerDesc.MipFilter = Diligent::FILTER_TYPE_LINEAR;
+        samplerDesc.AddressU = Diligent::TEXTURE_ADDRESS_WRAP;
+        samplerDesc.AddressV = Diligent::TEXTURE_ADDRESS_WRAP;
+        samplerDesc.AddressW = Diligent::TEXTURE_ADDRESS_WRAP;
+
+        Diligent::ImmutableSamplerDesc samplers[] = {
+            {Diligent::SHADER_TYPE_PIXEL, "g_Texture_sampler", samplerDesc}
+        };
+        psoCI.PSODesc.ResourceLayout.ImmutableSamplers = samplers;
+        psoCI.PSODesc.ResourceLayout.NumImmutableSamplers = static_cast<Diligent::Uint32>(std::size(samplers));
+
+        if (blendEnable) {
+            auto& rt0 = psoCI.GraphicsPipeline.BlendDesc.RenderTargets[0];
+            rt0.BlendEnable = true;
+            rt0.SrcBlend = Diligent::BLEND_FACTOR_SRC_ALPHA;
+            rt0.DestBlend = Diligent::BLEND_FACTOR_INV_SRC_ALPHA;
+            rt0.BlendOp = Diligent::BLEND_OPERATION_ADD;
+            rt0.SrcBlendAlpha = Diligent::BLEND_FACTOR_ONE;
+            rt0.DestBlendAlpha = Diligent::BLEND_FACTOR_INV_SRC_ALPHA;
+            rt0.BlendOpAlpha = Diligent::BLEND_OPERATION_ADD;
+        }
+
+        device_->CreatePipelineState(psoCI, &pipeline);
+        if (!pipeline) {
+            spdlog::error("Graphics(Diligent): failed to create pipeline state '{}'", name);
+            return;
+        }
+
+        if (constantBuffer_) {
+            if (auto* var = pipeline->GetStaticVariableByName(Diligent::SHADER_TYPE_VERTEX, "Constants")) {
+                var->Set(constantBuffer_);
+            }
+            if (auto* var = pipeline->GetStaticVariableByName(Diligent::SHADER_TYPE_PIXEL, "Constants")) {
+                var->Set(constantBuffer_);
+            }
+        }
+
+        pipeline->CreateShaderResourceBinding(&binding, true);
+    };
+
+    Diligent::TEXTURE_FORMAT swapRtv = Diligent::TEX_FORMAT_RGBA8_UNORM_SRGB;
+    Diligent::TEXTURE_FORMAT swapDsv = Diligent::TEX_FORMAT_D32_FLOAT;
     if (swapChain_) {
         const auto& scDesc = swapChain_->GetDesc();
-        psoCI.GraphicsPipeline.RTVFormats[0] = scDesc.ColorBufferFormat;
-        psoCI.GraphicsPipeline.DSVFormat = scDesc.DepthBufferFormat;
-    } else {
-        psoCI.GraphicsPipeline.RTVFormats[0] = Diligent::TEX_FORMAT_RGBA8_UNORM;
-        psoCI.GraphicsPipeline.DSVFormat = Diligent::TEX_FORMAT_D32_FLOAT;
+        swapRtv = scDesc.ColorBufferFormat;
+        swapDsv = scDesc.DepthBufferFormat;
     }
 
-    Diligent::LayoutElement layout[] = {
-        {0, 0, 3, Diligent::VT_FLOAT32, false},
-        {1, 0, 3, Diligent::VT_FLOAT32, false},
-        {2, 0, 2, Diligent::VT_FLOAT32, false}
-    };
-    psoCI.GraphicsPipeline.InputLayout.LayoutElements = layout;
-    psoCI.GraphicsPipeline.InputLayout.NumElements = static_cast<Diligent::Uint32>(std::size(layout));
-
-    Diligent::ShaderResourceVariableDesc vars[] = {
-        {Diligent::SHADER_TYPE_PIXEL, "g_Texture", Diligent::SHADER_RESOURCE_VARIABLE_TYPE_DYNAMIC}
-    };
-    psoCI.PSODesc.ResourceLayout.Variables = vars;
-    psoCI.PSODesc.ResourceLayout.NumVariables = static_cast<Diligent::Uint32>(std::size(vars));
-
-    Diligent::SamplerDesc samplerDesc;
-    samplerDesc.MinFilter = Diligent::FILTER_TYPE_LINEAR;
-    samplerDesc.MagFilter = Diligent::FILTER_TYPE_LINEAR;
-    samplerDesc.MipFilter = Diligent::FILTER_TYPE_LINEAR;
-    samplerDesc.AddressU = Diligent::TEXTURE_ADDRESS_WRAP;
-    samplerDesc.AddressV = Diligent::TEXTURE_ADDRESS_WRAP;
-    samplerDesc.AddressW = Diligent::TEXTURE_ADDRESS_WRAP;
-
-    Diligent::ImmutableSamplerDesc samplers[] = {
-        {Diligent::SHADER_TYPE_PIXEL, "g_Texture_sampler", samplerDesc}
-    };
-    psoCI.PSODesc.ResourceLayout.ImmutableSamplers = samplers;
-    psoCI.PSODesc.ResourceLayout.NumImmutableSamplers = static_cast<Diligent::Uint32>(std::size(samplers));
-
-    device_->CreatePipelineState(psoCI, &pipeline_);
-    if (!pipeline_) {
-        spdlog::error("Graphics(Diligent): failed to create pipeline state");
-        return;
-    }
-
-    Diligent::BufferDesc cbDesc;
-    cbDesc.Name = "BZ3 Diligent CB";
-    cbDesc.Size = sizeof(Constants);
-    cbDesc.Usage = Diligent::USAGE_DYNAMIC;
-    cbDesc.BindFlags = Diligent::BIND_UNIFORM_BUFFER;
-    cbDesc.CPUAccessFlags = Diligent::CPU_ACCESS_WRITE;
-    device_->CreateBuffer(cbDesc, nullptr, &constantBuffer_);
-    if (constantBuffer_) {
-        if (auto* var = pipeline_->GetStaticVariableByName(Diligent::SHADER_TYPE_VERTEX, "Constants")) {
-            var->Set(constantBuffer_);
-        }
-        if (auto* var = pipeline_->GetStaticVariableByName(Diligent::SHADER_TYPE_PIXEL, "Constants")) {
-            var->Set(constantBuffer_);
-        }
-    }
-
-    pipeline_->CreateShaderResourceBinding(&shaderBinding_, true);
+    buildPipeline(swapRtv,
+                  swapDsv,
+                  true,
+                  true,
+                  false,
+                  pipeline_,
+                  shaderBinding_,
+                  "BZ3 Diligent PSO");
+    buildPipeline(Diligent::TEX_FORMAT_RGBA8_UNORM,
+                  Diligent::TEX_FORMAT_D32_FLOAT,
+                  false,
+                  false,
+                  true,
+                  pipelineOffscreen_,
+                  shaderBindingOffscreen_,
+                  "BZ3 Diligent PSO Offscreen");
 }
 
 void DiligentBackend::buildSkyboxResources() {
@@ -1083,6 +1219,148 @@ float4 main(float3 dir : TEXCOORD0) : SV_Target
     spdlog::info("Graphics(Diligent): skybox ready={}", skyboxReady);
 }
 
+void DiligentBackend::ensureUiOverlayPipeline() {
+    if (!initialized || !device_) {
+        return;
+    }
+    if (uiOverlayPipeline_) {
+        return;
+    }
+
+    const char* vsSource = R"(
+struct VSInput
+{
+    float2 Pos : ATTRIB0;
+    float2 UV  : ATTRIB1;
+};
+struct PSInput
+{
+    float4 Pos : SV_POSITION;
+    float2 UV  : TEXCOORD0;
+};
+PSInput main(VSInput In)
+{
+    PSInput Out;
+    Out.Pos = float4(In.Pos, 0.0, 1.0);
+    Out.UV = In.UV;
+    return Out;
+}
+)";
+
+    const char* psSource = R"(
+Texture2D g_Texture;
+SamplerState g_Texture_sampler;
+float4 main(float2 uv : TEXCOORD0) : SV_Target
+{
+    return g_Texture.Sample(g_Texture_sampler, uv);
+}
+)";
+
+    Diligent::ShaderCreateInfo shaderCI;
+    shaderCI.SourceLanguage = Diligent::SHADER_SOURCE_LANGUAGE_HLSL;
+    shaderCI.EntryPoint = "main";
+
+    Diligent::RefCntAutoPtr<Diligent::IShader> vs;
+    shaderCI.Desc.ShaderType = Diligent::SHADER_TYPE_VERTEX;
+    shaderCI.Desc.Name = "BZ3 Diligent UI Overlay VS";
+    shaderCI.Source = vsSource;
+    device_->CreateShader(shaderCI, &vs);
+
+    Diligent::RefCntAutoPtr<Diligent::IShader> ps;
+    shaderCI.Desc.ShaderType = Diligent::SHADER_TYPE_PIXEL;
+    shaderCI.Desc.Name = "BZ3 Diligent UI Overlay PS";
+    shaderCI.Source = psSource;
+    device_->CreateShader(shaderCI, &ps);
+
+    if (!vs || !ps) {
+        spdlog::error("Graphics(Diligent): failed to create UI overlay shaders");
+        return;
+    }
+
+    Diligent::GraphicsPipelineStateCreateInfo psoCI;
+    psoCI.PSODesc.Name = "BZ3 Diligent UI Overlay PSO";
+    psoCI.PSODesc.PipelineType = Diligent::PIPELINE_TYPE_GRAPHICS;
+    psoCI.pVS = vs;
+    psoCI.pPS = ps;
+    psoCI.GraphicsPipeline.PrimitiveTopology = Diligent::PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+    psoCI.GraphicsPipeline.RasterizerDesc.CullMode = Diligent::CULL_MODE_NONE;
+    psoCI.GraphicsPipeline.DepthStencilDesc.DepthEnable = false;
+    psoCI.GraphicsPipeline.DepthStencilDesc.DepthWriteEnable = false;
+    psoCI.GraphicsPipeline.NumRenderTargets = 1;
+    if (swapChain_) {
+        const auto& scDesc = swapChain_->GetDesc();
+        psoCI.GraphicsPipeline.RTVFormats[0] = scDesc.ColorBufferFormat;
+        psoCI.GraphicsPipeline.DSVFormat = scDesc.DepthBufferFormat;
+    }
+
+    auto& rt0 = psoCI.GraphicsPipeline.BlendDesc.RenderTargets[0];
+    rt0.BlendEnable = true;
+    rt0.SrcBlend = Diligent::BLEND_FACTOR_SRC_ALPHA;
+    rt0.DestBlend = Diligent::BLEND_FACTOR_INV_SRC_ALPHA;
+    rt0.BlendOp = Diligent::BLEND_OPERATION_ADD;
+    rt0.SrcBlendAlpha = Diligent::BLEND_FACTOR_ONE;
+    rt0.DestBlendAlpha = Diligent::BLEND_FACTOR_INV_SRC_ALPHA;
+    rt0.BlendOpAlpha = Diligent::BLEND_OPERATION_ADD;
+
+    Diligent::LayoutElement layout[] = {
+        {0, 0, 2, Diligent::VT_FLOAT32, false},
+        {1, 0, 2, Diligent::VT_FLOAT32, false}
+    };
+    psoCI.GraphicsPipeline.InputLayout.LayoutElements = layout;
+    psoCI.GraphicsPipeline.InputLayout.NumElements = static_cast<Diligent::Uint32>(std::size(layout));
+
+    Diligent::ShaderResourceVariableDesc vars[] = {
+        {Diligent::SHADER_TYPE_PIXEL, "g_Texture", Diligent::SHADER_RESOURCE_VARIABLE_TYPE_DYNAMIC}
+    };
+    psoCI.PSODesc.ResourceLayout.Variables = vars;
+    psoCI.PSODesc.ResourceLayout.NumVariables = static_cast<Diligent::Uint32>(std::size(vars));
+
+    Diligent::SamplerDesc samplerDesc;
+    samplerDesc.MinFilter = Diligent::FILTER_TYPE_LINEAR;
+    samplerDesc.MagFilter = Diligent::FILTER_TYPE_LINEAR;
+    samplerDesc.MipFilter = Diligent::FILTER_TYPE_LINEAR;
+    samplerDesc.AddressU = Diligent::TEXTURE_ADDRESS_CLAMP;
+    samplerDesc.AddressV = Diligent::TEXTURE_ADDRESS_CLAMP;
+    samplerDesc.AddressW = Diligent::TEXTURE_ADDRESS_CLAMP;
+
+    Diligent::ImmutableSamplerDesc samplers[] = {
+        {Diligent::SHADER_TYPE_PIXEL, "g_Texture_sampler", samplerDesc}
+    };
+    psoCI.PSODesc.ResourceLayout.ImmutableSamplers = samplers;
+    psoCI.PSODesc.ResourceLayout.NumImmutableSamplers = static_cast<Diligent::Uint32>(std::size(samplers));
+
+    device_->CreatePipelineState(psoCI, &uiOverlayPipeline_);
+    if (!uiOverlayPipeline_) {
+        spdlog::error("Graphics(Diligent): failed to create UI overlay pipeline");
+        return;
+    }
+
+    uiOverlayPipeline_->CreateShaderResourceBinding(&uiOverlayBinding_, true);
+
+    struct UiOverlayVertex {
+        float x;
+        float y;
+        float u;
+        float v;
+    };
+    const UiOverlayVertex verts[] = {
+        {-1.0f, -1.0f, 0.0f, 1.0f},
+        { 1.0f, -1.0f, 1.0f, 1.0f},
+        {-1.0f,  1.0f, 0.0f, 0.0f},
+        { 1.0f,  1.0f, 1.0f, 0.0f}
+    };
+
+    Diligent::BufferDesc vbDesc;
+    vbDesc.Name = "BZ3 Diligent UI Overlay VB";
+    vbDesc.Usage = Diligent::USAGE_IMMUTABLE;
+    vbDesc.BindFlags = Diligent::BIND_VERTEX_BUFFER;
+    vbDesc.Size = sizeof(verts);
+    Diligent::BufferData vbData;
+    vbData.pData = verts;
+    vbData.DataSize = vbDesc.Size;
+    device_->CreateBuffer(vbDesc, &vbData, &uiOverlayVertexBuffer_);
+}
+
 void DiligentBackend::updateSwapChain(int width, int height) {
     if (!initialized || !swapChain_) {
         return;
@@ -1091,13 +1369,40 @@ void DiligentBackend::updateSwapChain(int width, int height) {
     graphics_backend::diligent_ui::SetContext(device_, context_, swapChain_, width, height);
 }
 
-void DiligentBackend::renderToTargets(Diligent::ITextureView* rtv, Diligent::ITextureView* dsv, graphics::LayerId layer) {
-    if (!context_ || !pipeline_) {
+void DiligentBackend::renderToTargets(Diligent::ITextureView* rtv,
+                                      Diligent::ITextureView* dsv,
+                                      graphics::LayerId layer,
+                                      int targetWidth,
+                                      int targetHeight) {
+    if (!context_ || !pipeline_ || !pipelineOffscreen_) {
         return;
     }
     context_->SetRenderTargets(1, &rtv, dsv, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+    if (targetWidth > 0 && targetHeight > 0) {
+        Diligent::Viewport vp{};
+        vp.TopLeftX = 0.0f;
+        vp.TopLeftY = 0.0f;
+        vp.Width = static_cast<float>(targetWidth);
+        vp.Height = static_cast<float>(targetHeight);
+        vp.MinDepth = 0.0f;
+        vp.MaxDepth = 1.0f;
+        context_->SetViewports(1, &vp, targetWidth, targetHeight);
 
-    const float clearColor[4] = {0.02f, 0.02f, 0.02f, 1.0f};
+        Diligent::Rect scissor;
+        scissor.left = 0;
+        scissor.top = 0;
+        scissor.right = targetWidth;
+        scissor.bottom = targetHeight;
+        context_->SetScissorRects(1, &scissor, targetWidth, targetHeight);
+    }
+
+    const bool useSwapchain = (swapChain_ && rtv == swapChain_->GetCurrentBackBufferRTV());
+    const float clearColor[4] = {
+        useSwapchain ? 0.02f : 1.0f,
+        useSwapchain ? 0.02f : 0.0f,
+        useSwapchain ? 0.02f : 1.0f,
+        1.0f
+    };
     if (rtv) {
         context_->ClearRenderTarget(rtv, clearColor, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
     }
@@ -1129,8 +1434,14 @@ void DiligentBackend::renderToTargets(Diligent::ITextureView* rtv, Diligent::ITe
         context_->Draw(drawAttrs);
     }
 
-    context_->SetPipelineState(pipeline_);
+    auto* pipeline = useSwapchain ? pipeline_.RawPtr() : pipelineOffscreen_.RawPtr();
+    auto* binding = useSwapchain ? shaderBinding_.RawPtr() : shaderBindingOffscreen_.RawPtr();
+    if (!pipeline || !binding) {
+        return;
+    }
+    context_->SetPipelineState(pipeline);
 
+    int drawCalls = 0;
     const glm::mat4 viewProj = getViewProjectionMatrix();
     for (const auto& [id, entity] : entities) {
         if (entity.layer != layer || !entity.visible) {
@@ -1171,17 +1482,18 @@ void DiligentBackend::renderToTargets(Diligent::ITextureView* rtv, Diligent::ITe
                                        Diligent::SET_VERTEX_BUFFERS_FLAG_RESET);
             context_->SetIndexBuffer(mesh.indexBuffer, 0, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
             if (mesh.srv) {
-                if (auto* var = shaderBinding_->GetVariableByName(Diligent::SHADER_TYPE_PIXEL, "g_Texture")) {
+                if (auto* var = binding->GetVariableByName(Diligent::SHADER_TYPE_PIXEL, "g_Texture")) {
                     var->Set(mesh.srv);
                 }
             }
-            context_->CommitShaderResources(shaderBinding_, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+            context_->CommitShaderResources(binding, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
 
             Diligent::DrawIndexedAttribs drawAttrs;
             drawAttrs.IndexType = Diligent::VT_UINT32;
             drawAttrs.NumIndices = mesh.indexCount;
             drawAttrs.Flags = Diligent::DRAW_FLAG_VERIFY_ALL;
             context_->DrawIndexed(drawAttrs);
+            ++drawCalls;
         };
 
         if (!entity.meshes.empty()) {
@@ -1190,6 +1502,18 @@ void DiligentBackend::renderToTargets(Diligent::ITextureView* rtv, Diligent::ITe
             }
         } else if (entity.mesh != graphics::kInvalidMesh) {
             drawMesh(entity.mesh);
+        }
+    }
+
+    if (!useSwapchain) {
+        static int frameCounter = 0;
+        if ((frameCounter++ % 120) == 0) {
+            spdlog::info("Graphics(Diligent): offscreen render rtv={} dsv={} size={}x{} draws={}",
+                         static_cast<void*>(rtv),
+                         static_cast<void*>(dsv),
+                         targetWidth,
+                         targetHeight,
+                         drawCalls);
         }
     }
 }

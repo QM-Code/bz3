@@ -13,11 +13,13 @@
 #include <DiligentCore/Graphics/GraphicsEngine/interface/Sampler.h>
 #include <DiligentCore/Graphics/GraphicsEngine/interface/SwapChain.h>
 #include <DiligentCore/Graphics/GraphicsEngine/interface/Shader.h>
+#include <DiligentCore/Graphics/GraphicsEngine/interface/Texture.h>
 #include <DiligentCore/Graphics/GraphicsTools/interface/MapHelper.hpp>
 
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
+#include <unordered_set>
 
 namespace graphics_backend {
 namespace {
@@ -55,7 +57,14 @@ DiligentImGuiBridge::~DiligentImGuiBridge() {
         graphics_backend::diligent_ui::UnregisterExternalTexture(fontToken_);
         fontToken_ = 0;
     }
+    if (uiToken_ != 0) {
+        graphics_backend::diligent_ui::UnregisterExternalTexture(uiToken_);
+        uiToken_ = 0;
+    }
     fontSrv_ = nullptr;
+    uiTargetSrv_ = nullptr;
+    uiTargetRtv_ = nullptr;
+    uiTargetTexture_ = nullptr;
     pipeline_ = nullptr;
     shaderBinding_ = nullptr;
     vertexBuffer_ = nullptr;
@@ -73,6 +82,72 @@ void* DiligentImGuiBridge::toImGuiTextureId(const graphics::TextureHandle& textu
 
 bool DiligentImGuiBridge::isImGuiReady() const {
     return ready_ && fontSrv_;
+}
+
+void DiligentImGuiBridge::ensureImGuiRenderTarget(int width, int height) {
+    auto ctx = graphics_backend::diligent_ui::GetContext();
+    if (!ctx.device || !ctx.swapChain) {
+        return;
+    }
+    if (width <= 0 || height <= 0) {
+        if (uiToken_ != 0) {
+            graphics_backend::diligent_ui::UnregisterExternalTexture(uiToken_);
+            uiToken_ = 0;
+        }
+        uiTargetSrv_ = nullptr;
+        uiTargetRtv_ = nullptr;
+        uiTargetTexture_ = nullptr;
+        uiWidth_ = 0;
+        uiHeight_ = 0;
+        return;
+    }
+    if (width == uiWidth_ && height == uiHeight_ && uiTargetTexture_) {
+        return;
+    }
+    if (uiToken_ != 0) {
+        graphics_backend::diligent_ui::UnregisterExternalTexture(uiToken_);
+        uiToken_ = 0;
+    }
+    uiTargetSrv_ = nullptr;
+    uiTargetRtv_ = nullptr;
+    uiTargetTexture_ = nullptr;
+
+    const auto& scDesc = ctx.swapChain->GetDesc();
+    Diligent::TextureDesc desc;
+    desc.Type = Diligent::RESOURCE_DIM_TEX_2D;
+    desc.Width = static_cast<Diligent::Uint32>(width);
+    desc.Height = static_cast<Diligent::Uint32>(height);
+    desc.MipLevels = 1;
+    desc.Format = scDesc.ColorBufferFormat;
+    desc.BindFlags = Diligent::BIND_RENDER_TARGET | Diligent::BIND_SHADER_RESOURCE;
+    desc.Name = "ImGui Diligent UI RT";
+    ctx.device->CreateTexture(desc, nullptr, &uiTargetTexture_);
+    if (!uiTargetTexture_) {
+        return;
+    }
+
+    uiTargetRtv_ = uiTargetTexture_->GetDefaultView(Diligent::TEXTURE_VIEW_RENDER_TARGET);
+    uiTargetSrv_ = uiTargetTexture_->GetDefaultView(Diligent::TEXTURE_VIEW_SHADER_RESOURCE);
+    if (!uiTargetRtv_ || !uiTargetSrv_) {
+        uiTargetTexture_ = nullptr;
+        uiTargetRtv_ = nullptr;
+        uiTargetSrv_ = nullptr;
+        return;
+    }
+    uiToken_ = graphics_backend::diligent_ui::RegisterExternalTexture(uiTargetSrv_);
+    uiWidth_ = width;
+    uiHeight_ = height;
+}
+
+graphics::TextureHandle DiligentImGuiBridge::getImGuiRenderTarget() const {
+    graphics::TextureHandle handle{};
+    if (uiToken_ == 0) {
+        return handle;
+    }
+    handle.id = uiToken_;
+    handle.width = static_cast<uint32_t>(uiWidth_);
+    handle.height = static_cast<uint32_t>(uiHeight_);
+    return handle;
 }
 
 void DiligentImGuiBridge::ensurePipeline() {
@@ -307,12 +382,15 @@ void DiligentImGuiBridge::rebuildImGuiFonts(ImFontAtlas* atlas) {
     atlas->SetTexID(textureIdToImTexture(fontToken_));
 }
 
-void DiligentImGuiBridge::renderImGuiDrawData(ImDrawData* drawData) {
+void DiligentImGuiBridge::renderImGuiToTarget(ImDrawData* drawData) {
     if (!drawData) {
         return;
     }
     auto ctx = graphics_backend::diligent_ui::GetContext();
     if (!ctx.device || !ctx.context || !ctx.swapChain) {
+        return;
+    }
+    if (!uiTargetRtv_) {
         return;
     }
 
@@ -375,13 +453,10 @@ void DiligentImGuiBridge::renderImGuiDrawData(ImDrawData* drawData) {
         *cb = constants;
     }
 
-    Diligent::ITextureView* rtv = ctx.swapChain->GetCurrentBackBufferRTV();
-    Diligent::ITextureView* dsv = ctx.swapChain->GetDepthBufferDSV();
-    if (!rtv) {
-        return;
-    }
-
-    ctx.context->SetRenderTargets(1, &rtv, dsv, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+    Diligent::ITextureView* rtv = uiTargetRtv_;
+    ctx.context->SetRenderTargets(1, &rtv, nullptr, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+    const float clearColor[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    ctx.context->ClearRenderTarget(rtv, clearColor, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
 
     Diligent::Viewport vp{};
     vp.TopLeftX = 0.0f;
@@ -401,6 +476,9 @@ void DiligentImGuiBridge::renderImGuiDrawData(ImDrawData* drawData) {
     drawData->ScaleClipRects(io.DisplayFramebufferScale);
 
     ctx.context->SetPipelineState(pipeline_);
+
+    static std::unordered_set<uint64_t> loggedMissing;
+    static std::unordered_set<uint64_t> loggedResolved;
 
     int globalVtxOffset = 0;
     int globalIdxOffset = 0;
@@ -430,7 +508,15 @@ void DiligentImGuiBridge::renderImGuiDrawData(ImDrawData* drawData) {
             }
             auto* srv = graphics_backend::diligent_ui::ResolveExternalTexture(token);
             if (!srv) {
+                if (loggedMissing.insert(token).second) {
+                    spdlog::warn("ImGui(Diligent): missing texture token {}", token);
+                }
                 continue;
+            }
+            if (token != fontToken_) {
+                if (loggedResolved.insert(token).second) {
+                    spdlog::info("ImGui(Diligent): resolved texture token {} -> {}", token, static_cast<void*>(srv));
+                }
             }
             if (auto* var = shaderBinding_->GetVariableByName(Diligent::SHADER_TYPE_PIXEL, "g_Texture")) {
                 var->Set(srv);

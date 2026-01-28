@@ -5,13 +5,20 @@
 #include "game/input/state.hpp"
 #include "spdlog/spdlog.h"
 #include "ui/render_bridge.hpp"
+#if defined(BZ3_UI_BACKEND_IMGUI)
+#include "ui/frontends/imgui/render_bridge.hpp"
+#endif
 #include <cstdint>
 #include <vector>
 #include <utility>
 
 namespace {
 
-class RenderBridgeImpl final : public ui::RenderBridge {
+class RenderBridgeImpl final : public ui::RenderBridge
+#if defined(BZ3_UI_BACKEND_IMGUI)
+    , public ui::ImGuiRenderBridge
+#endif
+{
 public:
     explicit RenderBridgeImpl(Render *renderIn) : render(renderIn) {}
 
@@ -19,9 +26,11 @@ public:
         return render ? render->getRadarTexture() : graphics::TextureHandle{};
     }
 
-    graphics_backend::UiBridge* getUiBridge() const override {
-        return render ? render->getUiBridge() : nullptr;
+#if defined(BZ3_UI_BACKEND_IMGUI)
+    graphics_backend::ImGuiBridge* getImGuiBridge() const override {
+        return render ? render->getImGuiBridge() : nullptr;
     }
+#endif
 
 private:
     Render *render = nullptr;
@@ -37,13 +46,17 @@ ClientEngine::ClientEngine(platform::Window &window) {
     spdlog::trace("ClientEngine: Render initializing");
     render = new Render(window);
     spdlog::trace("ClientEngine: Render initialized successfully");
-    uiRenderBridge = std::make_unique<RenderBridgeImpl>(render);
+    auto* renderBridgeImpl = new RenderBridgeImpl(render);
+    uiRenderBridge.reset(renderBridgeImpl);
     physics = new PhysicsWorld();
     spdlog::trace("ClientEngine: Physics initialized successfully");
     input = new Input(window, game_input::DefaultKeybindings());
     spdlog::trace("ClientEngine: Input initialized successfully");
     ui = new UiSystem(window);
-    ui->setRenderBridge(uiRenderBridge.get());
+    ui->setRenderBridge(renderBridgeImpl);
+#if defined(BZ3_UI_BACKEND_IMGUI)
+    ui->setImGuiRenderBridge(renderBridgeImpl);
+#endif
     spdlog::trace("ClientEngine: UiSystem initialized successfully");
     ui->setSpawnHint(game_input::SpawnHintText(*input));
     audio = new Audio();
@@ -85,6 +98,8 @@ void ClientEngine::step(TimeUtils::duration deltaTime) {
 void ClientEngine::lateUpdate(TimeUtils::duration deltaTime) {
     render->update();
     ui->update();
+    render->setUiOverlayTexture(ui->getRenderOutput());
+    render->renderUiOverlay();
     render->present();
 
     render->setBrightness(ui->getRenderBrightness());

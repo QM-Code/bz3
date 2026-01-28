@@ -19,6 +19,10 @@ namespace ui_backend {
 class Backend;
 }
 
+namespace ui {
+class ImGuiRenderBridge;
+}
+
 class UiSystem {
     friend class ClientEngine;
 
@@ -48,6 +52,7 @@ public:
     void displayDeathScreen(bool show);
     bool consumeKeybindingsReloadRequest();
     void setRenderBridge(const ui::RenderBridge *bridge);
+    void setImGuiRenderBridge(const ui::ImGuiRenderBridge *bridge);
     ui::RenderOutput getRenderOutput() const;
     float getRenderBrightness() const;
 };

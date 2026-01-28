@@ -10,15 +10,17 @@
 
 namespace graphics_backend {
 
-class BgfxUiBridge final : public UiBridge {
+class BgfxUiBridge final : public ImGuiBridge {
 public:
     BgfxUiBridge();
     ~BgfxUiBridge() override;
 
     void* toImGuiTextureId(const graphics::TextureHandle& texture) const override;
     void rebuildImGuiFonts(ImFontAtlas* atlas) override;
-    void renderImGuiDrawData(ImDrawData* drawData) override;
+    void renderImGuiToTarget(ImDrawData* drawData) override;
     bool isImGuiReady() const override;
+    void ensureImGuiRenderTarget(int width, int height) override;
+    graphics::TextureHandle getImGuiRenderTarget() const override;
 
 private:
     struct ImGuiVertex {
@@ -34,6 +36,10 @@ private:
     bgfx::UniformHandle scaleBias_ = BGFX_INVALID_HANDLE;
     bgfx::TextureHandle fontTexture_ = BGFX_INVALID_HANDLE;
     bgfx::VertexLayout layout_{};
+    bgfx::TextureHandle uiTargetTexture_ = BGFX_INVALID_HANDLE;
+    bgfx::FrameBufferHandle uiTargetFrameBuffer_ = BGFX_INVALID_HANDLE;
+    int uiWidth_ = 0;
+    int uiHeight_ = 0;
     bool ready_ = false;
     bool fontsReady_ = false;
 

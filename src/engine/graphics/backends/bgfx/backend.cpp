@@ -22,6 +22,7 @@
 #include <cstdlib>
 #include <stb_image.h>
 #include <array>
+#include <vector>
 
 #if defined(BZ3_WINDOW_BACKEND_SDL3)
 #include <SDL3/SDL.h>
@@ -30,6 +31,8 @@
 #endif
 
 namespace {
+constexpr bgfx::ViewId kUiOverlayView = 253;
+
 struct NativeWindowInfo {
     void* nwh = nullptr;
     void* ndt = nullptr;
@@ -72,6 +75,7 @@ NativeWindowInfo getNativeWindowInfo(platform::Window* window) {
     return {handle, nullptr, nullptr};
 #endif
 }
+
 
 std::vector<uint8_t> readFileToBytes(const std::filesystem::path& path) {
     std::ifstream file(path, std::ios::binary);
@@ -362,6 +366,15 @@ BgfxBackend::~BgfxBackend() {
         }
         if (bgfx::isValid(skyboxTexture)) {
             bgfx::destroy(skyboxTexture);
+        }
+        if (bgfx::isValid(uiOverlayProgram)) {
+            bgfx::destroy(uiOverlayProgram);
+        }
+        if (bgfx::isValid(uiOverlaySampler)) {
+            bgfx::destroy(uiOverlaySampler);
+        }
+        if (bgfx::isValid(uiOverlayScaleBias)) {
+            bgfx::destroy(uiOverlayScaleBias);
         }
         for (auto& [id, mesh] : meshes) {
             if (bgfx::isValid(mesh.vertexBuffer)) {
@@ -948,6 +961,84 @@ unsigned int BgfxBackend::getRenderTargetTextureId(graphics::RenderTargetId targ
     return static_cast<unsigned int>(idx + 1);
 }
 
+void BgfxBackend::setUiOverlayTexture(const graphics::TextureHandle& texture) {
+    if (!initialized) {
+        return;
+    }
+    if (!texture.valid()) {
+        uiOverlayTexture = BGFX_INVALID_HANDLE;
+        return;
+    }
+    bgfx::TextureHandle handle;
+    handle.idx = toTextureHandle(texture.id);
+    uiOverlayTexture = handle;
+}
+
+void BgfxBackend::setUiOverlayVisible(bool visible) {
+    uiOverlayVisible = visible;
+}
+
+void BgfxBackend::renderUiOverlay() {
+    if (!initialized || !uiOverlayVisible || !bgfx::isValid(uiOverlayTexture)) {
+        return;
+    }
+    ensureUiOverlayResources();
+    if (!bgfx::isValid(uiOverlayProgram) || !bgfx::isValid(uiOverlaySampler)
+        || !bgfx::isValid(uiOverlayScaleBias)) {
+        return;
+    }
+
+    const int width = framebufferWidth > 0 ? framebufferWidth : 1;
+    const int height = framebufferHeight > 0 ? framebufferHeight : 1;
+
+    const float scaleBias[4] = { 2.0f / static_cast<float>(width), -2.0f / static_cast<float>(height), -1.0f, 1.0f };
+    bgfx::setViewMode(kUiOverlayView, bgfx::ViewMode::Sequential);
+    bgfx::setViewTransform(kUiOverlayView, nullptr, nullptr);
+    bgfx::setViewRect(kUiOverlayView, 0, 0,
+                      static_cast<uint16_t>(width),
+                      static_cast<uint16_t>(height));
+    bgfx::setUniform(uiOverlayScaleBias, scaleBias);
+    bgfx::setTexture(0, uiOverlaySampler, uiOverlayTexture);
+
+    bgfx::TransientVertexBuffer tvb;
+    bgfx::TransientIndexBuffer tib;
+    if (bgfx::getAvailTransientVertexBuffer(4, uiOverlayLayout) < 4
+        || bgfx::getAvailTransientIndexBuffer(6, false) < 6) {
+        return;
+    }
+    bgfx::allocTransientVertexBuffer(&tvb, 4, uiOverlayLayout);
+    bgfx::allocTransientIndexBuffer(&tib, 6, false);
+
+    struct UiOverlayVertex {
+        float x;
+        float y;
+        float u;
+        float v;
+        uint32_t abgr;
+    };
+
+    auto* verts = reinterpret_cast<UiOverlayVertex*>(tvb.data);
+    const uint32_t color = 0xffffffff;
+    verts[0] = {0.0f, 0.0f, 0.0f, 0.0f, color};
+    verts[1] = {static_cast<float>(width), 0.0f, 1.0f, 0.0f, color};
+    verts[2] = {static_cast<float>(width), static_cast<float>(height), 1.0f, 1.0f, color};
+    verts[3] = {0.0f, static_cast<float>(height), 0.0f, 1.0f, color};
+
+    uint16_t* indices = reinterpret_cast<uint16_t*>(tib.data);
+    indices[0] = 0;
+    indices[1] = 1;
+    indices[2] = 2;
+    indices[3] = 0;
+    indices[4] = 2;
+    indices[5] = 3;
+
+    bgfx::setState(BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A |
+                   BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA));
+    bgfx::setVertexBuffer(0, &tvb);
+    bgfx::setIndexBuffer(&tib);
+    bgfx::submit(kUiOverlayView, uiOverlayProgram);
+}
+
 void BgfxBackend::setPosition(graphics::EntityId entity, const glm::vec3& position) {
     auto it = entities.find(entity);
     if (it == entities.end()) {
@@ -1255,6 +1346,45 @@ void BgfxBackend::buildSkyboxResources() {
     skyboxVertexBuffer = bgfx::createVertexBuffer(bgfx::copy(cubeVerts, sizeof(cubeVerts)), skyboxLayout);
     skyboxReady = bgfx::isValid(skyboxVertexBuffer) && bgfx::isValid(skyboxProgram);
     spdlog::info("Graphics(Bgfx): skybox ready={}", skyboxReady);
+}
+
+void BgfxBackend::ensureUiOverlayResources() {
+    if (!initialized || bgfx::isValid(uiOverlayProgram)) {
+        return;
+    }
+    const std::filesystem::path shaderDir = bz::data::Resolve("bgfx/shaders/bin/vk/imgui");
+    const auto vsPath = shaderDir / "vs_imgui.bin";
+    const auto fsPath = shaderDir / "fs_imgui.bin";
+    auto vsBytes = readFileToBytes(vsPath);
+    auto fsBytes = readFileToBytes(fsPath);
+    if (vsBytes.empty() || fsBytes.empty()) {
+        spdlog::error("Graphics(Bgfx): missing UI overlay shaders '{}', '{}'", vsPath.string(), fsPath.string());
+        return;
+    }
+    const bgfx::Memory* vsMem = bgfx::copy(vsBytes.data(), static_cast<uint32_t>(vsBytes.size()));
+    const bgfx::Memory* fsMem = bgfx::copy(fsBytes.data(), static_cast<uint32_t>(fsBytes.size()));
+    bgfx::ShaderHandle vsh = bgfx::createShader(vsMem);
+    bgfx::ShaderHandle fsh = bgfx::createShader(fsMem);
+    uiOverlayProgram = bgfx::createProgram(vsh, fsh, true);
+    if (!bgfx::isValid(uiOverlayProgram)) {
+        spdlog::error("Graphics(Bgfx): failed to create UI overlay shader program");
+        return;
+    }
+
+    uiOverlaySampler = bgfx::createUniform("s_tex", bgfx::UniformType::Sampler);
+    uiOverlayScaleBias = bgfx::createUniform("u_scaleBias", bgfx::UniformType::Vec4);
+    uiOverlayLayout.begin()
+        .add(bgfx::Attrib::Position, 2, bgfx::AttribType::Float)
+        .add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float)
+        .add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true)
+        .end();
+}
+
+uint16_t BgfxBackend::toTextureHandle(uint64_t textureId) {
+    if (textureId == 0) {
+        return bgfx::kInvalidHandle;
+    }
+    return static_cast<uint16_t>(textureId - 1);
 }
 
 } // namespace graphics_backend

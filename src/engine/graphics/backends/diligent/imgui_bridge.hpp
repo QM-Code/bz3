@@ -11,20 +11,23 @@ namespace Diligent {
 class IBuffer;
 class IShaderResourceBinding;
 class IPipelineState;
+class ITexture;
 class ITextureView;
 }
 
 namespace graphics_backend {
 
-class DiligentImGuiBridge final : public UiBridge {
+class DiligentImGuiBridge final : public ImGuiBridge {
 public:
     DiligentImGuiBridge();
     ~DiligentImGuiBridge() override;
 
     void* toImGuiTextureId(const graphics::TextureHandle& texture) const override;
     void rebuildImGuiFonts(ImFontAtlas* atlas) override;
-    void renderImGuiDrawData(ImDrawData* drawData) override;
+    void renderImGuiToTarget(ImDrawData* drawData) override;
     bool isImGuiReady() const override;
+    void ensureImGuiRenderTarget(int width, int height) override;
+    graphics::TextureHandle getImGuiRenderTarget() const override;
 
 private:
     void ensurePipeline();
@@ -39,6 +42,12 @@ private:
     std::size_t indexBufferSize_ = 0;
     Diligent::RefCntAutoPtr<Diligent::ITextureView> fontSrv_;
     uint64_t fontToken_ = 0;
+    Diligent::RefCntAutoPtr<Diligent::ITexture> uiTargetTexture_;
+    Diligent::RefCntAutoPtr<Diligent::ITextureView> uiTargetRtv_;
+    Diligent::RefCntAutoPtr<Diligent::ITextureView> uiTargetSrv_;
+    uint64_t uiToken_ = 0;
+    int uiWidth_ = 0;
+    int uiHeight_ = 0;
     bool ready_ = false;
 };
 

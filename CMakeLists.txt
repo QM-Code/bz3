@@ -350,48 +350,48 @@ endif()
 
 if(BZ3_UI_BACKEND STREQUAL "imgui")
     list(APPEND ENGINE_CLIENT_SOURCES
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/imgui/backend.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/imgui/console/console.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/imgui/console/thumbnail_cache.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/imgui/console/panels/panel_community.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/imgui/console/panels/panel_settings.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/imgui/console/panels/panel_documentation.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/imgui/console/panels/panel_start_server.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/imgui/console/panels/panel_themes.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/imgui/hud/hud.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/imgui/hud/chat.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/imgui/hud/crosshair.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/imgui/hud/fps.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/imgui/hud/radar.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/imgui/hud/scoreboard.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/imgui/hud/spawn_hint.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/backend.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/console/console.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/console/thumbnail_cache.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/console/panels/panel_community.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/console/panels/panel_settings.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/console/panels/panel_documentation.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/console/panels/panel_start_server.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/console/panels/panel_themes.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/hud/hud.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/hud/chat.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/hud/crosshair.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/hud/fps.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/hud/radar.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/hud/scoreboard.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/hud/spawn_hint.cpp
     )
 elseif(BZ3_UI_BACKEND STREQUAL "rmlui")
     list(APPEND ENGINE_CLIENT_SOURCES
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/backend.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/console/emoji_utils.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/console/console.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/console/modal_dialog.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/hud/hud.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/hud/chat.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/hud/dialog.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/hud/radar.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/hud/scoreboard.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/translate.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/console/panels/panel.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/console/panels/panel_community.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/console/panels/panel_settings.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/console/panels/panel_documentation.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/console/panels/panel_start_server.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/console/panels/panel_themes.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/backend.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/console/emoji_utils.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/console/console.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/console/modal_dialog.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/hud/hud.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/hud/chat.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/hud/dialog.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/hud/radar.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/hud/scoreboard.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/translate.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/console/panels/panel.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/console/panels/panel_community.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/console/panels/panel_settings.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/console/panels/panel_documentation.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/console/panels/panel_start_server.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/console/panels/panel_themes.cpp
     )
     if(BZ3_RENDER_BACKEND STREQUAL "bgfx")
         list(APPEND ENGINE_CLIENT_SOURCES
-            ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/platform/RmlUi_Renderer_BGFX.cpp
+            ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/platform/RmlUi_Renderer_BGFX.cpp
         )
     elseif(BZ3_RENDER_BACKEND STREQUAL "diligent")
         list(APPEND ENGINE_CLIENT_SOURCES
-            ${PROJECT_SOURCE_DIR}/src/game/ui/backends/rmlui/platform/RmlUi_Renderer_Diligent.cpp
+            ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/platform/RmlUi_Renderer_Diligent.cpp
         )
     endif()
 endif()

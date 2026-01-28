@@ -28,11 +28,13 @@ apt-get install -y --no-install-recommends \
   ca-certificates \
   clang-15 \
   curl \
+  file \
   git \
   ninja-build \
   pkg-config \
   python3 \
   rsync \
+  libgl1-mesa-dev \
   libx11-dev \
   libxrandr-dev \
   libxi-dev \
@@ -64,6 +66,28 @@ fi
 
 cd /work
 git config --global --add safe.directory /work/third_party/filament
+# Avoid building backend_test_linux (not needed for SDK install).
+python3 - <<'PY'
+from pathlib import Path
+
+path = Path("/work/third_party/filament/filament/backend/CMakeLists.txt")
+data = path.read_text()
+marker = "add_executable(backend_test_linux"
+if marker in data and "EXCLUDE_FROM_ALL" not in data:
+    data = data.replace(
+        marker,
+        marker,
+    )
+    inject = (
+        "    set_target_properties(backend_test_linux PROPERTIES EXCLUDE_FROM_ALL TRUE)\n"
+    )
+    if inject not in data:
+        data = data.replace(
+            "set_target_properties(backend_test_linux PROPERTIES FOLDER Tests)\n",
+            "set_target_properties(backend_test_linux PROPERTIES FOLDER Tests)\n" + inject,
+        )
+    path.write_text(data)
+PY
 export CC=clang-15
 export CXX=clang++-15
 export CLEAN_INSTALL
@@ -71,6 +95,7 @@ export FILAMENT_REF
 export BUILD_TYPE
 ./scripts/build_filament.sh
 
+git -C /work/third_party/filament checkout -- filament/backend/CMakeLists.txt || true
 chown -R ${HOST_UID}:${HOST_GID} /work/third_party/filament /work/libs/filament-sdk
 CMD
 )

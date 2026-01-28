@@ -82,6 +82,65 @@ bool BgfxUiBridge::isImGuiReady() const {
     return ready_ && fontsReady_;
 }
 
+void BgfxUiBridge::ensureImGuiRenderTarget(int width, int height) {
+    if (!ready_) {
+        return;
+    }
+    if (width <= 0 || height <= 0) {
+        if (bgfx::isValid(uiTargetFrameBuffer_)) {
+            bgfx::destroy(uiTargetFrameBuffer_);
+            uiTargetFrameBuffer_ = BGFX_INVALID_HANDLE;
+        }
+        if (bgfx::isValid(uiTargetTexture_)) {
+            bgfx::destroy(uiTargetTexture_);
+            uiTargetTexture_ = BGFX_INVALID_HANDLE;
+        }
+        uiWidth_ = 0;
+        uiHeight_ = 0;
+        return;
+    }
+    if (width == uiWidth_ && height == uiHeight_
+        && bgfx::isValid(uiTargetFrameBuffer_) && bgfx::isValid(uiTargetTexture_)) {
+        return;
+    }
+    if (bgfx::isValid(uiTargetFrameBuffer_)) {
+        bgfx::destroy(uiTargetFrameBuffer_);
+        uiTargetFrameBuffer_ = BGFX_INVALID_HANDLE;
+    }
+    if (bgfx::isValid(uiTargetTexture_)) {
+        bgfx::destroy(uiTargetTexture_);
+        uiTargetTexture_ = BGFX_INVALID_HANDLE;
+    }
+
+    const uint64_t colorFlags = BGFX_TEXTURE_RT | BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP;
+    uiTargetTexture_ = bgfx::createTexture2D(
+        static_cast<uint16_t>(width),
+        static_cast<uint16_t>(height),
+        false,
+        1,
+        bgfx::TextureFormat::RGBA8,
+        colorFlags);
+    if (bgfx::isValid(uiTargetTexture_)) {
+        bgfx::Attachment attachment;
+        attachment.init(uiTargetTexture_);
+        uiTargetFrameBuffer_ = bgfx::createFrameBuffer(1, &attachment, false);
+    }
+
+    uiWidth_ = width;
+    uiHeight_ = height;
+}
+
+graphics::TextureHandle BgfxUiBridge::getImGuiRenderTarget() const {
+    graphics::TextureHandle handle{};
+    if (!bgfx::isValid(uiTargetTexture_)) {
+        return handle;
+    }
+    handle.id = static_cast<uint64_t>(uiTargetTexture_.idx + 1);
+    handle.width = static_cast<uint32_t>(uiWidth_);
+    handle.height = static_cast<uint32_t>(uiHeight_);
+    return handle;
+}
+
 void BgfxUiBridge::rebuildImGuiFonts(ImFontAtlas* atlas) {
     if (!ready_ || !atlas) {
         return;
@@ -120,8 +179,11 @@ void BgfxUiBridge::rebuildImGuiFonts(ImFontAtlas* atlas) {
     fontsReady_ = true;
 }
 
-void BgfxUiBridge::renderImGuiDrawData(ImDrawData* drawData) {
+void BgfxUiBridge::renderImGuiToTarget(ImDrawData* drawData) {
     if (!drawData || !ready_ || !bgfx::isValid(program_) || !bgfx::isValid(fontTexture_)) {
+        return;
+    }
+    if (!bgfx::isValid(uiTargetFrameBuffer_)) {
         return;
     }
 
@@ -136,7 +198,10 @@ void BgfxUiBridge::renderImGuiDrawData(ImDrawData* drawData) {
 
     const float scaleBias[4] = { 2.0f / io.DisplaySize.x, -2.0f / io.DisplaySize.y, -1.0f, 1.0f };
     bgfx::setViewTransform(kImGuiView, nullptr, nullptr);
+    bgfx::setViewFrameBuffer(kImGuiView, uiTargetFrameBuffer_);
     bgfx::setViewRect(kImGuiView, 0, 0, static_cast<uint16_t>(fbWidth), static_cast<uint16_t>(fbHeight));
+    bgfx::setViewClear(kImGuiView, BGFX_CLEAR_COLOR, 0x00000000, 1.0f, 0);
+    bgfx::touch(kImGuiView);
     bgfx::setUniform(scaleBias_, scaleBias);
 
     for (int n = 0; n < drawData->CmdListsCount; n++) {
@@ -208,6 +273,16 @@ void BgfxUiBridge::destroyResources() {
         fontsReady_ = false;
         return;
     }
+    if (bgfx::isValid(uiTargetFrameBuffer_)) {
+        bgfx::destroy(uiTargetFrameBuffer_);
+        uiTargetFrameBuffer_ = BGFX_INVALID_HANDLE;
+    }
+    if (bgfx::isValid(uiTargetTexture_)) {
+        bgfx::destroy(uiTargetTexture_);
+        uiTargetTexture_ = BGFX_INVALID_HANDLE;
+    }
+    uiWidth_ = 0;
+    uiHeight_ = 0;
     if (bgfx::isValid(fontTexture_)) {
         bgfx::destroy(fontTexture_);
         fontTexture_ = BGFX_INVALID_HANDLE;

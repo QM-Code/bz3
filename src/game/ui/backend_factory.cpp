@@ -3,9 +3,9 @@
 #include "spdlog/spdlog.h"
 
 #if defined(BZ3_UI_BACKEND_IMGUI)
-#include "ui/backends/imgui/backend.hpp"
+#include "ui/frontends/imgui/backend.hpp"
 #elif defined(BZ3_UI_BACKEND_RMLUI)
-#include "ui/backends/rmlui/backend.hpp"
+#include "ui/frontends/rmlui/backend.hpp"
 #else
 #error "BZ3 UI backend not set. Define BZ3_UI_BACKEND_IMGUI or BZ3_UI_BACKEND_RMLUI."
 #endif

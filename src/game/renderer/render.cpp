@@ -288,7 +288,6 @@ void Render::update() {
     device_->renderLayer(mainLayer, mainTarget);
 #else
     device_->renderLayer(mainLayer, graphics::kDefaultRenderTarget);
-    device_->renderUiOverlay();
 #endif
 
 }
@@ -459,8 +458,8 @@ graphics::TextureHandle Render::getRadarTexture() const {
     return handle;
 }
 
-graphics_backend::UiBridge* Render::getUiBridge() const {
-    return device_ ? device_->getUiBridge() : nullptr;
+graphics_backend::ImGuiBridge* Render::getImGuiBridge() const {
+    return device_ ? device_->getImGuiBridge() : nullptr;
 }
 
 unsigned int Render::getMainTextureId() const {
@@ -488,6 +487,13 @@ void Render::setUiOverlayTexture(const ui::RenderOutput& output) {
     }
     device_->setUiOverlayTexture(output.texture);
     device_->setUiOverlayVisible(output.valid());
+}
+
+void Render::renderUiOverlay() {
+    if (!device_) {
+        return;
+    }
+    device_->renderUiOverlay();
 }
 
 void Render::setBrightness(float brightness) {

@@ -3,6 +3,7 @@
 #include "ui/backend.hpp"
 #include "platform/window.hpp"
 #include "common/i18n.hpp"
+#include "ui/frontends/imgui/render_bridge.hpp"
 
 UiSystem::UiSystem(platform::Window &window) {
     backend = ui_backend::CreateUiBackend(window);
@@ -73,6 +74,10 @@ bool UiSystem::consumeKeybindingsReloadRequest() {
 
 void UiSystem::setRenderBridge(const ui::RenderBridge *bridge) {
     backend->setRenderBridge(bridge);
+}
+
+void UiSystem::setImGuiRenderBridge(const ui::ImGuiRenderBridge *bridge) {
+    backend->setImGuiRenderBridge(bridge);
 }
 
 ui::RenderOutput UiSystem::getRenderOutput() const {

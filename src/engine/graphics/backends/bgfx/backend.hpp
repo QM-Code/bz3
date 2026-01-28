@@ -55,6 +55,9 @@ public:
     void renderLayer(graphics::LayerId layer, graphics::RenderTargetId target) override;
 
     unsigned int getRenderTargetTextureId(graphics::RenderTargetId target) const override;
+    void setUiOverlayTexture(const graphics::TextureHandle& texture) override;
+    void setUiOverlayVisible(bool visible) override;
+    void renderUiOverlay() override;
 
     void setPosition(graphics::EntityId entity, const glm::vec3& position) override;
     void setRotation(graphics::EntityId entity, const glm::quat& rotation) override;
@@ -72,8 +75,8 @@ public:
     glm::mat4 getProjectionMatrix() const override;
     glm::vec3 getCameraPosition() const override;
     glm::vec3 getCameraForward() const override;
-    UiBridge* getUiBridge() override { return uiBridge_.get(); }
-    const UiBridge* getUiBridge() const override { return uiBridge_.get(); }
+    ImGuiBridge* getImGuiBridge() override { return uiBridge_.get(); }
+    const ImGuiBridge* getImGuiBridge() const override { return uiBridge_.get(); }
 
 private:
     struct EntityRecord {
@@ -156,14 +159,22 @@ private:
     bgfx::UniformHandle skyboxSamplerUniform = BGFX_INVALID_HANDLE;
     bgfx::TextureHandle skyboxTexture = BGFX_INVALID_HANDLE;
     bool skyboxReady = false;
+    bgfx::ProgramHandle uiOverlayProgram = BGFX_INVALID_HANDLE;
+    bgfx::UniformHandle uiOverlaySampler = BGFX_INVALID_HANDLE;
+    bgfx::UniformHandle uiOverlayScaleBias = BGFX_INVALID_HANDLE;
+    bgfx::VertexLayout uiOverlayLayout{};
+    bgfx::TextureHandle uiOverlayTexture = BGFX_INVALID_HANDLE;
+    bool uiOverlayVisible = false;
 
     glm::mat4 computeViewMatrix() const;
     glm::mat4 computeProjectionMatrix() const;
     void buildTestResources();
     void buildMeshResources();
     void buildSkyboxResources();
+    void ensureUiOverlayResources();
+    static uint16_t toTextureHandle(uint64_t textureId);
 
-    std::unique_ptr<UiBridge> uiBridge_;
+    std::unique_ptr<ImGuiBridge> uiBridge_;
 };
 
 } // namespace graphics_backend

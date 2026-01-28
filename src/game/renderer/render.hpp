@@ -86,11 +86,12 @@ public:
     void setCameraPosition(const glm::vec3 &position);
     void setCameraRotation(const glm::quat &rotation);
     void setUiOverlayTexture(const ui::RenderOutput& output);
+    void renderUiOverlay();
     void setBrightness(float brightness);
     void present();
 
     graphics::TextureHandle getRadarTexture() const;
-    graphics_backend::UiBridge* getUiBridge() const;
+    graphics_backend::ImGuiBridge* getImGuiBridge() const;
     unsigned int getMainTextureId() const;
     std::pair<int, int> getMainTextureSize() const;
     void setRadarShaderPath(const std::filesystem::path& vertPath,
