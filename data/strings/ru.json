@@ -24,7 +24,7 @@
         "settings": "Настройки",
         "documentation": "Документация",
         "start_server": "Запустить сервер",
-        "themes": "Темы"
+        "bindings": "Bindings"
       },
       "start_server": {
         "title": "Запустить сервер",

@@ -27,6 +27,9 @@ void UiSystem::update() {
         hudModel.visibility.fps = ui::config::GetRequiredBool("ui.hud.fps");
         hudModel.visibility.crosshair = ui::config::GetRequiredBool("ui.hud.crosshair");
     }
+    const bool consoleVisible = backend->console().isVisible();
+    const bool connected = backend->console().getConnectionState().connected;
+    hudModel.visibility.hud = connected || !consoleVisible;
     backend->setHudModel(hudModel);
     backend->update();
 }
@@ -97,5 +100,11 @@ ui::RenderOutput UiSystem::getRenderOutput() const {
 }
 
 float UiSystem::getRenderBrightness() const {
-    return backend ? backend->getRenderBrightness() : 1.0f;
+    if (!backend) {
+        return 1.0f;
+    }
+    if (backend->isRenderBrightnessDragActive()) {
+        return 1.0f;
+    }
+    return backend->getRenderBrightness();
 }

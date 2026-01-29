@@ -13,6 +13,7 @@ struct HudDialog {
 };
 
 struct HudVisibility {
+    bool hud = true;
     bool scoreboard = true;
     bool chat = true;
     bool radar = true;

@@ -310,21 +310,22 @@ void ImGuiBackend::update() {
     hud.setDialogText(hudModel.dialog.text);
     hud.setDialogVisible(hudModel.dialog.visible);
 
-    if (consoleView.isVisible()) {
-        consoleView.draw(io);
-    } else {
+    const bool consoleVisible = consoleView.isVisible();
+    const bool hudVisible = hudModel.visibility.hud;
+    if (hudVisible) {
         hud.setScoreboardVisible(hudModel.visibility.scoreboard);
         hud.setChatVisible(hudModel.visibility.chat);
         hud.setRadarVisible(hudModel.visibility.radar);
-        hud.setCrosshairVisible(hudModel.visibility.crosshair);
+        hud.setCrosshairVisible(hudModel.visibility.crosshair && !consoleVisible);
         hud.setShowFps(hudModel.visibility.fps);
         hud.draw(io, bigFont);
+    }
+    if (consoleVisible) {
+        consoleView.draw(io);
     }
 
     ImGui::Render();
     ImDrawData* drawData = ImGui::GetDrawData();
-    const bool consoleVisible = consoleView.isVisible();
-    const bool hudVisible = !consoleVisible;
     outputVisible = (consoleVisible || hudVisible) && hasOutputDrawData(drawData);
     if (uiBridge && outputVisible) {
         uiBridge->renderImGuiToTarget(drawData);
@@ -407,6 +408,10 @@ ui::RenderOutput ImGuiBackend::getRenderOutput() const {
     output.texture = uiBridge->getImGuiRenderTarget();
     output.visible = outputVisible;
     return output;
+}
+
+bool ImGuiBackend::isRenderBrightnessDragActive() const {
+    return consoleView.isRenderBrightnessDragActive();
 }
 
 ui::ConsoleInterface &ImGuiBackend::console() {

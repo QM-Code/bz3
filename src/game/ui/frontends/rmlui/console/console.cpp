@@ -3,6 +3,7 @@
 #include "ui/frontends/rmlui/console/panels/panel_community.hpp"
 #include "ui/frontends/rmlui/console/panels/panel_start_server.hpp"
 #include "ui/frontends/rmlui/console/panels/panel_settings.hpp"
+#include "ui/frontends/rmlui/console/panels/panel_bindings.hpp"
 
 #include <filesystem>
 
@@ -35,6 +36,13 @@ void RmlUiConsole::attachSettingsPanel(RmlUiPanelSettings *panel) {
     settingsPanel = panel;
     if (settingsPanel && !userConfigPath.empty()) {
         settingsPanel->setUserConfigPath(userConfigPath);
+    }
+}
+
+void RmlUiConsole::attachBindingsPanel(RmlUiPanelBindings *panel) {
+    bindingsPanel = panel;
+    if (bindingsPanel && !userConfigPath.empty()) {
+        bindingsPanel->setUserConfigPath(userConfigPath);
     }
 }
 
@@ -243,6 +251,9 @@ void RmlUiConsole::setUserConfigPath(const std::string &path) {
     if (settingsPanel) {
         settingsPanel->setUserConfigPath(path);
     }
+    if (bindingsPanel) {
+        bindingsPanel->setUserConfigPath(path);
+    }
 }
 
 bool RmlUiConsole::consumeFontReloadRequest() {
@@ -250,10 +261,10 @@ bool RmlUiConsole::consumeFontReloadRequest() {
 }
 
 bool RmlUiConsole::consumeKeybindingsReloadRequest() {
-    if (!settingsPanel) {
+    if (!bindingsPanel) {
         return false;
     }
-    return settingsPanel->consumeKeybindingsReloadRequest();
+    return bindingsPanel->consumeKeybindingsReloadRequest();
 }
 
 void RmlUiConsole::setConnectionState(const ConnectionState &state) {
@@ -316,23 +327,6 @@ void RmlUiConsole::onServerSelection(int index) {
     }
     selectedServerIndex = index;
 }
-
-bool RmlUiConsole::loadUserConfig(bz::json::Value &out) const {
-    const std::filesystem::path path = userConfigPath.empty()
-        ? bz::data::EnsureUserConfigFile("config.json")
-        : std::filesystem::path(userConfigPath);
-    if (auto user = bz::data::LoadJsonFile(path, "user config", spdlog::level::debug)) {
-        if (!user->is_object()) {
-            out = bz::json::Object();
-            return false;
-        }
-        out = *user;
-        return true;
-    }
-    out = bz::json::Object();
-    return true;
-}
-
 
 std::string RmlUiConsole::communityKeyForIndex(int index) const {
     if (index < 0 || index >= static_cast<int>(listOptions.size())) {

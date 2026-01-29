@@ -419,6 +419,7 @@ set(ENGINE_CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/game/ui/system.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/backend_factory.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/config.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/console/keybindings.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/hud_settings.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/render_settings.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/render_scale.cpp
@@ -439,9 +440,9 @@ if(BZ3_UI_BACKEND STREQUAL "imgui")
         ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/console/thumbnail_cache.cpp
         ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/console/panels/panel_community.cpp
         ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/console/panels/panel_settings.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/console/panels/panel_bindings.cpp
         ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/console/panels/panel_documentation.cpp
         ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/console/panels/panel_start_server.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/console/panels/panel_themes.cpp
         ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/hud/hud.cpp
         ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/hud/chat.cpp
         ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/hud/crosshair.cpp
@@ -479,9 +480,9 @@ elseif(BZ3_UI_BACKEND STREQUAL "rmlui")
         ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/console/panels/panel.cpp
         ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/console/panels/panel_community.cpp
         ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/console/panels/panel_settings.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/console/panels/panel_bindings.cpp
         ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/console/panels/panel_documentation.cpp
         ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/console/panels/panel_start_server.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/console/panels/panel_themes.cpp
     )
     if(BZ3_RENDER_BACKEND STREQUAL "bgfx")
         list(APPEND ENGINE_CLIENT_SOURCES

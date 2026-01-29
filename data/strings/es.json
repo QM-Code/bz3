@@ -24,7 +24,7 @@
         "settings": "Configuración",
         "documentation": "Documentación",
         "start_server": "Iniciar servidor",
-        "themes": "Temas"
+        "bindings": "Bindings"
       },
       "start_server": {
         "title": "Iniciar servidor",

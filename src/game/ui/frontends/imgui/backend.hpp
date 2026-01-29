@@ -41,6 +41,7 @@ public:
     void setImGuiRenderBridge(const ui::ImGuiRenderBridge *bridge) override;
     ui::RenderOutput getRenderOutput() const override;
     float getRenderBrightness() const override { return consoleView.getRenderBrightness(); }
+    bool isRenderBrightnessDragActive() const override;
 
 private:
     platform::Window *window = nullptr;

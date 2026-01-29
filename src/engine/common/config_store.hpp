@@ -47,6 +47,7 @@ public:
     static bool ReplaceUserConfig(bz::json::Value userConfig, std::string *error = nullptr);
 
     static bool SaveUser(std::string *error = nullptr);
+    static void Tick();
     static const std::filesystem::path &UserConfigPath();
 
     static bool AddRuntimeLayer(const std::string &label,
@@ -62,7 +63,7 @@ private:
     static void rebuildMergedLocked();
     static bool setValueAtPath(bz::json::Value &root, std::string_view path, bz::json::Value value);
     static bool eraseValueAtPath(bz::json::Value &root, std::string_view path);
-    static bool saveUserUnlocked(std::string *error);
+    static bool saveUserUnlocked(std::string *error, bool ignoreInterval);
 };
 
 } // namespace bz::config

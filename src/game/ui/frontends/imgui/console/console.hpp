@@ -11,16 +11,14 @@
 #include <string>
 #include <thread>
 #include <vector>
-#include <unordered_map>
 
 struct ImGuiIO;
 struct ImFont;
 
 #include <imgui.h>
-#include "common/json.hpp"
-
 #include "ui/console/console_interface.hpp"
 #include "ui/frontends/imgui/console/thumbnail_cache.hpp"
+#include "ui/hud_settings.hpp"
 #include "ui/render_settings.hpp"
 
 namespace ui {
@@ -28,20 +26,6 @@ namespace ui {
 class ConsoleView : public ConsoleInterface {
 public:
     using MessageTone = ui::MessageTone;
-
-    struct ThemeFontConfig {
-        std::string font;
-        float size = 0.0f;
-        ImVec4 color = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
-    };
-
-    struct ThemeConfig {
-        std::string name;
-    ThemeFontConfig regular;
-    ThemeFontConfig title;
-    ThemeFontConfig heading;
-    ThemeFontConfig button;
-    };
 
     ~ConsoleView();
     void initializeFonts(ImGuiIO &io);
@@ -79,6 +63,7 @@ public:
     void setUserConfigPath(const std::string &path) override;
     void setLanguageCallback(std::function<void(const std::string &)> callback);
     float getRenderBrightness() const;
+    bool isRenderBrightnessDragActive() const;
     bool consumeFontReloadRequest() override;
     bool consumeKeybindingsReloadRequest() override;
     void requestKeybindingsReload();
@@ -100,25 +85,16 @@ private:
     ThumbnailTexture *getOrLoadThumbnail(const std::string &url);
     MessageColors getMessageColors() const;
     void drawSettingsPanel(const MessageColors &colors);
+    void drawBindingsPanel(const MessageColors &colors);
     void drawDocumentationPanel(const MessageColors &colors) const;
     void drawStartServerPanel(const MessageColors &colors);
     void drawPlaceholderPanel(const char *heading, const char *body, const MessageColors &colors) const;
     void drawCommunityPanel(const MessageColors &colors);
-    void drawThemesPanel(const MessageColors &colors);
-    void ensureThemesLoaded();
-    void applyThemeToView(const ThemeConfig &theme);
-    bool loadUserConfig(bz::json::Value &out) const;
-    bool saveUserConfig(const bz::json::Value &userConfig, std::string &error) const;
-    void setNestedConfig(bz::json::Value &root, std::initializer_list<const char*> path, bz::json::Value value) const;
-    void setNestedConfig(bz::json::Value &root, const std::vector<std::string> &path, bz::json::Value value) const;
-    void eraseNestedConfig(bz::json::Value &root, std::initializer_list<const char*> path) const;
     std::string communityKeyForIndex(int index) const;
     void refreshCommunityCredentials();
     void persistCommunityCredentials(bool passwordChanged);
-    bz::json::Value themeToJson(const ThemeConfig &theme) const;
-    ThemeConfig themeFromJson(const bz::json::Value &themeJson, const ThemeConfig &fallback) const;
-    void applyThemeSelection(const std::string &name);
-    void resetToDefaultTheme();
+    void applyRenderBrightness(float value, bool fromUser);
+    bool commitRenderBrightness();
     void stopAllLocalServers();
     void stopLocalServer(std::size_t index);
     std::string findServerBinary();
@@ -187,18 +163,7 @@ private:
     ThumbnailCache thumbnails;
 
     std::string userConfigPath;
-    bool themesLoaded = false;
-    std::vector<std::string> themeOptions;
-    std::unordered_map<std::string, ThemeConfig> themePresets;
-    std::optional<ThemeConfig> customTheme;
-    ThemeConfig defaultTheme;
-    ThemeConfig currentTheme;
-    int selectedThemeIndex = 0;
-    std::array<char, 64> themeNameBuffer{};
-    bool themeDirty = false;
-    std::string themeStatusText;
-    bool themeStatusIsError = false;
-    bool useThemeOverrides = false;
+    HudSettings hudSettings;
     enum class BindingColumn {
         Keyboard,
         Mouse,
@@ -211,9 +176,14 @@ private:
     int selectedBindingIndex = -1;
     BindingColumn selectedBindingColumn = BindingColumn::Keyboard;
     bool settingsLoaded = false;
+    bool bindingsLoaded = false;
+    uint64_t settingsRevision = 0;
     int selectedLanguageIndex = 0;
     std::string settingsStatusText;
     bool settingsStatusIsError = false;
+    std::string bindingsStatusText;
+    bool bindingsStatusIsError = false;
+    bool renderBrightnessDragging = false;
     RenderSettings renderSettings;
     std::function<void(const std::string &)> languageCallback;
 

@@ -24,7 +24,7 @@
         "settings": "Impostazioni",
         "documentation": "Documentazione",
         "start_server": "Avvia server",
-        "themes": "Temi"
+        "bindings": "Bindings"
       },
       "start_server": {
         "title": "Avvia server",

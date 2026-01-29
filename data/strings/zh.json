@@ -24,7 +24,7 @@
         "settings": "设置",
         "documentation": "文档",
         "start_server": "启动服务器",
-        "themes": "主题"
+        "bindings": "Bindings"
       },
       "start_server": {
         "title": "启动服务器",

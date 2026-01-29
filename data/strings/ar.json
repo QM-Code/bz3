@@ -24,7 +24,7 @@
         "settings": "الإعدادات",
         "documentation": "التوثيق",
         "start_server": "بدء الخادم",
-        "themes": "السمات"
+        "bindings": "Bindings"
       },
       "start_server": {
         "title": "بدء الخادم",

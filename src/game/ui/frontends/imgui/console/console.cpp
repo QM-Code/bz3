@@ -8,6 +8,8 @@
 #include <string>
 #include <vector>
 
+#include "common/json.hpp"
+#include "common/config_store.hpp"
 #include "common/data_path_resolver.hpp"
 #include "common/i18n.hpp"
 #include "spdlog/spdlog.h"
@@ -30,7 +32,7 @@ std::string trimCopy(const std::string &value) {
 }
 
 ImVec4 readColorConfig(const char *path, const ImVec4 &fallback) {
-    const auto *value = bz::data::ConfigValue(path);
+    const auto *value = bz::config::ConfigStore::Get(path);
     if (!value || !value->is_array()) {
         return fallback;
     }
@@ -129,9 +131,7 @@ void ConsoleView::initializeFonts(ImGuiIO &io) {
     } else if (language == "zh") {
         regularRanges = io.Fonts->GetGlyphRangesChineseSimplifiedCommon();
     }
-    const float regularFontSize = useThemeOverrides
-        ? currentTheme.regular.size
-        : ui::config::GetRequiredFloat("assets.hud.fonts.console.Regular.Size");
+    const float regularFontSize = ui::config::GetRequiredFloat("assets.hud.fonts.console.Regular.Size");
     this->regularFontSize = regularFontSize;
     regularFont = io.Fonts->AddFontFromFileTTF(
         regularFontPathStr.c_str(),
@@ -152,9 +152,7 @@ void ConsoleView::initializeFonts(ImGuiIO &io) {
 
     const auto titleFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Title.Font");
     const std::string titleFontPathStr = titleFontPath.string();
-    const float titleFontSize = useThemeOverrides
-        ? currentTheme.title.size
-        : ui::config::GetRequiredFloat("assets.hud.fonts.console.Title.Size");
+    const float titleFontSize = ui::config::GetRequiredFloat("assets.hud.fonts.console.Title.Size");
     this->titleFontSize = titleFontSize;
     titleFont = io.Fonts->AddFontFromFileTTF(
         titleFontPathStr.c_str(),
@@ -168,9 +166,7 @@ void ConsoleView::initializeFonts(ImGuiIO &io) {
 
     const auto headingFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Heading.Font");
     const std::string headingFontPathStr = headingFontPath.string();
-    const float headingFontSize = useThemeOverrides
-        ? currentTheme.heading.size
-        : ui::config::GetRequiredFloat("assets.hud.fonts.console.Heading.Size");
+    const float headingFontSize = ui::config::GetRequiredFloat("assets.hud.fonts.console.Heading.Size");
     this->headingFontSize = headingFontSize;
     headingFont = io.Fonts->AddFontFromFileTTF(
         headingFontPathStr.c_str(),
@@ -184,9 +180,7 @@ void ConsoleView::initializeFonts(ImGuiIO &io) {
 
     const auto buttonFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Button.Font");
     const std::string buttonFontPathStr = buttonFontPath.string();
-    const float buttonFontSize = useThemeOverrides
-        ? currentTheme.button.size
-        : ui::config::GetRequiredFloat("assets.hud.fonts.console.Button.Size");
+    const float buttonFontSize = ui::config::GetRequiredFloat("assets.hud.fonts.console.Button.Size");
     buttonFont = io.Fonts->AddFontFromFileTTF(
         buttonFontPathStr.c_str(),
         buttonFontSize
@@ -262,32 +256,38 @@ void ConsoleView::draw(ImGuiIO &io) {
     if (ImGui::BeginTabBar("CommunityBrowserTabs", ImGuiTabBarFlags_FittingPolicyScroll)) {
         const std::string tabCommunity = i18n.get("ui.console.tabs.community");
         const std::string tabSettings = i18n.get("ui.console.tabs.settings");
-        const std::string tabDocumentation = i18n.get("ui.console.tabs.documentation");
+        const std::string tabBindings = i18n.get("ui.console.tabs.bindings");
         const std::string tabStartServer = i18n.get("ui.console.tabs.start_server");
-        const std::string tabThemes = i18n.get("ui.console.tabs.themes");
-        if (ImGui::BeginTabItem((tabCommunity + "###TabCommunity").c_str())) {
-            if (ImGui::IsItemActivated()) {
-                refreshRequested = true;
-            }
+        const bool communityTabOpen = ImGui::BeginTabItem((tabCommunity + "###TabCommunity").c_str());
+        if (ImGui::IsItemActivated() || ImGui::IsItemClicked()) {
+            refreshRequested = true;
+        }
+        if (communityTabOpen) {
             drawCommunityPanel(messageColors);
             ImGui::EndTabItem();
         }
-    if (ImGui::BeginTabItem((tabSettings + "###TabSettings").c_str())) {
-        drawSettingsPanel(messageColors);
-        ImGui::EndTabItem();
-    }
-    if (ImGui::BeginTabItem((tabDocumentation + "###TabDocumentation").c_str())) {
-        drawDocumentationPanel(messageColors);
-        ImGui::EndTabItem();
-    }
-    if (ImGui::BeginTabItem((tabStartServer + "###TabStartServer").c_str())) {
-        drawStartServerPanel(messageColors);
-        ImGui::EndTabItem();
-    }
-    if (ImGui::BeginTabItem((tabThemes + "###TabThemes").c_str())) {
-        drawThemesPanel(messageColors);
-        ImGui::EndTabItem();
-    }
+        if (ImGui::BeginTabItem((tabStartServer + "###TabStartServer").c_str())) {
+            drawStartServerPanel(messageColors);
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem((tabSettings + "###TabSettings").c_str())) {
+            drawSettingsPanel(messageColors);
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem((tabBindings + "###TabBindings").c_str())) {
+            drawBindingsPanel(messageColors);
+            ImGui::EndTabItem();
+        }
+        const float docTabWidth =
+            ImGui::CalcTextSize("?").x + (ImGui::GetStyle().FramePadding.x * 2.0f);
+        const float docTabX = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - docTabWidth;
+        if (docTabX > ImGui::GetCursorPosX()) {
+            ImGui::SetCursorPosX(docTabX);
+        }
+        if (ImGui::BeginTabItem("?###TabDocumentation")) {
+            drawDocumentationPanel(messageColors);
+            ImGui::EndTabItem();
+        }
     ImGui::EndTabBar();
     }
 
@@ -303,15 +303,9 @@ void ConsoleView::draw(ImGuiIO &io) {
 
 void ConsoleView::setUserConfigPath(const std::string &path) {
     userConfigPath = path;
-    themesLoaded = false;
     settingsLoaded = false;
+    bindingsLoaded = false;
     renderSettings.reset();
-    if (!userConfigPath.empty()) {
-        bz::json::Value userConfig;
-        if (loadUserConfig(userConfig)) {
-            renderSettings.load(userConfig);
-        }
-    }
 }
 
 void ConsoleView::setLanguageCallback(std::function<void(const std::string &)> callback) {
@@ -331,9 +325,6 @@ bool ConsoleView::consumeKeybindingsReloadRequest() {
 }
 
 void ConsoleView::requestKeybindingsReload() {
-    if (!userConfigPath.empty()) {
-        bz::data::MergeExternalConfigLayer(userConfigPath, "user config", spdlog::level::debug);
-    }
     keybindingsReloadRequested = true;
 }
 
@@ -474,17 +465,8 @@ void ConsoleView::refreshCommunityCredentials() {
         return;
     }
 
-    bz::json::Value config;
-    if (!loadUserConfig(config)) {
-        return;
-    }
-
-    const auto guiIt = config.find("gui");
-    if (guiIt == config.end() || !guiIt->is_object()) {
-        return;
-    }
-    const auto credsIt = guiIt->find("communityCredentials");
-    if (credsIt == guiIt->end() || !credsIt->is_object()) {
+    const auto *credsIt = bz::config::ConfigStore::Get("gui.communityCredentials");
+    if (!credsIt || !credsIt->is_object()) {
         return;
     }
     const auto entryIt = credsIt->find(key);
@@ -511,28 +493,40 @@ void ConsoleView::persistCommunityCredentials(bool passwordChanged) {
         return;
     }
 
-    bz::json::Value config;
-    if (!loadUserConfig(config)) {
-        return;
+    bz::json::Value creds = bz::json::Object();
+    if (const auto *existing = bz::config::ConfigStore::Get("gui.communityCredentials")) {
+        if (existing->is_object()) {
+            creds = *existing;
+        }
     }
 
     const std::string username = trimCopy(usernameBuffer.data());
     if (username.empty()) {
-        eraseNestedConfig(config, {"gui", "communityCredentials", key.c_str()});
+        creds.erase(key);
     } else {
-        setNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "username"}, username);
+        if (!creds.contains(key) || !creds[key].is_object()) {
+            creds[key] = bz::json::Object();
+        }
+        creds[key]["username"] = username;
         if (key == "LAN") {
-            eraseNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "passwordHash"});
-            eraseNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "salt"});
+            if (creds[key].is_object()) {
+                creds[key].erase("passwordHash");
+                creds[key].erase("salt");
+            }
         } else if (!storedPasswordHash.empty()) {
-            setNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "passwordHash"}, storedPasswordHash);
+            creds[key]["passwordHash"] = storedPasswordHash;
         } else if (passwordChanged) {
-            eraseNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "passwordHash"});
+            if (creds[key].is_object()) {
+                creds[key].erase("passwordHash");
+            }
         }
     }
 
-    std::string error;
-    saveUserConfig(config, error);
+    if (creds.empty()) {
+        bz::config::ConfigStore::Erase("gui.communityCredentials");
+    } else {
+        bz::config::ConfigStore::Set("gui.communityCredentials", creds);
+    }
 }
 
 void ConsoleView::storeCommunityAuth(const std::string &communityHost,
@@ -548,21 +542,23 @@ void ConsoleView::storeCommunityAuth(const std::string &communityHost,
         key.pop_back();
     }
 
-    bz::json::Value config;
-    if (!loadUserConfig(config)) {
-        return;
+    bz::json::Value creds = bz::json::Object();
+    if (const auto *existing = bz::config::ConfigStore::Get("gui.communityCredentials")) {
+        if (existing->is_object()) {
+            creds = *existing;
+        }
     }
-
-    setNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "username"}, username);
+    if (!creds.contains(key) || !creds[key].is_object()) {
+        creds[key] = bz::json::Object();
+    }
+    creds[key]["username"] = username;
     if (!passhash.empty()) {
-        setNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "passwordHash"}, passhash);
+        creds[key]["passwordHash"] = passhash;
     }
     if (!salt.empty()) {
-        setNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "salt"}, salt);
+        creds[key]["salt"] = salt;
     }
-
-    std::string error;
-    saveUserConfig(config, error);
+    bz::config::ConfigStore::Set("gui.communityCredentials", creds);
 
     const std::string activeKey = communityKeyForIndex(listSelectedIndex);
     if (activeKey == key) {
@@ -575,6 +571,7 @@ void ConsoleView::storeCommunityAuth(const std::string &communityHost,
 
 void ConsoleView::hide() {
     visible = false;
+    renderBrightnessDragging = false;
     statusText.clear();
     statusIsError = false;
     pendingSelection.reset();

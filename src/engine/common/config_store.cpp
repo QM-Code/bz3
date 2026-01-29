@@ -31,6 +31,7 @@ struct ConfigStoreState {
     double mergeIntervalSeconds = 0.0;
     std::chrono::steady_clock::time_point lastSaveTime = std::chrono::steady_clock::now();
     std::chrono::steady_clock::time_point lastMergeTime = std::chrono::steady_clock::now();
+    uint64_t lastSavedRevision = 0;
     bool pendingSave = false;
     bool mergedDirty = false;
 };
@@ -330,10 +331,12 @@ void ConfigStore::Initialize(const std::vector<ConfigFileSpec> &defaultSpecs,
     g_state.mergeIntervalSeconds = readIntervalSeconds(g_state.defaults, "config.MergeIntervalSeconds", 0.0);
     g_state.lastSaveTime = std::chrono::steady_clock::now();
     g_state.lastMergeTime = g_state.lastSaveTime;
+    g_state.lastSavedRevision = 0;
     g_state.pendingSave = false;
     g_state.mergedDirty = false;
     rebuildMergedLocked();
     g_state.revision++;
+    g_state.lastSavedRevision = g_state.revision;
     g_state.initialized = true;
 }
 
@@ -378,7 +381,7 @@ const bz::json::Value *ConfigStore::Get(std::string_view path) {
         const auto now = std::chrono::steady_clock::now();
         if (g_state.saveIntervalSeconds <= 0.0 ||
             std::chrono::duration<double>(now - g_state.lastSaveTime).count() >= g_state.saveIntervalSeconds) {
-            saveUserUnlocked(nullptr);
+            saveUserUnlocked(nullptr, true);
         }
     }
     spdlog::trace("config_store: request for key '{}'", path);
@@ -407,7 +410,11 @@ bool ConfigStore::Set(std::string_view path, bz::json::Value value) {
     if (g_state.mergeIntervalSeconds <= 0.0) {
         rebuildMergedLocked();
     }
-    return saveUserUnlocked(nullptr);
+    g_state.pendingSave = true;
+    if (g_state.saveIntervalSeconds <= 0.0) {
+        return saveUserUnlocked(nullptr, true);
+    }
+    return true;
 }
 
 bool ConfigStore::Erase(std::string_view path) {
@@ -425,7 +432,11 @@ bool ConfigStore::Erase(std::string_view path) {
     if (g_state.mergeIntervalSeconds <= 0.0) {
         rebuildMergedLocked();
     }
-    return saveUserUnlocked(nullptr);
+    g_state.pendingSave = true;
+    if (g_state.saveIntervalSeconds <= 0.0) {
+        return saveUserUnlocked(nullptr, true);
+    }
+    return true;
 }
 
 bool ConfigStore::ReplaceUserConfig(bz::json::Value userConfig, std::string *error) {
@@ -444,7 +455,11 @@ bool ConfigStore::ReplaceUserConfig(bz::json::Value userConfig, std::string *err
     if (g_state.mergeIntervalSeconds <= 0.0) {
         rebuildMergedLocked();
     }
-    return saveUserUnlocked(error);
+    g_state.pendingSave = true;
+    if (g_state.saveIntervalSeconds <= 0.0) {
+        return saveUserUnlocked(error, true);
+    }
+    return true;
 }
 
 bool ConfigStore::SaveUser(std::string *error) {
@@ -455,12 +470,32 @@ bool ConfigStore::SaveUser(std::string *error) {
         }
         return false;
     }
-    return saveUserUnlocked(error);
+    return saveUserUnlocked(error, true);
 }
 
-bool ConfigStore::saveUserUnlocked(std::string *error) {
+void ConfigStore::Tick() {
+    std::lock_guard<std::mutex> lock(g_state.mutex);
+    if (!g_state.initialized) {
+        return;
+    }
+    if (!g_state.pendingSave) {
+        return;
+    }
     const auto now = std::chrono::steady_clock::now();
     if (g_state.saveIntervalSeconds > 0.0 &&
+        std::chrono::duration<double>(now - g_state.lastSaveTime).count() < g_state.saveIntervalSeconds) {
+        return;
+    }
+    saveUserUnlocked(nullptr, true);
+}
+
+bool ConfigStore::saveUserUnlocked(std::string *error, bool ignoreInterval) {
+    const auto now = std::chrono::steady_clock::now();
+    if (g_state.revision <= g_state.lastSavedRevision) {
+        g_state.pendingSave = false;
+        return true;
+    }
+    if (!ignoreInterval && g_state.saveIntervalSeconds > 0.0 &&
         std::chrono::duration<double>(now - g_state.lastSaveTime).count() < g_state.saveIntervalSeconds) {
         g_state.pendingSave = true;
         return true;
@@ -502,6 +537,7 @@ bool ConfigStore::saveUserUnlocked(std::string *error) {
         return false;
     }
     g_state.lastSaveTime = now;
+    g_state.lastSavedRevision = g_state.revision;
     g_state.pendingSave = false;
     return true;
 }

@@ -13,6 +13,7 @@ namespace ui {
 class RmlUiPanelCommunity;
 class RmlUiPanelStartServer;
 class RmlUiPanelSettings;
+class RmlUiPanelBindings;
 
 class RmlUiConsole final : public ConsoleInterface {
 public:
@@ -21,6 +22,7 @@ public:
     void attachCommunityPanel(RmlUiPanelCommunity *panel);
     void attachStartServerPanel(RmlUiPanelStartServer *panel);
     void attachSettingsPanel(RmlUiPanelSettings *panel);
+    void attachBindingsPanel(RmlUiPanelBindings *panel);
 
     void show(const std::vector<CommunityBrowserEntry> &entries) override;
     void setEntries(const std::vector<CommunityBrowserEntry> &entries) override;
@@ -69,7 +71,6 @@ public:
 
 private:
     void applyListOptionsToPanel();
-    bool loadUserConfig(bz::json::Value &out) const;
     std::string communityKeyForIndex(int index) const;
     void refreshCommunityCredentials();
 
@@ -95,6 +96,7 @@ private:
     RmlUiPanelCommunity *communityPanel = nullptr;
     RmlUiPanelStartServer *startServerPanel = nullptr;
     RmlUiPanelSettings *settingsPanel = nullptr;
+    RmlUiPanelBindings *bindingsPanel = nullptr;
 };
 
 } // namespace ui

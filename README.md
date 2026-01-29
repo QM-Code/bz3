@@ -14,6 +14,22 @@ BZ3 is a C++20 client/server 3D game inspired by BZFlag.
 
 This project uses vcpkg to provide most native dependencies and the setup scripts automatically configure CMake with the correct toolchain.
 
+## Optional: The Forge renderer backend
+
+The Forge is not bundled and must be cloned manually if you want to build with `-DBZ3_RENDER_BACKEND=forge`.
+
+- Linux/macOS:
+
+  - `git clone https://github.com/ConfettiFX/The-Forge.git third_party/the-forge`
+- Windows (PowerShell or cmd):
+
+  - `git clone https://github.com/ConfettiFX/The-Forge.git third_party\the-forge`
+
+The setup scripts can do this automatically if you set `BZ3_SETUP_FORGE=1`:
+
+- Linux/macOS: `BZ3_SETUP_FORGE=1 ./setup.sh`
+- Windows: `set BZ3_SETUP_FORGE=1` then `setup.bat`
+
 ## Runtime Data
 
 The programs load assets/config from a data root resolved via the `BZ3_DATA_DIR` environment variable (configured by `src/game/common/data_path_spec.*`).

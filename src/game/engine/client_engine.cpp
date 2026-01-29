@@ -5,6 +5,7 @@
 #include "game/input/state.hpp"
 #include "spdlog/spdlog.h"
 #include "ui/bridges/render_bridge.hpp"
+#include "common/config_store.hpp"
 #if defined(BZ3_UI_BACKEND_IMGUI)
 #include "ui/bridges/imgui_render_bridge.hpp"
 #endif
@@ -109,4 +110,5 @@ void ClientEngine::lateUpdate(TimeUtils::duration deltaTime) {
         ui->setDialogText(game_input::SpawnHintText(*input));
     }
     network->flushPeekedMessages();
+    bz::config::ConfigStore::Tick();
 }

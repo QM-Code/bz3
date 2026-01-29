@@ -24,7 +24,7 @@
         "settings": "설정",
         "documentation": "문서",
         "start_server": "서버 시작",
-        "themes": "테마"
+        "bindings": "Bindings"
       },
       "start_server": {
         "title": "서버 시작",

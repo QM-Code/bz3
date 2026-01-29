@@ -24,7 +24,7 @@
         "settings": "設定",
         "documentation": "ドキュメント",
         "start_server": "サーバーを開始",
-        "themes": "テーマ"
+        "bindings": "Bindings"
       },
       "start_server": {
         "title": "サーバーを開始",

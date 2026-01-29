@@ -32,10 +32,10 @@
 #include "ui/frontends/rmlui/hud/hud.hpp"
 #include "ui/frontends/rmlui/console/console.hpp"
 #include "ui/frontends/rmlui/console/panels/panel_community.hpp"
+#include "ui/frontends/rmlui/console/panels/panel_bindings.hpp"
 #include "ui/frontends/rmlui/console/panels/panel_documentation.hpp"
 #include "ui/frontends/rmlui/console/panels/panel_settings.hpp"
 #include "ui/frontends/rmlui/console/panels/panel_start_server.hpp"
-#include "ui/frontends/rmlui/console/panels/panel_themes.hpp"
 #include "common/data_path_resolver.hpp"
 #include "common/config_store.hpp"
 #include "spdlog/spdlog.h"
@@ -573,13 +573,16 @@ RmlUiBackend::RmlUiBackend(platform::Window &windowRefIn) : windowRef(&windowRef
         state->reloadRequested = false;
         state->reloadArmed = true;
     });
+    auto bindingsPanel = std::make_unique<ui::RmlUiPanelBindings>();
+    auto *bindingsPanelPtr = bindingsPanel.get();
+    state->panels.emplace_back(std::move(bindingsPanel));
     state->panels.emplace_back(std::make_unique<ui::RmlUiPanelDocumentation>());
     auto startServerPanel = std::make_unique<ui::RmlUiPanelStartServer>();
     auto *startServerPanelPtr = startServerPanel.get();
     state->panels.emplace_back(std::move(startServerPanel));
-    state->panels.emplace_back(std::make_unique<ui::RmlUiPanelThemes>());
     consoleView->attachCommunityPanel(communityPanelPtr);
     consoleView->attachSettingsPanel(settingsPanelPtr);
+    consoleView->attachBindingsPanel(bindingsPanelPtr);
     consoleView->attachStartServerPanel(startServerPanelPtr);
     communityPanelPtr->bindCallbacks(
         [this](int index) {
@@ -618,8 +621,8 @@ RmlUiBackend::RmlUiBackend(platform::Window &windowRefIn) : windowRef(&windowRef
             }
         }
     );
-    loadConsoleDocument();
     loadHudDocument();
+    loadConsoleDocument();
 
     spdlog::info("UiSystem: RmlUi backend initialized.");
 }
@@ -788,13 +791,14 @@ void RmlUiBackend::update() {
         state->hud->setRadarTexture(renderBridge->getRadarTexture());
     }
     if (state->hud) {
+        const bool consoleVisible = consoleView && consoleView->isVisible();
         state->hud->setScoreboardEntries(hudModel.scoreboardEntries);
         state->hud->setDialogText(hudModel.dialog.text);
         state->hud->setDialogVisible(hudModel.dialog.visible);
         state->hud->setScoreboardVisible(hudModel.visibility.scoreboard);
         state->hud->setChatVisible(hudModel.visibility.chat);
         state->hud->setRadarVisible(hudModel.visibility.radar);
-        state->hud->setCrosshairVisible(hudModel.visibility.crosshair);
+        state->hud->setCrosshairVisible(hudModel.visibility.crosshair && !consoleVisible);
     }
 
     int fbWidth = 0;
@@ -825,9 +829,6 @@ void RmlUiBackend::update() {
         if (state->document && !state->document->IsVisible()) {
             state->document->Show();
         }
-        if (state->hud) {
-            state->hud->hide();
-        }
         if (!state->bodyElement && state->document) {
             state->bodyElement = state->document->GetElementById("main-body");
         }
@@ -839,8 +840,16 @@ void RmlUiBackend::update() {
         if (state->document && state->document->IsVisible()) {
             state->document->Hide();
         }
-        if (state->hud) {
+        if (settingsPanel) {
+            settingsPanel->clearRenderBrightnessDrag();
+        }
+    }
+
+    if (state->hud) {
+        if (hudModel.visibility.hud) {
             state->hud->show();
+        } else {
+            state->hud->hide();
         }
     }
 
@@ -886,8 +895,8 @@ void RmlUiBackend::update() {
             bz::i18n::Get().loadLanguage(*state->pendingLanguage);
             state->pendingLanguage.reset();
         }
-        loadConsoleDocument();
         loadHudDocument();
+        loadConsoleDocument();
     }
 }
 
@@ -895,8 +904,8 @@ void RmlUiBackend::reloadFonts() {
     if (!state) {
         return;
     }
-    loadConsoleDocument();
     loadHudDocument();
+    loadConsoleDocument();
 }
 
 void RmlUiBackend::setHudModel(const ui::HudModel &model) {
@@ -971,6 +980,10 @@ ui::RenderOutput RmlUiBackend::getRenderOutput() const {
 
 float RmlUiBackend::getRenderBrightness() const {
     return settingsPanel ? settingsPanel->getRenderBrightness() : 1.0f;
+}
+
+bool RmlUiBackend::isRenderBrightnessDragActive() const {
+    return settingsPanel ? settingsPanel->isRenderBrightnessDragActive() : false;
 }
 
 void RmlUiBackend::setActiveTab(const std::string &tabKey) {

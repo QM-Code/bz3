@@ -1,39 +1,158 @@
-# UI Architecture
+# UI Architecture (current)
 
-This folder contains the shared UI system plus two frontend implementations (ImGui and RmlUi).
+This document reflects the UI subsystem as it exists today, plus the near-term refactor direction. It is intended for future coding agents.
 
-## High-level flow
-- `UiSystem` owns the selected UI backend and forwards engine events and data.
-- Each backend renders to a texture (RTT) and exposes `ui::RenderOutput`.
-- The renderer composites the UI texture as an overlay each frame.
+## 1) Big picture
 
-## Key components
-- `system.*`: lifecycle, event handling, and output retrieval.
-- `backend.*`: backend interface + factory.
-- `types.hpp`: shared UI types (scoreboard, render output).
-- `config.*`: config helpers for required values (no defaults).
-- `hud_model.hpp`: shared HUD state passed to frontends.
-- `render_scale.*`: UI render scale (config: `ui.RenderScale`).
-- `render_settings.*`: user-facing render settings (brightness, etc.).
+The UI subsystem exposes a single backend interface (`ui::Backend`) and two frontend implementations:
+- **ImGui** (`src/game/ui/frontends/imgui/`)
+- **RmlUi** (`src/game/ui/frontends/rmlui/`)
 
-## Bridges
-- `ui/bridges/render_bridge.hpp`: renderer-agnostic bridge (radar texture).
-- `ui/bridges/imgui_render_bridge.hpp`: ImGui-specific render-target bridge.
-- `engine/graphics/ui_render_target_bridge.hpp`: graphics-layer RTT bridge used by ImGui.
-Note: RmlUi does not use a UI-layer render bridge because it integrates directly via the RmlUi render interface inside `RmlUiBackend`.
+The UI is split into two surfaces:
+- **Console**: multi-tab UI (Community, Start Server, Settings, Bindings, ?)
+- **HUD**: gameplay overlay (chat, radar, scoreboard, crosshair, FPS, dialog)
 
-## Frontends
-- ImGui: `frontends/imgui/*`
-- RmlUi: `frontends/rmlui/*`
+Both frontends render HUD first, then Console (so the console overlays the HUD). The HUD can be forced off while the console is visible, depending on connection state.
 
-## Feature map (entry points)
-- UI render output/visibility: `frontends/*/backend.cpp`
-- HUD composition: `frontends/*/hud/*`
-- Shared HUD data: `ui/hud_model.hpp`
-- Console: `frontends/*/console/*`
-- Start server panel: `frontends/*/console/panels/panel_start_server.*`
-- Renderer integration: `frontends/*/platform/renderer_*.{hpp,cpp}`
+## 2) Core API surface
 
-## UI rendering policy
-- Both ImGui and RmlUi render into offscreen textures.
-- The render overlay uses `ui::RenderOutput` (texture + visibility).
+### `UiSystem` (`src/game/ui/system.*`)
+- Owns the chosen backend (created by `backend_factory.cpp`).
+- On each update:
+  - Reads `ConfigStore::Revision()` and updates HUD visibility flags from config.
+  - Sets `hudModel.visibility.hud` based on connection + console visibility.
+  - Sends the model to the backend and calls `backend->update()`.
+
+### `ui::Backend` (`src/game/ui/backend.hpp`)
+Key responsibilities:
+- Console interface access: `console()` returns `ui::ConsoleInterface`.
+- Receives HUD state: `setHudModel(const ui::HudModel &)`.
+- Exposes render output: `getRenderOutput()` and `getRenderBrightness()`.
+- Handles input events and UI update loop.
+
+### `ui::ConsoleInterface` (`src/game/ui/console/console_interface.hpp`)
+- Abstracts console operations (show/hide, list options, refresh requests, selections, status).
+- Both frontends implement this on their console view.
+
+### `HudModel` (`src/game/ui/hud_model.hpp`)
+- Shared model passed to both frontends.
+- Includes HUD visibility flags + data (scoreboard, dialog, etc.).
+
+## 3) Backend selection
+
+- `src/game/ui/backend_factory.cpp` chooses ImGui or RmlUi based on build configuration.
+- The rest of the engine only sees `UiSystem` / `ui::Backend`.
+
+## 4) Rendering + render outputs
+
+### ImGui path
+- Uses `ui::ImGuiRenderBridge` and `engine/graphics/ui_render_target_bridge.hpp` to render into a texture.
+- `ImGuiBackend::getRenderOutput()` returns a valid texture + visibility when the console or HUD drew.
+
+### RmlUi path
+- Uses RmlUi `RenderInterface` implementations in `frontends/rmlui/platform/renderer_{bgfx,diligent,forge}`.
+- `RenderOutput` is currently not fully wired (GetOutputTextureId is stubbed in some backends). This is a known refactor target.
+
+## 5) Input handling
+
+- Each backend maps `platform::Event` into its UI system.
+- Mapping logic is duplicated between ImGui and RmlUi and should be unified (`TODO.md`).
+
+## 6) Config and persistence
+
+**All UI config reads/writes must go through `ConfigStore`.**
+- Access via `ConfigStore::Get/Set/Erase`.
+- Use `ConfigStore::Revision()` to resync when config changes.
+
+Important: UI code should not load or write JSON files directly (except the Start Server override file, which is intentionally left as-is for now).
+
+## 7) Console vs HUD behavior
+
+- **Console**: tabbed UI with panels implemented separately per frontend.
+- **HUD**: overlay components (chat/radar/scoreboard/crosshair/fps/dialog).
+- The HUD is suppressed behind the console when **not connected**.
+- Crosshair is explicitly disabled while the console is visible to avoid a "white square" leak.
+
+## 8) Frontend structure
+
+### ImGui (`src/game/ui/frontends/imgui/`)
+- `backend.*`:
+  - ImGui frame lifecycle, input, render-to-texture, HUD/console draw order.
+- `console/console.*`:
+  - Owns tab layout and panel calls.
+- `console/panels/*`:
+  - Community, Start Server, Settings, Bindings, Documentation.
+- `hud/*`:
+  - HUD components (chat, radar, scoreboard, crosshair, fps, dialog).
+
+### RmlUi (`src/game/ui/frontends/rmlui/`)
+- `backend.*`:
+  - RmlUi context, document load/reload, render loop.
+- `console/console.*`:
+  - Glue for panel instances and UI events.
+- `console/panels/*`:
+  - RmlUi panel classes and event listeners (panel_community, panel_settings, panel_bindings, etc.).
+- `hud/*`:
+  - RML-driven HUD elements (chat, radar, scoreboard, crosshair, dialog).
+
+## 9) RML assets (RmlUi)
+
+RmlUi layout and styles live under `data/client/ui/`:
+- `console.rml`, `console.rcss`
+- `console_panel_*.rml` + `console_panel_*.rcss`
+- `hud.rml` and associated styles
+
+Any frontend changes that add UI elements generally require editing these asset files.
+
+## 10) Call-flow cheat sheet
+
+### ImGui path (per frame)
+1. `UiSystem::update()` updates `HudModel` and calls `ImGuiBackend::setHudModel()`.
+2. `ImGuiBackend::update()`:
+   - Converts `platform::Event` -> ImGui input.
+   - Begins ImGui frame.
+   - Draws HUD first (if visible), then Console.
+   - Renders to UI render target via `ImGuiRenderBridge`.
+3. Renderer composites `ui::RenderOutput` texture onto the frame.
+
+### RmlUi path (per frame)
+1. `UiSystem::update()` updates `HudModel` and calls `RmlUiBackend::setHudModel()`.
+2. `RmlUiBackend::update()`:
+   - Converts `platform::Event` -> RmlUi input.
+   - Updates HUD model + console state.
+   - Renders RmlUi documents via its render interface.
+3. Renderer composites (currently not fully wired) `RenderOutput` from RmlUi.
+
+### Config change propagation
+1. `ConfigStore` revision increments on any Set/Erase/Replace.
+2. `UiSystem` sees revision change and updates `HudModel.visibility.*`.
+3. Settings panels read `ConfigStore` in their own update loops and resync UI state.
+
+## 11) Hot spots + gotchas
+
+- **HUD visibility logic** lives in `UiSystem::update` (depends on connection + console visibility).
+- **Crosshair leak** is handled by disabling crosshair when console is visible.
+- **RmlUi output texture** support is incomplete in BGFX/Diligent/Forge; if you need `RenderOutput`, fix those renderers.
+- **ConfigStore** is authoritative; do not read/write JSON files in UI code.
+- **Start Server panels** still write a JSON override file for spawned servers; this is an intentional exception for now.
+
+## 12) Known refactor direction (short)
+
+Summarized in `src/game/ui/TODO.md`:
+- Shared input mapping layer.
+- Typed UI config facade around ConfigStore.
+- Renderer-agnostic models + controllers for HUD/Console/Settings/Bindings.
+- Unified render-to-texture output for both ImGui and RmlUi.
+- Shared font loading logic.
+- Cleanup of duplicated helpers.
+
+## 13) "Where do I start?"
+
+Recommended read order:
+1) `src/game/ui/system.cpp` + `src/game/ui/backend.hpp`
+2) `src/game/ui/frontends/imgui/backend.cpp`
+3) `src/game/ui/frontends/rmlui/backend.cpp`
+4) `src/game/ui/frontends/imgui/console/console.cpp`
+5) `src/game/ui/frontends/rmlui/console/console.cpp`
+6) `src/game/ui/TODO.md`
+

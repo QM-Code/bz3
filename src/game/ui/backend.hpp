@@ -42,6 +42,7 @@ public:
 
     virtual ui::RenderOutput getRenderOutput() const { return {}; }
     virtual float getRenderBrightness() const { return 1.0f; }
+    virtual bool isRenderBrightnessDragActive() const { return false; }
 };
 
 std::unique_ptr<Backend> CreateUiBackend(platform::Window &window);

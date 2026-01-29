@@ -1,97 +1,17 @@
 #include "ui/frontends/imgui/console/console.hpp"
 
-#include <algorithm>
-#include <array>
-#include <cctype>
-#include <cstdio>
-#include <optional>
-#include <sstream>
 #include <string>
 #include <vector>
 
-#include "common/json.hpp"
 #include "common/config_store.hpp"
 #include "common/i18n.hpp"
-#include "game/input/bindings.hpp"
 #include "spdlog/spdlog.h"
 
 namespace {
 
-struct KeybindingDefinition {
-    const char *action;
-    const char *label;
-};
-
 const std::vector<std::string> kLanguageCodes = {
     "en", "es", "fr", "de", "pt", "ru", "jp", "zh", "ko", "it", "hi", "ar"
 };
-
-constexpr KeybindingDefinition kKeybindings[] = {
-    {"moveForward", "Move Forward"},
-    {"moveBackward", "Move Backward"},
-    {"moveLeft", "Move Left"},
-    {"moveRight", "Move Right"},
-    {"jump", "Jump"},
-    {"fire", "Fire"},
-    {"spawn", "Spawn"},
-    {"chat", "Chat"},
-    {"toggleFullscreen", "Toggle Fullscreen"},
-    {"escape", "Escape Menu"},
-    {"quickQuit", "Quick Quit"}
-};
-
-bool IsMouseBindingName(const std::string &name) {
-    std::string upper;
-    upper.reserve(name.size());
-    for (const char ch : name) {
-        upper.push_back(static_cast<char>(std::toupper(static_cast<unsigned char>(ch))));
-    }
-    if (upper.rfind("MOUSE", 0) == 0) {
-        return true;
-    }
-    if (upper.size() >= 6 && upper.substr(upper.size() - 6) == "_MOUSE") {
-        return true;
-    }
-    return false;
-}
-
-std::string TrimCopy(const std::string &text) {
-    auto begin = text.begin();
-    auto end = text.end();
-    while (begin != end && std::isspace(static_cast<unsigned char>(*begin))) {
-        ++begin;
-    }
-    while (end != begin && std::isspace(static_cast<unsigned char>(*(end - 1)))) {
-        --end;
-    }
-    return std::string(begin, end);
-}
-
-std::string JoinEntries(const std::vector<std::string> &entries) {
-    std::ostringstream oss;
-    bool first = true;
-    for (const auto &item : entries) {
-        if (!first) {
-            oss << ", ";
-        }
-        oss << item;
-        first = false;
-    }
-    return oss.str();
-}
-
-std::vector<std::string> SplitKeyList(const std::string &text) {
-    std::vector<std::string> entries;
-    std::stringstream stream(text);
-    std::string token;
-    while (std::getline(stream, token, ',')) {
-        std::string trimmed = TrimCopy(token);
-        if (!trimmed.empty()) {
-            entries.push_back(trimmed);
-        }
-    }
-    return entries;
-}
 
 bool DrawOnOffToggle(const char *label, bool &value) {
     const float labelWidth = 140.0f;
@@ -120,164 +40,17 @@ bool DrawOnOffToggle(const char *label, bool &value) {
     return changed;
 }
 
-const std::vector<std::string>& DefaultBindingsForAction(std::string_view action) {
-    static const game_input::DefaultBindingsMap kDefaults = game_input::DefaultKeybindings();
-    static const std::vector<std::string> kEmpty;
-    auto it = kDefaults.find(std::string(action));
-    if (it == kDefaults.end()) {
-        return kEmpty;
-    }
-    return it->second;
-}
-
-void WriteBuffer(std::array<char, 128> &buffer, const std::string &value) {
-    std::snprintf(buffer.data(), buffer.size(), "%s", value.c_str());
-}
-
-void AppendBinding(std::array<char, 128> &buffer, const std::string &value) {
-    std::vector<std::string> existing = SplitKeyList(buffer.data());
-    if (std::find(existing.begin(), existing.end(), value) != existing.end()) {
-        return;
-    }
-    existing.push_back(value);
-    WriteBuffer(buffer, JoinEntries(existing));
-}
-
-std::optional<std::string> DetectKeyboardBinding() {
-    const struct { ImGuiKey key; const char *name; } namedKeys[] = {
-        {ImGuiKey_Space, "SPACE"},
-        {ImGuiKey_Enter, "ENTER"},
-        {ImGuiKey_Escape, "ESCAPE"},
-        {ImGuiKey_Tab, "TAB"},
-        {ImGuiKey_Backspace, "BACKSPACE"},
-        {ImGuiKey_LeftArrow, "LEFT"},
-        {ImGuiKey_RightArrow, "RIGHT"},
-        {ImGuiKey_UpArrow, "UP"},
-        {ImGuiKey_DownArrow, "DOWN"},
-        {ImGuiKey_LeftBracket, "LEFT_BRACKET"},
-        {ImGuiKey_RightBracket, "RIGHT_BRACKET"},
-        {ImGuiKey_Minus, "MINUS"},
-        {ImGuiKey_Equal, "EQUAL"},
-        {ImGuiKey_Apostrophe, "APOSTROPHE"},
-        {ImGuiKey_GraveAccent, "GRAVE_ACCENT"},
-        {ImGuiKey_Home, "HOME"},
-        {ImGuiKey_End, "END"},
-        {ImGuiKey_PageUp, "PAGE_UP"},
-        {ImGuiKey_PageDown, "PAGE_DOWN"},
-        {ImGuiKey_Insert, "INSERT"},
-        {ImGuiKey_Delete, "DELETE"},
-        {ImGuiKey_CapsLock, "CAPS_LOCK"},
-        {ImGuiKey_NumLock, "NUM_LOCK"},
-        {ImGuiKey_ScrollLock, "SCROLL_LOCK"},
-        {ImGuiKey_LeftShift, "LEFT_SHIFT"},
-        {ImGuiKey_RightShift, "RIGHT_SHIFT"},
-        {ImGuiKey_LeftCtrl, "LEFT_CONTROL"},
-        {ImGuiKey_RightCtrl, "RIGHT_CONTROL"},
-        {ImGuiKey_LeftAlt, "LEFT_ALT"},
-        {ImGuiKey_RightAlt, "RIGHT_ALT"},
-        {ImGuiKey_LeftSuper, "LEFT_SUPER"},
-        {ImGuiKey_RightSuper, "RIGHT_SUPER"},
-        {ImGuiKey_Menu, "MENU"}
-    };
-
-    for (int key = ImGuiKey_A; key <= ImGuiKey_Z; ++key) {
-        if (ImGui::IsKeyPressed(static_cast<ImGuiKey>(key))) {
-            char name[2] = { static_cast<char>('A' + (key - ImGuiKey_A)), '\0' };
-            return std::string(name);
-        }
-    }
-
-    for (int key = ImGuiKey_0; key <= ImGuiKey_9; ++key) {
-        if (ImGui::IsKeyPressed(static_cast<ImGuiKey>(key))) {
-            char name[2] = { static_cast<char>('0' + (key - ImGuiKey_0)), '\0' };
-            return std::string(name);
-        }
-    }
-
-    for (int key = ImGuiKey_F1; key <= ImGuiKey_F12; ++key) {
-        if (ImGui::IsKeyPressed(static_cast<ImGuiKey>(key))) {
-            return "F" + std::to_string(1 + (key - ImGuiKey_F1));
-        }
-    }
-
-    for (const auto &entry : namedKeys) {
-        if (ImGui::IsKeyPressed(entry.key)) {
-            return std::string(entry.name);
-        }
-    }
-
-    return std::nullopt;
-}
-
-std::optional<std::string> DetectMouseBinding(bool skipCapture) {
-    if (skipCapture) {
-        return std::nullopt;
-    }
-
-    const struct { int button; const char *name; } mouseButtons[] = {
-        {0, "LEFT_MOUSE"},
-        {1, "RIGHT_MOUSE"},
-        {2, "MIDDLE_MOUSE"},
-        {3, "MOUSE4"},
-        {4, "MOUSE5"},
-        {5, "MOUSE6"},
-        {6, "MOUSE7"},
-        {7, "MOUSE8"}
-    };
-
-    for (const auto &entry : mouseButtons) {
-        if (ImGui::IsMouseClicked(entry.button)) {
-            return std::string(entry.name);
-        }
-    }
-
-    return std::nullopt;
-}
-
-std::optional<std::string> DetectControllerBinding() {
-#ifdef ImGuiKey_GamepadStart
-    const struct { ImGuiKey key; const char *name; } gamepadKeys[] = {
-        {ImGuiKey_GamepadStart, "GAMEPAD_START"},
-        {ImGuiKey_GamepadBack, "GAMEPAD_BACK"},
-        {ImGuiKey_GamepadFaceDown, "GAMEPAD_A"},
-        {ImGuiKey_GamepadFaceRight, "GAMEPAD_B"},
-        {ImGuiKey_GamepadFaceLeft, "GAMEPAD_X"},
-        {ImGuiKey_GamepadFaceUp, "GAMEPAD_Y"},
-        {ImGuiKey_GamepadDpadLeft, "GAMEPAD_DPAD_LEFT"},
-        {ImGuiKey_GamepadDpadRight, "GAMEPAD_DPAD_RIGHT"},
-        {ImGuiKey_GamepadDpadUp, "GAMEPAD_DPAD_UP"},
-        {ImGuiKey_GamepadDpadDown, "GAMEPAD_DPAD_DOWN"},
-        {ImGuiKey_GamepadL1, "GAMEPAD_LB"},
-        {ImGuiKey_GamepadR1, "GAMEPAD_RB"},
-        {ImGuiKey_GamepadL2, "GAMEPAD_LT"},
-        {ImGuiKey_GamepadR2, "GAMEPAD_RT"},
-        {ImGuiKey_GamepadL3, "GAMEPAD_LS"},
-        {ImGuiKey_GamepadR3, "GAMEPAD_RS"}
-    };
-
-    for (const auto &entry : gamepadKeys) {
-        if (ImGui::IsKeyPressed(entry.key)) {
-            return std::string(entry.name);
-        }
-    }
-#endif
-
-    return std::nullopt;
-}
-
 } // namespace
 
 namespace ui {
 
 void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
-    static_assert(std::size(kKeybindings) == ConsoleView::kKeybindingCount,
-                  "kKeybindings must match buffer sizing.");
-
-    if (!settingsLoaded) {
+    const uint64_t revision = bz::config::ConfigStore::Revision();
+    if (!settingsLoaded || settingsRevision != revision) {
         settingsLoaded = true;
+        settingsRevision = revision;
         settingsStatusText.clear();
         settingsStatusIsError = false;
-        selectedBindingIndex = -1;
 
         if (!bz::config::ConfigStore::Initialized()) {
             settingsStatusText = "Failed to load config; showing defaults.";
@@ -313,68 +86,6 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
                 selectedLanguageIndex = static_cast<int>(i);
                 break;
             }
-        }
-
-        const bz::json::Value *bindingsNode = nullptr;
-        if (const auto *node = bz::config::ConfigStore::Get("keybindings")) {
-            if (node->is_object()) {
-                bindingsNode = node;
-            }
-        }
-        const bz::json::Value *controllerNode = nullptr;
-        if (const auto *node = bz::config::ConfigStore::Get("gui.keybindings.controller")) {
-            if (node->is_object()) {
-                controllerNode = node;
-            }
-        }
-
-        for (std::size_t i = 0; i < kKeybindingCount; ++i) {
-            std::vector<std::string> keyboardEntries;
-            std::vector<std::string> mouseEntries;
-            std::vector<std::string> controllerEntries;
-
-            if (bindingsNode) {
-                auto it = bindingsNode->find(kKeybindings[i].action);
-                if (it != bindingsNode->end() && it->is_array()) {
-                    for (const auto &entry : *it) {
-                        if (!entry.is_string()) {
-                            continue;
-                        }
-                        const auto value = entry.get<std::string>();
-                        if (IsMouseBindingName(value)) {
-                            mouseEntries.push_back(value);
-                        } else {
-                            keyboardEntries.push_back(value);
-                        }
-                    }
-                }
-            }
-
-            if (keyboardEntries.empty() && mouseEntries.empty()) {
-                const auto &defaults = DefaultBindingsForAction(kKeybindings[i].action);
-                for (const auto &value : defaults) {
-                    if (IsMouseBindingName(value)) {
-                        mouseEntries.push_back(value);
-                    } else {
-                        keyboardEntries.push_back(value);
-                    }
-                }
-            }
-
-            if (controllerNode) {
-                auto it = controllerNode->find(kKeybindings[i].action);
-                if (it != controllerNode->end() && it->is_array()) {
-                    for (const auto &entry : *it) {
-                        if (entry.is_string()) {
-                            controllerEntries.push_back(entry.get<std::string>());
-                        }
-                    }
-                }
-            }
-
-            WriteBuffer(keybindingKeyboardBuffers[i], JoinEntries(keyboardEntries));
-            WriteBuffer(keybindingMouseBuffers[i], JoinEntries(mouseEntries));
-            WriteBuffer(keybindingControllerBuffers[i], JoinEntries(controllerEntries));
         }
     }
 
@@ -415,256 +126,55 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
 
     ImGui::TextUnformatted("Render");
     ImGui::Spacing();
+    renderBrightnessDragging = false;
     float brightness = renderSettings.brightness();
     if (ImGui::SliderFloat("Brightness", &brightness, 0.2f, 3.0f, "%.2fx")) {
-        renderSettings.setBrightness(brightness, true);
+        applyRenderBrightness(brightness, true);
+    }
+    renderBrightnessDragging = ImGui::IsItemActive();
+    if (ImGui::IsItemDeactivatedAfterEdit()) {
+        commitRenderBrightness();
     }
     ImGui::Separator();
     ImGui::Spacing();
 
     ImGui::TextUnformatted("HUD");
     ImGui::Spacing();
+    auto applyHudSetting = [&](const char *key, bool value, auto setter) {
+        if (!bz::config::ConfigStore::Set(key, value)) {
+            settingsStatusText = "Failed to save HUD settings.";
+            settingsStatusIsError = true;
+            return;
+        }
+        setter(value, false);
+    };
     bool scoreboardVisible = hudSettings.scoreboardVisible();
     if (DrawOnOffToggle("Scoreboard", scoreboardVisible)) {
-        hudSettings.setScoreboardVisible(scoreboardVisible, true);
+        applyHudSetting("ui.hud.scoreboard", scoreboardVisible,
+                        [&](bool v, bool fromUser) { hudSettings.setScoreboardVisible(v, fromUser); });
     }
     bool chatVisible = hudSettings.chatVisible();
     if (DrawOnOffToggle("Chat", chatVisible)) {
-        hudSettings.setChatVisible(chatVisible, true);
+        applyHudSetting("ui.hud.chat", chatVisible,
+                        [&](bool v, bool fromUser) { hudSettings.setChatVisible(v, fromUser); });
     }
     bool radarVisible = hudSettings.radarVisible();
     if (DrawOnOffToggle("Radar", radarVisible)) {
-        hudSettings.setRadarVisible(radarVisible, true);
+        applyHudSetting("ui.hud.radar", radarVisible,
+                        [&](bool v, bool fromUser) { hudSettings.setRadarVisible(v, fromUser); });
     }
     bool fpsVisible = hudSettings.fpsVisible();
     if (DrawOnOffToggle("FPS", fpsVisible)) {
-        hudSettings.setFpsVisible(fpsVisible, true);
+        applyHudSetting("ui.hud.fps", fpsVisible,
+                        [&](bool v, bool fromUser) { hudSettings.setFpsVisible(v, fromUser); });
     }
     bool crosshairVisible = hudSettings.crosshairVisible();
     if (DrawOnOffToggle("Crosshair", crosshairVisible)) {
-        hudSettings.setCrosshairVisible(crosshairVisible, true);
+        applyHudSetting("ui.hud.crosshair", crosshairVisible,
+                        [&](bool v, bool fromUser) { hudSettings.setCrosshairVisible(v, fromUser); });
     }
     ImGui::Separator();
     ImGui::Spacing();
-
-    ImGui::TextUnformatted("Bindings");
-    ImGui::TextDisabled("Select a cell, then press a key/button to add it. Changes apply on next launch.");
-    ImGui::Spacing();
-
-    bool selectionChanged = false;
-    if (ImGui::BeginTable("KeybindingsTable", 4, ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_RowBg)) {
-        ImGui::TableSetupColumn("Action", ImGuiTableColumnFlags_WidthFixed, 180.0f);
-        ImGui::TableSetupColumn("Keyboard");
-        ImGui::TableSetupColumn("Mouse");
-        ImGui::TableSetupColumn("Controller");
-        ImGui::TableHeadersRow();
-        for (std::size_t i = 0; i < kKeybindingCount; ++i) {
-            ImGui::TableNextRow();
-            ImGui::TableSetColumnIndex(0);
-            ImGui::TextUnformatted(kKeybindings[i].label);
-
-            auto drawBindingCell = [&](BindingColumn column,
-                                       std::array<char, 128> &buffer,
-                                       const char *columnId) {
-                const bool isSelected = (selectedBindingIndex == static_cast<int>(i) &&
-                                         selectedBindingColumn == column);
-                std::string display = buffer.data();
-                if (display.empty()) {
-                    display = "Unbound";
-                }
-                std::string label = display + "##Bind_" + kKeybindings[i].action + "_" + columnId;
-                if (ImGui::Selectable(label.c_str(), isSelected)) {
-                    selectedBindingIndex = static_cast<int>(i);
-                    selectedBindingColumn = column;
-                    selectionChanged = true;
-                }
-            };
-
-            ImGui::TableSetColumnIndex(1);
-            drawBindingCell(BindingColumn::Keyboard, keybindingKeyboardBuffers[i], "Keyboard");
-            ImGui::TableSetColumnIndex(2);
-            drawBindingCell(BindingColumn::Mouse, keybindingMouseBuffers[i], "Mouse");
-            ImGui::TableSetColumnIndex(3);
-            drawBindingCell(BindingColumn::Controller, keybindingControllerBuffers[i], "Controller");
-        }
-        ImGui::EndTable();
-    }
-
-    ImGui::Spacing();
-    ImGui::TextDisabled("Selected cell: %s / %s",
-                        selectedBindingIndex >= 0 ? kKeybindings[selectedBindingIndex].label : "None",
-                        selectedBindingIndex >= 0
-                            ? (selectedBindingColumn == BindingColumn::Keyboard ? "Keyboard"
-                                : (selectedBindingColumn == BindingColumn::Mouse ? "Mouse" : "Controller"))
-                            : "None");
-
-    if (selectedBindingIndex >= 0) {
-        const bool skipMouseCapture = selectionChanged || ImGui::IsAnyItemActive();
-        std::optional<std::string> captured;
-
-        if (selectedBindingColumn == BindingColumn::Keyboard) {
-            captured = DetectKeyboardBinding();
-            if (captured) {
-                AppendBinding(keybindingKeyboardBuffers[selectedBindingIndex], *captured);
-            }
-        } else if (selectedBindingColumn == BindingColumn::Mouse) {
-            captured = DetectMouseBinding(skipMouseCapture);
-            if (captured) {
-                AppendBinding(keybindingMouseBuffers[selectedBindingIndex], *captured);
-            }
-        } else {
-            captured = DetectControllerBinding();
-            if (captured) {
-                AppendBinding(keybindingControllerBuffers[selectedBindingIndex], *captured);
-            }
-        }
-
-    }
-
-    bool saveClicked = false;
-    bool resetClicked = false;
-    bool clearClicked = false;
-    const bool hasButtonFont = (buttonFont != nullptr);
-    if (hasButtonFont) {
-        ImGui::PushFont(buttonFont);
-    }
-    ImGui::PushStyleColor(ImGuiCol_Text, buttonColor);
-    if (ImGui::Button("Clear Selected")) {
-        clearClicked = true;
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Save Bindings")) {
-        saveClicked = true;
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Reset to Defaults")) {
-        resetClicked = true;
-    }
-    ImGui::PopStyleColor();
-    if (hasButtonFont) {
-        ImGui::PopFont();
-    }
-
-    if (clearClicked) {
-        if (selectedBindingIndex >= 0) {
-            if (selectedBindingColumn == BindingColumn::Keyboard) {
-                keybindingKeyboardBuffers[selectedBindingIndex][0] = '\0';
-            } else if (selectedBindingColumn == BindingColumn::Mouse) {
-                keybindingMouseBuffers[selectedBindingIndex][0] = '\0';
-            } else {
-                keybindingControllerBuffers[selectedBindingIndex][0] = '\0';
-            }
-        }
-    }
-
-    if (saveClicked) {
-        bz::json::Value keybindings = bz::json::Object();
-        bz::json::Value controllerBindings = bz::json::Object();
-        bool hasBindings = false;
-        bool hasControllerBindings = false;
-        for (std::size_t i = 0; i < kKeybindingCount; ++i) {
-            std::vector<std::string> keyboardValues = SplitKeyList(keybindingKeyboardBuffers[i].data());
-            std::vector<std::string> mouseValues = SplitKeyList(keybindingMouseBuffers[i].data());
-            std::vector<std::string> controllerValues = SplitKeyList(keybindingControllerBuffers[i].data());
-
-            std::vector<std::string> combined;
-            combined.reserve(keyboardValues.size() + mouseValues.size());
-            for (const auto &value : keyboardValues) {
-                if (!value.empty()) {
-                    combined.push_back(value);
-                }
-            }
-            for (const auto &value : mouseValues) {
-                if (!value.empty()) {
-                    combined.push_back(value);
-                }
-            }
-
-            if (!combined.empty()) {
-                keybindings[kKeybindings[i].action] = combined;
-                hasBindings = true;
-            }
-
-            if (!controllerValues.empty()) {
-                controllerBindings[kKeybindings[i].action] = controllerValues;
-                hasControllerBindings = true;
-            }
-        }
-
-        bool ok = bz::config::ConfigStore::Initialized();
-        if (hasBindings) {
-            ok = ok && bz::config::ConfigStore::Set("keybindings", keybindings);
-        } else {
-            ok = ok && bz::config::ConfigStore::Erase("keybindings");
-        }
-        if (hasControllerBindings) {
-            ok = ok && bz::config::ConfigStore::Set("gui.keybindings.controller", controllerBindings);
-        } else {
-            ok = ok && bz::config::ConfigStore::Erase("gui.keybindings.controller");
-        }
-        ok = ok && bz::config::ConfigStore::Set("render.brightness", renderSettings.brightness());
-
-        if (!ok) {
-            settingsStatusText = "Failed to save bindings.";
-            settingsStatusIsError = true;
-        } else {
-            requestKeybindingsReload();
-            settingsStatusText = "Bindings saved.";
-            settingsStatusIsError = false;
-        }
-    }
-
-    if (resetClicked) {
-        for (std::size_t i = 0; i < kKeybindingCount; ++i) {
-            std::vector<std::string> keyboardEntries;
-            std::vector<std::string> mouseEntries;
-            const auto &defaults = DefaultBindingsForAction(kKeybindings[i].action);
-            for (const auto &value : defaults) {
-                if (IsMouseBindingName(value)) {
-                    mouseEntries.push_back(value);
-                } else {
-                    keyboardEntries.push_back(value);
-                }
-            }
-            WriteBuffer(keybindingKeyboardBuffers[i], JoinEntries(keyboardEntries));
-            WriteBuffer(keybindingMouseBuffers[i], JoinEntries(mouseEntries));
-            keybindingControllerBuffers[i][0] = '\0';
-        }
-
-        bz::config::ConfigStore::Erase("keybindings");
-        bz::config::ConfigStore::Erase("gui.keybindings.controller");
-        bz::config::ConfigStore::Erase("render.brightness");
-        requestKeybindingsReload();
-        settingsStatusText = "Bindings reset to defaults.";
-        settingsStatusIsError = false;
-
-        renderSettings.reset();
-        if (const auto *brightness = bz::config::ConfigStore::Get("render.brightness")) {
-            if (brightness->is_number()) {
-                renderSettings.setBrightness(static_cast<float>(brightness->get<double>()), false);
-            }
-        }
-    }
-
-    if (renderSettings.consumeDirty()) {
-        if (!bz::config::ConfigStore::Set("render.brightness", renderSettings.brightness())) {
-            settingsStatusText = "Failed to save render settings.";
-            settingsStatusIsError = true;
-        }
-    }
-
-    if (hudSettings.consumeDirty()) {
-        const bool ok =
-            bz::config::ConfigStore::Set("ui.hud.scoreboard", hudSettings.scoreboardVisible()) &&
-            bz::config::ConfigStore::Set("ui.hud.chat", hudSettings.chatVisible()) &&
-            bz::config::ConfigStore::Set("ui.hud.radar", hudSettings.radarVisible()) &&
-            bz::config::ConfigStore::Set("ui.hud.fps", hudSettings.fpsVisible()) &&
-            bz::config::ConfigStore::Set("ui.hud.crosshair", hudSettings.crosshairVisible());
-        if (!ok) {
-            settingsStatusText = "Failed to save HUD settings.";
-            settingsStatusIsError = true;
-        }
-    }
 
     if (!settingsStatusText.empty()) {
         ImVec4 statusColor = settingsStatusIsError ? colors.error : colors.notice;
@@ -675,6 +185,24 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
 
 float ConsoleView::getRenderBrightness() const {
     return renderSettings.brightness();
+}
+
+void ConsoleView::applyRenderBrightness(float value, bool fromUser) {
+    renderSettings.setBrightness(value, fromUser);
+}
+
+bool ConsoleView::commitRenderBrightness() {
+    if (!bz::config::ConfigStore::Set("render.brightness", renderSettings.brightness())) {
+        settingsStatusText = "Failed to save render settings.";
+        settingsStatusIsError = true;
+        return false;
+    }
+    renderSettings.clearDirty();
+    return true;
+}
+
+bool ConsoleView::isRenderBrightnessDragActive() const {
+    return renderBrightnessDragging;
 }
 
 } // namespace ui

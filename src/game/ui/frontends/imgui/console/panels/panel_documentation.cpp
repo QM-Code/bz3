@@ -4,8 +4,8 @@ namespace ui {
 
 void ConsoleView::drawDocumentationPanel(const MessageColors &colors) const {
     drawPlaceholderPanel(
-        "Documentation",
-        "Browse manuals, onboarding tips, and gameplay references.",
+        "?",
+        "This space intentionally left blank.",
         colors);
 }
 

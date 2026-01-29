@@ -24,7 +24,7 @@
         "settings": "सेटिंग्स",
         "documentation": "दस्तावेज़",
         "start_server": "सर्वर शुरू करें",
-        "themes": "थीम"
+        "bindings": "Bindings"
       },
       "start_server": {
         "title": "सर्वर शुरू करें",

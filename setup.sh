@@ -5,6 +5,13 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 pushd "$ROOT_DIR" >/dev/null
 
+if [[ "${BZ3_SETUP_FORGE:-}" == "1" ]]; then
+	if [[ ! -d "third_party/the-forge/Common_3" ]]; then
+		echo "[setup] The Forge not found; cloning..."
+		git clone https://github.com/ConfettiFX/The-Forge.git third_party/the-forge
+	fi
+fi
+
 if [[ ! -d "vcpkg" ]]; then
 		echo "[setup] vcpkg/ not found; cloning..."
 		git clone https://github.com/microsoft/vcpkg.git

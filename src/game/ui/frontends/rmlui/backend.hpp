@@ -43,6 +43,7 @@ public:
     void setRenderBridge(const ui::RenderBridge *bridge) override;
     ui::RenderOutput getRenderOutput() const override;
     float getRenderBrightness() const override;
+    bool isRenderBrightnessDragActive() const override;
     void setActiveTab(const std::string &tabKey);
     bool isUiInputEnabled() const;
 
