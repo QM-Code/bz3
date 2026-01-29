@@ -233,7 +233,8 @@ void ImGuiBackend::handleEvents(const std::vector<platform::Event> &events) {
             case platform::EventType::MouseButtonDown:
             case platform::EventType::MouseButtonUp: {
                 const bool down = (event.type == platform::EventType::MouseButtonDown);
-                io.AddMouseButtonEvent(toImGuiMouseButton(event.mouseButton), down);
+                const int button = toImGuiMouseButton(event.mouseButton);
+                io.AddMouseButtonEvent(button, down);
                 break;
             }
             case platform::EventType::MouseMove: {

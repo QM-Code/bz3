@@ -2,9 +2,10 @@
 
 #include <RmlUi/Core/Context.h>
 #include <RmlUi/Core/ElementDocument.h>
+#include <utility>
+
 #include "common/i18n.hpp"
 #include "ui/frontends/rmlui/translate.hpp"
-#include <utility>
 
 namespace ui {
 
@@ -27,6 +28,7 @@ void RmlUiHud::load(Rml::Context *contextIn, const std::string &pathIn, EmojiMar
         return;
     }
     rmlui::ApplyTranslations(document, bz::i18n::Get());
+    lastLanguage = bz::i18n::Get().language();
     bindElements();
     document->Show();
 }
@@ -61,6 +63,15 @@ bool RmlUiHud::isVisible() const {
 }
 
 void RmlUiHud::update() {
+    if (document) {
+        const std::string currentLanguage = bz::i18n::Get().language();
+        if (currentLanguage != lastLanguage) {
+            rmlui::ApplyTranslations(document, bz::i18n::Get());
+            lastLanguage = currentLanguage;
+            lastFpsInt = -1;
+            setFpsValue(lastFps);
+        }
+    }
     chat.update();
 }
 

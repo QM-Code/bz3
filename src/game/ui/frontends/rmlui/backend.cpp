@@ -548,7 +548,15 @@ RmlUiBackend::RmlUiBackend(platform::Window &windowRefIn) : windowRef(&windowRef
 
     float dpRatio = 1.0f;
     if (windowRef) { dpRatio = windowRef->getContentScale(); }
+#if defined(BZ3_RENDER_BACKEND_FORGE)
+    const float scaledDpRatio = dpRatio;
+#else
+    #if defined(BZ3_RENDER_BACKEND_FORGE)
+    const float scaledDpRatio = dpRatio;
+    #else
     const float scaledDpRatio = dpRatio / std::max(renderScale, 0.0001f);
+    #endif
+#endif
     state->lastDpRatio = scaledDpRatio;
     state->context->SetDensityIndependentPixelRatio(scaledDpRatio);
 
@@ -799,6 +807,7 @@ void RmlUiBackend::update() {
         state->hud->setChatVisible(hudModel.visibility.chat);
         state->hud->setRadarVisible(hudModel.visibility.radar);
         state->hud->setCrosshairVisible(hudModel.visibility.crosshair && !consoleVisible);
+        state->hud->setFpsVisible(hudModel.visibility.hud && hudModel.visibility.fps);
     }
 
     int fbWidth = 0;
@@ -863,7 +872,7 @@ void RmlUiBackend::update() {
             }
         } else if (state->hud) {
             state->hud->update();
-            if (hudModel.visibility.fps) {
+            if (hudModel.visibility.hud && hudModel.visibility.fps) {
                 state->fpsFrames += 1;
                 const double now = state->systemInterface.GetElapsedTime();
                 const double elapsed = now - state->fpsLastTime;
@@ -872,10 +881,7 @@ void RmlUiBackend::update() {
                     state->fpsFrames = 0;
                     state->fpsLastTime = now;
                 }
-                state->hud->setFpsVisible(true);
                 state->hud->setFpsValue(static_cast<float>(state->fpsValue));
-            } else {
-                state->hud->setFpsVisible(false);
             }
         }
         state->context->Update();

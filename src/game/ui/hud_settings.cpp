@@ -1,76 +1,32 @@
 #include "ui/hud_settings.hpp"
 
+#include "ui/ui_config.hpp"
+
 namespace ui {
-namespace {
 
-struct HudDefaults {
-    bool scoreboard = true;
-    bool chat = true;
-    bool radar = true;
-    bool fps = false;
-    bool crosshair = true;
-};
-
-const HudDefaults kDefaults{};
-
-}
-
-bool HudSettings::readBool(const bz::json::Value &node, const char *key, bool fallback) {
-    if (!node.is_object()) {
-        return fallback;
-    }
-    auto it = node.find(key);
-    if (it == node.end() || !it->is_boolean()) {
-        return fallback;
-    }
-    return it->get<bool>();
-}
-
-void HudSettings::load(const bz::json::Value &userConfig) {
+void HudSettings::loadFromConfig() {
     reset();
-    if (!userConfig.is_object()) {
-        return;
-    }
-    const auto uiIt = userConfig.find("ui");
-    if (uiIt == userConfig.end() || !uiIt->is_object()) {
-        return;
-    }
-    const auto hudIt = uiIt->find("hud");
-    if (hudIt == uiIt->end() || !hudIt->is_object()) {
-        return;
-    }
-    scoreboardVisibleValue = readBool(*hudIt, "scoreboard", scoreboardVisibleValue);
-    chatVisibleValue = readBool(*hudIt, "chat", chatVisibleValue);
-    radarVisibleValue = readBool(*hudIt, "radar", radarVisibleValue);
-    fpsVisibleValue = readBool(*hudIt, "fps", fpsVisibleValue);
-    crosshairVisibleValue = readBool(*hudIt, "crosshair", crosshairVisibleValue);
+    scoreboardVisibleValue = UiConfig::GetHudScoreboard();
+    chatVisibleValue = UiConfig::GetHudChat();
+    radarVisibleValue = UiConfig::GetHudRadar();
+    fpsVisibleValue = UiConfig::GetHudFps();
+    crosshairVisibleValue = UiConfig::GetHudCrosshair();
 }
 
-void HudSettings::save(bz::json::Value &userConfig) const {
-    if (!userConfig.is_object()) {
-        userConfig = bz::json::Object();
-    }
-    auto &uiNode = userConfig["ui"];
-    if (!uiNode.is_object()) {
-        uiNode = bz::json::Object();
-    }
-    auto &hudNode = uiNode["hud"];
-    if (!hudNode.is_object()) {
-        hudNode = bz::json::Object();
-    }
-    hudNode["scoreboard"] = scoreboardVisibleValue;
-    hudNode["chat"] = chatVisibleValue;
-    hudNode["radar"] = radarVisibleValue;
-    hudNode["fps"] = fpsVisibleValue;
-    hudNode["crosshair"] = crosshairVisibleValue;
+bool HudSettings::saveToConfig() const {
+    return UiConfig::SetHudScoreboard(scoreboardVisibleValue) &&
+        UiConfig::SetHudChat(chatVisibleValue) &&
+        UiConfig::SetHudRadar(radarVisibleValue) &&
+        UiConfig::SetHudFps(fpsVisibleValue) &&
+        UiConfig::SetHudCrosshair(crosshairVisibleValue);
 }
 
 void HudSettings::reset() {
-    scoreboardVisibleValue = kDefaults.scoreboard;
-    chatVisibleValue = kDefaults.chat;
-    radarVisibleValue = kDefaults.radar;
-    fpsVisibleValue = kDefaults.fps;
-    crosshairVisibleValue = kDefaults.crosshair;
+    scoreboardVisibleValue = UiConfig::kDefaultHudScoreboard;
+    chatVisibleValue = UiConfig::kDefaultHudChat;
+    radarVisibleValue = UiConfig::kDefaultHudRadar;
+    fpsVisibleValue = UiConfig::kDefaultHudFps;
+    crosshairVisibleValue = UiConfig::kDefaultHudCrosshair;
     dirty = false;
 }
 

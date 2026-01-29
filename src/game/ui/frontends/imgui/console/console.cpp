@@ -14,6 +14,7 @@
 #include "common/i18n.hpp"
 #include "spdlog/spdlog.h"
 #include "ui/config.hpp"
+#include "ui/ui_config.hpp"
 
 namespace {
 std::string trimCopy(const std::string &value) {
@@ -465,7 +466,7 @@ void ConsoleView::refreshCommunityCredentials() {
         return;
     }
 
-    const auto *credsIt = bz::config::ConfigStore::Get("gui.communityCredentials");
+    const auto *credsIt = ui::UiConfig::GetCommunityCredentials();
     if (!credsIt || !credsIt->is_object()) {
         return;
     }
@@ -494,7 +495,7 @@ void ConsoleView::persistCommunityCredentials(bool passwordChanged) {
     }
 
     bz::json::Value creds = bz::json::Object();
-    if (const auto *existing = bz::config::ConfigStore::Get("gui.communityCredentials")) {
+    if (const auto *existing = ui::UiConfig::GetCommunityCredentials()) {
         if (existing->is_object()) {
             creds = *existing;
         }
@@ -523,9 +524,9 @@ void ConsoleView::persistCommunityCredentials(bool passwordChanged) {
     }
 
     if (creds.empty()) {
-        bz::config::ConfigStore::Erase("gui.communityCredentials");
+        ui::UiConfig::EraseCommunityCredentials();
     } else {
-        bz::config::ConfigStore::Set("gui.communityCredentials", creds);
+        ui::UiConfig::SetCommunityCredentials(creds);
     }
 }
 
@@ -543,7 +544,7 @@ void ConsoleView::storeCommunityAuth(const std::string &communityHost,
     }
 
     bz::json::Value creds = bz::json::Object();
-    if (const auto *existing = bz::config::ConfigStore::Get("gui.communityCredentials")) {
+    if (const auto *existing = ui::UiConfig::GetCommunityCredentials()) {
         if (existing->is_object()) {
             creds = *existing;
         }
@@ -558,7 +559,7 @@ void ConsoleView::storeCommunityAuth(const std::string &communityHost,
     if (!salt.empty()) {
         creds[key]["salt"] = salt;
     }
-    bz::config::ConfigStore::Set("gui.communityCredentials", creds);
+    ui::UiConfig::SetCommunityCredentials(creds);
 
     const std::string activeKey = communityKeyForIndex(listSelectedIndex);
     if (activeKey == key) {

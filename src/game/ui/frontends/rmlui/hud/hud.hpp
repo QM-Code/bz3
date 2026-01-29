@@ -74,6 +74,7 @@ private:
     bool chatVisible = true;
     bool radarVisible = true;
     bool crosshairVisible = true;
+    std::string lastLanguage;
 
     void bindElements();
 };

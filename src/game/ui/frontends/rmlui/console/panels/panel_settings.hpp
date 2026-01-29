@@ -16,6 +16,8 @@ class EventListener;
 
 #include "ui/frontends/rmlui/console/panels/panel.hpp"
 
+#include <memory>
+
 namespace ui {
 
 class RmlUiPanelSettings final : public RmlUiPanel {

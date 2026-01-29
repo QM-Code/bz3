@@ -63,3 +63,7 @@ The UI subsystem should converge on a clean separation of renderer-agnostic mode
 1. Build `UiConfig` facade + remove JSON from `RenderSettings`/`HudSettings`.
 2. Introduce `ConsoleModel` + `ConsoleController`, refactor Settings panel first.
 3. Start `input_mapping.*` and hook it into ImGui backend, then RmlUi backend.
+
+## Repo Hygiene Notes
+- Forge shader outputs + `forge_data/*` logs are currently in-tree for ongoing Forge work; leave them
+  for now and clean up once the Forge workstream is done.

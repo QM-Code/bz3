@@ -177,7 +177,7 @@ private:
     BindingColumn selectedBindingColumn = BindingColumn::Keyboard;
     bool settingsLoaded = false;
     bool bindingsLoaded = false;
-    uint64_t settingsRevision = 0;
+    uint64_t settingsLastConfigRevision = 0;
     int selectedLanguageIndex = 0;
     std::string settingsStatusText;
     bool settingsStatusIsError = false;
@@ -186,6 +186,7 @@ private:
     bool renderBrightnessDragging = false;
     RenderSettings renderSettings;
     std::function<void(const std::string &)> languageCallback;
+    bool bindingsResetConfirmOpen = false;
 
     struct LocalServerProcess {
         int id = 0;

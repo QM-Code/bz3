@@ -81,8 +81,6 @@ void ImGuiHudChat::draw(const ImVec2 &pos, const ImVec2 &size, float inputHeight
 
     if (chatFocus) {
         ImGui::SetKeyboardFocusHere();
-    } else {
-        ImGui::SetKeyboardFocusHere(-1);
     }
 
     ImGui::PushItemWidth(-1);

@@ -181,8 +181,10 @@ private:
 
     void ensureUiOverlayResources();
     void destroyUiOverlayResources();
+    void ensureDebugTriangleTexture();
     void ensureBrightnessResources();
     void destroyBrightnessResources();
+    void renderDebugTriangle();
     void ensureSceneTarget(int width, int height);
     void destroySceneTarget();
     void renderBrightnessPass();
@@ -199,6 +201,8 @@ private:
     Buffer* uiOverlayUniformBuffer_ = nullptr;
     Descriptor uiOverlayDescriptors_[3]{};
     Sampler* uiOverlaySampler_ = nullptr;
+    Texture* debugTriangleTexture_ = nullptr;
+    bool debugTriangleEnabled_ = false;
 
     Shader* meshShader_ = nullptr;
     Pipeline* meshPipeline_ = nullptr;

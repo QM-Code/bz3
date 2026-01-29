@@ -6,6 +6,7 @@
 #include "common/config_store.hpp"
 #include "common/i18n.hpp"
 #include "spdlog/spdlog.h"
+#include "ui/ui_config.hpp"
 
 namespace {
 
@@ -46,9 +47,16 @@ namespace ui {
 
 void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
     const uint64_t revision = bz::config::ConfigStore::Revision();
-    if (!settingsLoaded || settingsRevision != revision) {
+    if (settingsLastConfigRevision != 0 && settingsLastConfigRevision != revision) {
+        spdlog::info("ImGuiSettings: config revision changed while open: {} -> {} (connected={})",
+                     settingsLastConfigRevision,
+                     revision,
+                     connectionState.connected);
+    }
+    settingsLastConfigRevision = revision;
+
+    if (!settingsLoaded) {
         settingsLoaded = true;
-        settingsRevision = revision;
         settingsStatusText.clear();
         settingsStatusIsError = false;
 
@@ -56,30 +64,11 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
             settingsStatusText = "Failed to load config; showing defaults.";
             settingsStatusIsError = true;
         }
-        renderSettings.reset();
-        hudSettings.reset();
-        if (const auto *brightness = bz::config::ConfigStore::Get("render.brightness")) {
-            if (brightness->is_number()) {
-                renderSettings.setBrightness(static_cast<float>(brightness->get<double>()), false);
-            }
-        }
-        auto applyHud = [&](const char *path, auto setter) {
-            if (const auto *value = bz::config::ConfigStore::Get(path)) {
-                if (value->is_boolean()) {
-                    setter(value->get<bool>());
-                }
-            }
-        };
-        applyHud("ui.hud.scoreboard", [&](bool value) { hudSettings.setScoreboardVisible(value, false); });
-        applyHud("ui.hud.chat", [&](bool value) { hudSettings.setChatVisible(value, false); });
-        applyHud("ui.hud.radar", [&](bool value) { hudSettings.setRadarVisible(value, false); });
-        applyHud("ui.hud.fps", [&](bool value) { hudSettings.setFpsVisible(value, false); });
-        applyHud("ui.hud.crosshair", [&](bool value) { hudSettings.setCrosshairVisible(value, false); });
-        std::string configuredLanguage = bz::i18n::Get().language();
-        if (const auto *language = bz::config::ConfigStore::Get("language")) {
-            if (language->is_string()) {
-                configuredLanguage = language->get<std::string>();
-            }
+        renderSettings.loadFromConfig();
+        hudSettings.loadFromConfig();
+        std::string configuredLanguage = ui::UiConfig::GetLanguage();
+        if (configuredLanguage.empty()) {
+            configuredLanguage = bz::i18n::Get().language();
         }
         for (std::size_t i = 0; i < kLanguageCodes.size(); ++i) {
             if (kLanguageCodes[i] == configuredLanguage) {
@@ -110,7 +99,7 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
             const bool isSelected = (selectedLanguageIndex == static_cast<int>(i));
             if (ImGui::Selectable(label.c_str(), isSelected)) {
                 selectedLanguageIndex = static_cast<int>(i);
-                if (!bz::config::ConfigStore::Set("language", code)) {
+                if (!ui::UiConfig::SetLanguage(code)) {
                     settingsStatusText = "Failed to save language.";
                     settingsStatusIsError = true;
                 } else if (languageCallback) {
@@ -128,7 +117,7 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
     ImGui::Spacing();
     renderBrightnessDragging = false;
     float brightness = renderSettings.brightness();
-    if (ImGui::SliderFloat("Brightness", &brightness, 0.2f, 3.0f, "%.2fx")) {
+    if (ImGui::SliderFloat("Brightness", &brightness, 1.0f, 3.0f, "%.2fx")) {
         applyRenderBrightness(brightness, true);
     }
     renderBrightnessDragging = ImGui::IsItemActive();
@@ -140,13 +129,12 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
 
     ImGui::TextUnformatted("HUD");
     ImGui::Spacing();
-    auto applyHudSetting = [&](const char *key, bool value, auto setter) {
-        if (!bz::config::ConfigStore::Set(key, value)) {
+    auto applyHudSetting = [&](const char *name, bool value, auto setter) {
+        setter(value, false);
+        if (!hudSettings.saveToConfig()) {
             settingsStatusText = "Failed to save HUD settings.";
             settingsStatusIsError = true;
-            return;
         }
-        setter(value, false);
     };
     bool scoreboardVisible = hudSettings.scoreboardVisible();
     if (DrawOnOffToggle("Scoreboard", scoreboardVisible)) {
@@ -192,7 +180,7 @@ void ConsoleView::applyRenderBrightness(float value, bool fromUser) {
 }
 
 bool ConsoleView::commitRenderBrightness() {
-    if (!bz::config::ConfigStore::Set("render.brightness", renderSettings.brightness())) {
+    if (!renderSettings.saveToConfig()) {
         settingsStatusText = "Failed to save render settings.";
         settingsStatusIsError = true;
         return false;

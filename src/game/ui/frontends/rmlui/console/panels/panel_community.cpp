@@ -16,16 +16,16 @@
 
 #include <md4c.h>
 
-#include "common/config_store.hpp"
+#include "common/json.hpp"
 #if defined(_WIN32)
 #include <shellapi.h>
 #include <windows.h>
 #endif
 
 #include "common/data_path_resolver.hpp"
-#include "common/config_store.hpp"
 #include "ui/frontends/rmlui/console/emoji_utils.hpp"
 #include "spdlog/spdlog.h"
+#include "ui/ui_config.hpp"
 
 namespace ui {
 namespace {
@@ -699,7 +699,7 @@ void RmlUiPanelCommunity::refreshCommunityCredentials() {
         return;
     }
 
-    const auto *credsIt = bz::config::ConfigStore::Get("gui.communityCredentials");
+    const auto *credsIt = ui::UiConfig::GetCommunityCredentials();
     if (!credsIt || !credsIt->is_object()) {
         return;
     }
@@ -1082,7 +1082,7 @@ void RmlUiPanelCommunity::persistCommunityCredentials(bool passwordChanged) {
     }
 
     bz::json::Value creds = bz::json::Object();
-    if (const auto *existing = bz::config::ConfigStore::Get("gui.communityCredentials")) {
+    if (const auto *existing = ui::UiConfig::GetCommunityCredentials()) {
         if (existing->is_object()) {
             creds = *existing;
         }
@@ -1112,9 +1112,9 @@ void RmlUiPanelCommunity::persistCommunityCredentials(bool passwordChanged) {
         }
     }
     if (creds.empty()) {
-        bz::config::ConfigStore::Erase("gui.communityCredentials");
+        ui::UiConfig::EraseCommunityCredentials();
     } else {
-        bz::config::ConfigStore::Set("gui.communityCredentials", creds);
+        ui::UiConfig::SetCommunityCredentials(creds);
     }
 }
 

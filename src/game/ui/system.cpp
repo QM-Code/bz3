@@ -4,8 +4,9 @@
 #include "platform/window.hpp"
 #include "common/i18n.hpp"
 #include "ui/bridges/imgui_render_bridge.hpp"
-#include "ui/config.hpp"
+#include "ui/ui_config.hpp"
 #include "common/config_store.hpp"
+#include "spdlog/spdlog.h"
 
 UiSystem::UiSystem(platform::Window &window) {
     backend = ui_backend::CreateUiBackend(window);
@@ -21,11 +22,11 @@ void UiSystem::update() {
     const uint64_t revision = bz::config::ConfigStore::Revision();
     if (revision != lastConfigRevision) {
         lastConfigRevision = revision;
-        hudModel.visibility.scoreboard = ui::config::GetRequiredBool("ui.hud.scoreboard");
-        hudModel.visibility.chat = ui::config::GetRequiredBool("ui.hud.chat");
-        hudModel.visibility.radar = ui::config::GetRequiredBool("ui.hud.radar");
-        hudModel.visibility.fps = ui::config::GetRequiredBool("ui.hud.fps");
-        hudModel.visibility.crosshair = ui::config::GetRequiredBool("ui.hud.crosshair");
+        hudModel.visibility.scoreboard = ui::UiConfig::GetHudScoreboard();
+        hudModel.visibility.chat = ui::UiConfig::GetHudChat();
+        hudModel.visibility.radar = ui::UiConfig::GetHudRadar();
+        hudModel.visibility.fps = ui::UiConfig::GetHudFps();
+        hudModel.visibility.crosshair = ui::UiConfig::GetHudCrosshair();
     }
     const bool consoleVisible = backend->console().isVisible();
     const bool connected = backend->console().getConnectionState().connected;

@@ -13,6 +13,7 @@
 #include "common/config_store.hpp"
 #include "common/i18n.hpp"
 #include "spdlog/spdlog.h"
+#include "ui/ui_config.hpp"
 
 namespace ui {
 namespace {
@@ -217,13 +218,7 @@ void RmlUiPanelSettings::onUpdate() {
         updateStatus();
     }
     if (hudSettings.consumeDirty()) {
-        const bool ok =
-            bz::config::ConfigStore::Set("ui.hud.scoreboard", hudSettings.scoreboardVisible()) &&
-            bz::config::ConfigStore::Set("ui.hud.chat", hudSettings.chatVisible()) &&
-            bz::config::ConfigStore::Set("ui.hud.radar", hudSettings.radarVisible()) &&
-            bz::config::ConfigStore::Set("ui.hud.fps", hudSettings.fpsVisible()) &&
-            bz::config::ConfigStore::Set("ui.hud.crosshair", hudSettings.crosshairVisible());
-        if (!ok) {
+        if (!hudSettings.saveToConfig()) {
             showStatus("Failed to save HUD settings.", true);
         }
     }
@@ -261,7 +256,7 @@ void RmlUiPanelSettings::applyLanguageSelection(const std::string &code) {
     if (code == selectedLanguageFromConfig() && code == bz::i18n::Get().language()) {
         return;
     }
-    if (!bz::config::ConfigStore::Set("language", code)) {
+    if (!ui::UiConfig::SetLanguage(code)) {
         showStatus("Failed to save language.", true);
         return;
     }
@@ -271,10 +266,9 @@ void RmlUiPanelSettings::applyLanguageSelection(const std::string &code) {
 }
 
 std::string RmlUiPanelSettings::selectedLanguageFromConfig() const {
-    if (const auto *value = bz::config::ConfigStore::Get("language")) {
-        if (value->is_string()) {
-            return value->get<std::string>();
-        }
+    const std::string configured = ui::UiConfig::GetLanguage();
+    if (!configured.empty()) {
+        return configured;
     }
     return bz::i18n::Get().language();
 }
@@ -303,7 +297,7 @@ void RmlUiPanelSettings::applyRenderBrightness(float value, bool fromUser) {
 }
 
 bool RmlUiPanelSettings::commitRenderBrightness() {
-    if (!bz::config::ConfigStore::Set("render.brightness", renderSettings.brightness())) {
+    if (!renderSettings.saveToConfig()) {
         showStatus("Failed to save render settings.", true);
         return false;
     }
@@ -406,24 +400,8 @@ void RmlUiPanelSettings::syncSettingsFromConfig() {
         return;
     }
 
-    if (const auto *brightness = bz::config::ConfigStore::Get("render.brightness")) {
-        if (brightness->is_number()) {
-            renderSettings.setBrightness(static_cast<float>(brightness->get<double>()), false);
-        }
-    }
-
-    auto applyHud = [&](const char *path, auto setter) {
-        if (const auto *value = bz::config::ConfigStore::Get(path)) {
-            if (value->is_boolean()) {
-                setter(value->get<bool>());
-            }
-        }
-    };
-    applyHud("ui.hud.scoreboard", [&](bool value) { hudSettings.setScoreboardVisible(value, false); });
-    applyHud("ui.hud.chat", [&](bool value) { hudSettings.setChatVisible(value, false); });
-    applyHud("ui.hud.radar", [&](bool value) { hudSettings.setRadarVisible(value, false); });
-    applyHud("ui.hud.fps", [&](bool value) { hudSettings.setFpsVisible(value, false); });
-    applyHud("ui.hud.crosshair", [&](bool value) { hudSettings.setCrosshairVisible(value, false); });
+    renderSettings.loadFromConfig();
+    hudSettings.loadFromConfig();
 }
 
 } // namespace ui

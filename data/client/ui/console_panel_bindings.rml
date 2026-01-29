@@ -23,4 +23,13 @@
         </div>
         <div id="bindings-status" class="status hidden"></div>
     </div>
+    <div id="bindings-reset-overlay" class="modal hidden">
+        <div class="modal-content">
+            <div id="bindings-reset-message" class="modal-text"></div>
+            <div class="modal-actions">
+                <button id="bindings-reset-yes" class="danger">Reset</button>
+                <button id="bindings-reset-no" class="primary">Cancel</button>
+            </div>
+        </div>
+    </div>
 </div>

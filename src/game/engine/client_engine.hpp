@@ -20,6 +20,7 @@ class ClientEngine {
 private:
     platform::Window *window;
     std::unique_ptr<ui::RenderBridge> uiRenderBridge;
+    std::string lastLanguage;
 
 public:
     ClientNetwork *network;

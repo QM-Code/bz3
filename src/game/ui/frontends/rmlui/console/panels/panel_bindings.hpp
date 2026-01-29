@@ -10,6 +10,7 @@ class ElementDocument;
 class EventListener;
 }
 
+#include "ui/frontends/rmlui/console/modal_dialog.hpp"
 #include "ui/frontends/rmlui/console/panels/panel.hpp"
 
 namespace ui {
@@ -48,13 +49,16 @@ private:
     void updateSelectedLabel();
     void updateStatus();
     void setSelected(int index, BindingColumn column);
+    void clearSelection();
     void clearSelected();
     void saveBindings();
     void resetBindings();
+    void showResetDialog();
     void showStatus(const std::string &message, bool isError);
     void requestKeybindingsReload();
     void captureKey(int keyIdentifier);
     void captureMouse(int button);
+    void handleMouseClick(Rml::Element *target, int button);
     std::string keyIdentifierToName(int keyIdentifier) const;
 
     Rml::ElementDocument *document = nullptr;
@@ -78,6 +82,7 @@ private:
     std::string statusText;
     std::vector<std::unique_ptr<Rml::EventListener>> listeners;
     std::vector<std::unique_ptr<Rml::EventListener>> rowListeners;
+    RmlUiModalDialog resetDialog;
 };
 
 } // namespace ui

@@ -1,13 +1,11 @@
 #pragma once
 
-#include "common/json.hpp"
-
 namespace ui {
 
 class HudSettings {
 public:
-    void load(const bz::json::Value &userConfig);
-    void save(bz::json::Value &userConfig) const;
+    void loadFromConfig();
+    bool saveToConfig() const;
     void reset();
 
     bool scoreboardVisible() const { return scoreboardVisibleValue; }
@@ -26,8 +24,6 @@ public:
     void clearDirty();
 
 private:
-    static bool readBool(const bz::json::Value &node, const char *key, bool fallback);
-
     bool scoreboardVisibleValue = true;
     bool chatVisibleValue = true;
     bool radarVisibleValue = true;

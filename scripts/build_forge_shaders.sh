@@ -4,12 +4,16 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 shader_dir="$repo_root/data/forge/shaders"
 
+
+
 if [[ ! -d "$shader_dir" ]]; then
   echo "Forge shader directory not found: $shader_dir" >&2
   exit 1
 fi
 
 find_glslang() {
+	echo "$repo_root/third_party/the-forge/Common_3/Graphics/ThirdParty/OpenSource/VulkanSDK/bin/Linux/glslangValidator"
+	return 0
   if command -v glslangValidator >/dev/null 2>&1; then
     command -v glslangValidator
     return 0

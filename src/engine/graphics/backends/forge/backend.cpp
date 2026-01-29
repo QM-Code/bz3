@@ -26,6 +26,7 @@
 #include <vector>
 #include <cstring>
 #include <cmath>
+#include <cstdlib>
 
 namespace graphics_backend {
 
@@ -153,7 +154,8 @@ struct MeshConstants {
 } // namespace
 
 ForgeBackend::ForgeBackend(platform::Window& windowRef) : window(&windowRef) {
-    spdlog::info("Graphics(Forge): init begin");
+    spdlog::warn("Graphics(Forge): init begin");
+    debugTriangleEnabled_ = std::getenv("BZ3_FORGE_DEBUG_TRIANGLE") != nullptr;
     int fbWidth = 0;
     int fbHeight = 0;
     window->getFramebufferSize(fbWidth, fbHeight);
@@ -161,7 +163,7 @@ ForgeBackend::ForgeBackend(platform::Window& windowRef) : window(&windowRef) {
     framebufferHeight = fbHeight;
 
     initMemAlloc("bz3");
-    spdlog::info("Graphics(Forge): initMemAlloc ok");
+    spdlog::warn("Graphics(Forge): initMemAlloc ok");
     ensureForgeConfigFiles();
     FileSystemInitDesc fsDesc{};
     fsDesc.pAppName = "bz3";
@@ -170,9 +172,9 @@ ForgeBackend::ForgeBackend(platform::Window& windowRef) : window(&windowRef) {
         return;
     }
     initLog("bz3", eALL);
-    spdlog::info("Graphics(Forge): initFileSystem/initLog ok");
+    spdlog::warn("Graphics(Forge): initFileSystem/initLog ok");
     initGPUConfiguration(nullptr);
-    spdlog::info("Graphics(Forge): initGPUConfiguration ok");
+    spdlog::warn("Graphics(Forge): initGPUConfiguration ok");
 
     RendererDesc rendererDesc{};
     rendererDesc.mGpuMode = GPU_MODE_SINGLE;
@@ -182,10 +184,10 @@ ForgeBackend::ForgeBackend(platform::Window& windowRef) : window(&windowRef) {
         spdlog::error("Graphics(Forge): failed to initialize renderer.");
         return;
     }
-    spdlog::info("Graphics(Forge): initRenderer ok");
+    spdlog::warn("Graphics(Forge): initRenderer ok");
     initResourceLoaderInterface(renderer_, nullptr);
     setupGPUConfigurationPlatformParameters(renderer_, nullptr);
-    spdlog::info("Graphics(Forge): setupGPUConfigurationPlatformParameters ok");
+    spdlog::warn("Graphics(Forge): setupGPUConfigurationPlatformParameters ok");
 
     QueueDesc queueDesc{};
     queueDesc.mType = QUEUE_TYPE_GRAPHICS;
@@ -195,14 +197,14 @@ ForgeBackend::ForgeBackend(platform::Window& windowRef) : window(&windowRef) {
         spdlog::error("Graphics(Forge): failed to create graphics queue.");
         return;
     }
-    spdlog::info("Graphics(Forge): initQueue ok");
+    spdlog::warn("Graphics(Forge): initQueue ok");
 
     WindowHandle handle = buildWindowHandle(window);
     if (handle.type == WINDOW_HANDLE_TYPE_UNKNOWN) {
         spdlog::error("Graphics(Forge): unsupported SDL3 native window handle.");
         return;
     }
-    spdlog::info("Graphics(Forge): buildWindowHandle ok type={}", static_cast<int>(handle.type));
+    spdlog::warn("Graphics(Forge): buildWindowHandle ok type={}", static_cast<int>(handle.type));
 
     SwapChainDesc swapDesc{};
     swapDesc.mWindowHandle = handle;
@@ -218,7 +220,7 @@ ForgeBackend::ForgeBackend(platform::Window& windowRef) : window(&windowRef) {
         spdlog::error("Graphics(Forge): failed to create swapchain.");
         return;
     }
-    spdlog::info("Graphics(Forge): addSwapChain ok");
+    spdlog::warn("Graphics(Forge): addSwapChain ok");
 
     initFence(renderer_, &renderFence_);
     initSemaphore(renderer_, &imageAcquiredSemaphore_);
@@ -229,16 +231,16 @@ ForgeBackend::ForgeBackend(platform::Window& windowRef) : window(&windowRef) {
     CmdDesc cmdDesc{};
     cmdDesc.pPool = cmdPool_;
     initCmd(renderer_, &cmdDesc, &cmd_);
-    spdlog::info("Graphics(Forge): sync primitives ok");
+    spdlog::warn("Graphics(Forge): sync primitives ok");
 
     const uint32_t colorFormat = swapChain_->ppRenderTargets[0]->mFormat;
     graphics_backend::forge_ui::SetContext(renderer_, graphicsQueue_, framebufferWidth, framebufferHeight, colorFormat);
-    spdlog::info("Graphics(Forge): ui bridge context ok");
+    spdlog::warn("Graphics(Forge): ui bridge context ok");
 
 #if defined(BZ3_UI_BACKEND_IMGUI)
     uiBridge_ = std::make_unique<ForgeRenderer>();
 #endif
-    spdlog::info("Graphics(Forge): initialized (SDL3 + Vulkan).");
+    spdlog::warn("Graphics(Forge): initialized (SDL3 + Vulkan).");
 }
 
 ForgeBackend::~ForgeBackend() {
@@ -334,6 +336,7 @@ void ForgeBackend::beginFrame() {
                    static_cast<float>(framebufferHeight), 0.0f, 1.0f);
     cmdSetScissor(cmd_, 0, 0, static_cast<uint32_t>(framebufferWidth),
                   static_cast<uint32_t>(framebufferHeight));
+
 }
 
 void ForgeBackend::endFrame() {
@@ -341,6 +344,9 @@ void ForgeBackend::endFrame() {
         return;
     }
     if (cmd_) {
+        if (debugTriangleEnabled_) {
+            renderDebugTriangle();
+        }
         endCmd(cmd_);
         QueueSubmitDesc submitDesc{};
         submitDesc.ppCmds = &cmd_;
@@ -814,7 +820,7 @@ void ForgeBackend::renderUiOverlay() {
     if (!uiOverlayVisible_ || !uiOverlayTexture_.valid()) {
         static bool loggedOnce = false;
         if (!loggedOnce) {
-            spdlog::info("Graphics(Forge): UI overlay skipped visible={} valid={}",
+            spdlog::warn("Graphics(Forge): UI overlay skipped visible={} valid={}",
                          uiOverlayVisible_ ? "yes" : "no",
                          uiOverlayTexture_.valid() ? "yes" : "no");
             loggedOnce = true;
@@ -1181,6 +1187,155 @@ void ForgeBackend::destroyUiOverlayResources() {
     if (uiOverlayUniformBuffer_) {
         removeResource(uiOverlayUniformBuffer_);
         uiOverlayUniformBuffer_ = nullptr;
+    }
+    if (debugTriangleTexture_) {
+        removeResource(debugTriangleTexture_);
+        debugTriangleTexture_ = nullptr;
+    }
+}
+
+void ForgeBackend::ensureDebugTriangleTexture() {
+    if (!renderer_ || debugTriangleTexture_) {
+        return;
+    }
+    const uint32_t white = 0xffffffffu;
+    TextureDesc textureDesc{};
+    textureDesc.mArraySize = 1;
+    textureDesc.mDepth = 1;
+    textureDesc.mDescriptors = DESCRIPTOR_TYPE_TEXTURE;
+    textureDesc.mFormat = TinyImageFormat_R8G8B8A8_UNORM;
+    textureDesc.mHeight = 1;
+    textureDesc.mMipLevels = 1;
+    textureDesc.mSampleCount = SAMPLE_COUNT_1;
+    textureDesc.mStartState = RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+    textureDesc.mWidth = 1;
+    textureDesc.pName = "Forge Debug Triangle White";
+
+    TextureLoadDesc loadDesc{};
+    loadDesc.pDesc = &textureDesc;
+    loadDesc.ppTexture = &debugTriangleTexture_;
+    SyncToken token{};
+    addResource(&loadDesc, &token);
+    waitForToken(&token);
+
+    if (!debugTriangleTexture_) {
+        return;
+    }
+
+    TextureUpdateDesc updateDesc = { debugTriangleTexture_, 0, 1, 0, 1, RESOURCE_STATE_PIXEL_SHADER_RESOURCE };
+    beginUpdateResource(&updateDesc);
+    TextureSubresourceUpdate subresource = updateDesc.getSubresourceUpdateDesc(0, 0);
+    std::memcpy(subresource.pMappedData, &white, sizeof(white));
+    endUpdateResource(&updateDesc);
+    if (renderFence_) {
+        FlushResourceUpdateDesc flush{};
+        flush.pOutFence = renderFence_;
+        flushResourceUpdates(&flush);
+        waitForFences(renderer_, 1, &renderFence_);
+    }
+}
+
+void ForgeBackend::renderDebugTriangle() {
+    ensureUiOverlayResources();
+    ensureDebugTriangleTexture();
+    if (!cmd_ || !uiOverlayPipeline_ || !uiOverlayDescriptorSet_ || !uiOverlayVertexBuffer_ || !uiOverlayIndexBuffer_
+        || !uiOverlayUniformBuffer_ || !uiOverlaySampler_ || !debugTriangleTexture_) {
+        static bool logged = false;
+        if (!logged) {
+            spdlog::warn("Graphics(Forge): debug triangle skipped cmd={} pipeline={} set={} vb={} ib={} ub={} sampler={} tex={}",
+                         cmd_ ? "yes" : "no",
+                         uiOverlayPipeline_ ? "yes" : "no",
+                         uiOverlayDescriptorSet_ ? "yes" : "no",
+                         uiOverlayVertexBuffer_ ? "yes" : "no",
+                         uiOverlayIndexBuffer_ ? "yes" : "no",
+                         uiOverlayUniformBuffer_ ? "yes" : "no",
+                         uiOverlaySampler_ ? "yes" : "no",
+                         debugTriangleTexture_ ? "yes" : "no");
+            logged = true;
+        }
+        return;
+    }
+
+    RenderTarget* backBuffer = swapChain_->ppRenderTargets[frameIndex_];
+    BindRenderTargetsDesc bindDesc{};
+    bindDesc.mRenderTargetCount = 1;
+    bindDesc.mRenderTargets[0].pRenderTarget = backBuffer;
+    bindDesc.mRenderTargets[0].mLoadAction = LOAD_ACTION_LOAD;
+    bindDesc.mRenderTargets[0].mStoreAction = STORE_ACTION_STORE;
+    bindDesc.mDepthStencil.pDepthStencil = nullptr;
+    bindDesc.mDepthStencil.mLoadAction = LOAD_ACTION_DONTCARE;
+    bindDesc.mDepthStencil.mStoreAction = STORE_ACTION_DONTCARE;
+    cmdBindRenderTargets(cmd_, &bindDesc);
+
+    struct UiOverlayConstants {
+        float scaleBias[4];
+    } constants{};
+    const float width = framebufferWidth > 0 ? static_cast<float>(framebufferWidth) : 1.0f;
+    const float height = framebufferHeight > 0 ? static_cast<float>(framebufferHeight) : 1.0f;
+    constants.scaleBias[0] = 2.0f / width;
+    constants.scaleBias[1] = -2.0f / height;
+    constants.scaleBias[2] = -1.0f;
+    constants.scaleBias[3] = 1.0f;
+    BufferUpdateDesc cbUpdate = { uiOverlayUniformBuffer_ };
+    beginUpdateResource(&cbUpdate);
+    std::memcpy(cbUpdate.pMappedData, &constants, sizeof(constants));
+    endUpdateResource(&cbUpdate);
+
+    struct UiVertex {
+        float x;
+        float y;
+        float u;
+        float v;
+        uint32_t color;
+    };
+    const uint32_t color = 0xffffffffu;
+    UiVertex vertices[3] = {
+        {width * 0.5f, height * 0.25f, 0.0f, 0.0f, color},
+        {width * 0.25f, height * 0.75f, 0.0f, 0.0f, color},
+        {width * 0.75f, height * 0.75f, 0.0f, 0.0f, color},
+    };
+    const uint16_t indices[3] = {0, 1, 2};
+
+    BufferUpdateDesc vbUpdate = { uiOverlayVertexBuffer_ };
+    beginUpdateResource(&vbUpdate);
+    std::memcpy(vbUpdate.pMappedData, vertices, sizeof(vertices));
+    endUpdateResource(&vbUpdate);
+
+    BufferUpdateDesc ibUpdate = { uiOverlayIndexBuffer_ };
+    beginUpdateResource(&ibUpdate);
+    std::memcpy(ibUpdate.pMappedData, indices, sizeof(indices));
+    endUpdateResource(&ibUpdate);
+
+    DescriptorData params[3] = {};
+    params[0].mIndex = 0;
+    params[0].ppBuffers = &uiOverlayUniformBuffer_;
+    params[1].mIndex = 1;
+    params[1].ppTextures = &debugTriangleTexture_;
+    params[2].mIndex = 2;
+    params[2].ppSamplers = &uiOverlaySampler_;
+    updateDescriptorSet(renderer_, 0, uiOverlayDescriptorSet_, 3, params);
+
+    cmdSetViewport(cmd_, 0.0f, 0.0f, width, height, 0.0f, 1.0f);
+    cmdSetScissor(cmd_, 0, 0, static_cast<uint32_t>(width), static_cast<uint32_t>(height));
+    cmdBindPipeline(cmd_, uiOverlayPipeline_);
+    cmdBindDescriptorSet(cmd_, 0, uiOverlayDescriptorSet_);
+    uint32_t stride = sizeof(UiVertex);
+    uint64_t offset = 0;
+    cmdBindVertexBuffer(cmd_, 1, &uiOverlayVertexBuffer_, &stride, &offset);
+    cmdBindIndexBuffer(cmd_, uiOverlayIndexBuffer_, INDEX_TYPE_UINT16, 0);
+    cmdDrawIndexed(cmd_, 3, 0, 0);
+    static bool drewLogged = false;
+    if (!drewLogged) {
+        spdlog::warn("Graphics(Forge): debug triangle draw issued");
+        if (swapChain_ && swapChain_->ppRenderTargets[frameIndex_]) {
+            const RenderTarget* rt = swapChain_->ppRenderTargets[frameIndex_];
+            spdlog::warn("Graphics(Forge): debug triangle dims fb={}x{} rt={}x{} frame={}",
+                         framebufferWidth, framebufferHeight, rt->mWidth, rt->mHeight, frameIndex_);
+        } else {
+            spdlog::warn("Graphics(Forge): debug triangle dims fb={}x{} rt=<null> frame={}",
+                         framebufferWidth, framebufferHeight, frameIndex_);
+        }
+        drewLogged = true;
     }
 }
 

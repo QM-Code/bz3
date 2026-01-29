@@ -419,6 +419,7 @@ set(ENGINE_CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/game/ui/system.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/backend_factory.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/config.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/ui_config.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/console/keybindings.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/hud_settings.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/render_settings.cpp

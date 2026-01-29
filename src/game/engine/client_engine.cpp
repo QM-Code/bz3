@@ -6,6 +6,8 @@
 #include "spdlog/spdlog.h"
 #include "ui/bridges/render_bridge.hpp"
 #include "common/config_store.hpp"
+#include <cstdlib>
+#include "common/i18n.hpp"
 #if defined(BZ3_UI_BACKEND_IMGUI)
 #include "ui/bridges/imgui_render_bridge.hpp"
 #endif
@@ -59,6 +61,7 @@ ClientEngine::ClientEngine(platform::Window &window) {
     ui->setImGuiRenderBridge(renderBridgeImpl);
 #endif
     spdlog::trace("ClientEngine: UiSystem initialized successfully");
+    lastLanguage = bz::i18n::Get().language();
     ui->setDialogText(game_input::SpawnHintText(*input));
     audio = new Audio();
     spdlog::trace("ClientEngine: Audio initialized successfully");
@@ -99,8 +102,17 @@ void ClientEngine::step(TimeUtils::duration deltaTime) {
 void ClientEngine::lateUpdate(TimeUtils::duration deltaTime) {
     render->update();
     ui->update();
+    const std::string currentLanguage = bz::i18n::Get().language();
+    if (currentLanguage != lastLanguage) {
+        lastLanguage = currentLanguage;
+        if (input) {
+            ui->setDialogText(game_input::SpawnHintText(*input));
+        }
+    }
     render->setUiOverlayTexture(ui->getRenderOutput());
-    render->renderUiOverlay();
+    if (!std::getenv("BZ3_DISABLE_UI_OVERLAY")) {
+        render->renderUiOverlay();
+    }
     render->present();
 
     render->setBrightness(ui->getRenderBrightness());

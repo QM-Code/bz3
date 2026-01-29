@@ -12,6 +12,7 @@
 #include "common/config_store.hpp"
 #include "game/input/bindings.hpp"
 #include "ui/console/keybindings.hpp"
+#include "ui/ui_config.hpp"
 
 namespace ui {
 namespace {
@@ -79,7 +80,7 @@ public:
         switch (action) {
             case Action::Clear: panel->clearSelected(); break;
             case Action::Save: panel->saveBindings(); break;
-            case Action::Reset: panel->resetBindings(); break;
+            case Action::Reset: panel->showResetDialog(); break;
         }
     }
 
@@ -115,6 +116,7 @@ public:
             return;
         }
         const int button = event.GetParameter<int>("button", -1);
+        panel->handleMouseClick(event.GetTargetElement(), button);
         panel->captureMouse(button);
     }
 
@@ -160,6 +162,16 @@ void RmlUiPanelBindings::onLoaded(Rml::ElementDocument *doc) {
     clearButton = document->GetElementById("bindings-clear");
     saveButton = document->GetElementById("bindings-save");
     resetButton = document->GetElementById("bindings-reset");
+    resetDialog.bind(document,
+                     "bindings-reset-overlay",
+                     "bindings-reset-message",
+                     "bindings-reset-yes",
+                     "bindings-reset-no");
+    resetDialog.setOnAccept([this]() {
+        resetBindings();
+        resetDialog.hide();
+    });
+    resetDialog.setOnCancel([this]() { resetDialog.hide(); });
 
     listeners.clear();
     if (clearButton) {
@@ -187,6 +199,7 @@ void RmlUiPanelBindings::onLoaded(Rml::ElementDocument *doc) {
         document->AddEventListener("mousedown", listener.get());
         listeners.emplace_back(std::move(listener));
     }
+    resetDialog.installListeners(listeners);
 
     loadBindings();
     rebuildBindings();
@@ -218,16 +231,14 @@ void RmlUiPanelBindings::loadBindings() {
     }
 
     const bz::json::Value *bindingsNode = nullptr;
-    if (const auto *node = bz::config::ConfigStore::Get("keybindings")) {
-        if (node->is_object()) {
-            bindingsNode = node;
-        }
+    auto keybindingsNode = ui::UiConfig::GetKeybindings();
+    if (keybindingsNode && keybindingsNode->is_object()) {
+        bindingsNode = &(*keybindingsNode);
     }
     const bz::json::Value *controllerNode = nullptr;
-    if (const auto *node = bz::config::ConfigStore::Get("gui.keybindings.controller")) {
-        if (node->is_object()) {
-            controllerNode = node;
-        }
+    auto controllerBindingsNode = ui::UiConfig::GetControllerKeybindings();
+    if (controllerBindingsNode && controllerBindingsNode->is_object()) {
+        controllerNode = &(*controllerBindingsNode);
     }
 
     auto defs = ui::bindings::Definitions();
@@ -381,6 +392,22 @@ void RmlUiPanelBindings::setSelected(int index, BindingColumn column) {
     updateSelectedLabel();
 }
 
+void RmlUiPanelBindings::clearSelection() {
+    selectedIndex = -1;
+    for (auto &row : rows) {
+        if (row.keyboard) {
+            row.keyboard->SetClass("selected", false);
+        }
+        if (row.mouse) {
+            row.mouse->SetClass("selected", false);
+        }
+        if (row.controller) {
+            row.controller->SetClass("selected", false);
+        }
+    }
+    updateSelectedLabel();
+}
+
 void RmlUiPanelBindings::clearSelected() {
     if (selectedIndex < 0 || selectedIndex >= static_cast<int>(keyboardBindings.size())) {
         return;
@@ -432,21 +459,21 @@ void RmlUiPanelBindings::saveBindings() {
     }
 
     if (hasBindings) {
-        if (!bz::config::ConfigStore::Set("keybindings", keybindings)) {
+        if (!ui::UiConfig::SetKeybindings(keybindings)) {
             showStatus("Failed to save bindings.", true);
             return;
         }
     } else {
-        bz::config::ConfigStore::Erase("keybindings");
+        ui::UiConfig::EraseKeybindings();
     }
 
     if (hasController) {
-        if (!bz::config::ConfigStore::Set("gui.keybindings.controller", controllerJson)) {
+        if (!ui::UiConfig::SetControllerKeybindings(controllerJson)) {
             showStatus("Failed to save bindings.", true);
             return;
         }
     } else {
-        bz::config::ConfigStore::Erase("gui.keybindings.controller");
+        ui::UiConfig::EraseControllerKeybindings();
     }
     requestKeybindingsReload();
     showStatus("Bindings saved.", false);
@@ -470,12 +497,16 @@ void RmlUiPanelBindings::resetBindings() {
         controllerBindings[i].clear();
     }
 
-    bz::config::ConfigStore::Erase("keybindings");
-    bz::config::ConfigStore::Erase("gui.keybindings.controller");
+    ui::UiConfig::EraseKeybindings();
+    ui::UiConfig::EraseControllerKeybindings();
     requestKeybindingsReload();
     showStatus("Bindings reset to defaults.", false);
 
     rebuildBindings();
+}
+
+void RmlUiPanelBindings::showResetDialog() {
+    resetDialog.show("Reset all keybindings to defaults? This will overwrite your custom bindings.");
 }
 
 void RmlUiPanelBindings::showStatus(const std::string &message, bool isError) {
@@ -493,6 +524,11 @@ void RmlUiPanelBindings::captureKey(int keyIdentifier) {
         return;
     }
     if (keyIdentifier == Rml::Input::KI_UNKNOWN) {
+        return;
+    }
+    if (selectedColumn == BindingColumn::Mouse && keyIdentifier == Rml::Input::KI_ESCAPE) {
+        saveBindings();
+        clearSelection();
         return;
     }
     if (selectedColumn == BindingColumn::Mouse) {
@@ -516,6 +552,51 @@ void RmlUiPanelBindings::captureKey(int keyIdentifier) {
             controllerBindings[selectedIndex] = ui::bindings::JoinBindings(entries);
             rebuildBindings();
         }
+    }
+}
+
+void RmlUiPanelBindings::handleMouseClick(Rml::Element *target, int button) {
+    if (button != 0) {
+        return;
+    }
+    if (selectedIndex < 0 || selectedIndex >= static_cast<int>(rows.size())) {
+        return;
+    }
+    if (selectedColumn != BindingColumn::Keyboard) {
+        return;
+    }
+    if (target == clearButton || target == saveButton || target == resetButton) {
+        return;
+    }
+    bool targetIsBindingCell = false;
+    int targetIndex = -1;
+    BindingColumn targetColumn = BindingColumn::Keyboard;
+    for (std::size_t i = 0; i < rows.size(); ++i) {
+        if (target == rows[i].keyboard) {
+            targetIsBindingCell = true;
+            targetIndex = static_cast<int>(i);
+            targetColumn = BindingColumn::Keyboard;
+            break;
+        }
+        if (target == rows[i].mouse) {
+            targetIsBindingCell = true;
+            targetIndex = static_cast<int>(i);
+            targetColumn = BindingColumn::Mouse;
+            break;
+        }
+        if (target == rows[i].controller) {
+            targetIsBindingCell = true;
+            targetIndex = static_cast<int>(i);
+            targetColumn = BindingColumn::Controller;
+            break;
+        }
+    }
+    if (targetIsBindingCell && targetIndex == selectedIndex && targetColumn == selectedColumn) {
+        return;
+    }
+    saveBindings();
+    if (!targetIsBindingCell) {
+        clearSelection();
     }
 }
 

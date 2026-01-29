@@ -349,9 +349,24 @@ int main(int argc, char *argv[]) {
             communityBrowser.handleDisconnected(disconnectEvent->reason);
         }
 
-        if (engine.ui->console().isVisible()) {
+        const bool consoleVisible = engine.ui->console().isVisible();
+        if (consoleVisible) {
+            engine.inputState = {};
+        }
+        if (!consoleVisible && engine.getInputState().toggleFullscreen) {
+            const bool wasFullscreen = window->isFullscreen();
+            spdlog::info("Fullscreen toggle requested (before={})", wasFullscreen);
+            window->setFullscreen(!wasFullscreen);
+            const bool nowFullscreen = window->isFullscreen();
+            spdlog::info("Fullscreen toggle complete (after={})", nowFullscreen);
+            if (nowFullscreen == wasFullscreen) {
+                spdlog::warn("Fullscreen toggle had no effect");
+            }
+        }
+        if (consoleVisible) {
             communityBrowser.update();
-        } else if (game) {
+        }
+        if (game) {
             game->earlyUpdate(deltaTime);
             game->lateUpdate(deltaTime);
         }
