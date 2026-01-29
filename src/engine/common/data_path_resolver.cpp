@@ -4,7 +4,6 @@
 #include <cctype>
 #include <cstdlib>
 #include <fstream>
-#include <limits>
 #include <map>
 #include <utility>
 #include <mutex>
@@ -17,6 +16,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "common/config_store.hpp"
 #include "common/json.hpp"
 #include <spdlog/spdlog.h>
 
@@ -144,86 +144,6 @@ std::filesystem::path DetectDataRoot(const std::optional<std::filesystem::path> 
     }
 
     return ValidateDataRootCandidate(envDataDir);
-}
-
-struct ConfigCacheState {
-    std::mutex mutex;
-    bool initialized = false;
-    std::vector<bz::data::ConfigLayer> layers;
-    bz::json::Value merged = bz::json::Object();
-    std::unordered_map<std::string, std::size_t> labelIndex;
-    std::unordered_map<std::string, std::filesystem::path> assetLookup;
-};
-
-ConfigCacheState g_configCache;
-
-const bz::json::Value *ResolveConfigPath(const bz::json::Value &root, const std::string &path) {
-    if (path.empty()) {
-        return &root;
-    }
-
-    const bz::json::Value *current = &root;
-    std::size_t position = 0;
-
-    while (position < path.size()) {
-        const std::size_t dot = path.find('.', position);
-        const bool lastSegment = (dot == std::string::npos);
-        const std::string segment = path.substr(position, lastSegment ? std::string::npos : dot - position);
-        if (segment.empty()) {
-            return nullptr;
-        }
-
-        std::string key = segment;
-        std::optional<std::size_t> arrayIndex;
-        const auto bracketPos = segment.find('[');
-        if (bracketPos != std::string::npos) {
-            key = segment.substr(0, bracketPos);
-            const auto closingPos = segment.find(']', bracketPos);
-            if (closingPos == std::string::npos || closingPos != segment.size() - 1) {
-                return nullptr;
-            }
-
-            const std::string indexText = segment.substr(bracketPos + 1, closingPos - bracketPos - 1);
-            if (indexText.empty()) {
-                return nullptr;
-            }
-
-            try {
-                arrayIndex = static_cast<std::size_t>(std::stoul(indexText));
-            } catch (...) {
-                return nullptr;
-            }
-        }
-
-        if (!key.empty()) {
-            if (!current->is_object()) {
-                return nullptr;
-            }
-
-            const auto it = current->find(key);
-            if (it == current->end()) {
-                return nullptr;
-            }
-
-            current = &(*it);
-        }
-
-        if (arrayIndex.has_value()) {
-            if (!current->is_array() || *arrayIndex >= current->size()) {
-                return nullptr;
-            }
-
-            current = &((*current)[*arrayIndex]);
-        }
-
-        if (lastSegment) {
-            break;
-        }
-
-        position = dot + 1;
-    }
-
-    return current;
 }
 
 } // namespace
@@ -397,62 +317,6 @@ std::filesystem::path EnsureUserWorldDirectoryForServer(const std::string &host,
     return TryCanonical(serverDir);
 }
 
-namespace {
-std::unordered_map<std::string, std::filesystem::path> BuildAssetLookupFromLayers(const std::vector<ConfigLayer> &layers);
-}
-
-bool MergeConfigLayer(const std::string &label,
-                      const bz::json::Value &layerJson,
-                      const std::filesystem::path &baseDir) {
-    std::filesystem::path canonicalBase = TryCanonical(baseDir);
-    const std::string resolvedLabel = label.empty() ? canonicalBase.string() : label;
-
-    if (!layerJson.is_object()) {
-        spdlog::warn("data_path_resolver: Config layer '{}' ignored because it is not a JSON object", resolvedLabel);
-        return false;
-    }
-
-    std::lock_guard<std::mutex> lock(g_configCache.mutex);
-    if (!g_configCache.initialized) {
-        spdlog::warn("data_path_resolver: Config cache not initialized; cannot merge layer '{}'", resolvedLabel);
-        return false;
-    }
-
-    ConfigLayer newLayer{layerJson, canonicalBase, resolvedLabel};
-
-    auto labelIt = g_configCache.labelIndex.find(resolvedLabel);
-    if (labelIt != g_configCache.labelIndex.end()) {
-        g_configCache.layers[labelIt->second] = newLayer;
-    } else {
-        g_configCache.labelIndex[resolvedLabel] = g_configCache.layers.size();
-        g_configCache.layers.push_back(newLayer);
-    }
-
-    g_configCache.merged = bz::json::Object();
-    for (const auto &layer : g_configCache.layers) {
-        MergeJsonObjects(g_configCache.merged, layer.json);
-    }
-
-    g_configCache.assetLookup = BuildAssetLookupFromLayers(g_configCache.layers);
-
-    spdlog::debug("data_path_resolver: Merged config layer '{}' from {}", resolvedLabel, canonicalBase.string());
-    return true;
-}
-
-bool MergeExternalConfigLayer(const std::filesystem::path &configPath,
-                              const std::string &label,
-                              spdlog::level::level_enum missingLevel) {
-    const auto canonicalPath = TryCanonical(configPath);
-    const auto jsonOpt = LoadJsonFile(canonicalPath,
-                                      label.empty() ? canonicalPath.string() : label,
-                                      missingLevel);
-    if (!jsonOpt) {
-        return false;
-    }
-
-    return MergeConfigLayer(label, *jsonOpt, canonicalPath.parent_path());
-}
-
 std::optional<bz::json::Value> LoadJsonFile(const std::filesystem::path &path,
                                            const std::string &label,
                                            spdlog::level::level_enum missingLevel) {
@@ -589,14 +453,12 @@ std::filesystem::path ResolveConfiguredAsset(const std::string &assetKey,
                                              const std::filesystem::path &defaultRelativePath) {
     const auto defaultPath = defaultRelativePath.empty() ? std::filesystem::path{} : Resolve(defaultRelativePath);
 
-    {
-        std::lock_guard<std::mutex> lock(g_configCache.mutex);
-        if (g_configCache.initialized) {
-            const auto it = g_configCache.assetLookup.find(assetKey);
-            if (it != g_configCache.assetLookup.end()) {
-                return it->second;
-            }
+    if (bz::config::ConfigStore::Initialized()) {
+        const auto resolved = bz::config::ConfigStore::ResolveAssetPath(assetKey, defaultPath);
+        if (resolved.empty() && defaultPath.empty()) {
+            spdlog::warn("data_path_resolver: Asset '{}' not found in configuration layers", assetKey);
         }
+        return resolved;
     }
 
     DataPathSpec spec;
@@ -622,117 +484,6 @@ std::filesystem::path ResolveConfiguredAsset(const std::string &assetKey,
 
     spdlog::warn("data_path_resolver: Asset '{}' not found in configuration layers, using default.", assetKey);
     return defaultPath;
-}
-
-void InitializeConfigCache(const std::vector<ConfigLayerSpec> &specs) {
-    std::vector<ConfigLayer> layers = LoadConfigLayers(specs);
-
-    bz::json::Value merged = bz::json::Object();
-    for (const auto &layer : layers) {
-        MergeJsonObjects(merged, layer.json);
-    }
-
-    std::unordered_map<std::string, std::size_t> labelIndex;
-    labelIndex.reserve(layers.size());
-    for (std::size_t i = 0; i < layers.size(); ++i) {
-        if (!layers[i].label.empty()) {
-            labelIndex[layers[i].label] = i;
-        }
-    }
-
-    auto assetLookup = BuildAssetLookupFromLayers(layers);
-
-    std::lock_guard<std::mutex> lock(g_configCache.mutex);
-    g_configCache.layers = std::move(layers);
-    g_configCache.merged = std::move(merged);
-    g_configCache.labelIndex = std::move(labelIndex);
-    g_configCache.assetLookup = std::move(assetLookup);
-    g_configCache.initialized = true;
-}
-
-bool ConfigCacheInitialized() {
-    std::lock_guard<std::mutex> lock(g_configCache.mutex);
-    return g_configCache.initialized;
-}
-
-const bz::json::Value &ConfigCacheRoot() {
-    std::lock_guard<std::mutex> lock(g_configCache.mutex);
-    if (!g_configCache.initialized) {
-        static const bz::json::Value empty = bz::json::Object();
-        return empty;
-    }
-
-    return g_configCache.merged;
-}
-
-const bz::json::Value *ConfigLayerByLabel(const std::string &label) {
-    std::lock_guard<std::mutex> lock(g_configCache.mutex);
-    if (!g_configCache.initialized) {
-        return nullptr;
-    }
-
-    const auto it = g_configCache.labelIndex.find(label);
-    if (it == g_configCache.labelIndex.end()) {
-        return nullptr;
-    }
-
-    return &g_configCache.layers[it->second].json;
-}
-
-const bz::json::Value *ConfigValue(const std::string &path) {
-    std::lock_guard<std::mutex> lock(g_configCache.mutex);
-    if (!g_configCache.initialized) {
-        return nullptr;
-    }
-
-    return ResolveConfigPath(g_configCache.merged, path);
-}
-
-std::optional<bz::json::Value> ConfigValueCopy(const std::string &path) {
-    if (const auto *value = ConfigValue(path)) {
-        return std::optional<bz::json::Value>(std::in_place, *value);
-    }
-    return std::nullopt;
-}
-
-std::optional<uint16_t> ConfigValueUInt16(const std::string &path) {
-    const auto *value = ConfigValue(path);
-    if (!value) {
-        return std::nullopt;
-    }
-
-    auto clampToUint16 = [](long long number) -> std::optional<uint16_t> {
-        if (number < 0 || number > std::numeric_limits<uint16_t>::max()) {
-            return std::nullopt;
-        }
-        return static_cast<uint16_t>(number);
-    };
-
-    if (value->is_number_unsigned()) {
-        return clampToUint16(static_cast<long long>(value->get<unsigned long long>()));
-    }
-
-    if (value->is_number_integer()) {
-        return clampToUint16(static_cast<long long>(value->get<long long>()));
-    }
-
-    if (value->is_string()) {
-        try {
-            return clampToUint16(std::stoll(value->get<std::string>()));
-        } catch (...) {
-            return std::nullopt;
-        }
-    }
-
-    return std::nullopt;
-}
-
-std::optional<std::string> ConfigValueString(const std::string &path) {
-    const auto *value = ConfigValue(path);
-    if (!value || !value->is_string()) {
-        return std::nullopt;
-    }
-    return value->get<std::string>();
 }
 
 } // namespace bz::data

@@ -27,6 +27,7 @@
 
 #include <array>
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -70,7 +71,7 @@ bool isShotModelPath(const std::filesystem::path& path) {
 }
 
 std::string getThemeName() {
-    return bz::data::ReadStringConfig("graphics.theme", "classic");
+    return bz::config::ReadStringConfig("graphics.theme", "classic");
 }
 
 bool isLikelyGrass(const MeshLoader::TextureData& texture) {
@@ -275,6 +276,7 @@ void DiligentBackend::endFrame() {
 void DiligentBackend::resize(int width, int height) {
     framebufferWidth = std::max(1, width);
     framebufferHeight = std::max(1, height);
+    destroySceneTarget();
     updateSwapChain(framebufferWidth, framebufferHeight);
 }
 
@@ -621,15 +623,36 @@ void DiligentBackend::renderLayer(graphics::LayerId layer, graphics::RenderTarge
         if (!swapChain_) {
             return;
         }
-        rtv = swapChain_->GetCurrentBackBufferRTV();
-        dsv = swapChain_->GetDepthBufferDSV();
-        if (!rtv) {
-            spdlog::warn("Graphics(Diligent): swapchain RTV is null in renderLayer");
-            return;
+        const bool wantsBrightness = std::abs(brightness_ - 1.0f) > 0.0001f;
+        if (wantsBrightness) {
+            const auto& scDesc = swapChain_->GetDesc();
+            ensureSceneTarget(static_cast<int>(scDesc.Width), static_cast<int>(scDesc.Height));
+            if (sceneTargetValid_ && sceneTarget_.rtv) {
+                rtv = sceneTarget_.rtv;
+                dsv = sceneTarget_.dsv;
+                targetWidth = static_cast<int>(scDesc.Width);
+                targetHeight = static_cast<int>(scDesc.Height);
+            } else {
+                rtv = swapChain_->GetCurrentBackBufferRTV();
+                dsv = swapChain_->GetDepthBufferDSV();
+                if (!rtv) {
+                    spdlog::warn("Graphics(Diligent): swapchain RTV is null in renderLayer");
+                    return;
+                }
+                targetWidth = static_cast<int>(scDesc.Width);
+                targetHeight = static_cast<int>(scDesc.Height);
+            }
+        } else {
+            rtv = swapChain_->GetCurrentBackBufferRTV();
+            dsv = swapChain_->GetDepthBufferDSV();
+            if (!rtv) {
+                spdlog::warn("Graphics(Diligent): swapchain RTV is null in renderLayer");
+                return;
+            }
+            const auto& scDesc = swapChain_->GetDesc();
+            targetWidth = static_cast<int>(scDesc.Width);
+            targetHeight = static_cast<int>(scDesc.Height);
         }
-        const auto& scDesc = swapChain_->GetDesc();
-        targetWidth = static_cast<int>(scDesc.Width);
-        targetHeight = static_cast<int>(scDesc.Height);
     } else {
         auto it = renderTargets.find(target);
         if (it == renderTargets.end()) {
@@ -642,6 +665,11 @@ void DiligentBackend::renderLayer(graphics::LayerId layer, graphics::RenderTarge
     }
 
     renderToTargets(rtv, dsv, layer, targetWidth, targetHeight);
+
+    if (target == graphics::kDefaultRenderTarget && std::abs(brightness_ - 1.0f) > 0.0001f
+        && sceneTargetValid_ && sceneTarget_.srv) {
+        renderBrightnessPass();
+    }
 }
 
 unsigned int DiligentBackend::getRenderTargetTextureId(graphics::RenderTargetId target) const {
@@ -716,6 +744,10 @@ void DiligentBackend::renderUiOverlay() {
     drawAttrs.NumVertices = 4;
     drawAttrs.Flags = Diligent::DRAW_FLAG_VERIFY_ALL;
     context_->Draw(drawAttrs);
+}
+
+void DiligentBackend::setBrightness(float brightness) {
+    brightness_ = brightness;
 }
 
 void DiligentBackend::initDiligent() {
@@ -1000,13 +1032,13 @@ void DiligentBackend::buildSkyboxResources() {
         return;
     }
 
-    const std::string mode = bz::data::ReadStringConfig("graphics.skybox.Mode", "none");
+    const std::string mode = bz::config::ReadStringConfig("graphics.skybox.Mode", "none");
     spdlog::info("Graphics(Diligent): skybox mode='{}'", mode);
     if (mode != "cubemap") {
         return;
     }
 
-    const std::string name = bz::data::ReadStringConfig("graphics.skybox.Cubemap.Name", "classic");
+    const std::string name = bz::config::ReadStringConfig("graphics.skybox.Cubemap.Name", "classic");
     spdlog::info("Graphics(Diligent): skybox cubemap='{}'", name);
     const std::array<std::string, 6> faces = {"right", "left", "up", "down", "front", "back"};
     std::array<std::vector<uint8_t>, 6> facePixels{};
@@ -1345,6 +1377,272 @@ float4 main(float2 uv : TEXCOORD0) : SV_Target
     vbData.pData = verts;
     vbData.DataSize = vbDesc.Size;
     device_->CreateBuffer(vbDesc, &vbData, &uiOverlayVertexBuffer_);
+}
+
+void DiligentBackend::ensureBrightnessPipeline() {
+    if (!initialized || !device_) {
+        return;
+    }
+    if (brightnessPipeline_) {
+        return;
+    }
+
+    const char* vsSource = R"(
+struct VSInput
+{
+    float2 Pos : ATTRIB0;
+    float2 UV  : ATTRIB1;
+};
+struct PSInput
+{
+    float4 Pos : SV_POSITION;
+    float2 UV  : TEXCOORD0;
+};
+PSInput main(VSInput In)
+{
+    PSInput Out;
+    Out.Pos = float4(In.Pos, 0.0, 1.0);
+    Out.UV = In.UV;
+    return Out;
+}
+)";
+
+    const char* psSource = R"(
+Texture2D g_Texture;
+SamplerState g_Texture_sampler;
+cbuffer Constants
+{
+    float g_Brightness;
+    float3 g_Pad;
+};
+float4 main(float2 uv : TEXCOORD0) : SV_Target
+{
+    float4 color = g_Texture.Sample(g_Texture_sampler, uv);
+    return color * g_Brightness;
+}
+)";
+
+    Diligent::ShaderCreateInfo shaderCI;
+    shaderCI.SourceLanguage = Diligent::SHADER_SOURCE_LANGUAGE_HLSL;
+    shaderCI.EntryPoint = "main";
+
+    Diligent::RefCntAutoPtr<Diligent::IShader> vs;
+    shaderCI.Desc.ShaderType = Diligent::SHADER_TYPE_VERTEX;
+    shaderCI.Desc.Name = "BZ3 Diligent Brightness VS";
+    shaderCI.Source = vsSource;
+    device_->CreateShader(shaderCI, &vs);
+
+    Diligent::RefCntAutoPtr<Diligent::IShader> ps;
+    shaderCI.Desc.ShaderType = Diligent::SHADER_TYPE_PIXEL;
+    shaderCI.Desc.Name = "BZ3 Diligent Brightness PS";
+    shaderCI.Source = psSource;
+    device_->CreateShader(shaderCI, &ps);
+
+    if (!vs || !ps) {
+        spdlog::error("Graphics(Diligent): failed to create brightness shaders");
+        return;
+    }
+
+    if (!brightnessConstantBuffer_) {
+        Diligent::BufferDesc cbDesc;
+        cbDesc.Name = "BZ3 Diligent Brightness CB";
+        cbDesc.Size = sizeof(float) * 4;
+        cbDesc.Usage = Diligent::USAGE_DYNAMIC;
+        cbDesc.BindFlags = Diligent::BIND_UNIFORM_BUFFER;
+        cbDesc.CPUAccessFlags = Diligent::CPU_ACCESS_WRITE;
+        device_->CreateBuffer(cbDesc, nullptr, &brightnessConstantBuffer_);
+    }
+
+    Diligent::GraphicsPipelineStateCreateInfo psoCI;
+    psoCI.PSODesc.Name = "BZ3 Diligent Brightness PSO";
+    psoCI.PSODesc.PipelineType = Diligent::PIPELINE_TYPE_GRAPHICS;
+    psoCI.pVS = vs;
+    psoCI.pPS = ps;
+    psoCI.GraphicsPipeline.PrimitiveTopology = Diligent::PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+    psoCI.GraphicsPipeline.RasterizerDesc.CullMode = Diligent::CULL_MODE_NONE;
+    psoCI.GraphicsPipeline.DepthStencilDesc.DepthEnable = false;
+    psoCI.GraphicsPipeline.DepthStencilDesc.DepthWriteEnable = false;
+    psoCI.GraphicsPipeline.NumRenderTargets = 1;
+    if (swapChain_) {
+        const auto& scDesc = swapChain_->GetDesc();
+        psoCI.GraphicsPipeline.RTVFormats[0] = scDesc.ColorBufferFormat;
+        psoCI.GraphicsPipeline.DSVFormat = scDesc.DepthBufferFormat;
+    }
+
+    Diligent::LayoutElement layout[] = {
+        {0, 0, 2, Diligent::VT_FLOAT32, false},
+        {1, 0, 2, Diligent::VT_FLOAT32, false}
+    };
+    psoCI.GraphicsPipeline.InputLayout.LayoutElements = layout;
+    psoCI.GraphicsPipeline.InputLayout.NumElements = static_cast<Diligent::Uint32>(std::size(layout));
+
+    Diligent::ShaderResourceVariableDesc vars[] = {
+        {Diligent::SHADER_TYPE_PIXEL, "g_Texture", Diligent::SHADER_RESOURCE_VARIABLE_TYPE_DYNAMIC},
+        {Diligent::SHADER_TYPE_PIXEL, "Constants", Diligent::SHADER_RESOURCE_VARIABLE_TYPE_DYNAMIC}
+    };
+    psoCI.PSODesc.ResourceLayout.Variables = vars;
+    psoCI.PSODesc.ResourceLayout.NumVariables = static_cast<Diligent::Uint32>(std::size(vars));
+
+    Diligent::SamplerDesc samplerDesc;
+    samplerDesc.MinFilter = Diligent::FILTER_TYPE_LINEAR;
+    samplerDesc.MagFilter = Diligent::FILTER_TYPE_LINEAR;
+    samplerDesc.MipFilter = Diligent::FILTER_TYPE_LINEAR;
+    samplerDesc.AddressU = Diligent::TEXTURE_ADDRESS_CLAMP;
+    samplerDesc.AddressV = Diligent::TEXTURE_ADDRESS_CLAMP;
+    samplerDesc.AddressW = Diligent::TEXTURE_ADDRESS_CLAMP;
+
+    Diligent::ImmutableSamplerDesc samplers[] = {
+        {Diligent::SHADER_TYPE_PIXEL, "g_Texture_sampler", samplerDesc}
+    };
+    psoCI.PSODesc.ResourceLayout.ImmutableSamplers = samplers;
+    psoCI.PSODesc.ResourceLayout.NumImmutableSamplers = static_cast<Diligent::Uint32>(std::size(samplers));
+
+    device_->CreatePipelineState(psoCI, &brightnessPipeline_);
+    if (!brightnessPipeline_) {
+        spdlog::error("Graphics(Diligent): failed to create brightness pipeline");
+        return;
+    }
+
+    brightnessPipeline_->CreateShaderResourceBinding(&brightnessBinding_, true);
+
+    struct BrightnessVertex {
+        float x;
+        float y;
+        float u;
+        float v;
+    };
+    const BrightnessVertex verts[] = {
+        {-1.0f, -1.0f, 0.0f, 1.0f},
+        { 1.0f, -1.0f, 1.0f, 1.0f},
+        {-1.0f,  1.0f, 0.0f, 0.0f},
+        { 1.0f,  1.0f, 1.0f, 0.0f}
+    };
+
+    Diligent::BufferDesc vbDesc;
+    vbDesc.Name = "BZ3 Diligent Brightness VB";
+    vbDesc.Usage = Diligent::USAGE_IMMUTABLE;
+    vbDesc.BindFlags = Diligent::BIND_VERTEX_BUFFER;
+    vbDesc.Size = sizeof(verts);
+    Diligent::BufferData vbData;
+    vbData.pData = verts;
+    vbData.DataSize = vbDesc.Size;
+    device_->CreateBuffer(vbDesc, &vbData, &brightnessVertexBuffer_);
+}
+
+void DiligentBackend::ensureSceneTarget(int width, int height) {
+    if (!initialized || !device_) {
+        return;
+    }
+    if (sceneTargetValid_ && sceneTarget_.desc.width == width && sceneTarget_.desc.height == height) {
+        return;
+    }
+    destroySceneTarget();
+    if (width <= 0 || height <= 0) {
+        return;
+    }
+
+    sceneTarget_.desc.width = width;
+    sceneTarget_.desc.height = height;
+    sceneTarget_.desc.depth = true;
+
+    Diligent::TextureDesc colorDesc;
+    colorDesc.Type = Diligent::RESOURCE_DIM_TEX_2D;
+    colorDesc.Width = static_cast<Diligent::Uint32>(width);
+    colorDesc.Height = static_cast<Diligent::Uint32>(height);
+    colorDesc.MipLevels = 1;
+    if (swapChain_) {
+        colorDesc.Format = swapChain_->GetDesc().ColorBufferFormat;
+    } else {
+        colorDesc.Format = Diligent::TEX_FORMAT_RGBA8_UNORM;
+    }
+    colorDesc.BindFlags = Diligent::BIND_RENDER_TARGET | Diligent::BIND_SHADER_RESOURCE;
+    colorDesc.Name = "BZ3 Diligent Scene Color";
+    device_->CreateTexture(colorDesc, nullptr, &sceneTarget_.colorTexture);
+    if (sceneTarget_.colorTexture) {
+        sceneTarget_.rtv = sceneTarget_.colorTexture->GetDefaultView(Diligent::TEXTURE_VIEW_RENDER_TARGET);
+        sceneTarget_.srv = sceneTarget_.colorTexture->GetDefaultView(Diligent::TEXTURE_VIEW_SHADER_RESOURCE);
+    }
+
+    Diligent::TextureDesc depthDesc;
+    depthDesc.Type = Diligent::RESOURCE_DIM_TEX_2D;
+    depthDesc.Width = static_cast<Diligent::Uint32>(width);
+    depthDesc.Height = static_cast<Diligent::Uint32>(height);
+    depthDesc.MipLevels = 1;
+    if (swapChain_) {
+        depthDesc.Format = swapChain_->GetDesc().DepthBufferFormat;
+    } else {
+        depthDesc.Format = Diligent::TEX_FORMAT_D32_FLOAT;
+    }
+    depthDesc.BindFlags = Diligent::BIND_DEPTH_STENCIL;
+    depthDesc.Name = "BZ3 Diligent Scene Depth";
+    device_->CreateTexture(depthDesc, nullptr, &sceneTarget_.depthTexture);
+    if (sceneTarget_.depthTexture) {
+        sceneTarget_.dsv = sceneTarget_.depthTexture->GetDefaultView(Diligent::TEXTURE_VIEW_DEPTH_STENCIL);
+    }
+
+    sceneTargetValid_ = (sceneTarget_.rtv != nullptr && sceneTarget_.srv != nullptr);
+}
+
+void DiligentBackend::destroySceneTarget() {
+    sceneTarget_ = {};
+    sceneTargetValid_ = false;
+}
+
+void DiligentBackend::renderBrightnessPass() {
+    if (!initialized || !context_ || !swapChain_) {
+        return;
+    }
+    if (!sceneTarget_.srv) {
+        return;
+    }
+    ensureBrightnessPipeline();
+    if (!brightnessPipeline_ || !brightnessBinding_ || !brightnessVertexBuffer_ || !brightnessConstantBuffer_) {
+        return;
+    }
+
+    if (auto* var = brightnessBinding_->GetVariableByName(Diligent::SHADER_TYPE_PIXEL, "g_Texture")) {
+        var->Set(sceneTarget_.srv);
+    }
+    if (auto* var = brightnessBinding_->GetVariableByName(Diligent::SHADER_TYPE_PIXEL, "Constants")) {
+        var->Set(brightnessConstantBuffer_);
+    }
+
+    Diligent::MapHelper<float> cb(context_, brightnessConstantBuffer_, Diligent::MAP_WRITE, Diligent::MAP_FLAG_DISCARD);
+    if (cb) {
+        cb[0] = brightness_;
+        cb[1] = 0.0f;
+        cb[2] = 0.0f;
+        cb[3] = 0.0f;
+    }
+
+    auto* rtv = swapChain_->GetCurrentBackBufferRTV();
+    if (!rtv) {
+        return;
+    }
+    context_->SetRenderTargets(1, &rtv, nullptr, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+
+    const auto& scDesc = swapChain_->GetDesc();
+    Diligent::Viewport vp{};
+    vp.TopLeftX = 0.0f;
+    vp.TopLeftY = 0.0f;
+    vp.Width = static_cast<float>(scDesc.Width);
+    vp.Height = static_cast<float>(scDesc.Height);
+    vp.MinDepth = 0.0f;
+    vp.MaxDepth = 1.0f;
+    context_->SetViewports(1, &vp, 0, 0);
+
+    const Diligent::Uint64 offset = 0;
+    Diligent::IBuffer* vbs[] = {brightnessVertexBuffer_};
+    context_->SetVertexBuffers(0, 1, vbs, &offset, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION,
+                               Diligent::SET_VERTEX_BUFFERS_FLAG_RESET);
+
+    context_->SetPipelineState(brightnessPipeline_);
+    context_->CommitShaderResources(brightnessBinding_, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+
+    Diligent::DrawAttribs drawAttrs;
+    drawAttrs.NumVertices = 4;
+    drawAttrs.Flags = Diligent::DRAW_FLAG_VERIFY_ALL;
+    context_->Draw(drawAttrs);
 }
 
 void DiligentBackend::updateSwapChain(int width, int height) {

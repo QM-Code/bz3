@@ -12,6 +12,7 @@ This folder contains the shared UI system plus two frontend implementations (ImG
 - `backend.*`: backend interface + factory.
 - `types.hpp`: shared UI types (scoreboard, render output).
 - `config.*`: config helpers for required values (no defaults).
+- `hud_model.hpp`: shared HUD state passed to frontends.
 - `render_scale.*`: UI render scale (config: `ui.RenderScale`).
 - `render_settings.*`: user-facing render settings (brightness, etc.).
 
@@ -28,6 +29,7 @@ Note: RmlUi does not use a UI-layer render bridge because it integrates directly
 ## Feature map (entry points)
 - UI render output/visibility: `frontends/*/backend.cpp`
 - HUD composition: `frontends/*/hud/*`
+- Shared HUD data: `ui/hud_model.hpp`
 - Console: `frontends/*/console/*`
 - Start server panel: `frontends/*/console/panels/panel_start_server.*`
 - Renderer integration: `frontends/*/platform/renderer_*.{hpp,cpp}`

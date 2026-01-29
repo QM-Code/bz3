@@ -48,6 +48,11 @@ body#hud-body
     pointer-events: none;
 }
 
+.hud-crosshair.hidden
+{
+    display: none;
+}
+
 .hud-crosshair-box
 {
     position: absolute;
@@ -121,6 +126,11 @@ body#hud-body
     border-radius: 6px;
 }
 
+.hud-chat-panel.hidden
+{
+    display: none;
+}
+
 .hud-chat-log
 {
     flex: 1 1 auto;
@@ -187,6 +197,11 @@ body#hud-body
     box-sizing: border-box;
 }
 
+.hud-scoreboard.hidden
+{
+    display: none;
+}
+
 .hud-scoreboard-line
 {
     margin: 2px 0px;
@@ -212,6 +227,11 @@ body#hud-body
     display: flex;
     align-items: stretch;
     justify-content: stretch;
+}
+
+.hud-radar-panel.hidden
+{
+    display: none;
 }
 
 .hud-radar-image

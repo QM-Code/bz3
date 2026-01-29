@@ -30,14 +30,12 @@ public:
     void update() override;
     void reloadFonts() override;
 
-    void setScoreboardEntries(const std::vector<ScoreboardEntry> &entries) override;
-    void setSpawnHint(const std::string &hint) override;
+    void setHudModel(const ui::HudModel &model) override;
     void addConsoleLine(const std::string &playerName, const std::string &line) override;
     std::string getChatInputBuffer() const override;
     void clearChatInputBuffer() override;
     void focusChatInput() override;
     bool getChatInputFocus() const override;
-    void displayDeathScreen(bool show) override;
     bool consumeKeybindingsReloadRequest() override;
     void setRenderBridge(const ui::RenderBridge *bridge) override;
     void setImGuiRenderBridge(const ui::ImGuiRenderBridge *bridge) override;
@@ -50,7 +48,7 @@ private:
     ImFont *bigFont = nullptr;
     ui::ConsoleView consoleView;
     ui::ImGuiHud hud;
-    bool showFPS = false;
+    ui::HudModel hudModel;
     const ui::RenderBridge *renderBridge = nullptr;
     const ui::ImGuiRenderBridge* imguiBridge = nullptr;
     graphics_backend::UiRenderTargetBridge* uiBridge = nullptr;

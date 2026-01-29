@@ -5,7 +5,7 @@
 #include <functional>
 #include <vector>
 
-#include "common/json.hpp"
+#include "ui/hud_settings.hpp"
 #include "ui/render_settings.hpp"
 
 namespace Rml {
@@ -50,6 +50,7 @@ private:
     class SettingsMouseListener;
     class BrightnessListener;
     class LanguageListener;
+    class HudToggleListener;
 
     void loadBindings();
     void rebuildBindings();
@@ -61,6 +62,8 @@ private:
     void resetBindings();
     void setRenderBrightness(float value, bool fromUser);
     void syncRenderBrightnessControls();
+    void syncHudControls();
+    void handleHudToggle(Rml::Element *target);
     void showStatus(const std::string &message, bool isError);
     void requestKeybindingsReload();
     void captureKey(int keyIdentifier);
@@ -70,14 +73,7 @@ private:
     void applyLanguageSelection(const std::string &code);
     std::string selectedLanguageFromConfig() const;
     bool isLanguageSelectionSuppressed() const { return suppressLanguageSelection; }
-
-    bool loadUserConfig(bz::json::Value &out) const;
-    bool saveUserConfig(const bz::json::Value &userConfig, std::string &error) const;
-    void setNestedConfig(bz::json::Value &root,
-                         std::initializer_list<const char*> path,
-                         bz::json::Value value) const;
-    void eraseNestedConfig(bz::json::Value &root,
-                           std::initializer_list<const char*> path) const;
+    void syncSettingsFromConfig();
 
     Rml::ElementDocument *document = nullptr;
     Rml::Element *bindingsList = nullptr;
@@ -99,13 +95,23 @@ private:
     bool statusIsError = false;
     bool keybindingsReloadRequested = false;
     std::string statusText;
-    std::string userConfigPath;
     std::vector<std::unique_ptr<Rml::EventListener>> listeners;
     std::vector<std::unique_ptr<Rml::EventListener>> rowListeners;
 
     Rml::Element *brightnessSlider = nullptr;
     Rml::Element *brightnessValueLabel = nullptr;
+    struct HudToggleButtons {
+        Rml::Element *on = nullptr;
+        Rml::Element *off = nullptr;
+    };
+
+    HudToggleButtons hudScoreboardToggle{};
+    HudToggleButtons hudChatToggle{};
+    HudToggleButtons hudRadarToggle{};
+    HudToggleButtons hudFpsToggle{};
+    HudToggleButtons hudCrosshairToggle{};
     RenderSettings renderSettings;
+    HudSettings hudSettings;
     std::function<void(const std::string &)> languageCallback;
     bool suppressLanguageSelection = false;
 };

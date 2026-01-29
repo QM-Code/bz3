@@ -139,7 +139,7 @@ Backend layouts (examples)
 - `src/engine/platform/backends/` (currently `sdl3`, with an `sdl2` stub)
 - `src/game/ui/backends/imgui/` and `src/game/ui/backends/rmlui/`
 - `src/engine/physics/backends/jolt/` and `src/engine/physics/backends/bullet/`
-- `src/engine/graphics/backends/bgfx/`, `src/engine/graphics/backends/diligent/`, `src/engine/graphics/backends/filament/`
+- `src/engine/graphics/backends/bgfx/`, `src/engine/graphics/backends/diligent/`, `src/engine/graphics/backends/forge/`
 - `src/game/net/backends/enet/` (future: steam, webrtc, etc.)
 - `src/engine/world/backends/fs/` (future: zip, remote, etc.)
 - `src/engine/input/mapping/` (action-agnostic mapping: bindings, maps, mapper)
@@ -153,7 +153,7 @@ These CMake cache variables select backends at build time:
 - `BZ3_WINDOW_BACKEND=sdl3|sdl2`
 - `BZ3_PHYSICS_BACKEND=jolt|bullet|physx`
 - `BZ3_AUDIO_BACKEND=miniaudio|sdlaudio`
-- `BZ3_RENDER_BACKEND=bgfx|diligent|filament`
+- `BZ3_RENDER_BACKEND=bgfx|diligent|forge`
 - `BZ3_NETWORK_BACKEND=enet`
 - `BZ3_WORLD_BACKEND=fs`
 

@@ -5,11 +5,16 @@
 namespace ui {
 
 void RmlUiHudRadar::bind(Rml::ElementDocument *document) {
+    panel = nullptr;
     image = nullptr;
     if (!document) {
         return;
     }
+    panel = document->GetElementById("hud-radar-panel");
     image = document->GetElementById("hud-radar-image");
+    if (panel) {
+        panel->SetClass("hidden", !visible);
+    }
     if (image) {
         if (!texture.valid()) {
             image->SetAttribute("src", "");
@@ -36,6 +41,17 @@ void RmlUiHudRadar::setTexture(const graphics::TextureHandle& textureIn) {
             image->SetAttribute("src", src);
         }
     }
+}
+
+void RmlUiHudRadar::setVisible(bool visibleIn) {
+    visible = visibleIn;
+    if (panel) {
+        panel->SetClass("hidden", !visible);
+    }
+}
+
+bool RmlUiHudRadar::isVisible() const {
+    return visible;
 }
 
 } // namespace ui

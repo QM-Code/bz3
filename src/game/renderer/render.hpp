@@ -53,12 +53,6 @@ private:
     float lastAspect = 1.0f;
     float radarFovDegrees = CAMERA_FOV;
 
-#if defined(BZ3_RENDER_BACKEND_FILAMENT)
-    graphics::RenderTargetId mainTarget = graphics::kDefaultRenderTarget;
-    int mainTargetWidth = 0;
-    int mainTargetHeight = 0;
-#endif
-
     Render(platform::Window &window);
     ~Render();
 
@@ -66,7 +60,6 @@ private:
     void resizeCallback(int width, int height);
 
     void ensureRadarResources();
-    void ensureMainTarget(int width, int height);
     void updateRadarFovLines();
     glm::quat computeRadarCameraRotation(const glm::vec3& radarCamPos) const;
 
@@ -92,8 +85,6 @@ public:
 
     graphics::TextureHandle getRadarTexture() const;
     graphics_backend::UiRenderTargetBridge* getUiRenderTargetBridge() const;
-    unsigned int getMainTextureId() const;
-    std::pair<int, int> getMainTextureSize() const;
     void setRadarShaderPath(const std::filesystem::path& vertPath,
                             const std::filesystem::path& fragPath);
 

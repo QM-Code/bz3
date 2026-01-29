@@ -25,6 +25,7 @@
 #include <fstream>
 #include <vector>
 #include <cstring>
+#include <cmath>
 
 namespace graphics_backend {
 
@@ -246,6 +247,8 @@ ForgeBackend::~ForgeBackend() {
     }
     uiBridge_.reset();
     destroyUiOverlayResources();
+    destroyBrightnessResources();
+    destroySceneTarget();
     for (auto& [id, mesh] : meshes) {
         if (mesh.vertexBuffer) {
             removeResource(mesh.vertexBuffer);
@@ -363,6 +366,7 @@ void ForgeBackend::resize(int width, int height) {
     }
     framebufferWidth = width;
     framebufferHeight = height;
+    destroySceneTarget();
     auto ctx = graphics_backend::forge_ui::GetContext();
     graphics_backend::forge_ui::SetContext(ctx.renderer, ctx.graphicsQueue, width, height, ctx.colorFormat);
     if (!renderer_ || !swapChain_) {
@@ -649,12 +653,25 @@ void ForgeBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId
     RenderTarget* renderTarget = nullptr;
     int targetWidth = framebufferWidth;
     int targetHeight = framebufferHeight;
-    const bool useSwapchain = (target == graphics::kDefaultRenderTarget);
+    bool wantsBrightness = (target == graphics::kDefaultRenderTarget && std::abs(brightness_ - 1.0f) > 0.0001f);
+    bool useSwapchain = (target == graphics::kDefaultRenderTarget && !wantsBrightness);
     if (useSwapchain) {
         if (!swapChain_) {
             return;
         }
         renderTarget = swapChain_->ppRenderTargets[frameIndex_];
+    } else if (wantsBrightness) {
+        ensureSceneTarget(framebufferWidth, framebufferHeight);
+        if (!sceneTarget_) {
+            if (!swapChain_) {
+                return;
+            }
+            renderTarget = swapChain_->ppRenderTargets[frameIndex_];
+            wantsBrightness = false;
+            useSwapchain = true;
+        } else {
+            renderTarget = sceneTarget_;
+        }
     } else {
         auto it = renderTargets.find(target);
         if (it == renderTargets.end() || !it->second.renderTarget) {
@@ -675,7 +692,7 @@ void ForgeBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId
     bindDesc.mRenderTargets[0].pRenderTarget = renderTarget;
     bindDesc.mRenderTargets[0].mLoadAction = LOAD_ACTION_CLEAR;
     bindDesc.mRenderTargets[0].mStoreAction = STORE_ACTION_STORE;
-    if (useSwapchain) {
+    if (useSwapchain || wantsBrightness) {
         bindDesc.mRenderTargets[0].mClearValue = {0.05f, 0.08f, 0.12f, 1.0f};
     } else {
         bindDesc.mRenderTargets[0].mClearValue = {0.0f, 0.0f, 0.0f, 0.0f};
@@ -770,6 +787,10 @@ void ForgeBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId
         rtEnd.mCurrentState = RESOURCE_STATE_RENDER_TARGET;
         rtEnd.mNewState = RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
         cmdResourceBarrier(cmd_, 0, nullptr, 0, nullptr, 1, &rtEnd);
+    }
+
+    if (wantsBrightness && sceneTarget_) {
+        renderBrightnessPass();
     }
 }
 
@@ -883,6 +904,10 @@ void ForgeBackend::renderUiOverlay() {
     cmdBindVertexBuffer(cmd_, 1, &uiOverlayVertexBuffer_, &stride, &offset);
     cmdBindIndexBuffer(cmd_, uiOverlayIndexBuffer_, INDEX_TYPE_UINT16, 0);
     cmdDrawIndexed(cmd_, 6, 0, 0);
+}
+
+void ForgeBackend::setBrightness(float brightness) {
+    brightness_ = brightness;
 }
 
 void ForgeBackend::setPosition(graphics::EntityId entity, const glm::vec3& position) {
@@ -1157,6 +1182,302 @@ void ForgeBackend::destroyUiOverlayResources() {
         removeResource(uiOverlayUniformBuffer_);
         uiOverlayUniformBuffer_ = nullptr;
     }
+}
+
+void ForgeBackend::ensureBrightnessResources() {
+    if (!renderer_) {
+        return;
+    }
+    if (brightnessPipeline_ && brightnessDescriptorSet_ && brightnessVertexBuffer_
+        && brightnessIndexBuffer_ && brightnessUniformBuffer_) {
+        return;
+    }
+
+    const std::filesystem::path shaderDir = bz::data::Resolve("forge/shaders");
+    const auto vsPath = shaderDir / "brightness.vert.spv";
+    const auto fsPath = shaderDir / "brightness.frag.spv";
+    auto vsBytes = readFileBytes(vsPath);
+    auto fsBytes = readFileBytes(fsPath);
+    if (vsBytes.empty() || fsBytes.empty()) {
+        spdlog::error("Graphics(Forge): missing brightness shaders '{}', '{}'", vsPath.string(), fsPath.string());
+        return;
+    }
+
+    BinaryShaderDesc shaderDesc{};
+    shaderDesc.mStages = SHADER_STAGE_VERT | SHADER_STAGE_FRAG;
+    shaderDesc.mOwnByteCode = false;
+    shaderDesc.mVert = { "brightness.vert", vsBytes.data(), static_cast<uint32_t>(vsBytes.size()), "main" };
+    shaderDesc.mFrag = { "brightness.frag", fsBytes.data(), static_cast<uint32_t>(fsBytes.size()), "main" };
+    addShaderBinary(renderer_, &shaderDesc, &brightnessShader_);
+    if (!brightnessShader_) {
+        spdlog::error("Graphics(Forge): failed to create brightness shader");
+        return;
+    }
+
+    SamplerDesc samplerDesc{};
+    samplerDesc.mMinFilter = FILTER_LINEAR;
+    samplerDesc.mMagFilter = FILTER_LINEAR;
+    samplerDesc.mMipMapMode = MIPMAP_MODE_LINEAR;
+    samplerDesc.mAddressU = ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerDesc.mAddressV = ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerDesc.mAddressW = ADDRESS_MODE_CLAMP_TO_EDGE;
+    addSampler(renderer_, &samplerDesc, &brightnessSampler_);
+
+    brightnessDescriptors_[0].mType = DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    brightnessDescriptors_[0].mCount = 1;
+    brightnessDescriptors_[0].mOffset = 0;
+    brightnessDescriptors_[1].mType = DESCRIPTOR_TYPE_TEXTURE;
+    brightnessDescriptors_[1].mCount = 1;
+    brightnessDescriptors_[1].mOffset = 1;
+    brightnessDescriptors_[2].mType = DESCRIPTOR_TYPE_SAMPLER;
+    brightnessDescriptors_[2].mCount = 1;
+    brightnessDescriptors_[2].mOffset = 2;
+
+    DescriptorSetDesc setDesc{};
+    setDesc.mIndex = 0;
+    setDesc.mMaxSets = 1;
+    setDesc.mDescriptorCount = 3;
+    setDesc.pDescriptors = brightnessDescriptors_;
+    addDescriptorSet(renderer_, &setDesc, &brightnessDescriptorSet_);
+
+    BufferLoadDesc vbDesc{};
+    vbDesc.mDesc.mDescriptors = DESCRIPTOR_TYPE_VERTEX_BUFFER;
+    vbDesc.mDesc.mMemoryUsage = RESOURCE_MEMORY_USAGE_CPU_TO_GPU;
+    vbDesc.mDesc.mSize = sizeof(float) * 4 * 4;
+    vbDesc.mDesc.mFlags = BUFFER_CREATION_FLAG_PERSISTENT_MAP_BIT;
+    vbDesc.mDesc.pName = "Forge Brightness VB";
+    vbDesc.ppBuffer = &brightnessVertexBuffer_;
+    addResource(&vbDesc, nullptr);
+
+    BufferLoadDesc ibDesc = vbDesc;
+    ibDesc.mDesc.mDescriptors = DESCRIPTOR_TYPE_INDEX_BUFFER;
+    ibDesc.mDesc.mSize = sizeof(uint16_t) * 6;
+    ibDesc.mDesc.pName = "Forge Brightness IB";
+    ibDesc.ppBuffer = &brightnessIndexBuffer_;
+    addResource(&ibDesc, nullptr);
+
+    BufferLoadDesc ubDesc{};
+    ubDesc.mDesc.mDescriptors = DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    ubDesc.mDesc.mMemoryUsage = RESOURCE_MEMORY_USAGE_CPU_TO_GPU;
+    ubDesc.mDesc.mFlags = BUFFER_CREATION_FLAG_PERSISTENT_MAP_BIT;
+    ubDesc.mDesc.mSize = sizeof(float) * 8;
+    ubDesc.mDesc.pName = "Forge Brightness UB";
+    ubDesc.ppBuffer = &brightnessUniformBuffer_;
+    addResource(&ubDesc, nullptr);
+
+    VertexLayout layout{};
+    layout.mBindingCount = 1;
+    layout.mAttribCount = 2;
+    layout.mBindings[0].mStride = sizeof(float) * 4;
+    layout.mBindings[0].mRate = VERTEX_BINDING_RATE_VERTEX;
+    layout.mAttribs[0].mSemantic = SEMANTIC_POSITION;
+    layout.mAttribs[0].mFormat = TinyImageFormat_R32G32_SFLOAT;
+    layout.mAttribs[0].mBinding = 0;
+    layout.mAttribs[0].mLocation = 0;
+    layout.mAttribs[0].mOffset = 0;
+    layout.mAttribs[1].mSemantic = SEMANTIC_TEXCOORD0;
+    layout.mAttribs[1].mFormat = TinyImageFormat_R32G32_SFLOAT;
+    layout.mAttribs[1].mBinding = 0;
+    layout.mAttribs[1].mLocation = 1;
+    layout.mAttribs[1].mOffset = sizeof(float) * 2;
+
+    BlendStateDesc blend{};
+    blend.mSrcFactors[0] = BC_ONE;
+    blend.mDstFactors[0] = BC_ZERO;
+    blend.mSrcAlphaFactors[0] = BC_ONE;
+    blend.mDstAlphaFactors[0] = BC_ZERO;
+    blend.mColorWriteMasks[0] = COLOR_MASK_ALL;
+    blend.mRenderTargetMask = BLEND_STATE_TARGET_ALL;
+    blend.mIndependentBlend = false;
+
+    DepthStateDesc depth{};
+    depth.mDepthTest = false;
+    depth.mDepthWrite = false;
+
+    RasterizerStateDesc raster{};
+    raster.mCullMode = CULL_MODE_NONE;
+    raster.mScissor = true;
+
+    const TinyImageFormat colorFormat = swapChain_ ? swapChain_->ppRenderTargets[0]->mFormat : TinyImageFormat_R8G8B8A8_UNORM;
+    PipelineDesc pipelineDesc{};
+    pipelineDesc.mType = PIPELINE_TYPE_GRAPHICS;
+    pipelineDesc.mGraphicsDesc.pShaderProgram = brightnessShader_;
+    pipelineDesc.mGraphicsDesc.pVertexLayout = &layout;
+    pipelineDesc.mGraphicsDesc.pBlendState = &blend;
+    pipelineDesc.mGraphicsDesc.pDepthState = &depth;
+    pipelineDesc.mGraphicsDesc.pRasterizerState = &raster;
+    pipelineDesc.mGraphicsDesc.mRenderTargetCount = 1;
+    pipelineDesc.mGraphicsDesc.mSampleCount = SAMPLE_COUNT_1;
+    pipelineDesc.mGraphicsDesc.mSampleQuality = 0;
+    pipelineDesc.mGraphicsDesc.mPrimitiveTopo = PRIMITIVE_TOPO_TRI_LIST;
+    pipelineDesc.mGraphicsDesc.pColorFormats = const_cast<TinyImageFormat*>(&colorFormat);
+    pipelineDesc.mGraphicsDesc.mDepthStencilFormat = TinyImageFormat_UNDEFINED;
+
+    DescriptorSetLayoutDesc layoutDesc{};
+    layoutDesc.pDescriptors = brightnessDescriptors_;
+    layoutDesc.mDescriptorCount = 3;
+    layoutDesc.pStaticSamplers = nullptr;
+    layoutDesc.mStaticSamplerCount = 0;
+    const DescriptorSetLayoutDesc* layoutPtrs[] = { &layoutDesc };
+    pipelineDesc.pLayouts = layoutPtrs;
+    pipelineDesc.mLayoutCount = 1;
+
+    addPipeline(renderer_, &pipelineDesc, &brightnessPipeline_);
+}
+
+void ForgeBackend::destroyBrightnessResources() {
+    if (!renderer_) {
+        return;
+    }
+    if (brightnessPipeline_) {
+        removePipeline(renderer_, brightnessPipeline_);
+        brightnessPipeline_ = nullptr;
+    }
+    if (brightnessShader_) {
+        removeShader(renderer_, brightnessShader_);
+        brightnessShader_ = nullptr;
+    }
+    if (brightnessDescriptorSet_) {
+        removeDescriptorSet(renderer_, brightnessDescriptorSet_);
+        brightnessDescriptorSet_ = nullptr;
+    }
+    if (brightnessSampler_) {
+        removeSampler(renderer_, brightnessSampler_);
+        brightnessSampler_ = nullptr;
+    }
+    if (brightnessVertexBuffer_) {
+        removeResource(brightnessVertexBuffer_);
+        brightnessVertexBuffer_ = nullptr;
+    }
+    if (brightnessIndexBuffer_) {
+        removeResource(brightnessIndexBuffer_);
+        brightnessIndexBuffer_ = nullptr;
+    }
+    if (brightnessUniformBuffer_) {
+        removeResource(brightnessUniformBuffer_);
+        brightnessUniformBuffer_ = nullptr;
+    }
+}
+
+void ForgeBackend::ensureSceneTarget(int width, int height) {
+    if (!renderer_ || width <= 0 || height <= 0) {
+        return;
+    }
+    if (sceneTarget_ && sceneTargetWidth_ == width && sceneTargetHeight_ == height) {
+        return;
+    }
+    destroySceneTarget();
+
+    RenderTargetDesc rtDesc{};
+    rtDesc.mWidth = static_cast<uint32_t>(width);
+    rtDesc.mHeight = static_cast<uint32_t>(height);
+    rtDesc.mDepth = 1;
+    rtDesc.mArraySize = 1;
+    rtDesc.mMipLevels = 1;
+    rtDesc.mSampleCount = SAMPLE_COUNT_1;
+    rtDesc.mSampleQuality = 0;
+    rtDesc.mFormat = swapChain_ ? swapChain_->ppRenderTargets[0]->mFormat : TinyImageFormat_R8G8B8A8_UNORM;
+    rtDesc.mDescriptors = DESCRIPTOR_TYPE_TEXTURE;
+    rtDesc.mStartState = RESOURCE_STATE_RENDER_TARGET;
+    rtDesc.pName = "Forge Scene RenderTarget";
+    addRenderTarget(renderer_, &rtDesc, &sceneTarget_);
+    sceneTargetWidth_ = width;
+    sceneTargetHeight_ = height;
+}
+
+void ForgeBackend::destroySceneTarget() {
+    if (renderer_ && sceneTarget_) {
+        removeRenderTarget(renderer_, sceneTarget_);
+        sceneTarget_ = nullptr;
+    }
+    sceneTargetWidth_ = 0;
+    sceneTargetHeight_ = 0;
+}
+
+void ForgeBackend::renderBrightnessPass() {
+    if (!cmd_ || !renderer_ || !swapChain_ || !sceneTarget_) {
+        return;
+    }
+    ensureBrightnessResources();
+    if (!brightnessPipeline_ || !brightnessDescriptorSet_ || !brightnessVertexBuffer_
+        || !brightnessIndexBuffer_ || !brightnessUniformBuffer_ || !brightnessSampler_) {
+        return;
+    }
+
+    RenderTarget* backBuffer = swapChain_->ppRenderTargets[frameIndex_];
+    BindRenderTargetsDesc bindDesc{};
+    bindDesc.mRenderTargetCount = 1;
+    bindDesc.mRenderTargets[0].pRenderTarget = backBuffer;
+    bindDesc.mRenderTargets[0].mLoadAction = LOAD_ACTION_CLEAR;
+    bindDesc.mRenderTargets[0].mStoreAction = STORE_ACTION_STORE;
+    bindDesc.mRenderTargets[0].mClearValue = {0.0f, 0.0f, 0.0f, 1.0f};
+    bindDesc.mRenderTargets[0].mOverrideClearValue = 1;
+    bindDesc.mDepthStencil.pDepthStencil = nullptr;
+    bindDesc.mDepthStencil.mLoadAction = LOAD_ACTION_DONTCARE;
+    bindDesc.mDepthStencil.mStoreAction = STORE_ACTION_DONTCARE;
+    cmdBindRenderTargets(cmd_, &bindDesc);
+
+    const uint32_t width = framebufferWidth > 0 ? static_cast<uint32_t>(framebufferWidth) : 1u;
+    const uint32_t height = framebufferHeight > 0 ? static_cast<uint32_t>(framebufferHeight) : 1u;
+
+    struct BrightnessConstants {
+        float scaleBias[4];
+        float brightness;
+        float pad[3];
+    } constants{};
+    constants.scaleBias[0] = 2.0f / static_cast<float>(width);
+    constants.scaleBias[1] = -2.0f / static_cast<float>(height);
+    constants.scaleBias[2] = -1.0f;
+    constants.scaleBias[3] = 1.0f;
+    constants.brightness = brightness_;
+    BufferUpdateDesc cbUpdate = { brightnessUniformBuffer_ };
+    beginUpdateResource(&cbUpdate);
+    std::memcpy(cbUpdate.pMappedData, &constants, sizeof(constants));
+    endUpdateResource(&cbUpdate);
+
+    struct BrightnessVertex {
+        float x;
+        float y;
+        float u;
+        float v;
+    };
+    BrightnessVertex vertices[4] = {
+        {0.0f, 0.0f, 0.0f, 0.0f},
+        {static_cast<float>(width), 0.0f, 1.0f, 0.0f},
+        {static_cast<float>(width), static_cast<float>(height), 1.0f, 1.0f},
+        {0.0f, static_cast<float>(height), 0.0f, 1.0f},
+    };
+    const uint16_t indices[6] = {0, 1, 2, 0, 2, 3};
+
+    BufferUpdateDesc vbUpdate = { brightnessVertexBuffer_ };
+    beginUpdateResource(&vbUpdate);
+    std::memcpy(vbUpdate.pMappedData, vertices, sizeof(vertices));
+    endUpdateResource(&vbUpdate);
+
+    BufferUpdateDesc ibUpdate = { brightnessIndexBuffer_ };
+    beginUpdateResource(&ibUpdate);
+    std::memcpy(ibUpdate.pMappedData, indices, sizeof(indices));
+    endUpdateResource(&ibUpdate);
+
+    DescriptorData params[3] = {};
+    params[0].mIndex = 0;
+    params[0].ppBuffers = &brightnessUniformBuffer_;
+    params[1].mIndex = 1;
+    params[1].ppTextures = &sceneTarget_->pTexture;
+    params[2].mIndex = 2;
+    params[2].ppSamplers = &brightnessSampler_;
+    updateDescriptorSet(renderer_, 0, brightnessDescriptorSet_, 3, params);
+
+    cmdSetViewport(cmd_, 0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f);
+    cmdSetScissor(cmd_, 0, 0, width, height);
+    cmdBindPipeline(cmd_, brightnessPipeline_);
+    cmdBindDescriptorSet(cmd_, 0, brightnessDescriptorSet_);
+
+    uint32_t stride = sizeof(BrightnessVertex);
+    uint64_t offset = 0;
+    cmdBindVertexBuffer(cmd_, 1, &brightnessVertexBuffer_, &stride, &offset);
+    cmdBindIndexBuffer(cmd_, brightnessIndexBuffer_, INDEX_TYPE_UINT16, 0);
+    cmdDrawIndexed(cmd_, 6, 0, 0);
 }
 
 void ForgeBackend::ensureMeshResources() {

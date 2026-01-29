@@ -9,16 +9,36 @@ void ImGuiHud::setScoreboardEntries(const std::vector<ScoreboardEntry> &entries)
     scoreboard.setEntries(entries);
 }
 
-void ImGuiHud::setSpawnHint(const std::string &hint) {
-    spawnHint.setHint(hint);
+void ImGuiHud::setDialogText(const std::string &text) {
+    dialog.setText(text);
 }
 
-void ImGuiHud::displayDeathScreen(bool show) {
-    spawnHint.setVisible(show);
+void ImGuiHud::setDialogVisible(bool show) {
+    dialog.setVisible(show);
 }
 
 void ImGuiHud::setRadarTexture(const graphics::TextureHandle& texture) {
     radar.setTexture(texture);
+}
+
+void ImGuiHud::setScoreboardVisible(bool show) {
+    scoreboardVisible = show;
+}
+
+void ImGuiHud::setChatVisible(bool show) {
+    chatVisible = show;
+    if (!chatVisible) {
+        chat.clearSubmittedInput();
+        chat.clearFocus();
+    }
+}
+
+void ImGuiHud::setRadarVisible(bool show) {
+    radarVisible = show;
+}
+
+void ImGuiHud::setCrosshairVisible(bool show) {
+    crosshairVisible = show;
 }
 
 void ImGuiHud::addConsoleLine(const std::string &playerName, const std::string &line) {
@@ -34,11 +54,13 @@ void ImGuiHud::clearChatInputBuffer() {
 }
 
 void ImGuiHud::focusChatInput() {
-    chat.focusInput();
+    if (chatVisible) {
+        chat.focusInput();
+    }
 }
 
 bool ImGuiHud::getChatInputFocus() const {
-    return chat.isFocused();
+    return chatVisible && chat.isFocused();
 }
 
 void ImGuiHud::setShowFps(bool show) {
@@ -46,7 +68,9 @@ void ImGuiHud::setShowFps(bool show) {
 }
 
 void ImGuiHud::draw(ImGuiIO &io, ImFont *bigFont) {
-    scoreboard.draw(io);
+    if (scoreboardVisible) {
+        scoreboard.draw(io);
+    }
 
     const float margin = 12.0f;
     const float panelHeight = 260.0f;
@@ -62,17 +86,23 @@ void ImGuiHud::draw(ImGuiIO &io, ImFont *bigFont) {
 
     const ImVec2 radarPos = ImVec2(vpPos.x + margin, vpPos.y + vpSize.y - margin - radarSize);
     const ImVec2 radarWindowSize = ImVec2(radarSize, radarSize);
-    radar.draw(radarPos, radarWindowSize);
+    if (radarVisible) {
+        radar.draw(radarPos, radarWindowSize);
+    }
 
-    const float consoleLeft = vpPos.x + margin + radarSize + margin;
-    const float consoleWidth = std::max(50.0f, vpSize.x - (radarSize + 3.0f * margin));
+    const float consoleLeft = vpPos.x + margin + (radarVisible ? radarSize + margin : 0.0f);
+    const float consoleWidth = std::max(50.0f, vpSize.x - (radarVisible ? (radarSize + 3.0f * margin) : (2.0f * margin)));
     ImVec2 pos  = ImVec2(consoleLeft, vpPos.y + vpSize.y - margin - panelHeight);
     ImVec2 size = ImVec2(consoleWidth, panelHeight);
 
-    chat.draw(pos, size, inputHeight);
+    if (chatVisible) {
+        chat.draw(pos, size, inputHeight);
+    }
 
-    spawnHint.draw(io, bigFont);
-    crosshair.draw(io);
+    dialog.draw(io, bigFont);
+    if (crosshairVisible) {
+        crosshair.draw(io);
+    }
     fps.draw(io);
 }
 

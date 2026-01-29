@@ -15,6 +15,7 @@ public:
     std::string getSubmittedInput() const;
     void clearSubmittedInput();
     void focusInput();
+    void clearFocus();
     bool isFocused() const;
 
     void draw(const ImVec2 &pos, const ImVec2 &size, float inputHeight);

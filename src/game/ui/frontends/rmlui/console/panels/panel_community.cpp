@@ -11,18 +11,19 @@
 #include <cstdlib>
 #include <iomanip>
 #include <fstream>
-#include <filesystem>
 #include <sstream>
 #include <string_view>
 
 #include <md4c.h>
 
+#include "common/config_store.hpp"
 #if defined(_WIN32)
 #include <shellapi.h>
 #include <windows.h>
 #endif
 
 #include "common/data_path_resolver.hpp"
+#include "common/config_store.hpp"
 #include "ui/frontends/rmlui/console/emoji_utils.hpp"
 #include "spdlog/spdlog.h"
 
@@ -698,17 +699,8 @@ void RmlUiPanelCommunity::refreshCommunityCredentials() {
         return;
     }
 
-    bz::json::Value config;
-    if (!loadUserConfig(config)) {
-        return;
-    }
-
-    const auto guiIt = config.find("gui");
-    if (guiIt == config.end() || !guiIt->is_object()) {
-        return;
-    }
-    const auto credsIt = guiIt->find("communityCredentials");
-    if (credsIt == guiIt->end() || !credsIt->is_object()) {
+    const auto *credsIt = bz::config::ConfigStore::Get("gui.communityCredentials");
+    if (!credsIt || !credsIt->is_object()) {
         return;
     }
     const auto entryIt = credsIt->find(key);
@@ -828,7 +820,7 @@ void RmlUiPanelCommunity::setConnectionState(const ConsoleInterface::ConnectionS
 }
 
 void RmlUiPanelCommunity::setUserConfigPath(const std::string &path) {
-    userConfigPath = path;
+    (void)path;
 }
 
 void RmlUiPanelCommunity::showErrorDialog(const std::string &message) {
@@ -1068,95 +1060,6 @@ void RmlUiPanelCommunity::showDeleteDialog() {
     deleteDialog.show("Delete \"" + escapeRmlText(label) + "\"?");
 }
 
-bool RmlUiPanelCommunity::loadUserConfig(bz::json::Value &out) const {
-    const std::filesystem::path path = userConfigPath.empty()
-        ? bz::data::EnsureUserConfigFile("config.json")
-        : std::filesystem::path(userConfigPath);
-    if (auto user = bz::data::LoadJsonFile(path, "user config", spdlog::level::debug)) {
-        if (!user->is_object()) {
-            out = bz::json::Object();
-            return false;
-        }
-        out = *user;
-        return true;
-    }
-    out = bz::json::Object();
-    return true;
-}
-
-bool RmlUiPanelCommunity::saveUserConfig(const bz::json::Value &userConfig, std::string &error) const {
-    const std::filesystem::path path = userConfigPath.empty()
-        ? bz::data::EnsureUserConfigFile("config.json")
-        : std::filesystem::path(userConfigPath);
-    std::error_code ec;
-    const auto parentDir = path.parent_path();
-    if (!parentDir.empty()) {
-        std::filesystem::create_directories(parentDir, ec);
-        if (ec) {
-            error = "Failed to create config directory.";
-            return false;
-        }
-    }
-
-    std::ofstream file(path, std::ios::trunc);
-    if (!file.is_open()) {
-        error = "Failed to open user config for writing.";
-        return false;
-    }
-
-    try {
-        file << userConfig.dump(4) << '\n';
-    } catch (const std::exception &ex) {
-        error = ex.what();
-        return false;
-    }
-    return true;
-}
-
-void RmlUiPanelCommunity::setNestedConfig(bz::json::Value &root,
-                                          std::initializer_list<const char*> path,
-                                          bz::json::Value value) const {
-    bz::json::Value *cursor = &root;
-    std::vector<std::string> keys;
-    keys.reserve(path.size());
-    for (const char *entry : path) {
-        keys.emplace_back(entry);
-    }
-    if (keys.empty()) {
-        return;
-    }
-    for (std::size_t i = 0; i + 1 < keys.size(); ++i) {
-        const std::string &key = keys[i];
-        if (!cursor->contains(key) || !(*cursor)[key].is_object()) {
-            (*cursor)[key] = bz::json::Object();
-        }
-        cursor = &(*cursor)[key];
-    }
-    (*cursor)[keys.back()] = std::move(value);
-}
-
-void RmlUiPanelCommunity::eraseNestedConfig(bz::json::Value &root,
-                                            std::initializer_list<const char*> path) const {
-    bz::json::Value *cursor = &root;
-    std::vector<std::string> keys;
-    keys.reserve(path.size());
-    for (const char *entry : path) {
-        keys.emplace_back(entry);
-    }
-    if (keys.empty()) {
-        return;
-    }
-    for (std::size_t i = 0; i + 1 < keys.size(); ++i) {
-        const std::string &key = keys[i];
-        auto it = cursor->find(key);
-        if (it == cursor->end() || !it->is_object()) {
-            return;
-        }
-        cursor = &(*it);
-    }
-    cursor->erase(keys.back());
-}
-
 std::string RmlUiPanelCommunity::communityKeyForIndex(int index) const {
     if (index < 0 || index >= static_cast<int>(listOptions.size())) {
         return {};
@@ -1178,30 +1081,41 @@ void RmlUiPanelCommunity::persistCommunityCredentials(bool passwordChanged) {
         return;
     }
 
-    bz::json::Value config;
-    if (!loadUserConfig(config)) {
-        return;
+    bz::json::Value creds = bz::json::Object();
+    if (const auto *existing = bz::config::ConfigStore::Get("gui.communityCredentials")) {
+        if (existing->is_object()) {
+            creds = *existing;
+        }
     }
 
     const std::string username = getUsernameValue();
     if (username.empty()) {
-        eraseNestedConfig(config, {"gui", "communityCredentials", key.c_str()});
+        creds.erase(key);
     } else {
-        setNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "username"}, username);
+        if (!creds.contains(key) || !creds[key].is_object()) {
+            creds[key] = bz::json::Object();
+        }
+        creds[key]["username"] = username;
         if (key == "LAN") {
-            eraseNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "passwordHash"});
-            eraseNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "salt"});
+            if (creds[key].is_object()) {
+                creds[key].erase("passwordHash");
+                creds[key].erase("salt");
+            }
         } else if (!storedPasswordHash.empty()) {
-            setNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "passwordHash"}, storedPasswordHash);
+            creds[key]["passwordHash"] = storedPasswordHash;
         } else if (passwordChanged) {
-            eraseNestedConfig(config, {"gui", "communityCredentials", key.c_str(), "passwordHash"});
+            if (creds[key].is_object()) {
+                creds[key].erase("passwordHash");
+            }
             passwordHintActive = false;
             storedPasswordHash.clear();
         }
     }
-
-    std::string error;
-    saveUserConfig(config, error);
+    if (creds.empty()) {
+        bz::config::ConfigStore::Erase("gui.communityCredentials");
+    } else {
+        bz::config::ConfigStore::Set("gui.communityCredentials", creds);
+    }
 }
 
 void RmlUiPanelCommunity::handleCommunityInfoToggle() {

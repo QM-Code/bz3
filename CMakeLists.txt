@@ -81,11 +81,9 @@ else()
     message(FATAL_ERROR "Unknown BZ3_WORLD_BACKEND value: ${BZ3_WORLD_BACKEND}")
 endif()
 
-set(BZ3_RENDER_BACKEND "bgfx" CACHE STRING "Render backend (filament|diligent|bgfx|forge)")
-set_property(CACHE BZ3_RENDER_BACKEND PROPERTY STRINGS filament diligent bgfx forge)
-if(BZ3_RENDER_BACKEND STREQUAL "filament")
-    add_compile_definitions(BZ3_RENDER_BACKEND_FILAMENT)
-elseif(BZ3_RENDER_BACKEND STREQUAL "diligent")
+set(BZ3_RENDER_BACKEND "bgfx" CACHE STRING "Render backend (diligent|bgfx|forge)")
+set_property(CACHE BZ3_RENDER_BACKEND PROPERTY STRINGS diligent bgfx forge)
+if(BZ3_RENDER_BACKEND STREQUAL "diligent")
     add_compile_definitions(BZ3_RENDER_BACKEND_DILIGENT)
 elseif(BZ3_RENDER_BACKEND STREQUAL "bgfx")
     add_compile_definitions(BZ3_RENDER_BACKEND_BGFX)
@@ -375,6 +373,7 @@ list(APPEND CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/game/client/server/community_browser_controller.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/common/curl_global.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/common/config_helpers.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/common/config_store.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/common/i18n.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/common/data_path_resolver.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/common/data_dir_override.cpp
@@ -385,6 +384,7 @@ list(APPEND SERVER_SOURCES
     ${PROJECT_SOURCE_DIR}/src/game/server/server_cli_options.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/common/curl_global.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/common/config_helpers.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/common/config_store.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/common/i18n.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/common/data_path_resolver.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/common/data_dir_override.cpp
@@ -419,6 +419,7 @@ set(ENGINE_CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/game/ui/system.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/backend_factory.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/config.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/hud_settings.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/render_settings.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/render_scale.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/audio/audio.cpp
@@ -447,7 +448,7 @@ if(BZ3_UI_BACKEND STREQUAL "imgui")
         ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/hud/fps.cpp
         ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/hud/radar.cpp
         ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/hud/scoreboard.cpp
-        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/hud/spawn_hint.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/imgui/hud/dialog.cpp
     )
     if(BZ3_RENDER_BACKEND STREQUAL "bgfx")
         list(APPEND ENGINE_CLIENT_SOURCES
@@ -564,11 +565,7 @@ elseif(BZ3_AUDIO_BACKEND STREQUAL "sdlaudio")
     )
 endif()
 
-if(BZ3_RENDER_BACKEND STREQUAL "filament")
-    list(APPEND ENGINE_CLIENT_SOURCES
-        ${PROJECT_SOURCE_DIR}/src/engine/graphics/backends/filament/backend.cpp
-    )
-elseif(BZ3_RENDER_BACKEND STREQUAL "diligent")
+if(BZ3_RENDER_BACKEND STREQUAL "diligent")
     list(APPEND ENGINE_CLIENT_SOURCES
         ${PROJECT_SOURCE_DIR}/src/engine/graphics/backends/diligent/backend.cpp
         ${PROJECT_SOURCE_DIR}/src/engine/graphics/backends/diligent/ui_bridge.cpp
@@ -651,79 +648,7 @@ target_link_libraries(bz3 PRIVATE
 if(TARGET the_forge_headers)
     target_link_libraries(bz3 PRIVATE the_forge_headers)
 endif()
-if(BZ3_RENDER_BACKEND STREQUAL "filament")
-    set(FILAMENT_SDK_DIR "${PROJECT_SOURCE_DIR}/libs/filament-sdk" CACHE PATH "Filament SDK root directory")
-    option(FILAMENT_SDK_USE_LIBCXX "Link Filament SDK against libc++/libc++abi" OFF)
-    set(FILAMENT_SDK_INCLUDE_DIR "${FILAMENT_SDK_DIR}/include")
-    set(FILAMENT_SDK_LIB_DIR "${FILAMENT_SDK_DIR}/lib/x86_64")
-
-    if(NOT EXISTS "${FILAMENT_SDK_INCLUDE_DIR}" OR NOT EXISTS "${FILAMENT_SDK_LIB_DIR}")
-        message(FATAL_ERROR "Filament SDK not found at ${FILAMENT_SDK_DIR}. Download the Linux SDK and extract it to libs/filament-sdk or set FILAMENT_SDK_DIR.")
-    endif()
-
-    file(GLOB FILAMENT_SDK_LIBS "${FILAMENT_SDK_LIB_DIR}/*.a")
-    if(NOT FILAMENT_SDK_LIBS)
-        message(FATAL_ERROR "Filament SDK libraries not found in ${FILAMENT_SDK_LIB_DIR}.")
-    endif()
-
-    # Detect whether the SDK was built with libc++ (std::__1).
-    if(NOT FILAMENT_SDK_USE_LIBCXX)
-        set(FILAMENT_LIB "${FILAMENT_SDK_LIB_DIR}/libfilament.a")
-        if(EXISTS "${FILAMENT_LIB}")
-            find_program(NM_EXECUTABLE nm)
-            if(NM_EXECUTABLE)
-                execute_process(
-                    COMMAND ${NM_EXECUTABLE} -g "${FILAMENT_LIB}"
-                    OUTPUT_VARIABLE FILAMENT_NM_OUTPUT
-                    ERROR_QUIET
-                )
-                if(FILAMENT_NM_OUTPUT MATCHES "std::__1")
-                    set(FILAMENT_SDK_USE_LIBCXX ON)
-                endif()
-            endif()
-        endif()
-    endif()
-
-    # Detect whether BlueVK in the SDK provides Wayland surface entry points.
-    set(BZ3_FILAMENT_BLUEVK_HAS_WAYLAND OFF)
-    set(BLUEVK_LIB "${FILAMENT_SDK_LIB_DIR}/libbluevk.a")
-    if(EXISTS "${BLUEVK_LIB}")
-        find_program(NM_EXECUTABLE nm)
-        if(NM_EXECUTABLE)
-            execute_process(
-                COMMAND ${NM_EXECUTABLE} -g "${BLUEVK_LIB}"
-                OUTPUT_VARIABLE BLUEVK_NM_OUTPUT
-                ERROR_QUIET
-            )
-            if(BLUEVK_NM_OUTPUT MATCHES "vkCreateWaylandSurfaceKHR")
-                set(BZ3_FILAMENT_BLUEVK_HAS_WAYLAND ON)
-            endif()
-        endif()
-    endif()
-
-    if(FILAMENT_SDK_USE_LIBCXX)
-        find_library(LIBCXX_LIBRARY NAMES c++ libc++)
-        find_library(LIBCXXABI_LIBRARY NAMES c++abi)
-        if(NOT LIBCXX_LIBRARY OR NOT LIBCXXABI_LIBRARY)
-            message(FATAL_ERROR "Filament SDK requires libc++ and libc++abi. Install libc++-dev and libc++abi-dev, or rebuild the SDK with libstdc++ (USE_STATIC_LIBCXX=OFF).")
-        endif()
-    endif()
-
-    target_include_directories(bz3 PRIVATE ${FILAMENT_SDK_INCLUDE_DIR})
-    target_compile_definitions(bz3 PRIVATE
-        $<$<BOOL:${BZ3_FILAMENT_BLUEVK_HAS_WAYLAND}>:BZ3_FILAMENT_BLUEVK_HAS_WAYLAND=1>
-    )
-    target_link_libraries(bz3 PRIVATE
-        -Wl,--start-group
-        ${FILAMENT_SDK_LIBS}
-        -Wl,--end-group
-        $<$<BOOL:${FILAMENT_SDK_USE_LIBCXX}>:${LIBCXX_LIBRARY}>
-        $<$<BOOL:${FILAMENT_SDK_USE_LIBCXX}>:${LIBCXXABI_LIBRARY}>
-        pthread
-        dl
-        m
-    )
-elseif(BZ3_RENDER_BACKEND STREQUAL "diligent")
+if(BZ3_RENDER_BACKEND STREQUAL "diligent")
     target_link_libraries(bz3 PRIVATE Diligent-GraphicsEngineVk-static)
     if(TARGET Diligent-Common)
         target_link_libraries(bz3 PRIVATE Diligent-Common)

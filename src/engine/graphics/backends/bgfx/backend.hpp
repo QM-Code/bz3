@@ -58,6 +58,7 @@ public:
     void setUiOverlayTexture(const graphics::TextureHandle& texture) override;
     void setUiOverlayVisible(bool visible) override;
     void renderUiOverlay() override;
+    void setBrightness(float brightness) override;
 
     void setPosition(graphics::EntityId entity, const glm::vec3& position) override;
     void setRotation(graphics::EntityId entity, const glm::quat& rotation) override;
@@ -166,12 +167,29 @@ private:
     bgfx::TextureHandle uiOverlayTexture = BGFX_INVALID_HANDLE;
     bool uiOverlayVisible = false;
 
+    uint64_t configRevision = 0;
+    glm::vec3 cachedSunDirection = glm::vec3(0.0f, -1.0f, 0.0f);
+    glm::vec3 cachedAmbientColor = glm::vec3(0.2f);
+    glm::vec3 cachedSunColor = glm::vec3(1.0f);
+
+    float brightness = 1.0f;
+    RenderTargetRecord sceneTarget{};
+    bool sceneTargetValid = false;
+    bgfx::ProgramHandle brightnessProgram = BGFX_INVALID_HANDLE;
+    bgfx::UniformHandle brightnessSampler = BGFX_INVALID_HANDLE;
+    bgfx::UniformHandle brightnessScaleBias = BGFX_INVALID_HANDLE;
+    bgfx::UniformHandle brightnessValue = BGFX_INVALID_HANDLE;
+    bgfx::VertexLayout brightnessLayout{};
+
     glm::mat4 computeViewMatrix() const;
     glm::mat4 computeProjectionMatrix() const;
     void buildTestResources();
     void buildMeshResources();
     void buildSkyboxResources();
     void ensureUiOverlayResources();
+    void ensureBrightnessResources();
+    void ensureSceneTarget(int width, int height);
+    void destroySceneTarget();
     static uint16_t toTextureHandle(uint64_t textureId);
 
     std::unique_ptr<UiRenderTargetBridge> uiBridge_;

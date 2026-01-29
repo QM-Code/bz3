@@ -25,6 +25,10 @@ void ImGuiHudChat::focusInput() {
     chatFocus = true;
 }
 
+void ImGuiHudChat::clearFocus() {
+    chatFocus = false;
+}
+
 bool ImGuiHudChat::isFocused() const {
     return chatFocus;
 }

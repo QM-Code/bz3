@@ -1,6 +1,6 @@
 #include "ui/config.hpp"
 
-#include "common/data_path_resolver.hpp"
+#include "common/config_store.hpp"
 #include "spdlog/spdlog.h"
 
 #include <algorithm>
@@ -11,7 +11,7 @@ namespace ui::config {
 namespace {
 
 const bz::json::Value* getValue(const char* path) {
-    const auto* value = bz::data::ConfigValue(path);
+    const auto* value = bz::config::ConfigStore::Get(path);
     if (!value) {
         spdlog::error("Config '{}' is missing", path);
     }

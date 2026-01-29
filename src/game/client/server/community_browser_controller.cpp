@@ -11,7 +11,7 @@
 #include "client/server/password_hash.hpp"
 #include "client/server/server_connector.hpp"
 #include "common/curl_global.hpp"
-#include "common/data_path_resolver.hpp"
+#include "common/config_helpers.hpp"
 #include "spdlog/spdlog.h"
 #include <curl/curl.h>
 #include "common/json.hpp"
@@ -56,10 +56,7 @@ bool isLanToken(const std::string &value) {
 }
 
 uint16_t configuredServerPort() {
-    if (const auto configured = bz::data::ConfigValueUInt16("network.ServerPort")) {
-        return *configured;
-    }
-    return 0;
+    return bz::config::ReadUInt16Config({"network.ServerPort"}, 0);
 }
 
 uint16_t applyPortFallback(uint16_t candidate) {

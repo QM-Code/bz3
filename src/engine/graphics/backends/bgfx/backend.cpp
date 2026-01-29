@@ -5,6 +5,7 @@
 
 #include "engine/common/data_path_resolver.hpp"
 #include "engine/common/config_helpers.hpp"
+#include "engine/common/config_store.hpp"
 #include "engine/geometry/mesh_loader.hpp"
 #include "platform/window.hpp"
 
@@ -32,6 +33,7 @@
 
 namespace {
 constexpr bgfx::ViewId kUiOverlayView = 253;
+constexpr bgfx::ViewId kBrightnessView = 252;
 
 struct NativeWindowInfo {
     void* nwh = nullptr;
@@ -114,6 +116,8 @@ std::filesystem::path getBgfxShaderDir(std::string_view subdir = {}) {
     return base;
 }
 
+// helper removed; scene target is created in ensureSceneTarget()
+
 bgfx::TextureHandle createTextureRGBA8(int width, int height, const uint8_t* pixels) {
     if (width <= 0 || height <= 0 || !pixels) {
         return BGFX_INVALID_HANDLE;
@@ -163,7 +167,7 @@ bool isShotModelPath(const std::filesystem::path& path) {
 std::string getThemeName() {
     const char* env = std::getenv("BZ3_BGFX_THEME");
     if (!env || !*env) {
-        return bz::data::ReadStringConfig("graphics.theme", "classic");
+        return bz::config::ReadStringConfig("graphics.theme", "classic");
     }
     return std::string(env);
 }
@@ -223,7 +227,7 @@ std::filesystem::path skyboxPathFor(const std::string& name, const std::string& 
 }
 
 glm::vec3 readVec3Config(const char* path, const glm::vec3& fallback) {
-    const auto* value = bz::data::ConfigValue(path);
+    const auto* value = bz::config::ConfigStore::Get(path);
     if (!value || !value->is_array() || value->size() < 3) {
         return fallback;
     }
@@ -376,6 +380,19 @@ BgfxBackend::~BgfxBackend() {
         if (bgfx::isValid(uiOverlayScaleBias)) {
             bgfx::destroy(uiOverlayScaleBias);
         }
+        if (bgfx::isValid(brightnessProgram)) {
+            bgfx::destroy(brightnessProgram);
+        }
+        if (bgfx::isValid(brightnessSampler)) {
+            bgfx::destroy(brightnessSampler);
+        }
+        if (bgfx::isValid(brightnessScaleBias)) {
+            bgfx::destroy(brightnessScaleBias);
+        }
+        if (bgfx::isValid(brightnessValue)) {
+            bgfx::destroy(brightnessValue);
+        }
+        destroySceneTarget();
         for (auto& [id, mesh] : meshes) {
             if (bgfx::isValid(mesh.vertexBuffer)) {
                 bgfx::destroy(mesh.vertexBuffer);
@@ -424,6 +441,7 @@ void BgfxBackend::endFrame() {
 void BgfxBackend::resize(int width, int height) {
     framebufferWidth = std::max(1, width);
     framebufferHeight = std::max(1, height);
+    destroySceneTarget();
     if (initialized) {
         bgfx::reset(static_cast<uint32_t>(framebufferWidth),
                     static_cast<uint32_t>(framebufferHeight),
@@ -790,6 +808,13 @@ void BgfxBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId 
         return;
     }
     RenderTargetRecord* targetRecord = nullptr;
+    const bool wantsBrightness = (target == graphics::kDefaultRenderTarget && std::abs(brightness - 1.0f) > 0.0001f);
+    if (wantsBrightness) {
+        ensureSceneTarget(framebufferWidth, framebufferHeight);
+        if (sceneTargetValid && bgfx::isValid(sceneTarget.frameBuffer)) {
+            targetRecord = &sceneTarget;
+        }
+    }
     if (target != graphics::kDefaultRenderTarget) {
         auto targetIt = renderTargets.find(target);
         if (targetIt == renderTargets.end()) {
@@ -821,11 +846,12 @@ void BgfxBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId 
                           static_cast<uint16_t>(framebufferWidth),
                           static_cast<uint16_t>(framebufferHeight));
     }
-    const uint32_t clearColor = targetRecord ? 0xff000000 : 0x0d1620ff;
+    const bool renderSkybox = (target == graphics::kDefaultRenderTarget);
+    const uint32_t clearColor = (renderSkybox ? 0x0d1620ff : 0xff000000);
     bgfx::setViewClear(viewId, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, clearColor, 1.0f, 0);
     bgfx::touch(viewId);
 
-    if (!targetRecord && skyboxReady && bgfx::isValid(skyboxProgram) && bgfx::isValid(skyboxVertexBuffer) && bgfx::isValid(skyboxTexture)) {
+    if (renderSkybox && skyboxReady && bgfx::isValid(skyboxProgram) && bgfx::isValid(skyboxVertexBuffer) && bgfx::isValid(skyboxTexture)) {
         bgfx::setViewTransform(viewId, nullptr, nullptr);
         bgfx::setTransform(glm::value_ptr(glm::mat4(1.0f)));
         bgfx::setVertexBuffer(0, skyboxVertexBuffer);
@@ -835,6 +861,15 @@ void BgfxBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId 
         bgfx::setState(BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A);
         bgfx::submit(viewId, skyboxProgram);
         bgfx::setViewTransform(viewId, glm::value_ptr(view), glm::value_ptr(proj));
+    }
+
+    const uint64_t revision = bz::config::ConfigStore::Revision();
+    if (revision != configRevision) {
+        configRevision = revision;
+        const glm::vec3 defaultSunDir = glm::normalize(glm::vec3(-0.4f, -1.0f, -0.2f));
+        cachedSunDirection = glm::normalize(readVec3Config("graphics.lighting.SunDirection", defaultSunDir));
+        cachedAmbientColor = readVec3Config("graphics.lighting.AmbientColor", glm::vec3(0.2f));
+        cachedSunColor = readVec3Config("graphics.lighting.SunColor", glm::vec3(1.0f));
     }
 
     for (const auto& [id, entity] : entities) {
@@ -867,20 +902,16 @@ void BgfxBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId 
             state |= BGFX_STATE_WRITE_Z | BGFX_STATE_CULL_CW;
         }
 
-        const glm::vec3 defaultSunDir = glm::normalize(glm::vec3(-0.4f, -1.0f, -0.2f));
-        const glm::vec3 sunDir = glm::normalize(readVec3Config("graphics.lighting.SunDirection", defaultSunDir));
-        const glm::vec3 ambient = readVec3Config("graphics.lighting.AmbientColor", glm::vec3(0.2f));
-        const glm::vec3 sunColor = readVec3Config("graphics.lighting.SunColor", glm::vec3(1.0f));
-        const glm::vec4 viewLightDir = glm::vec4(glm::mat3(view) * (-sunDir), 0.0f);
+        const glm::vec4 viewLightDir = glm::vec4(glm::mat3(view) * (-cachedSunDirection), 0.0f);
         if (bgfx::isValid(meshLightDirUniform)) {
             bgfx::setUniform(meshLightDirUniform, glm::value_ptr(viewLightDir));
         }
         if (bgfx::isValid(meshAmbientColorUniform)) {
-            const glm::vec4 amb(ambient, 1.0f);
+            const glm::vec4 amb(cachedAmbientColor, 1.0f);
             bgfx::setUniform(meshAmbientColorUniform, glm::value_ptr(amb));
         }
         if (bgfx::isValid(meshLightColorUniform)) {
-            const glm::vec4 col(sunColor, 1.0f);
+            const glm::vec4 col(cachedSunColor, 1.0f);
             bgfx::setUniform(meshLightColorUniform, glm::value_ptr(col));
         }
 
@@ -935,6 +966,59 @@ void BgfxBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId 
             }
         } else {
             drawMesh(entity.mesh);
+        }
+    }
+
+    if (wantsBrightness && targetRecord == &sceneTarget) {
+        ensureBrightnessResources();
+        if (bgfx::isValid(brightnessProgram) && bgfx::isValid(brightnessSampler)
+            && bgfx::isValid(brightnessScaleBias) && bgfx::isValid(brightnessValue)) {
+            const int width = framebufferWidth > 0 ? framebufferWidth : 1;
+            const int height = framebufferHeight > 0 ? framebufferHeight : 1;
+            const float scaleBias[4] = { 2.0f / static_cast<float>(width), -2.0f / static_cast<float>(height), -1.0f, 1.0f };
+            const float brightnessData[4] = { brightness, 0.0f, 0.0f, 0.0f };
+            bgfx::setViewMode(kBrightnessView, bgfx::ViewMode::Sequential);
+            bgfx::setViewTransform(kBrightnessView, nullptr, nullptr);
+            bgfx::setViewRect(kBrightnessView, 0, 0,
+                              static_cast<uint16_t>(width),
+                              static_cast<uint16_t>(height));
+            bgfx::setUniform(brightnessScaleBias, scaleBias);
+            bgfx::setUniform(brightnessValue, brightnessData);
+            bgfx::setTexture(0, brightnessSampler, sceneTarget.colorTexture);
+
+            bgfx::TransientVertexBuffer tvb;
+            bgfx::TransientIndexBuffer tib;
+            if (bgfx::getAvailTransientVertexBuffer(4, brightnessLayout) < 4
+                || bgfx::getAvailTransientIndexBuffer(6, false) < 6) {
+                return;
+            }
+            bgfx::allocTransientVertexBuffer(&tvb, 4, brightnessLayout);
+            bgfx::allocTransientIndexBuffer(&tib, 6, false);
+
+            struct BrightnessVertex {
+                float x;
+                float y;
+                float u;
+                float v;
+            };
+            auto* verts = reinterpret_cast<BrightnessVertex*>(tvb.data);
+            verts[0] = {0.0f, 0.0f, 0.0f, 0.0f};
+            verts[1] = {static_cast<float>(width), 0.0f, 1.0f, 0.0f};
+            verts[2] = {static_cast<float>(width), static_cast<float>(height), 1.0f, 1.0f};
+            verts[3] = {0.0f, static_cast<float>(height), 0.0f, 1.0f};
+
+            uint16_t* indices = reinterpret_cast<uint16_t*>(tib.data);
+            indices[0] = 0;
+            indices[1] = 1;
+            indices[2] = 2;
+            indices[3] = 0;
+            indices[4] = 2;
+            indices[5] = 3;
+
+            bgfx::setState(BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A);
+            bgfx::setVertexBuffer(0, &tvb);
+            bgfx::setIndexBuffer(&tib);
+            bgfx::submit(kBrightnessView, brightnessProgram);
         }
     }
 }
@@ -1037,6 +1121,10 @@ void BgfxBackend::renderUiOverlay() {
     bgfx::setVertexBuffer(0, &tvb);
     bgfx::setIndexBuffer(&tib);
     bgfx::submit(kUiOverlayView, uiOverlayProgram);
+}
+
+void BgfxBackend::setBrightness(float brightness) {
+    this->brightness = brightness;
 }
 
 void BgfxBackend::setPosition(graphics::EntityId entity, const glm::vec3& position) {
@@ -1245,13 +1333,13 @@ void BgfxBackend::buildSkyboxResources() {
         return;
     }
 
-    const std::string mode = bz::data::ReadStringConfig("graphics.skybox.Mode", "none");
+    const std::string mode = bz::config::ReadStringConfig("graphics.skybox.Mode", "none");
     spdlog::info("Graphics(Bgfx): skybox mode='{}'", mode);
     if (mode != "cubemap") {
         return;
     }
 
-    const std::string name = bz::data::ReadStringConfig("graphics.skybox.Cubemap.Name", "classic");
+    const std::string name = bz::config::ReadStringConfig("graphics.skybox.Cubemap.Name", "classic");
     spdlog::info("Graphics(Bgfx): skybox cubemap='{}'", name);
     const std::array<std::string, 6> faces = {"right", "left", "up", "down", "front", "back"};
     std::array<std::vector<uint8_t>, 6> facePixels{};
@@ -1378,6 +1466,102 @@ void BgfxBackend::ensureUiOverlayResources() {
         .add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float)
         .add(bgfx::Attrib::Color0, 4, bgfx::AttribType::Uint8, true)
         .end();
+}
+
+void BgfxBackend::ensureBrightnessResources() {
+    if (!initialized || bgfx::isValid(brightnessProgram)) {
+        return;
+    }
+    const std::filesystem::path shaderDir = getBgfxShaderDir("brightness");
+    const auto vsPath = shaderDir / "vs_brightness.bin";
+    const auto fsPath = shaderDir / "fs_brightness.bin";
+    auto vsBytes = readFileToBytes(vsPath);
+    auto fsBytes = readFileToBytes(fsPath);
+    if (vsBytes.empty() || fsBytes.empty()) {
+        spdlog::error("Graphics(Bgfx): missing brightness shaders '{}', '{}'", vsPath.string(), fsPath.string());
+        return;
+    }
+    const bgfx::Memory* vsMem = bgfx::copy(vsBytes.data(), static_cast<uint32_t>(vsBytes.size()));
+    const bgfx::Memory* fsMem = bgfx::copy(fsBytes.data(), static_cast<uint32_t>(fsBytes.size()));
+    bgfx::ShaderHandle vsh = bgfx::createShader(vsMem);
+    bgfx::ShaderHandle fsh = bgfx::createShader(fsMem);
+    brightnessProgram = bgfx::createProgram(vsh, fsh, true);
+    if (!bgfx::isValid(brightnessProgram)) {
+        spdlog::error("Graphics(Bgfx): failed to create brightness shader program");
+        return;
+    }
+
+    brightnessSampler = bgfx::createUniform("s_tex", bgfx::UniformType::Sampler);
+    brightnessScaleBias = bgfx::createUniform("u_scaleBias", bgfx::UniformType::Vec4);
+    brightnessValue = bgfx::createUniform("u_brightness", bgfx::UniformType::Vec4);
+    brightnessLayout.begin()
+        .add(bgfx::Attrib::Position, 2, bgfx::AttribType::Float)
+        .add(bgfx::Attrib::TexCoord0, 2, bgfx::AttribType::Float)
+        .end();
+}
+
+void BgfxBackend::ensureSceneTarget(int width, int height) {
+    if (!initialized) {
+        return;
+    }
+    if (sceneTargetValid && sceneTarget.desc.width == width && sceneTarget.desc.height == height) {
+        return;
+    }
+    destroySceneTarget();
+    sceneTarget.desc.width = width;
+    sceneTarget.desc.height = height;
+    sceneTarget.desc.depth = true;
+    if (width <= 0 || height <= 0) {
+        sceneTargetValid = false;
+        return;
+    }
+    const uint64_t colorFlags = BGFX_TEXTURE_RT | BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP;
+    sceneTarget.colorTexture = bgfx::createTexture2D(
+        static_cast<uint16_t>(width),
+        static_cast<uint16_t>(height),
+        false,
+        1,
+        bgfx::TextureFormat::RGBA8,
+        colorFlags);
+
+    const uint64_t depthFlags = BGFX_TEXTURE_RT;
+    sceneTarget.depthTexture = bgfx::createTexture2D(
+        static_cast<uint16_t>(width),
+        static_cast<uint16_t>(height),
+        false,
+        1,
+        bgfx::TextureFormat::D24,
+        depthFlags);
+
+    bgfx::Attachment attachments[2];
+    uint8_t attachmentCount = 0;
+    if (bgfx::isValid(sceneTarget.colorTexture)) {
+        attachments[attachmentCount++].init(sceneTarget.colorTexture);
+    }
+    if (bgfx::isValid(sceneTarget.depthTexture)) {
+        attachments[attachmentCount++].init(sceneTarget.depthTexture);
+    }
+    if (attachmentCount > 0) {
+        sceneTarget.frameBuffer = bgfx::createFrameBuffer(attachmentCount, attachments, false);
+    }
+    sceneTargetValid = bgfx::isValid(sceneTarget.frameBuffer);
+}
+
+void BgfxBackend::destroySceneTarget() {
+    if (!sceneTargetValid) {
+        return;
+    }
+    if (bgfx::isValid(sceneTarget.frameBuffer)) {
+        bgfx::destroy(sceneTarget.frameBuffer);
+    }
+    if (bgfx::isValid(sceneTarget.colorTexture)) {
+        bgfx::destroy(sceneTarget.colorTexture);
+    }
+    if (bgfx::isValid(sceneTarget.depthTexture)) {
+        bgfx::destroy(sceneTarget.depthTexture);
+    }
+    sceneTarget = {};
+    sceneTargetValid = false;
 }
 
 uint16_t BgfxBackend::toTextureHandle(uint64_t textureId) {

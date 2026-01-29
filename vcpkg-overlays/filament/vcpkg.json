@@ -1,7 +1,0 @@
-{
-  "name": "filament",
-  "version": "1.68.5",
-  "description": "Physically based rendering engine",
-  "homepage": "https://github.com/google/filament",
-  "license": "Apache-2.0"
-}

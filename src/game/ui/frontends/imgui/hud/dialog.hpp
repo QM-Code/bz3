@@ -7,14 +7,14 @@ struct ImGuiIO;
 
 namespace ui {
 
-class ImGuiHudSpawnHint {
+class ImGuiHudDialog {
 public:
-    void setHint(const std::string &hint);
+    void setText(const std::string &text);
     void setVisible(bool show);
     void draw(ImGuiIO &io, ImFont *bigFont);
 
 private:
-    std::string hintText = "Press U to spawn";
+    std::string dialogText = "Press U to spawn";
     bool visible = false;
 };
 

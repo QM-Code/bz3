@@ -33,8 +33,8 @@ def prompt_choice(prompt: str, default: str, options: list[str]) -> str:
         print(f"Invalid choice: {choice}")
 
 
-def run(cmd: list[str]) -> None:
-    subprocess.run(cmd, check=True)
+def run(cmd: list[str], *, env: dict[str, str] | None = None) -> None:
+    subprocess.run(cmd, check=True, env=env)
 
 
 args = sys.argv[1:]
@@ -62,7 +62,7 @@ if not args:
     ui = prompt_choice("UI (rmlui/imgui)", "rmlui", ["rmlui", "imgui"])
     physics = prompt_choice("Physics (jolt/bullet/physx)", "jolt", ["jolt", "bullet", "physx"])
     audio = prompt_choice("Audio (miniaudio/sdlaudio)", "sdlaudio", ["miniaudio", "sdlaudio"])
-    render = prompt_choice("Renderer (filament/diligent/bgfx/forge)", "bgfx", ["filament", "diligent", "bgfx", "forge"])
+    render = prompt_choice("Renderer (diligent/bgfx/forge)", "bgfx", ["diligent", "bgfx", "forge"])
     network = prompt_choice("Network (enet)", "enet", ["enet"])
     world = prompt_choice("World (fs)", "fs", ["fs"])
     build_dir = f"build-{window}-{ui}-{physics}-{audio}-{render}-{network}-{world}"
@@ -85,7 +85,7 @@ else:
             physics = part
         elif part in ("miniaudio", "sdlaudio"):
             audio = part
-        elif part in ("filament", "diligent", "bgfx", "forge"):
+        elif part in ("diligent", "bgfx", "forge"):
             render = part
         elif part == "enet":
             network = part
@@ -124,11 +124,23 @@ else:
 if run_configure:
     run(["cmake", "-S", ".", "-B", build_dir, *cmake_args])
 
-if render == "forge":
-    script_path = os.path.join(os.path.dirname(__file__), "scripts", "build_forge_shaders.sh")
-    if os.path.isfile(script_path):
-        run([script_path])
-    else:
-        print(f"Warning: forge shader build script not found at {script_path}", file=sys.stderr)
+if render in ("forge", "bgfx"):
+    scripts_dir = os.path.join(os.path.dirname(__file__), "scripts")
+
+    if render == "forge":
+        script_path = os.path.join(scripts_dir, "build_forge_shaders.sh")
+        if os.path.isfile(script_path):
+            run([script_path])
+        else:
+            print(f"Warning: forge shader build script not found at {script_path}", file=sys.stderr)
+
+    if render == "bgfx":
+        script_path = os.path.join(scripts_dir, "build_bgfx_shaders.sh")
+        if os.path.isfile(script_path):
+            env = os.environ.copy()
+            env.setdefault("BZ3_BUILD_DIR", os.path.abspath(build_dir))
+            run([script_path], env=env)
+        else:
+            print(f"Warning: bgfx shader build script not found at {script_path}", file=sys.stderr)
 
 run(["cmake", "--build", build_dir, "-j4"])

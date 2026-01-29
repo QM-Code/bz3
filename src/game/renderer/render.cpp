@@ -116,38 +116,6 @@ void Render::ensureRadarResources() {
     }
 }
 
-void Render::ensureMainTarget(int width, int height) {
-#if defined(BZ3_RENDER_BACKEND_FILAMENT)
-    if (!device_) {
-        return;
-    }
-    if (width <= 0) {
-        width = 1;
-    }
-    if (height <= 0) {
-        height = 1;
-    }
-    if (mainTarget != graphics::kDefaultRenderTarget &&
-        (mainTargetWidth != width || mainTargetHeight != height)) {
-        device_->destroyRenderTarget(mainTarget);
-        mainTarget = graphics::kDefaultRenderTarget;
-    }
-    if (mainTarget == graphics::kDefaultRenderTarget) {
-        graphics::RenderTargetDesc desc;
-        desc.width = width;
-        desc.height = height;
-        desc.depth = true;
-        desc.stencil = false;
-        mainTarget = device_->createRenderTarget(desc);
-        mainTargetWidth = width;
-        mainTargetHeight = height;
-    }
-#else
-    (void)width;
-    (void)height;
-#endif
-}
-
 void Render::updateRadarFovLines() {
     if (!device_) {
         return;
@@ -247,7 +215,6 @@ void Render::update() {
     device_->beginFrame();
 
     ensureRadarResources();
-    ensureMainTarget(width, height);
     updateRadarFovLines();
 
     // Render radar layer to offscreen target
@@ -274,7 +241,6 @@ void Render::update() {
         static size_t lastEntities = static_cast<size_t>(-1);
         static size_t lastCircles = static_cast<size_t>(-1);
         if (radarEntities.size() != lastEntities || radarCircles.size() != lastCircles) {
-            spdlog::info("Radar content counts: entities={}, circles={}", radarEntities.size(), radarCircles.size());
             lastEntities = radarEntities.size();
             lastCircles = radarCircles.size();
         }
@@ -284,11 +250,7 @@ void Render::update() {
     device_->setPerspective(CAMERA_FOV, lastAspect, 0.1f, 1000.0f);
     device_->setCameraPosition(cameraPosition);
     device_->setCameraRotation(cameraRotation);
-#if defined(BZ3_RENDER_BACKEND_FILAMENT)
-    device_->renderLayer(mainLayer, mainTarget);
-#else
     device_->renderLayer(mainLayer, graphics::kDefaultRenderTarget);
-#endif
 
 }
 
@@ -460,25 +422,6 @@ graphics::TextureHandle Render::getRadarTexture() const {
 
 graphics_backend::UiRenderTargetBridge* Render::getUiRenderTargetBridge() const {
     return device_ ? device_->getUiRenderTargetBridge() : nullptr;
-}
-
-unsigned int Render::getMainTextureId() const {
-#if defined(BZ3_RENDER_BACKEND_FILAMENT)
-    if (!device_ || mainTarget == graphics::kDefaultRenderTarget) {
-        return 0;
-    }
-    return device_->getRenderTargetTextureId(mainTarget);
-#else
-    return 0;
-#endif
-}
-
-std::pair<int, int> Render::getMainTextureSize() const {
-#if defined(BZ3_RENDER_BACKEND_FILAMENT)
-    return {mainTargetWidth, mainTargetHeight};
-#else
-    return {0, 0};
-#endif
 }
 
 void Render::setUiOverlayTexture(const ui::RenderOutput& output) {

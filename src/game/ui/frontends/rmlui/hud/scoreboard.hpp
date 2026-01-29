@@ -20,11 +20,14 @@ public:
 
     void bind(Rml::ElementDocument *document, EmojiMarkupFn emojiMarkupIn);
     void setEntries(const std::vector<ScoreboardEntry> &entries);
+    void setVisible(bool visible);
+    bool isVisible() const;
 
 private:
     Rml::Element *container = nullptr;
     std::vector<ScoreboardEntry> entries;
     EmojiMarkupFn emojiMarkup;
+    bool visible = true;
 
     void rebuild(Rml::ElementDocument *document);
 };

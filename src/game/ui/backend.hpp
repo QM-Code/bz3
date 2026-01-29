@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "platform/events.hpp"
+#include "ui/hud_model.hpp"
 #include "ui/types.hpp"
 #include "ui/bridges/render_bridge.hpp"
 #include "ui/console/console_interface.hpp"
@@ -29,14 +30,12 @@ public:
     virtual void update() = 0;
     virtual void reloadFonts() = 0;
 
-    virtual void setScoreboardEntries(const std::vector<ScoreboardEntry> &entries) = 0;
-    virtual void setSpawnHint(const std::string &hint) = 0;
+    virtual void setHudModel(const ui::HudModel &model) = 0;
     virtual void addConsoleLine(const std::string &playerName, const std::string &line) = 0;
     virtual std::string getChatInputBuffer() const = 0;
     virtual void clearChatInputBuffer() = 0;
     virtual void focusChatInput() = 0;
     virtual bool getChatInputFocus() const = 0;
-    virtual void displayDeathScreen(bool show) = 0;
     virtual bool consumeKeybindingsReloadRequest() = 0;
     virtual void setRenderBridge(const ui::RenderBridge *bridge) = 0;
     virtual void setImGuiRenderBridge(const ui::ImGuiRenderBridge *bridge) { (void)bridge; }

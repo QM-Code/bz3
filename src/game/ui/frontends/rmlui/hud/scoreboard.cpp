@@ -11,6 +11,9 @@ void RmlUiHudScoreboard::bind(Rml::ElementDocument *document, EmojiMarkupFn emoj
         return;
     }
     container = document->GetElementById("hud-scoreboard");
+    if (container) {
+        container->SetClass("hidden", !visible);
+    }
     rebuild(document);
 }
 
@@ -19,6 +22,17 @@ void RmlUiHudScoreboard::setEntries(const std::vector<ScoreboardEntry> &entriesI
     if (container) {
         rebuild(container->GetOwnerDocument());
     }
+}
+
+void RmlUiHudScoreboard::setVisible(bool visibleIn) {
+    visible = visibleIn;
+    if (container) {
+        container->SetClass("hidden", !visible);
+    }
+}
+
+bool RmlUiHudScoreboard::isVisible() const {
+    return visible;
 }
 
 void RmlUiHudScoreboard::rebuild(Rml::ElementDocument *document) {

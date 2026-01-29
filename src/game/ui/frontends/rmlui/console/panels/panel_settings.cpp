@@ -8,17 +8,17 @@
 #include <RmlUi/Core/Elements/ElementFormControlSelect.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cctype>
-#include <filesystem>
 #include <fstream>
 #include <sstream>
 
 #include "common/json.hpp"
 
-#include "common/data_path_resolver.hpp"
 #include "common/i18n.hpp"
 #include "game/input/bindings.hpp"
 #include "spdlog/spdlog.h"
+#include "common/config_store.hpp"
 
 namespace ui {
 namespace {
@@ -260,20 +260,32 @@ private:
     RmlUiPanelSettings *panel = nullptr;
 };
 
+class RmlUiPanelSettings::HudToggleListener final : public Rml::EventListener {
+public:
+    explicit HudToggleListener(RmlUiPanelSettings *panelIn)
+        : panel(panelIn) {}
+
+    void ProcessEvent(Rml::Event &event) override {
+        if (panel) {
+            panel->handleHudToggle(event.GetTargetElement());
+        }
+    }
+
+private:
+    RmlUiPanelSettings *panel = nullptr;
+};
+
 RmlUiPanelSettings::RmlUiPanelSettings()
     : RmlUiPanel("settings", "client/ui/console_panel_settings.rml") {}
 
 void RmlUiPanelSettings::setUserConfigPath(const std::string &path) {
-    userConfigPath = path;
+    (void)path;
     loaded = false;
     renderSettings.reset();
-    if (!userConfigPath.empty()) {
-        bz::json::Value userConfig;
-        if (loadUserConfig(userConfig)) {
-            renderSettings.load(userConfig);
-            syncRenderBrightnessControls();
-        }
-    }
+    hudSettings.reset();
+    syncSettingsFromConfig();
+    syncRenderBrightnessControls();
+    syncHudControls();
 }
 
 void RmlUiPanelSettings::setLanguageCallback(std::function<void(const std::string &)> callback) {
@@ -294,6 +306,16 @@ void RmlUiPanelSettings::onLoaded(Rml::ElementDocument *doc) {
     brightnessSlider = document->GetElementById("settings-brightness-slider");
     brightnessValueLabel = document->GetElementById("settings-brightness-value");
     languageSelect = document->GetElementById("settings-language-select");
+    hudScoreboardToggle.on = document->GetElementById("settings-hud-scoreboard-on");
+    hudScoreboardToggle.off = document->GetElementById("settings-hud-scoreboard-off");
+    hudChatToggle.on = document->GetElementById("settings-hud-chat-on");
+    hudChatToggle.off = document->GetElementById("settings-hud-chat-off");
+    hudRadarToggle.on = document->GetElementById("settings-hud-radar-on");
+    hudRadarToggle.off = document->GetElementById("settings-hud-radar-off");
+    hudFpsToggle.on = document->GetElementById("settings-hud-fps-on");
+    hudFpsToggle.off = document->GetElementById("settings-hud-fps-off");
+    hudCrosshairToggle.on = document->GetElementById("settings-hud-crosshair-on");
+    hudCrosshairToggle.off = document->GetElementById("settings-hud-crosshair-off");
 
     listeners.clear();
     if (clearButton) {
@@ -333,33 +355,89 @@ void RmlUiPanelSettings::onLoaded(Rml::ElementDocument *doc) {
         listeners.emplace_back(std::move(listener));
         rebuildLanguageOptions();
     }
+    if (hudScoreboardToggle.on || hudScoreboardToggle.off ||
+        hudChatToggle.on || hudChatToggle.off ||
+        hudRadarToggle.on || hudRadarToggle.off ||
+        hudFpsToggle.on || hudFpsToggle.off ||
+        hudCrosshairToggle.on || hudCrosshairToggle.off) {
+        auto listener = std::make_unique<HudToggleListener>(this);
+        if (hudScoreboardToggle.on) {
+            hudScoreboardToggle.on->AddEventListener("click", listener.get());
+        }
+        if (hudScoreboardToggle.off) {
+            hudScoreboardToggle.off->AddEventListener("click", listener.get());
+        }
+        if (hudChatToggle.on) {
+            hudChatToggle.on->AddEventListener("click", listener.get());
+        }
+        if (hudChatToggle.off) {
+            hudChatToggle.off->AddEventListener("click", listener.get());
+        }
+        if (hudRadarToggle.on) {
+            hudRadarToggle.on->AddEventListener("click", listener.get());
+        }
+        if (hudRadarToggle.off) {
+            hudRadarToggle.off->AddEventListener("click", listener.get());
+        }
+        if (hudFpsToggle.on) {
+            hudFpsToggle.on->AddEventListener("click", listener.get());
+        }
+        if (hudFpsToggle.off) {
+            hudFpsToggle.off->AddEventListener("click", listener.get());
+        }
+        if (hudCrosshairToggle.on) {
+            hudCrosshairToggle.on->AddEventListener("click", listener.get());
+        }
+        if (hudCrosshairToggle.off) {
+            hudCrosshairToggle.off->AddEventListener("click", listener.get());
+        }
+        listeners.emplace_back(std::move(listener));
+    }
 
     loadBindings();
     rebuildBindings();
     updateSelectedLabel();
     updateStatus();
+    syncHudControls();
 }
 
 void RmlUiPanelSettings::onUpdate() {
     if (!document) {
         return;
     }
+    if (brightnessSlider) {
+        auto *input = rmlui_dynamic_cast<Rml::ElementFormControlInput*>(brightnessSlider);
+        if (input) {
+            try {
+                const float brightness = std::stof(input->GetValue());
+                if (std::abs(brightness - renderSettings.brightness()) > 0.0001f) {
+                    setRenderBrightness(brightness, true);
+                }
+            } catch (...) {
+            }
+        }
+    }
     if (!loaded) {
         loadBindings();
         rebuildBindings();
         updateSelectedLabel();
         updateStatus();
+        syncHudControls();
     }
     if (renderSettings.consumeDirty()) {
-        bz::json::Value userConfig;
-        if (!loadUserConfig(userConfig)) {
-            showStatus("Failed to load user config.", true);
-        } else {
-            renderSettings.save(userConfig);
-            std::string error;
-            if (!saveUserConfig(userConfig, error)) {
-                showStatus(error.empty() ? "Failed to save render settings." : error, true);
-            }
+        if (!bz::config::ConfigStore::Set("render.brightness", renderSettings.brightness())) {
+            showStatus("Failed to save render settings.", true);
+        }
+    }
+    if (hudSettings.consumeDirty()) {
+        const bool ok =
+            bz::config::ConfigStore::Set("ui.hud.scoreboard", hudSettings.scoreboardVisible()) &&
+            bz::config::ConfigStore::Set("ui.hud.chat", hudSettings.chatVisible()) &&
+            bz::config::ConfigStore::Set("ui.hud.radar", hudSettings.radarVisible()) &&
+            bz::config::ConfigStore::Set("ui.hud.fps", hudSettings.fpsVisible()) &&
+            bz::config::ConfigStore::Set("ui.hud.crosshair", hudSettings.crosshairVisible());
+        if (!ok) {
+            showStatus("Failed to save HUD settings.", true);
         }
     }
     selectionJustChanged = false;
@@ -397,19 +475,9 @@ void RmlUiPanelSettings::applyLanguageSelection(const std::string &code) {
     if (code == selectedLanguageFromConfig() && code == bz::i18n::Get().language()) {
         return;
     }
-    bz::json::Value userConfig;
-    if (!loadUserConfig(userConfig)) {
-        showStatus("Failed to load user config.", true);
+    if (!bz::config::ConfigStore::Set("language", code)) {
+        showStatus("Failed to save language.", true);
         return;
-    }
-    userConfig["language"] = code;
-    std::string error;
-    if (!saveUserConfig(userConfig, error)) {
-        showStatus(error.empty() ? "Failed to save language." : error, true);
-        return;
-    }
-    if (!userConfigPath.empty()) {
-        bz::data::MergeExternalConfigLayer(userConfigPath, "user config", spdlog::level::debug);
     }
     if (languageCallback) {
         languageCallback(code);
@@ -417,10 +485,9 @@ void RmlUiPanelSettings::applyLanguageSelection(const std::string &code) {
 }
 
 std::string RmlUiPanelSettings::selectedLanguageFromConfig() const {
-    bz::json::Value userConfig;
-    if (loadUserConfig(userConfig)) {
-        if (auto it = userConfig.find("language"); it != userConfig.end() && it->is_string()) {
-            return it->get<std::string>();
+    if (const auto *value = bz::config::ConfigStore::Get("language")) {
+        if (value->is_string()) {
+            return value->get<std::string>();
         }
     }
     return bz::i18n::Get().language();
@@ -432,24 +499,24 @@ void RmlUiPanelSettings::loadBindings() {
     mouseBindings.assign(std::size(kKeybindings), std::string());
     controllerBindings.assign(std::size(kKeybindings), std::string());
 
-    bz::json::Value userConfig;
-    bool loadedConfig = loadUserConfig(userConfig);
-    if (!loadedConfig) {
-        showStatus("Failed to load user config; showing defaults.", true);
+    renderSettings.reset();
+    hudSettings.reset();
+    if (!bz::config::ConfigStore::Initialized()) {
+        showStatus("Failed to load config; showing defaults.", true);
     }
-    renderSettings.load(userConfig);
+    syncSettingsFromConfig();
     syncRenderBrightnessControls();
 
     const bz::json::Value *bindingsNode = nullptr;
-    if (auto it = userConfig.find("keybindings"); it != userConfig.end() && it->is_object()) {
-        bindingsNode = &(*it);
+    if (const auto *node = bz::config::ConfigStore::Get("keybindings")) {
+        if (node->is_object()) {
+            bindingsNode = node;
+        }
     }
     const bz::json::Value *controllerNode = nullptr;
-    if (auto guiIt = userConfig.find("gui"); guiIt != userConfig.end() && guiIt->is_object()) {
-        if (auto keyIt = guiIt->find("keybindings"); keyIt != guiIt->end() && keyIt->is_object()) {
-            if (auto controllerIt = keyIt->find("controller"); controllerIt != keyIt->end() && controllerIt->is_object()) {
-                controllerNode = &(*controllerIt);
-            }
+    if (const auto *node = bz::config::ConfigStore::Get("gui.keybindings.controller")) {
+        if (node->is_object()) {
+            controllerNode = node;
         }
     }
 
@@ -616,12 +683,6 @@ void RmlUiPanelSettings::clearSelected() {
 }
 
 void RmlUiPanelSettings::saveBindings() {
-    bz::json::Value userConfig;
-    if (!loadUserConfig(userConfig)) {
-        showStatus("Failed to load user config.", true);
-        return;
-    }
-
     bz::json::Value keybindings = bz::json::Object();
     bz::json::Value controllerJson = bz::json::Object();
     bool hasBindings = false;
@@ -657,26 +718,28 @@ void RmlUiPanelSettings::saveBindings() {
     }
 
     if (hasBindings) {
-        setNestedConfig(userConfig, {"keybindings"}, keybindings);
+        if (!bz::config::ConfigStore::Set("keybindings", keybindings)) {
+            showStatus("Failed to save bindings.", true);
+            return;
+        }
     } else {
-        eraseNestedConfig(userConfig, {"keybindings"});
+        bz::config::ConfigStore::Erase("keybindings");
     }
 
     if (hasController) {
-        setNestedConfig(userConfig, {"gui", "keybindings", "controller"}, controllerJson);
+        if (!bz::config::ConfigStore::Set("gui.keybindings.controller", controllerJson)) {
+            showStatus("Failed to save bindings.", true);
+            return;
+        }
     } else {
-        eraseNestedConfig(userConfig, {"gui", "keybindings", "controller"});
+        bz::config::ConfigStore::Erase("gui.keybindings.controller");
     }
-
-    renderSettings.save(userConfig);
-
-    std::string error;
-    if (!saveUserConfig(userConfig, error)) {
-        showStatus(error.empty() ? "Failed to save bindings." : error, true);
-    } else {
-        requestKeybindingsReload();
-        showStatus("Bindings saved.", false);
+    if (!bz::config::ConfigStore::Set("render.brightness", renderSettings.brightness())) {
+        showStatus("Failed to save render settings.", true);
+        return;
     }
+    requestKeybindingsReload();
+    showStatus("Bindings saved.", false);
 }
 
 void RmlUiPanelSettings::resetBindings() {
@@ -696,24 +759,15 @@ void RmlUiPanelSettings::resetBindings() {
         controllerBindings[i].clear();
     }
 
-    bz::json::Value userConfig;
-    if (!loadUserConfig(userConfig)) {
-        showStatus("Failed to load user config.", true);
-    } else {
-        eraseNestedConfig(userConfig, {"keybindings"});
-        eraseNestedConfig(userConfig, {"gui", "keybindings", "controller"});
-        RenderSettings::eraseFromConfig(userConfig);
-        std::string error;
-        if (!saveUserConfig(userConfig, error)) {
-            showStatus(error.empty() ? "Failed to reset bindings." : error, true);
-        } else {
-            requestKeybindingsReload();
-            showStatus("Bindings reset to defaults.", false);
-        }
-    }
+    bz::config::ConfigStore::Erase("keybindings");
+    bz::config::ConfigStore::Erase("gui.keybindings.controller");
+    bz::config::ConfigStore::Erase("render.brightness");
+    requestKeybindingsReload();
+    showStatus("Bindings reset to defaults.", false);
 
     rebuildBindings();
     renderSettings.reset();
+    syncSettingsFromConfig();
     syncRenderBrightnessControls();
 }
 
@@ -744,10 +798,53 @@ void RmlUiPanelSettings::syncRenderBrightnessControls() {
     }
 }
 
-void RmlUiPanelSettings::requestKeybindingsReload() {
-    if (!userConfigPath.empty()) {
-        bz::data::MergeExternalConfigLayer(userConfigPath, "user config", spdlog::level::debug);
+void RmlUiPanelSettings::syncHudControls() {
+    auto applyToggle = [](const HudToggleButtons &toggle, bool value) {
+        if (toggle.on) {
+            toggle.on->SetClass("active", value);
+        }
+        if (toggle.off) {
+            toggle.off->SetClass("active", !value);
+        }
+    };
+    applyToggle(hudScoreboardToggle, hudSettings.scoreboardVisible());
+    applyToggle(hudChatToggle, hudSettings.chatVisible());
+    applyToggle(hudRadarToggle, hudSettings.radarVisible());
+    applyToggle(hudFpsToggle, hudSettings.fpsVisible());
+    applyToggle(hudCrosshairToggle, hudSettings.crosshairVisible());
+}
+
+void RmlUiPanelSettings::handleHudToggle(Rml::Element *target) {
+    if (!target) {
+        return;
     }
+    if (target == hudScoreboardToggle.on) {
+        hudSettings.setScoreboardVisible(true, true);
+    } else if (target == hudScoreboardToggle.off) {
+        hudSettings.setScoreboardVisible(false, true);
+    } else if (target == hudChatToggle.on) {
+        hudSettings.setChatVisible(true, true);
+    } else if (target == hudChatToggle.off) {
+        hudSettings.setChatVisible(false, true);
+    } else if (target == hudRadarToggle.on) {
+        hudSettings.setRadarVisible(true, true);
+    } else if (target == hudRadarToggle.off) {
+        hudSettings.setRadarVisible(false, true);
+    } else if (target == hudFpsToggle.on) {
+        hudSettings.setFpsVisible(true, true);
+    } else if (target == hudFpsToggle.off) {
+        hudSettings.setFpsVisible(false, true);
+    } else if (target == hudCrosshairToggle.on) {
+        hudSettings.setCrosshairVisible(true, true);
+    } else if (target == hudCrosshairToggle.off) {
+        hudSettings.setCrosshairVisible(false, true);
+    } else {
+        return;
+    }
+    syncHudControls();
+}
+
+void RmlUiPanelSettings::requestKeybindingsReload() {
     keybindingsReloadRequested = true;
 }
 
@@ -871,92 +968,29 @@ std::string RmlUiPanelSettings::keyIdentifierToName(int keyIdentifier) const {
     return {};
 }
 
-bool RmlUiPanelSettings::loadUserConfig(bz::json::Value &out) const {
-    const std::filesystem::path path = userConfigPath.empty()
-        ? bz::data::EnsureUserConfigFile("config.json")
-        : std::filesystem::path(userConfigPath);
-    if (auto user = bz::data::LoadJsonFile(path, "user config", spdlog::level::debug)) {
-        if (!user->is_object()) {
-            out = bz::json::Object();
-            return false;
-        }
-        out = *user;
-        return true;
-    }
-    out = bz::json::Object();
-    return true;
-}
-
-bool RmlUiPanelSettings::saveUserConfig(const bz::json::Value &userConfig, std::string &error) const {
-    const std::filesystem::path path = userConfigPath.empty()
-        ? bz::data::EnsureUserConfigFile("config.json")
-        : std::filesystem::path(userConfigPath);
-    std::error_code ec;
-    const auto parentDir = path.parent_path();
-    if (!parentDir.empty()) {
-        std::filesystem::create_directories(parentDir, ec);
-        if (ec) {
-            error = "Failed to create config directory.";
-            return false;
-        }
-    }
-
-    std::ofstream file(path, std::ios::trunc);
-    if (!file.is_open()) {
-        error = "Failed to open user config for writing.";
-        return false;
-    }
-
-    try {
-        file << userConfig.dump(4) << '\n';
-    } catch (const std::exception &ex) {
-        error = ex.what();
-        return false;
-    }
-    return true;
-}
-
-void RmlUiPanelSettings::setNestedConfig(bz::json::Value &root,
-                                         std::initializer_list<const char*> path,
-                                         bz::json::Value value) const {
-    bz::json::Value *cursor = &root;
-    std::vector<std::string> keys;
-    keys.reserve(path.size());
-    for (const char *entry : path) {
-        keys.emplace_back(entry);
-    }
-    if (keys.empty()) {
+void RmlUiPanelSettings::syncSettingsFromConfig() {
+    if (!bz::config::ConfigStore::Initialized()) {
         return;
     }
-    for (std::size_t i = 0; i + 1 < keys.size(); ++i) {
-        const std::string &key = keys[i];
-        if (!cursor->contains(key) || !(*cursor)[key].is_object()) {
-            (*cursor)[key] = bz::json::Object();
-        }
-        cursor = &(*cursor)[key];
-    }
-    (*cursor)[keys.back()] = std::move(value);
-}
 
-void RmlUiPanelSettings::eraseNestedConfig(bz::json::Value &root,
-                                           std::initializer_list<const char*> path) const {
-    bz::json::Value *cursor = &root;
-    std::vector<std::string> keys;
-    keys.reserve(path.size());
-    for (const char *entry : path) {
-        keys.emplace_back(entry);
-    }
-    if (keys.empty()) {
-        return;
-    }
-    for (std::size_t i = 0; i + 1 < keys.size(); ++i) {
-        const std::string &key = keys[i];
-        if (!cursor->contains(key) || !(*cursor)[key].is_object()) {
-            return;
+    if (const auto *brightness = bz::config::ConfigStore::Get("render.brightness")) {
+        if (brightness->is_number()) {
+            renderSettings.setBrightness(static_cast<float>(brightness->get<double>()), false);
         }
-        cursor = &(*cursor)[key];
     }
-    cursor->erase(keys.back());
+
+    auto applyHud = [&](const char *path, auto setter) {
+        if (const auto *value = bz::config::ConfigStore::Get(path)) {
+            if (value->is_boolean()) {
+                setter(value->get<bool>());
+            }
+        }
+    };
+    applyHud("ui.hud.scoreboard", [&](bool value) { hudSettings.setScoreboardVisible(value, false); });
+    applyHud("ui.hud.chat", [&](bool value) { hudSettings.setChatVisible(value, false); });
+    applyHud("ui.hud.radar", [&](bool value) { hudSettings.setRadarVisible(value, false); });
+    applyHud("ui.hud.fps", [&](bool value) { hudSettings.setFpsVisible(value, false); });
+    applyHud("ui.hud.crosshair", [&](bool value) { hudSettings.setCrosshairVisible(value, false); });
 }
 
 } // namespace ui

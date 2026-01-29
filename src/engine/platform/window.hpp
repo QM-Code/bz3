@@ -41,6 +41,8 @@ public:
     virtual void setClipboardText(std::string_view text) = 0;
     virtual std::string getClipboardText() const = 0;
 
+    virtual void setBrightness(float brightness) = 0;
+
     virtual void* nativeHandle() const = 0;
     virtual std::string getVideoDriver() const = 0;
 };

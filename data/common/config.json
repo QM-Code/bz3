@@ -1,6 +1,9 @@
 {
     "language": "en",
-    "ui": {
+    "ui": {},
+    "config": {
+        "SaveIntervalSeconds": 3,
+        "MergeIntervalSeconds": 0.1
     },
     "graphics": {
         "theme": "classic",
@@ -43,114 +46,6 @@
                 "fragment": "shaders/vintage.frag",
                 "vertex": "shaders/vintage.vert"
             }
-        }
-    },
-    "filament": {
-        "ibl": {
-            "Options": [
-        {
-            "IndirectLight": "filament/ibl/lightroom_14b/lightroom_14b_ibl.ktx",
-            "Intensity": 30000.0,
-            "Name": "lightroom",
-            "Skybox": "filament/ibl/lightroom_14b/lightroom_14b_skybox.ktx"
-        },
-        {
-            "IndirectLight": "filament/ibl/lightroom_14b/lightroom_14b_ibl.ktx",
-            "Intensity": 60000.0,
-            "Name": "lightroom-bright",
-            "Skybox": "filament/ibl/lightroom_14b/lightroom_14b_skybox.ktx"
-        },
-        {
-            "IndirectLight": "filament/ibl/lightroom_14b/lightroom_14b_ibl.ktx",
-            "Intensity": 15000.0,
-            "Name": "lightroom-soft",
-            "Skybox": "filament/ibl/lightroom_14b/lightroom_14b_skybox.ktx"
-        },
-        {
-            "Intensity": 18000.0,
-            "Name": "studio-neutral",
-            "SkyboxColor": [
-                0.12,
-                0.12,
-                0.12,
-                1.0
-            ]
-        },
-        {
-            "Intensity": 12000.0,
-            "Name": "dusk",
-            "SkyboxColor": [
-                0.05,
-                0.07,
-                0.12,
-                1.0
-            ]
-        },
-        {
-            "FillIntensity": 30000.0,
-            "FillLightColor": [
-                0.5,
-                0.15,
-                0.15
-            ],
-            "KeyIntensity": 50000.0,
-            "KeyLightColor": [
-                1.0,
-                0.35,
-                0.35
-            ],
-            "Name": "tint-red",
-            "SkyboxColor": [
-                0.18,
-                0.04,
-                0.04,
-                1.0
-            ]
-        },
-        {
-            "FillIntensity": 30000.0,
-            "FillLightColor": [
-                0.15,
-                0.5,
-                0.15
-            ],
-            "KeyIntensity": 50000.0,
-            "KeyLightColor": [
-                0.35,
-                1.0,
-                0.35
-            ],
-            "Name": "tint-green",
-            "SkyboxColor": [
-                0.04,
-                0.18,
-                0.04,
-                1.0
-            ]
-        },
-        {
-            "FillIntensity": 30000.0,
-            "FillLightColor": [
-                0.15,
-                0.15,
-                0.5
-            ],
-            "KeyIntensity": 50000.0,
-            "KeyLightColor": [
-                0.35,
-                0.35,
-                1.0
-            ],
-            "Name": "tint-blue",
-            "SkyboxColor": [
-                0.04,
-                0.04,
-                0.18,
-                1.0
-            ]
-        }
-    ],
-    "Selected": "lightroom"
         }
     },
     "network": {

@@ -4,10 +4,13 @@
 #include "spdlog/spdlog.h"
 #include "common/data_path_resolver.hpp"
 #include "common/config_helpers.hpp"
+#include "common/config_store.hpp"
 
 ClientWorldSession::ClientWorldSession(Game &game, std::string worldDir)
         : game(game), backend_(world_backend::CreateWorldBackend()) {
-    const auto userConfigPath = bz::data::EnsureUserConfigFile("config.json");
+    const auto userConfigPath = bz::config::ConfigStore::Initialized()
+        ? bz::config::ConfigStore::UserConfigPath()
+        : bz::data::EnsureUserConfigFile("config.json");
 
     const std::vector<bz::data::ConfigLayerSpec> layerSpecs = {
         {"common/config.json", "data/common/config.json", spdlog::level::err, true},
@@ -76,7 +79,7 @@ void ClientWorldSession::update() {
                     spdlog::warn("ClientWorldSession: World config is not a JSON object: {}", worldConfigPath.string());
                 } else {
                     constexpr const char* worldConfigLabel = "world config";
-                    if (!bz::data::MergeConfigLayer(worldConfigLabel, *worldConfigOpt, downloadsDir)) {
+                    if (!bz::config::ConfigStore::AddRuntimeLayer(worldConfigLabel, *worldConfigOpt, downloadsDir)) {
                         spdlog::warn("ClientWorldSession: Failed to merge world config layer from {}", worldConfigPath.string());
                     } else {
                         bz::data::MergeJsonObjects(content_.config, *worldConfigOpt);

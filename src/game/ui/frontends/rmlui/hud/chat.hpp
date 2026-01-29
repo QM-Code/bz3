@@ -28,6 +28,8 @@ public:
 
     void focusInput();
     bool isFocused() const;
+    void setVisible(bool visible);
+    bool isVisible() const;
     bool consumeSuppressNextChar();
     void handleInputEvent(Rml::Event &event);
 
@@ -40,6 +42,7 @@ private:
 
     std::vector<std::string> lines;
     std::string submittedInput;
+    bool visible = true;
     bool focused = false;
     bool autoScroll = true;
     bool pendingScroll = false;

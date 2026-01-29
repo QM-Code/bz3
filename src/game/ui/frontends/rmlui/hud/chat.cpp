@@ -40,6 +40,10 @@ void RmlUiHudChat::bind(Rml::ElementDocument *document, EmojiMarkupFn emojiMarku
     logContent = document->GetElementById("hud-chat-log-content");
     input = document->GetElementById("hud-chat-input");
 
+    if (panel) {
+        panel->SetClass("hidden", !visible);
+    }
+
     if (input) {
         inputListener = std::make_unique<ChatInputListener>(this);
         input->AddEventListener("keydown", inputListener.get());
@@ -114,6 +118,20 @@ void RmlUiHudChat::focusInput() {
 
 bool RmlUiHudChat::isFocused() const {
     return focused;
+}
+
+void RmlUiHudChat::setVisible(bool visibleIn) {
+    visible = visibleIn;
+    if (panel) {
+        panel->SetClass("hidden", !visible);
+    }
+    if (!visible) {
+        focused = false;
+    }
+}
+
+bool RmlUiHudChat::isVisible() const {
+    return visible;
 }
 
 

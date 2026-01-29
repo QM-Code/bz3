@@ -12,17 +12,13 @@ struct ClientCLIOptions {
     std::string userConfigPath;
     std::string language;
     std::string theme;
-    std::string videoDriver;
-    std::string renderer;
     bool addrExplicit = false;
     bool worldExplicit = false;
     bool dataDirExplicit = false;
     bool userConfigExplicit = false;
     bool languageExplicit = false;
     bool themeExplicit = false;
-    bool videoDriverExplicit = false;
-    bool rendererExplicit = false;
-    bool forceWaylandVulkan = false;
+    bool devQuickStart = false;
     bool verbose = false;
     std::string logLevel;
     bool logLevelExplicit = false;

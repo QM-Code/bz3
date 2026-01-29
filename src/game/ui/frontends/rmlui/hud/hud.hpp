@@ -36,7 +36,7 @@ public:
     void update();
 
     void setDialogText(const std::string &text);
-    void showDialog(bool show);
+    void setDialogVisible(bool show);
 
     void addChatLine(const std::string &line);
     std::string getSubmittedChatInput() const;
@@ -48,6 +48,10 @@ public:
 
     void setRadarTexture(const graphics::TextureHandle& texture);
     void setScoreboardEntries(const std::vector<ScoreboardEntry> &entries);
+    void setScoreboardVisible(bool visible);
+    void setChatVisible(bool visible);
+    void setRadarVisible(bool visible);
+    void setCrosshairVisible(bool visible);
     void setFpsVisible(bool visible);
     void setFpsValue(float fps);
 
@@ -66,6 +70,10 @@ private:
     float lastFps = 0.0f;
     int lastFpsInt = -1;
     bool fpsVisible = false;
+    bool scoreboardVisible = true;
+    bool chatVisible = true;
+    bool radarVisible = true;
+    bool crosshairVisible = true;
 
     void bindElements();
 };

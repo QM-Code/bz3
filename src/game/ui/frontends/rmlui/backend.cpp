@@ -28,9 +28,7 @@
 #include "ui/frontends/rmlui/console/emoji_utils.hpp"
 #include "ui/frontends/rmlui/translate.hpp"
 #include "platform/window.hpp"
-#include "common/config_helpers.hpp"
 #include "common/i18n.hpp"
-#include "ui/config.hpp"
 #include "ui/frontends/rmlui/hud/hud.hpp"
 #include "ui/frontends/rmlui/console/console.hpp"
 #include "ui/frontends/rmlui/console/panels/panel_community.hpp"
@@ -39,6 +37,7 @@
 #include "ui/frontends/rmlui/console/panels/panel_start_server.hpp"
 #include "ui/frontends/rmlui/console/panels/panel_themes.hpp"
 #include "common/data_path_resolver.hpp"
+#include "common/config_store.hpp"
 #include "spdlog/spdlog.h"
 #include "ui/render_scale.hpp"
 
@@ -171,7 +170,7 @@ public:
     }
 
     void setUserConfigPath(const std::string &path) override {
-        userConfigPath = path;
+        (void)path;
     }
 
     bool consumeFontReloadRequest() override {
@@ -239,7 +238,6 @@ private:
     std::string salt;
     std::string newListHost;
     bool scanning = false;
-    std::string userConfigPath;
     bool fontReloadRequested = false;
     bool refreshRequested = false;
     bool quitRequested = false;
@@ -494,7 +492,6 @@ struct RmlUiBackend::RmlUiState {
     std::string regularFontPath;
     std::string emojiFontPath;
     std::unique_ptr<ui::RmlUiHud> hud;
-    bool showFps = false;
     double fpsLastTime = 0.0;
     double fpsValue = 0.0;
     int fpsFrames = 0;
@@ -560,7 +557,6 @@ RmlUiBackend::RmlUiBackend(platform::Window &windowRefIn) : windowRef(&windowRef
     state->consolePath = bz::data::Resolve("client/ui/console.rml").string();
     state->hudPath = bz::data::Resolve("client/ui/hud.rml").string();
     state->hud = std::make_unique<ui::RmlUiHud>();
-    state->showFps = ui::config::GetRequiredBool("debug.ShowFPS");
     state->fpsLastTime = state->systemInterface.GetElapsedTime();
     auto communityPanel = std::make_unique<ui::RmlUiPanelCommunity>();
     auto *communityPanelPtr = communityPanel.get();
@@ -791,6 +787,15 @@ void RmlUiBackend::update() {
     if (renderBridge && state->hud) {
         state->hud->setRadarTexture(renderBridge->getRadarTexture());
     }
+    if (state->hud) {
+        state->hud->setScoreboardEntries(hudModel.scoreboardEntries);
+        state->hud->setDialogText(hudModel.dialog.text);
+        state->hud->setDialogVisible(hudModel.dialog.visible);
+        state->hud->setScoreboardVisible(hudModel.visibility.scoreboard);
+        state->hud->setChatVisible(hudModel.visibility.chat);
+        state->hud->setRadarVisible(hudModel.visibility.radar);
+        state->hud->setCrosshairVisible(hudModel.visibility.crosshair);
+    }
 
     int fbWidth = 0;
     int fbHeight = 0;
@@ -849,7 +854,7 @@ void RmlUiBackend::update() {
             }
         } else if (state->hud) {
             state->hud->update();
-            if (state->showFps) {
+            if (hudModel.visibility.fps) {
                 state->fpsFrames += 1;
                 const double now = state->systemInterface.GetElapsedTime();
                 const double elapsed = now - state->fpsLastTime;
@@ -894,18 +899,8 @@ void RmlUiBackend::reloadFonts() {
     loadHudDocument();
 }
 
-void RmlUiBackend::setScoreboardEntries(const std::vector<ScoreboardEntry> &entries) {
-    if (!state || !state->hud) {
-        return;
-    }
-    state->hud->setScoreboardEntries(entries);
-}
-
-void RmlUiBackend::setSpawnHint(const std::string &hint) {
-    if (!state || !state->hud) {
-        return;
-    }
-    state->hud->setDialogText(hint);
+void RmlUiBackend::setHudModel(const ui::HudModel &model) {
+    hudModel = model;
 }
 
 void RmlUiBackend::addConsoleLine(const std::string &playerName, const std::string &line) {
@@ -948,13 +943,6 @@ bool RmlUiBackend::getChatInputFocus() const {
     return state->hud->isChatFocused();
 }
 
-void RmlUiBackend::displayDeathScreen(bool show) {
-    if (!state || !state->hud) {
-        return;
-    }
-    state->hud->showDialog(show);
-}
-
 bool RmlUiBackend::consumeKeybindingsReloadRequest() {
     return consoleView && consoleView->consumeKeybindingsReloadRequest();
 }
@@ -994,6 +982,7 @@ void RmlUiBackend::setActiveTab(const std::string &tabKey) {
         return;
     }
 
+    const std::string previousTab = state->activeTab;
     state->activeTab = tabKey;
     for (const auto &entry : state->tabs) {
         entry.second->SetClass("active", entry.first == tabKey);
@@ -1011,6 +1000,10 @@ void RmlUiBackend::setActiveTab(const std::string &tabKey) {
         const std::string &labelMarkup = cachedTwemojiMarkup(label);
         state->contentElement->SetInnerRML(
             "<div style=\"padding: 8px 0;\">" + labelMarkup + " panel</div>");
+    }
+
+    if (previousTab != tabKey && tabKey == "community" && consoleView) {
+        consoleView->onRefreshRequested();
     }
 }
 
@@ -1052,7 +1045,7 @@ void RmlUiBackend::loadConfiguredFonts(const std::string &language) {
         loadFont(emojiFontPath, true);
     }
 
-    if (const auto *extras = bz::data::ConfigValue("assets.hud.fonts.console.Extras")) {
+    if (const auto *extras = bz::config::ConfigStore::Get("assets.hud.fonts.console.Extras")) {
         if (extras->is_array()) {
             for (const auto &entry : *extras) {
                 if (!entry.is_string()) {

@@ -140,7 +140,7 @@ public:
     }
 
     void setUserConfigPath(const std::string &path) override {
-        userConfigPath = path;
+        (void)path;
     }
 
     bool consumeFontReloadRequest() override {
@@ -196,7 +196,6 @@ private:
     std::string password;
     std::string storedPasswordHash;
     std::string communityStatusText;
-    std::string userConfigPath;
     std::string lastErrorDialog;
 
     std::optional<ui::CommunityBrowserSelection> pendingSelection;
@@ -220,8 +219,7 @@ public:
     void handleEvents(const std::vector<platform::Event> &events) override { (void)events; }
     void update() override {}
     void reloadFonts() override {}
-    void setScoreboardEntries(const std::vector<ScoreboardEntry> &entries) override { (void)entries; }
-    void setSpawnHint(const std::string &hint) override { (void)hint; }
+    void setHudModel(const ui::HudModel &model) override { (void)model; }
     void addConsoleLine(const std::string &playerName, const std::string &line) override {
         (void)playerName;
         (void)line;
@@ -230,7 +228,6 @@ public:
     void clearChatInputBuffer() override {}
     void focusChatInput() override {}
     bool getChatInputFocus() const override { return false; }
-    void displayDeathScreen(bool show) override { (void)show; }
     bool consumeKeybindingsReloadRequest() override { return false; }
     void setRenderBridge(const ui::RenderBridge *bridge) override { (void)bridge; }
     ui::RenderOutput getRenderOutput() const override { return {}; }

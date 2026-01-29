@@ -17,7 +17,14 @@
     }
   },
   "ui": {
-    "RenderScale": 1.0
+    "RenderScale": 1.0,
+    "hud": {
+      "scoreboard": true,
+      "chat": true,
+      "radar": true,
+      "fps": false,
+      "crosshair": true
+    }
   },
   "keybindings": {
     "fire": [

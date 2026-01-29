@@ -68,7 +68,7 @@ void Player::earlyUpdate() {
     game.engine.render->setPosition(renderId, state.position);
 
     if (state.alive) {
-        game.engine.ui->displayDeathScreen(false);
+        game.engine.ui->setDialogVisible(false);
         
         if (grounded) {
             glm::vec2 movement(0.0f);
@@ -153,7 +153,7 @@ void Player::earlyUpdate() {
             physics->setAngularVelocity(glm::vec3(0.0f));
         }
 
-        game.engine.ui->displayDeathScreen(true);
+        game.engine.ui->setDialogVisible(true);
 
         if (game.engine.getInputState().spawn) {
             ClientMsg_RequestPlayerSpawn spawnMsg;

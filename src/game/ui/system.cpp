@@ -4,6 +4,8 @@
 #include "platform/window.hpp"
 #include "common/i18n.hpp"
 #include "ui/bridges/imgui_render_bridge.hpp"
+#include "ui/config.hpp"
+#include "common/config_store.hpp"
 
 UiSystem::UiSystem(platform::Window &window) {
     backend = ui_backend::CreateUiBackend(window);
@@ -16,6 +18,16 @@ void UiSystem::handleEvents(const std::vector<platform::Event> &events) {
 }
 
 void UiSystem::update() {
+    const uint64_t revision = bz::config::ConfigStore::Revision();
+    if (revision != lastConfigRevision) {
+        lastConfigRevision = revision;
+        hudModel.visibility.scoreboard = ui::config::GetRequiredBool("ui.hud.scoreboard");
+        hudModel.visibility.chat = ui::config::GetRequiredBool("ui.hud.chat");
+        hudModel.visibility.radar = ui::config::GetRequiredBool("ui.hud.radar");
+        hudModel.visibility.fps = ui::config::GetRequiredBool("ui.hud.fps");
+        hudModel.visibility.crosshair = ui::config::GetRequiredBool("ui.hud.crosshair");
+    }
+    backend->setHudModel(hudModel);
     backend->update();
 }
 
@@ -37,11 +49,11 @@ const ui::ConsoleInterface &UiSystem::console() const {
 }
 
 void UiSystem::setScoreboardEntries(const std::vector<ScoreboardEntry> &entries) {
-    backend->setScoreboardEntries(entries);
+    hudModel.scoreboardEntries = entries;
 }
 
-void UiSystem::setSpawnHint(const std::string &hint) {
-    backend->setSpawnHint(hint);
+void UiSystem::setDialogText(const std::string &text) {
+    hudModel.dialog.text = text;
 }
 
 void UiSystem::addConsoleLine(const std::string &playerName, const std::string &line) {
@@ -64,8 +76,8 @@ bool UiSystem::getChatInputFocus() const {
     return backend->getChatInputFocus();
 }
 
-void UiSystem::displayDeathScreen(bool show) {
-    backend->displayDeathScreen(show);
+void UiSystem::setDialogVisible(bool show) {
+    hudModel.dialog.visible = show;
 }
 
 bool UiSystem::consumeKeybindingsReloadRequest() {

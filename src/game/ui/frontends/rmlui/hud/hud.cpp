@@ -68,7 +68,7 @@ void RmlUiHud::setDialogText(const std::string &text) {
     dialog.setText(text);
 }
 
-void RmlUiHud::showDialog(bool show) {
+void RmlUiHud::setDialogVisible(bool show) {
     dialog.show(show);
 }
 
@@ -89,7 +89,7 @@ void RmlUiHud::focusChatInput() {
 }
 
 bool RmlUiHud::isChatFocused() const {
-    return chat.isFocused();
+    return chatVisible && chat.isFocused();
 }
 
 
@@ -107,6 +107,26 @@ void RmlUiHud::setRadarTexture(const graphics::TextureHandle& texture) {
 
 void RmlUiHud::setScoreboardEntries(const std::vector<ScoreboardEntry> &entries) {
     scoreboard.setEntries(entries);
+}
+
+void RmlUiHud::setScoreboardVisible(bool visible) {
+    scoreboardVisible = visible;
+    scoreboard.setVisible(visible);
+}
+
+void RmlUiHud::setChatVisible(bool visible) {
+    chatVisible = visible;
+    chat.setVisible(visible);
+}
+
+void RmlUiHud::setRadarVisible(bool visible) {
+    radarVisible = visible;
+    radar.setVisible(visible);
+}
+
+void RmlUiHud::setCrosshairVisible(bool visible) {
+    crosshairVisible = visible;
+    crosshair.setVisible(visible);
 }
 
 void RmlUiHud::setFpsVisible(bool visible) {
@@ -142,6 +162,10 @@ void RmlUiHud::bindElements() {
     crosshair.bind(document);
     radar.bind(document);
     scoreboard.bind(document, emojiMarkup);
+    chat.setVisible(chatVisible);
+    scoreboard.setVisible(scoreboardVisible);
+    radar.setVisible(radarVisible);
+    crosshair.setVisible(crosshairVisible);
     fpsElement = document->GetElementById("hud-fps");
     fpsVisible = fpsElement && !fpsElement->IsClassSet("hidden");
     setFpsValue(lastFps);

@@ -3,6 +3,7 @@
 #include <SDL3/SDL.h>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <cstdlib>
 #include <string>
 
@@ -551,6 +552,16 @@ public:
         std::string out(text);
         SDL_free(text);
         return out;
+    }
+
+    void setBrightness(float brightness) override {
+        if (!window) {
+            return;
+        }
+        const float clamped = std::clamp(brightness, 0.2f, 3.0f);
+        const float t = (clamped - 0.2f) / 2.8f;
+        const float opacity = std::clamp(0.2f + t * 0.8f, 0.2f, 1.0f);
+        SDL_SetWindowOpacity(window, opacity);
     }
 
     void* nativeHandle() const override {

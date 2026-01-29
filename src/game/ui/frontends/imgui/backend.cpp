@@ -5,7 +5,6 @@
 #include "engine/graphics/ui_render_target_bridge.hpp"
 #include "platform/window.hpp"
 #include "spdlog/spdlog.h"
-#include "ui/config.hpp"
 #include "ui/render_scale.hpp"
 
 #include <cmath>
@@ -190,8 +189,7 @@ ImGuiBackend::ImGuiBackend(platform::Window &windowRef) : window(&windowRef) {
     consoleView.initializeFonts(io);
     spdlog::info("UiSystem: ImGui console font init done");
 
-    showFPS = ui::config::GetRequiredBool("debug.ShowFPS");
-    hud.setShowFps(showFPS);
+    hud.setShowFps(hudModel.visibility.fps);
 
     consoleView.setLanguageCallback([this](const std::string &language) {
 #if defined(BZ3_RENDER_BACKEND_BGFX)
@@ -308,10 +306,18 @@ void ImGuiBackend::update() {
     io.FontGlobalScale = 1.0f;
     ImGui::NewFrame();
 
+    hud.setScoreboardEntries(hudModel.scoreboardEntries);
+    hud.setDialogText(hudModel.dialog.text);
+    hud.setDialogVisible(hudModel.dialog.visible);
+
     if (consoleView.isVisible()) {
         consoleView.draw(io);
     } else {
-        hud.setShowFps(showFPS);
+        hud.setScoreboardVisible(hudModel.visibility.scoreboard);
+        hud.setChatVisible(hudModel.visibility.chat);
+        hud.setRadarVisible(hudModel.visibility.radar);
+        hud.setCrosshairVisible(hudModel.visibility.crosshair);
+        hud.setShowFps(hudModel.visibility.fps);
         hud.draw(io, bigFont);
     }
 
@@ -351,12 +357,8 @@ void ImGuiBackend::reloadFonts() {
     }
 }
 
-void ImGuiBackend::setScoreboardEntries(const std::vector<ScoreboardEntry> &entries) {
-    hud.setScoreboardEntries(entries);
-}
-
-void ImGuiBackend::setSpawnHint(const std::string &hint) {
-    hud.setSpawnHint(hint);
+void ImGuiBackend::setHudModel(const ui::HudModel &model) {
+    hudModel = model;
 }
 
 void ImGuiBackend::addConsoleLine(const std::string &playerName, const std::string &line) {
@@ -377,10 +379,6 @@ void ImGuiBackend::focusChatInput() {
 
 bool ImGuiBackend::getChatInputFocus() const {
     return hud.getChatInputFocus();
-}
-
-void ImGuiBackend::displayDeathScreen(bool show) {
-    hud.displayDeathScreen(show);
 }
 
 bool ImGuiBackend::consumeKeybindingsReloadRequest() {

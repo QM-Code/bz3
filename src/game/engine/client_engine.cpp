@@ -58,7 +58,7 @@ ClientEngine::ClientEngine(platform::Window &window) {
     ui->setImGuiRenderBridge(renderBridgeImpl);
 #endif
     spdlog::trace("ClientEngine: UiSystem initialized successfully");
-    ui->setSpawnHint(game_input::SpawnHintText(*input));
+    ui->setDialogText(game_input::SpawnHintText(*input));
     audio = new Audio();
     spdlog::trace("ClientEngine: Audio initialized successfully");
 }
@@ -106,7 +106,7 @@ void ClientEngine::lateUpdate(TimeUtils::duration deltaTime) {
 
     if (ui->consumeKeybindingsReloadRequest()) {
         input->reloadKeyBindings();
-        ui->setSpawnHint(game_input::SpawnHintText(*input));
+        ui->setDialogText(game_input::SpawnHintText(*input));
     }
     network->flushPeekedMessages();
 }

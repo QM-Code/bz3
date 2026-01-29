@@ -75,6 +75,7 @@ public:
     void setUiOverlayTexture(const graphics::TextureHandle& texture) override;
     void setUiOverlayVisible(bool visible) override;
     void renderUiOverlay() override;
+    void setBrightness(float brightness) override;
     UiRenderTargetBridge* getUiRenderTargetBridge() override { return uiBridge_.get(); }
     const UiRenderTargetBridge* getUiRenderTargetBridge() const override { return uiBridge_.get(); }
 
@@ -140,6 +141,19 @@ private:
     graphics::TextureHandle uiOverlayTexture_{};
     bool uiOverlayVisible_ = false;
 
+    float brightness_ = 1.0f;
+    RenderTarget* sceneTarget_ = nullptr;
+    int sceneTargetWidth_ = 0;
+    int sceneTargetHeight_ = 0;
+    Shader* brightnessShader_ = nullptr;
+    Pipeline* brightnessPipeline_ = nullptr;
+    DescriptorSet* brightnessDescriptorSet_ = nullptr;
+    Buffer* brightnessVertexBuffer_ = nullptr;
+    Buffer* brightnessIndexBuffer_ = nullptr;
+    Buffer* brightnessUniformBuffer_ = nullptr;
+    Descriptor brightnessDescriptors_[3]{};
+    Sampler* brightnessSampler_ = nullptr;
+
     Renderer* renderer_ = nullptr;
     Queue* graphicsQueue_ = nullptr;
     SwapChain* swapChain_ = nullptr;
@@ -167,6 +181,11 @@ private:
 
     void ensureUiOverlayResources();
     void destroyUiOverlayResources();
+    void ensureBrightnessResources();
+    void destroyBrightnessResources();
+    void ensureSceneTarget(int width, int height);
+    void destroySceneTarget();
+    void renderBrightnessPass();
     void ensureMeshResources();
     void destroyMeshResources();
 

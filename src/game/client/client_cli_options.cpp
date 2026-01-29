@@ -1,6 +1,7 @@
 #include "client/client_cli_options.hpp"
 
 #include "common/data_path_resolver.hpp"
+#include "common/config_store.hpp"
 #include "cxxopts.hpp"
 #include <algorithm>
 #include <cstdlib>
@@ -9,7 +10,7 @@
 namespace {
 
 std::string ConfiguredPortDefault() {
-    if (const auto *portNode = bz::data::ConfigValue("network.ServerPort")) {
+    if (const auto *portNode = bz::config::ConfigStore::Get("network.ServerPort")) {
         if (portNode->is_string()) {
             return portNode->get<std::string>();
         }
@@ -48,16 +49,6 @@ std::string NormalizeLower(std::string value) {
     return value;
 }
 
-bool IsValidVideoDriver(std::string value) {
-    value = NormalizeLower(std::move(value));
-    return value == "auto" || value == "wayland" || value == "x11";
-}
-
-bool IsValidRenderer(std::string value) {
-    value = NormalizeLower(std::move(value));
-    return value == "auto" || value == "vulkan";
-}
-
 } // namespace
 
 ClientCLIOptions ParseClientCLIOptions(int argc, char *argv[]) {
@@ -79,11 +70,7 @@ ClientCLIOptions ParseClientCLIOptions(int argc, char *argv[]) {
     options.add_options()
         ("theme", "Render theme (overrides graphics.theme)", cxxopts::value<std::string>());
     options.add_options()
-        ("video-driver", "Video driver override (auto, wayland, x11)", cxxopts::value<std::string>());
-    options.add_options()
-        ("renderer", "Renderer override for bgfx (auto, vulkan)", cxxopts::value<std::string>());
-    options.add_options()
-        ("wayland-vulkan", "Force Wayland video driver + Vulkan renderer");
+        ("dev-quick-start", "Dev helper: show console, start local server, auto-connect");
     options.add_options()
         ("v,verbose", "Enable verbose logging (alias for --log-level trace)")
         ("L,log-level", "Logging level (trace, debug, info, warn, err, critical, off)", cxxopts::value<std::string>());
@@ -115,17 +102,13 @@ ClientCLIOptions ParseClientCLIOptions(int argc, char *argv[]) {
     parsed.userConfigPath = result.count("config") ? result["config"].as<std::string>() : std::string();
     parsed.language = result.count("language") ? result["language"].as<std::string>() : std::string();
     parsed.theme = result.count("theme") ? result["theme"].as<std::string>() : std::string();
-    parsed.videoDriver = result.count("video-driver") ? result["video-driver"].as<std::string>() : std::string();
-    parsed.renderer = result.count("renderer") ? result["renderer"].as<std::string>() : std::string();
     parsed.addrExplicit = result.count("addr") > 0;
     parsed.worldExplicit = result.count("world") > 0;
     parsed.dataDirExplicit = result.count("data-dir") > 0;
     parsed.userConfigExplicit = result.count("config") > 0;
     parsed.languageExplicit = result.count("language") > 0;
     parsed.themeExplicit = result.count("theme") > 0;
-    parsed.videoDriverExplicit = result.count("video-driver") > 0;
-    parsed.rendererExplicit = result.count("renderer") > 0;
-    parsed.forceWaylandVulkan = result.count("wayland-vulkan") > 0;
+    parsed.devQuickStart = result.count("dev-quick-start") > 0;
     parsed.verbose = result.count("verbose") > 0;
     parsed.logLevel = result.count("log-level") ? result["log-level"].as<std::string>() : std::string();
     parsed.logLevelExplicit = result.count("log-level") > 0;
@@ -137,22 +120,6 @@ ClientCLIOptions ParseClientCLIOptions(int argc, char *argv[]) {
     }
     if (parsed.logLevelExplicit) {
         parsed.logLevel = NormalizeLogLevel(parsed.logLevel);
-    }
-    if (parsed.videoDriverExplicit) {
-        parsed.videoDriver = NormalizeLower(parsed.videoDriver);
-        if (!IsValidVideoDriver(parsed.videoDriver)) {
-            std::cerr << "Error: invalid --video-driver value '" << parsed.videoDriver << "'.\n";
-            std::cerr << options.help() << std::endl;
-            std::exit(1);
-        }
-    }
-    if (parsed.rendererExplicit) {
-        parsed.renderer = NormalizeLower(parsed.renderer);
-        if (!IsValidRenderer(parsed.renderer)) {
-            std::cerr << "Error: invalid --renderer value '" << parsed.renderer << "'.\n";
-            std::cerr << options.help() << std::endl;
-            std::exit(1);
-        }
     }
     return parsed;
 }

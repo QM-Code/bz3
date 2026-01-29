@@ -266,6 +266,9 @@ void ConsoleView::draw(ImGuiIO &io) {
         const std::string tabStartServer = i18n.get("ui.console.tabs.start_server");
         const std::string tabThemes = i18n.get("ui.console.tabs.themes");
         if (ImGui::BeginTabItem((tabCommunity + "###TabCommunity").c_str())) {
+            if (ImGui::IsItemActivated()) {
+                refreshRequested = true;
+            }
             drawCommunityPanel(messageColors);
             ImGui::EndTabItem();
         }

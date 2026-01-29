@@ -344,7 +344,7 @@ float BlinnExponentToGGXRoughness( const in float blinnExponent ) {
 
 #if defined( USE_SHEEN )
 
-// https://github.com/google/filament/blob/master/shaders/src/brdf.fs#L94
+// BRDF reference source (Filament).
 float D_Charlie(float roughness, float NoH) {
 	// Estevez and Kulla 2017, "Production Friendly Microfacet Sheen BRDF"
 	float invAlpha = 1.0 / roughness;
@@ -353,7 +353,7 @@ float D_Charlie(float roughness, float NoH) {
 	return (2.0 + invAlpha) * pow(sin2h, invAlpha * 0.5) / (2.0 * PI);
 }
 
-// https://github.com/google/filament/blob/master/shaders/src/brdf.fs#L136
+// BRDF reference source (Filament).
 float V_Neubelt(float NoV, float NoL) {
 	// Neubelt and Pettineo 2013, "Crafting a Next-gen Material Pipeline for The Order: 1886"
 	return saturate(1.0 / (4.0 * (NoL + NoV - NoL * NoV)));

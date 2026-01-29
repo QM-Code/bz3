@@ -64,7 +64,7 @@ std::unordered_map<std::string, std::string> loadLanguageStrings(const std::stri
 } // namespace
 
 void I18n::loadFromConfig() {
-    std::string language = bz::data::ReadStringConfig("language", "en");
+    std::string language = bz::config::ReadStringConfig("language", "en");
     language = normalizeLanguage(language);
     if (language.empty()) {
         language = "en";

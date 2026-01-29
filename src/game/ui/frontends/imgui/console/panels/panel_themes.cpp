@@ -2,13 +2,13 @@
 
 #include <algorithm>
 #include <cstdio>
-#include <filesystem>
 #include <fstream>
 #include <string>
 #include <vector>
 
 #include "common/json.hpp"
 
+#include "common/config_store.hpp"
 #include "common/data_path_resolver.hpp"
 
 namespace {
@@ -151,117 +151,6 @@ void ConsoleView::applyThemeToView(const ThemeConfig &theme) {
     buttonColor = theme.button.color;
 }
 
-bool ConsoleView::loadUserConfig(bz::json::Value &out) const {
-    const std::filesystem::path path = userConfigPath.empty()
-        ? bz::data::EnsureUserConfigFile("config.json")
-        : std::filesystem::path(userConfigPath);
-    if (auto user = bz::data::LoadJsonFile(path, "user config", spdlog::level::debug)) {
-        if (!user->is_object()) {
-            out = bz::json::Object();
-            return false;
-        }
-        out = *user;
-        return true;
-    }
-    out = bz::json::Object();
-    return true;
-}
-
-bool ConsoleView::saveUserConfig(const bz::json::Value &userConfig, std::string &error) const {
-    const std::filesystem::path path = userConfigPath.empty()
-        ? bz::data::EnsureUserConfigFile("config.json")
-        : std::filesystem::path(userConfigPath);
-    std::error_code ec;
-    const auto parentDir = path.parent_path();
-    if (!parentDir.empty()) {
-        std::filesystem::create_directories(parentDir, ec);
-        if (ec) {
-            error = "Failed to create config directory.";
-            return false;
-        }
-    }
-
-    std::ofstream file(path, std::ios::trunc);
-    if (!file.is_open()) {
-        error = "Failed to open user config for writing.";
-        return false;
-    }
-
-    try {
-        file << userConfig.dump(4) << '\n';
-    } catch (const std::exception &ex) {
-        error = ex.what();
-        return false;
-    }
-    return true;
-}
-
-void ConsoleView::setNestedConfig(bz::json::Value &root,
-                                           std::initializer_list<const char*> path,
-                                           bz::json::Value value) const {
-    bz::json::Value *node = &root;
-    for (auto it = path.begin(); it != path.end(); ++it) {
-        const bool isLast = std::next(it) == path.end();
-        const std::string key(*it);
-        if (isLast) {
-            (*node)[key] = std::move(value);
-        } else {
-            if (!node->contains(key) || !(*node)[key].is_object()) {
-                (*node)[key] = bz::json::Object();
-            }
-            node = &(*node)[key];
-        }
-    }
-}
-
-void ConsoleView::setNestedConfig(bz::json::Value &root,
-                                           const std::vector<std::string> &path,
-                                           bz::json::Value value) const {
-    bz::json::Value *node = &root;
-    for (std::size_t i = 0; i < path.size(); ++i) {
-        const std::string &key = path[i];
-        const bool isLast = (i + 1 == path.size());
-        if (isLast) {
-            (*node)[key] = std::move(value);
-        } else {
-            if (!node->contains(key) || !(*node)[key].is_object()) {
-                (*node)[key] = bz::json::Object();
-            }
-            node = &(*node)[key];
-        }
-    }
-}
-
-void ConsoleView::eraseNestedConfig(bz::json::Value &root,
-                                             std::initializer_list<const char*> path) const {
-    std::vector<std::pair<bz::json::Value*, std::string>> chain;
-    bz::json::Value *node = &root;
-    for (const char *segment : path) {
-        if (!node->is_object()) {
-            return;
-        }
-        auto it = node->find(segment);
-        if (it == node->end()) {
-            return;
-        }
-        chain.emplace_back(node, segment);
-        node = &(*it);
-    }
-
-    if (chain.empty()) {
-        return;
-    }
-    chain.back().first->erase(chain.back().second);
-    for (auto it = chain.rbegin() + 1; it != chain.rend(); ++it) {
-        if (it->first->is_object() && it->first->empty()) {
-            auto parent = it + 1;
-            parent->first->erase(it->second);
-        } else {
-            break;
-        }
-    }
-}
-
 bz::json::Value ConsoleView::themeToJson(const ThemeConfig &theme) const {
     auto encodeFont = [](const ThemeFontConfig &font) {
         return bz::json::Value{
@@ -364,29 +253,30 @@ void ConsoleView::applyThemeSelection(const std::string &name) {
         }
     }
 
-    bz::json::Value userConfig;
-    if (!loadUserConfig(userConfig)) {
-        themeStatusText = "Failed to load user config.";
+    if (!bz::config::ConfigStore::Initialized()) {
+        themeStatusText = "Failed to load config.";
         themeStatusIsError = true;
         return;
     }
 
     bz::json::Value consoleJson = themeToJson(selected);
-    setNestedConfig(userConfig, {"assets", "hud", "fonts", "console"}, consoleJson);
-
+    bool ok = bz::config::ConfigStore::Set("assets.hud.fonts.console", consoleJson);
     if (!name.empty()) {
-        setNestedConfig(userConfig, {"gui", "themes", "active"}, name);
+        ok = ok && bz::config::ConfigStore::Set("gui.themes.active", name);
     }
     if (name != "Custom" && name != "Default") {
-        setNestedConfig(
-            userConfig,
-            std::vector<std::string>{"gui", "themes", "presets", name},
-            bz::json::Value{{"fonts", {{"console", consoleJson}}}});
+        bz::json::Value presets = bz::json::Object();
+        if (const auto *existing = bz::config::ConfigStore::Get("gui.themes.presets")) {
+            if (existing->is_object()) {
+                presets = *existing;
+            }
+        }
+        presets[name] = bz::json::Value{{"fonts", {{"console", consoleJson}}}};
+        ok = ok && bz::config::ConfigStore::Set("gui.themes.presets", presets);
     }
 
-    std::string error;
-    if (!saveUserConfig(userConfig, error)) {
-        themeStatusText = error.empty() ? "Failed to save theme." : error;
+    if (!ok) {
+        themeStatusText = "Failed to save theme.";
         themeStatusIsError = true;
         return;
     }
@@ -407,22 +297,8 @@ void ConsoleView::applyThemeSelection(const std::string &name) {
 }
 
 void ConsoleView::resetToDefaultTheme() {
-    bz::json::Value userConfig;
-    if (!loadUserConfig(userConfig)) {
-        themeStatusText = "Failed to load user config.";
-        themeStatusIsError = true;
-        return;
-    }
-
-    eraseNestedConfig(userConfig, {"assets", "hud", "fonts", "console"});
-    eraseNestedConfig(userConfig, {"gui", "themes", "active"});
-
-    std::string error;
-    if (!saveUserConfig(userConfig, error)) {
-        themeStatusText = error.empty() ? "Failed to save theme." : error;
-        themeStatusIsError = true;
-        return;
-    }
+    bz::config::ConfigStore::Erase("assets.hud.fonts.console");
+    bz::config::ConfigStore::Erase("gui.themes.active");
 
     currentTheme = defaultTheme;
     applyThemeToView(currentTheme);
@@ -462,9 +338,15 @@ void ConsoleView::ensureThemesLoaded() {
     }
     defaultTheme.name = "Default";
 
-    bz::json::Value userConfig;
-    if (loadUserConfig(userConfig)) {
-        if (auto guiIt = userConfig.find("gui"); guiIt != userConfig.end() && guiIt->is_object()) {
+    const bz::json::Value *userConfig = nullptr;
+    if (bz::config::ConfigStore::Initialized()) {
+        const auto &user = bz::config::ConfigStore::User();
+        if (user.is_object()) {
+            userConfig = &user;
+        }
+    }
+    if (userConfig) {
+        if (auto guiIt = userConfig->find("gui"); guiIt != userConfig->end() && guiIt->is_object()) {
             auto &guiObj = *guiIt;
             if (auto themesIt = guiObj.find("themes"); themesIt != guiObj.end() && themesIt->is_object()) {
                 auto &themesObj = *themesIt;
@@ -482,7 +364,7 @@ void ConsoleView::ensureThemesLoaded() {
         }
 
         const bz::json::Value *consoleNode = nullptr;
-        if (auto assetsIt = userConfig.find("assets"); assetsIt != userConfig.end() && assetsIt->is_object()) {
+        if (auto assetsIt = userConfig->find("assets"); assetsIt != userConfig->end() && assetsIt->is_object()) {
             const auto &assetsObj = *assetsIt;
             if (auto hudIt = assetsObj.find("hud"); hudIt != assetsObj.end() && hudIt->is_object()) {
                 const auto &hudObj = *hudIt;
@@ -517,8 +399,8 @@ void ConsoleView::ensureThemesLoaded() {
     }
 
     std::string activeName;
-    if (loadUserConfig(userConfig)) {
-        if (auto guiIt = userConfig.find("gui"); guiIt != userConfig.end() && guiIt->is_object()) {
+    if (userConfig) {
+        if (auto guiIt = userConfig->find("gui"); guiIt != userConfig->end() && guiIt->is_object()) {
             const auto &guiObj = *guiIt;
             if (auto themesIt = guiObj.find("themes"); themesIt != guiObj.end() && themesIt->is_object()) {
                 const auto &themesObj = *themesIt;

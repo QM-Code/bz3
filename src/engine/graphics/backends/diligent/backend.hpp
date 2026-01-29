@@ -62,6 +62,7 @@ public:
     void setUiOverlayTexture(const graphics::TextureHandle& texture) override;
     void setUiOverlayVisible(bool visible) override;
     void renderUiOverlay() override;
+    void setBrightness(float brightness) override;
 
     void setPosition(graphics::EntityId entity, const glm::vec3& position) override;
     void setRotation(graphics::EntityId entity, const glm::quat& rotation) override;
@@ -155,6 +156,14 @@ private:
     uint64_t uiOverlayToken_ = 0;
     bool uiOverlayVisible_ = false;
 
+    float brightness_ = 1.0f;
+    RenderTargetRecord sceneTarget_;
+    bool sceneTargetValid_ = false;
+    Diligent::RefCntAutoPtr<Diligent::IPipelineState> brightnessPipeline_;
+    Diligent::RefCntAutoPtr<Diligent::IShaderResourceBinding> brightnessBinding_;
+    Diligent::RefCntAutoPtr<Diligent::IBuffer> brightnessVertexBuffer_;
+    Diligent::RefCntAutoPtr<Diligent::IBuffer> brightnessConstantBuffer_;
+
     std::unique_ptr<UiRenderTargetBridge> uiBridge_;
 
     glm::vec3 cameraPosition{0.0f};
@@ -174,6 +183,10 @@ private:
     void updateSwapChain(int width, int height);
     void buildSkyboxResources();
     void ensureUiOverlayPipeline();
+    void ensureBrightnessPipeline();
+    void ensureSceneTarget(int width, int height);
+    void destroySceneTarget();
+    void renderBrightnessPass();
     void renderToTargets(Diligent::ITextureView* rtv,
                          Diligent::ITextureView* dsv,
                          graphics::LayerId layer,

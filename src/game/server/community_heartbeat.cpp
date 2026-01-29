@@ -12,8 +12,8 @@ CommunityHeartbeat::~CommunityHeartbeat() = default;
 void CommunityHeartbeat::configureFromConfig(const bz::json::Value &mergedConfig,
                                              uint16_t listenPort,
                                              const std::string &communityOverride) {
-    std::string advertiseHost = bz::data::ReadStringConfig("network.ServerAdvertiseHost", "");
-    std::string serverHost = bz::data::ReadStringConfig("network.ServerHost", "");
+    std::string advertiseHost = bz::config::ReadStringConfig("network.ServerAdvertiseHost", "");
+    std::string serverHost = bz::config::ReadStringConfig("network.ServerHost", "");
     if (advertiseHost.empty() || advertiseHost == "0.0.0.0") {
         advertiseHost = serverHost;
     }
