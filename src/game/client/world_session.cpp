@@ -98,7 +98,7 @@ void ClientWorldSession::update() {
         }
 
         const auto worldPath = resolveAssetPath("world");
-        renderId = game.engine.render->create(worldPath.string());
+        renderId = game.engine.render->create(worldPath.string(), false);
         physics = game.engine.physics->createStaticMesh(worldPath.string());
 
         spdlog::info("ClientWorldSession: World initialized from server");

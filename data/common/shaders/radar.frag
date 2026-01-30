@@ -8,9 +8,12 @@ const float BLUE_SOLID_DY = 1.0;
 void main() {
     float dy = vWorldPos.y - playerY;
 
-    // Exactly at player height should contribute nothing.
+    // Exactly at player height should still be visible on radar (player/shot blips).
     // Use a small epsilon to avoid precision artifacts.
-    if (abs(dy) < 1e-4) discard;
+    if (abs(dy) < 1e-4) {
+        gl_FragColor = vec4(1.0, 1.0, 1.0, 0.85);
+        return;
+    }
 
     float alpha = 0.0;
     vec3 color = vec3(0.0);

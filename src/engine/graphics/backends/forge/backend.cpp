@@ -779,6 +779,7 @@ void ForgeBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId
     cmdSetViewport(cmd_, 0.0f, 0.0f, static_cast<float>(targetWidth),
                    static_cast<float>(targetHeight), 0.0f, 1.0f);
     cmdSetScissor(cmd_, 0, 0, static_cast<uint32_t>(targetWidth), static_cast<uint32_t>(targetHeight));
+    const uint32_t setIndex = frameIndex_ % kDescriptorSetRingSize;
 
     const bool singleDescriptor = []() {
         const char* flag = std::getenv("BZ3_FORGE_DEBUG_SINGLE_DESCRIPTOR");
@@ -984,10 +985,12 @@ void ForgeBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId
 
         MeshConstants constants{};
         std::memcpy(constants.mvp, glm::value_ptr(mvp), sizeof(constants.mvp));
-        graphics::MaterialDesc desc;
+        graphics::MaterialDesc desc{};
         auto matIt = materials.find(entity.material);
         if (matIt != materials.end()) {
             desc = matIt->second;
+        } else {
+            desc.baseColor = glm::vec4(1.0f);
         }
         constants.color[0] = desc.baseColor.x;
         constants.color[1] = desc.baseColor.y;
@@ -1175,7 +1178,6 @@ void ForgeBackend::renderUiOverlay() {
 
     const uint32_t width = framebufferWidth > 0 ? static_cast<uint32_t>(framebufferWidth) : 1u;
     const uint32_t height = framebufferHeight > 0 ? static_cast<uint32_t>(framebufferHeight) : 1u;
-    const uint32_t setIndex = frameIndex_ % kDescriptorSetRingSize;
 
     struct UiOverlayConstants {
         float scaleBias[4];
@@ -1748,6 +1750,7 @@ void ForgeBackend::renderBrightnessPass() {
         || !brightnessIndexBuffer_ || !brightnessUniformBuffer_ || !brightnessSampler_) {
         return;
     }
+    const uint32_t setIndex = frameIndex_ % kDescriptorSetRingSize;
 
     RenderTarget* backBuffer = swapChain_->ppRenderTargets[frameIndex_];
     BindRenderTargetsDesc bindDesc{};

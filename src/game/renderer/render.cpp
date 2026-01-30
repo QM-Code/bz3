@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <limits>
@@ -18,6 +19,14 @@ constexpr float kRadarHeightAbovePlayer = 60.0f;
 constexpr float kRadarBeamLength = 80.0f;
 constexpr float kRadarBeamWidth = 0.3f;
 constexpr int kRadarTexSize = 512 * 2;
+
+bool RadarDebugEnabled() {
+    static const bool enabled = []() {
+        const char* flag = std::getenv("BZ3_RADAR_DEBUG");
+        return flag && flag[0] == '1';
+    }();
+    return enabled;
+}
 
 graphics::MeshData makeDiskMesh(int segments = 64, float radius = 1.0f) {
     graphics::MeshData mesh;
@@ -76,8 +85,13 @@ void Render::ensureRadarResources() {
         return;
     }
 
-    if (radarTarget == graphics::kDefaultRenderTarget
-        || device_->getRenderTargetTextureId(radarTarget) == 0u) {
+    const unsigned int existingTexId =
+        (radarTarget == graphics::kDefaultRenderTarget) ? 0u : device_->getRenderTargetTextureId(radarTarget);
+    const bool needsRadarTarget = (radarTarget == graphics::kDefaultRenderTarget || existingTexId == 0u);
+    if (needsRadarTarget) {
+        if (radarTarget != graphics::kDefaultRenderTarget) {
+            spdlog::warn("Radar RT invalid (target={} texId=0). Recreating.", radarTarget);
+        }
         if (radarTarget != graphics::kDefaultRenderTarget) {
             device_->destroyRenderTarget(radarTarget);
         }
@@ -87,6 +101,12 @@ void Render::ensureRadarResources() {
         desc.depth = true;
         desc.stencil = false;
         radarTarget = device_->createRenderTarget(desc);
+        const unsigned int newTexId = device_->getRenderTargetTextureId(radarTarget);
+        if (newTexId == 0u) {
+            spdlog::warn("Radar RT creation returned texId=0 (target={})", radarTarget);
+        } else {
+            spdlog::warn("Radar RT created target={} texId={} size={}x{}", radarTarget, newTexId, desc.width, desc.height);
+        }
     }
 
     if (radarMaterial == graphics::kInvalidMaterial) {
@@ -233,6 +253,34 @@ void Render::update() {
     device_->setCameraPosition(radarCamPos);
     device_->setCameraRotation(computeRadarCameraRotation(radarCamPos));
     device_->setMaterialFloat(radarMaterial, "playerY", cameraPosition.y);
+    if (RadarDebugEnabled()) {
+        static int frameCounter = 0;
+        frameCounter++;
+        if (frameCounter % 60 == 0) {
+            const unsigned int texId = device_->getRenderTargetTextureId(radarTarget);
+            spdlog::warn("Radar debug: target={} texId={} entities={} circles={} cam=({:.2f},{:.2f},{:.2f})",
+                         radarTarget, texId, radarEntities.size(), radarCircles.size(),
+                         cameraPosition.x, cameraPosition.y, cameraPosition.z);
+            if (radarMaterial == graphics::kInvalidMaterial || radarLineMaterial == graphics::kInvalidMaterial) {
+                spdlog::warn("Radar debug: materials invalid radarMaterial={} radarLineMaterial={}",
+                             radarMaterial, radarLineMaterial);
+            }
+            int logged = 0;
+            for (const auto& [id, circleEntity] : radarCircles) {
+                (void)circleEntity;
+                auto pit = lastPositions.find(id);
+                if (pit == lastPositions.end()) {
+                    continue;
+                }
+                const glm::vec3 rel = pit->second - cameraPosition;
+                spdlog::warn("Radar debug: circle id={} rel=({:.2f},{:.2f},{:.2f}) pos=({:.2f},{:.2f},{:.2f})",
+                             id, rel.x, rel.y, rel.z, pit->second.x, pit->second.y, pit->second.z);
+                if (++logged >= 3) {
+                    break;
+                }
+            }
+        }
+    }
     device_->renderLayer(radarLayer, radarTarget);
 
     // Debug: track radar render target texture id changes.
@@ -311,6 +359,9 @@ void Render::setModel(render_id id, const std::filesystem::path& modelPath, bool
 
 void Render::setRadarCircleGraphic(render_id id, float radius) {
     ensureRadarResources();
+    if (RadarDebugEnabled() && mainEntities.find(id) == mainEntities.end()) {
+        spdlog::warn("Radar debug: setRadarCircleGraphic for unknown id={}", id);
+    }
 
     auto it = radarCircles.find(id);
     if (it == radarCircles.end()) {
@@ -347,9 +398,17 @@ void Render::destroy(render_id id) {
     }
 
     modelPaths.erase(id);
+    lastPositions.erase(id);
 }
 
 void Render::setPosition(render_id id, const glm::vec3 &position) {
+    if (RadarDebugEnabled()) {
+        if (!std::isfinite(position.x) || !std::isfinite(position.y) || !std::isfinite(position.z)) {
+            spdlog::warn("Radar debug: non-finite position for id={} pos=({},{},{})",
+                         id, position.x, position.y, position.z);
+        }
+    }
+    lastPositions[id] = position;
     if (auto it = mainEntities.find(id); it != mainEntities.end()) {
         device_->setPosition(it->second, position);
     }
@@ -422,6 +481,13 @@ graphics::TextureHandle Render::getRadarTexture() const {
         return handle;
     }
     const unsigned int textureId = device_->getRenderTargetTextureId(radarTarget);
+    if (textureId == 0u && radarTarget != graphics::kDefaultRenderTarget) {
+        static bool loggedMissing = false;
+        if (!loggedMissing) {
+            spdlog::warn("Radar RT texture id is 0 (target={}); radar will appear blank.", radarTarget);
+            loggedMissing = true;
+        }
+    }
     handle.id = static_cast<uint64_t>(textureId);
     handle.width = static_cast<uint32_t>(kRadarTexSize);
     handle.height = static_cast<uint32_t>(kRadarTexSize);

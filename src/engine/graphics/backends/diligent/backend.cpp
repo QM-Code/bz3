@@ -29,6 +29,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <cstdlib>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -40,6 +41,14 @@
 #endif
 
 namespace graphics_backend {
+
+bool RadarDebugEnabled() {
+    static const bool enabled = []() {
+        const char* flag = std::getenv("BZ3_RADAR_DEBUG");
+        return flag && flag[0] == '1';
+    }();
+    return enabled;
+}
 namespace {
 
 struct Constants {
@@ -1742,6 +1751,10 @@ void DiligentBackend::renderToTargets(Diligent::ITextureView* rtv,
     context_->SetPipelineState(pipeline);
 
     const glm::mat4 viewProj = getViewProjectionMatrix();
+    const bool radarPass = (!useSwapchain);
+    int radarEntitiesSeen = 0;
+    int radarDraws = 0;
+    int radarMissingMeshes = 0;
     for (const auto& [id, entity] : entities) {
         if (entity.layer != layer || !entity.visible) {
             continue;
@@ -1767,6 +1780,9 @@ void DiligentBackend::renderToTargets(Diligent::ITextureView* rtv,
         auto drawMesh = [&](graphics::MeshId meshId) {
             auto meshIt = meshes.find(meshId);
             if (meshIt == meshes.end()) {
+                if (radarPass && RadarDebugEnabled()) {
+                    radarMissingMeshes++;
+                }
                 return;
             }
             const MeshRecord& mesh = meshIt->second;
@@ -1792,14 +1808,29 @@ void DiligentBackend::renderToTargets(Diligent::ITextureView* rtv,
             drawAttrs.NumIndices = mesh.indexCount;
             drawAttrs.Flags = Diligent::DRAW_FLAG_VERIFY_ALL;
             context_->DrawIndexed(drawAttrs);
+            if (radarPass && RadarDebugEnabled()) {
+                radarDraws++;
+            }
         };
 
+        if (radarPass && RadarDebugEnabled()) {
+            radarEntitiesSeen++;
+        }
         if (!entity.meshes.empty()) {
             for (graphics::MeshId meshId : entity.meshes) {
                 drawMesh(meshId);
             }
         } else if (entity.mesh != graphics::kInvalidMesh) {
             drawMesh(entity.mesh);
+        }
+    }
+
+    if (radarPass && RadarDebugEnabled()) {
+        static int radarFrameCounter = 0;
+        radarFrameCounter++;
+        if (radarFrameCounter % 60 == 0) {
+            spdlog::warn("Radar debug(diligent): entities={} draws={} missingMeshes={}",
+                         radarEntitiesSeen, radarDraws, radarMissingMeshes);
         }
     }
 

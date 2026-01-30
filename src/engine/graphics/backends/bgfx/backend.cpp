@@ -25,6 +25,7 @@
 #include <stb_image.h>
 #include <array>
 #include <vector>
+#include <cstdlib>
 
 #if defined(BZ3_WINDOW_BACKEND_SDL3)
 #include <SDL3/SDL.h>
@@ -35,6 +36,14 @@
 namespace {
 constexpr bgfx::ViewId kUiOverlayView = 253;
 constexpr bgfx::ViewId kBrightnessView = 252;
+
+bool RadarDebugEnabled() {
+    static const bool enabled = []() {
+        const char* flag = std::getenv("BZ3_RADAR_DEBUG");
+        return flag && flag[0] == '1';
+    }();
+    return enabled;
+}
 
 struct NativeWindowInfo {
     void* nwh = nullptr;
@@ -855,6 +864,10 @@ void BgfxBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId 
         cachedSunColor = readVec3Config("graphics.lighting.SunColor", glm::vec3(1.0f));
     }
 
+    const bool radarPass = (targetRecord != nullptr);
+    int radarEntitiesSeen = 0;
+    int radarDraws = 0;
+    int radarMissingMeshes = 0;
     for (const auto& [id, entity] : entities) {
         if (entity.layer != layer || !entity.visible) {
             continue;
@@ -904,6 +917,9 @@ void BgfxBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId 
             }
             auto meshIt = meshes.find(meshId);
             if (meshIt == meshes.end()) {
+                if (radarPass && RadarDebugEnabled()) {
+                    radarMissingMeshes++;
+                }
                 return;
             }
             const MeshRecord& mesh = meshIt->second;
@@ -941,14 +957,29 @@ void BgfxBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId 
 
             bgfx::setState(state);
             bgfx::submit(viewId, meshProgram);
+            if (radarPass && RadarDebugEnabled()) {
+                radarDraws++;
+            }
         };
 
+        if (radarPass && RadarDebugEnabled()) {
+            radarEntitiesSeen++;
+        }
         if (!entity.meshes.empty()) {
             for (const auto meshId : entity.meshes) {
                 drawMesh(meshId);
             }
         } else {
             drawMesh(entity.mesh);
+        }
+    }
+
+    if (radarPass && RadarDebugEnabled()) {
+        static int radarFrameCounter = 0;
+        radarFrameCounter++;
+        if (radarFrameCounter % 60 == 0) {
+            spdlog::warn("Radar debug(bgfx): entities={} draws={} missingMeshes={}",
+                         radarEntitiesSeen, radarDraws, radarMissingMeshes);
         }
     }
 
