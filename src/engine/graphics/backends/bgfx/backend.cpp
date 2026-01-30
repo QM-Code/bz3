@@ -855,7 +855,7 @@ void BgfxBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId 
         cachedSunColor = readVec3Config("graphics.lighting.SunColor", glm::vec3(1.0f));
     }
 
-    const bool radarPass = (targetRecord != nullptr);
+    const bool radarPass = (target != graphics::kDefaultRenderTarget && layer != 0);
     auto renderEntity = [&](const EntityRecord& entity) {
         if (entity.layer != layer || !entity.visible) {
             return;

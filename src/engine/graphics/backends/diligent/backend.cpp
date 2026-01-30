@@ -1042,9 +1042,9 @@ float4 main(PSInput In) : SV_Target
                   "BZ3 Diligent PSO");
     buildPipeline(Diligent::TEX_FORMAT_RGBA8_UNORM,
                   Diligent::TEX_FORMAT_D32_FLOAT,
-                  false,
-                  false,
                   true,
+                  true,
+                  false,
                   pipelineOffscreen_,
                   shaderBindingOffscreen_,
                   "BZ3 Diligent PSO Offscreen");
