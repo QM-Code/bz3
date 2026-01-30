@@ -29,7 +29,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
-#include <cstdlib>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -42,13 +41,6 @@
 
 namespace graphics_backend {
 
-bool RadarDebugEnabled() {
-    static const bool enabled = []() {
-        const char* flag = std::getenv("BZ3_RADAR_DEBUG");
-        return flag && flag[0] == '1';
-    }();
-    return enabled;
-}
 namespace {
 
 struct Constants {
@@ -1751,13 +1743,9 @@ void DiligentBackend::renderToTargets(Diligent::ITextureView* rtv,
     context_->SetPipelineState(pipeline);
 
     const glm::mat4 viewProj = getViewProjectionMatrix();
-    const bool radarPass = (!useSwapchain);
-    int radarEntitiesSeen = 0;
-    int radarDraws = 0;
-    int radarMissingMeshes = 0;
-    for (const auto& [id, entity] : entities) {
+    auto renderEntity = [&](const EntityRecord& entity) {
         if (entity.layer != layer || !entity.visible) {
-            continue;
+            return;
         }
 
         const glm::mat4 translate = glm::translate(glm::mat4(1.0f), entity.position);
@@ -1780,9 +1768,6 @@ void DiligentBackend::renderToTargets(Diligent::ITextureView* rtv,
         auto drawMesh = [&](graphics::MeshId meshId) {
             auto meshIt = meshes.find(meshId);
             if (meshIt == meshes.end()) {
-                if (radarPass && RadarDebugEnabled()) {
-                    radarMissingMeshes++;
-                }
                 return;
             }
             const MeshRecord& mesh = meshIt->second;
@@ -1808,14 +1793,8 @@ void DiligentBackend::renderToTargets(Diligent::ITextureView* rtv,
             drawAttrs.NumIndices = mesh.indexCount;
             drawAttrs.Flags = Diligent::DRAW_FLAG_VERIFY_ALL;
             context_->DrawIndexed(drawAttrs);
-            if (radarPass && RadarDebugEnabled()) {
-                radarDraws++;
-            }
         };
 
-        if (radarPass && RadarDebugEnabled()) {
-            radarEntitiesSeen++;
-        }
         if (!entity.meshes.empty()) {
             for (graphics::MeshId meshId : entity.meshes) {
                 drawMesh(meshId);
@@ -1823,15 +1802,21 @@ void DiligentBackend::renderToTargets(Diligent::ITextureView* rtv,
         } else if (entity.mesh != graphics::kInvalidMesh) {
             drawMesh(entity.mesh);
         }
-    }
+    };
 
-    if (radarPass && RadarDebugEnabled()) {
-        static int radarFrameCounter = 0;
-        radarFrameCounter++;
-        if (radarFrameCounter % 60 == 0) {
-            spdlog::warn("Radar debug(diligent): entities={} draws={} missingMeshes={}",
-                         radarEntitiesSeen, radarDraws, radarMissingMeshes);
+    for (const auto& [id, entity] : entities) {
+        (void)id;
+        if (entity.overlay) {
+            continue;
         }
+        renderEntity(entity);
+    }
+    for (const auto& [id, entity] : entities) {
+        (void)id;
+        if (!entity.overlay) {
+            continue;
+        }
+        renderEntity(entity);
     }
 
     (void)useSwapchain;
@@ -1875,6 +1860,14 @@ void DiligentBackend::setTransparency(graphics::EntityId entity, bool transparen
         return;
     }
     it->second.transparent = transparency;
+}
+
+void DiligentBackend::setOverlay(graphics::EntityId entity, bool overlay) {
+    auto it = entities.find(entity);
+    if (it == entities.end()) {
+        return;
+    }
+    it->second.overlay = overlay;
 }
 
 void DiligentBackend::setCameraPosition(const glm::vec3& position) {

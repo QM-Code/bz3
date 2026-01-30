@@ -6,7 +6,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdlib>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <limits>
@@ -19,14 +18,6 @@ constexpr float kRadarHeightAbovePlayer = 60.0f;
 constexpr float kRadarBeamLength = 80.0f;
 constexpr float kRadarBeamWidth = 0.3f;
 constexpr int kRadarTexSize = 512 * 2;
-
-bool RadarDebugEnabled() {
-    static const bool enabled = []() {
-        const char* flag = std::getenv("BZ3_RADAR_DEBUG");
-        return flag && flag[0] == '1';
-    }();
-    return enabled;
-}
 
 graphics::MeshData makeDiskMesh(int segments = 64, float radius = 1.0f) {
     graphics::MeshData mesh;
@@ -104,8 +95,6 @@ void Render::ensureRadarResources() {
         const unsigned int newTexId = device_->getRenderTargetTextureId(radarTarget);
         if (newTexId == 0u) {
             spdlog::warn("Radar RT creation returned texId=0 (target={})", radarTarget);
-        } else {
-            spdlog::warn("Radar RT created target={} texId={} size={}x{}", radarTarget, newTexId, desc.width, desc.height);
         }
     }
 
@@ -153,28 +142,29 @@ void Render::updateRadarFovLines() {
     if (radarFovRight == graphics::kInvalidEntity) {
         radarFovRight = device_->createMeshEntity(radarBeamMesh, radarLayer, radarLineMaterial);
     }
+    device_->setOverlay(radarFovLeft, true);
+    device_->setOverlay(radarFovRight, true);
 
     const float halfVertRad = glm::radians(radarFovDegrees * 0.5f);
     const float halfHorizRad = std::atan(std::tan(halfVertRad) * lastAspect);
 
-    const glm::vec3 radarCamPos = cameraPosition + glm::vec3(0.0f, kRadarHeightAbovePlayer, 0.0f);
-    const glm::quat radarCamRot = computeRadarCameraRotation(radarCamPos);
-    glm::vec3 radarUp = radarCamRot * glm::vec3(0.0f, 1.0f, 0.0f);
-    radarUp.y = 0.0f;
-    const float len2 = glm::dot(radarUp, radarUp);
+    // Keep radar FOV lines fixed in radar screen space while the radar camera rotates with the player.
+    glm::vec3 forward = glm::mat3_cast(cameraRotation) * glm::vec3(0.0f, 0.0f, -1.0f);
+    forward.y = 0.0f;
+    float len2 = glm::dot(forward, forward);
     if (len2 < 1e-6f) {
-        radarUp = glm::vec3(0.0f, 0.0f, -1.0f);
+        forward = glm::vec3(0.0f, 0.0f, -1.0f);
     } else {
-        radarUp *= 1.0f / std::sqrt(len2);
+        forward *= 1.0f / std::sqrt(len2);
     }
-    const float yaw = std::atan2(radarUp.x, -radarUp.z);
+    const float yaw = std::atan2(forward.x, -forward.z);
     const glm::quat baseYaw = glm::angleAxis(yaw, glm::vec3(0, 1, 0));
 
     const glm::quat yawLeft = glm::angleAxis(halfHorizRad, glm::vec3(0, 1, 0));
     const glm::quat yawRight = glm::angleAxis(-halfHorizRad, glm::vec3(0, 1, 0));
 
-    const glm::quat leftRot = baseYaw * yawLeft;
-    const glm::quat rightRot = baseYaw * yawRight;
+    const glm::quat leftRot = glm::inverse(baseYaw) * yawLeft;
+    const glm::quat rightRot = glm::inverse(baseYaw) * yawRight;
 
     auto maxRayToRadarEdge = [](const glm::vec3& dir) {
         const float half = kRadarOrthoHalfSize;
@@ -185,10 +175,10 @@ void Render::updateRadarFovLines() {
         return std::min(tx, tz);
     };
 
-    const glm::vec3 leftDir = leftRot * glm::vec3(0.0f, 0.0f, -1.0f);
-    const glm::vec3 rightDir = rightRot * glm::vec3(0.0f, 0.0f, -1.0f);
-    const float leftLength = maxRayToRadarEdge(leftDir);
-    const float rightLength = maxRayToRadarEdge(rightDir);
+    const glm::vec3 leftDirScreen = yawLeft * glm::vec3(0.0f, 0.0f, -1.0f);
+    const glm::vec3 rightDirScreen = yawRight * glm::vec3(0.0f, 0.0f, -1.0f);
+    const float leftLength = maxRayToRadarEdge(leftDirScreen);
+    const float rightLength = maxRayToRadarEdge(rightDirScreen);
 
     device_->setRotation(radarFovLeft, leftRot);
     device_->setPosition(radarFovLeft, cameraPosition);
@@ -200,6 +190,7 @@ void Render::updateRadarFovLines() {
 }
 
 glm::quat Render::computeRadarCameraRotation(const glm::vec3& radarCamPos) const {
+    // Player-forward-up: rotate radar so player forward is "up" on the radar.
     glm::vec3 forward = glm::mat3_cast(cameraRotation) * glm::vec3(0.0f, 0.0f, -1.0f);
     forward.y = 0.0f;
     float len2 = glm::dot(forward, forward);
@@ -208,9 +199,7 @@ glm::quat Render::computeRadarCameraRotation(const glm::vec3& radarCamPos) const
     } else {
         forward *= 1.0f / std::sqrt(len2);
     }
-
-    // Match the old behavior: camera looks at the player with "up" pointing along player forward.
-    const glm::vec3 up = forward;
+    const glm::vec3 up = -forward;
     const glm::mat4 view = glm::lookAt(radarCamPos, cameraPosition, up);
     const glm::mat4 world = glm::inverse(view);
     return glm::quat_cast(glm::mat3(world));
@@ -246,61 +235,14 @@ void Render::update() {
     updateRadarFovLines();
 
     // Render radar layer to offscreen target
-    device_->setOrthographic(-kRadarOrthoHalfSize, kRadarOrthoHalfSize,
+    device_->setOrthographic(kRadarOrthoHalfSize, -kRadarOrthoHalfSize,
                              kRadarOrthoHalfSize, -kRadarOrthoHalfSize,
                              kRadarNear, kRadarFar);
     const glm::vec3 radarCamPos = cameraPosition + glm::vec3(0.0f, kRadarHeightAbovePlayer, 0.0f);
     device_->setCameraPosition(radarCamPos);
     device_->setCameraRotation(computeRadarCameraRotation(radarCamPos));
     device_->setMaterialFloat(radarMaterial, "playerY", cameraPosition.y);
-    if (RadarDebugEnabled()) {
-        static int frameCounter = 0;
-        frameCounter++;
-        if (frameCounter % 60 == 0) {
-            const unsigned int texId = device_->getRenderTargetTextureId(radarTarget);
-            spdlog::warn("Radar debug: target={} texId={} entities={} circles={} cam=({:.2f},{:.2f},{:.2f})",
-                         radarTarget, texId, radarEntities.size(), radarCircles.size(),
-                         cameraPosition.x, cameraPosition.y, cameraPosition.z);
-            if (radarMaterial == graphics::kInvalidMaterial || radarLineMaterial == graphics::kInvalidMaterial) {
-                spdlog::warn("Radar debug: materials invalid radarMaterial={} radarLineMaterial={}",
-                             radarMaterial, radarLineMaterial);
-            }
-            int logged = 0;
-            for (const auto& [id, circleEntity] : radarCircles) {
-                (void)circleEntity;
-                auto pit = lastPositions.find(id);
-                if (pit == lastPositions.end()) {
-                    continue;
-                }
-                const glm::vec3 rel = pit->second - cameraPosition;
-                spdlog::warn("Radar debug: circle id={} rel=({:.2f},{:.2f},{:.2f}) pos=({:.2f},{:.2f},{:.2f})",
-                             id, rel.x, rel.y, rel.z, pit->second.x, pit->second.y, pit->second.z);
-                if (++logged >= 3) {
-                    break;
-                }
-            }
-        }
-    }
     device_->renderLayer(radarLayer, radarTarget);
-
-    // Debug: track radar render target texture id changes.
-    {
-        static unsigned int lastRadarTex = ~0u;
-        const unsigned int currentRadarTex = device_->getRenderTargetTextureId(radarTarget);
-        if (currentRadarTex != lastRadarTex) {
-            spdlog::info("Radar RT texture id changed: {} -> {} (entities: {}, circles: {})",
-                         lastRadarTex, currentRadarTex, radarEntities.size(), radarCircles.size());
-            lastRadarTex = currentRadarTex;
-        }
-    }
-    {
-        static size_t lastEntities = static_cast<size_t>(-1);
-        static size_t lastCircles = static_cast<size_t>(-1);
-        if (radarEntities.size() != lastEntities || radarCircles.size() != lastCircles) {
-            lastEntities = radarEntities.size();
-            lastCircles = radarCircles.size();
-        }
-    }
 
     // Render main layer to screen
     device_->setPerspective(CAMERA_FOV, lastAspect, 0.1f, 1000.0f);
@@ -359,16 +301,13 @@ void Render::setModel(render_id id, const std::filesystem::path& modelPath, bool
 
 void Render::setRadarCircleGraphic(render_id id, float radius) {
     ensureRadarResources();
-    if (RadarDebugEnabled() && mainEntities.find(id) == mainEntities.end()) {
-        spdlog::warn("Radar debug: setRadarCircleGraphic for unknown id={}", id);
-    }
-
     auto it = radarCircles.find(id);
     if (it == radarCircles.end()) {
         const auto circleEntity = device_->createMeshEntity(radarCircleMesh, radarLayer, radarLineMaterial);
         radarCircles[id] = circleEntity;
         it = radarCircles.find(id);
     }
+    device_->setOverlay(it->second, true);
 
     device_->setScale(it->second, glm::vec3(radius, 1.0f, radius));
 }
@@ -398,17 +337,9 @@ void Render::destroy(render_id id) {
     }
 
     modelPaths.erase(id);
-    lastPositions.erase(id);
 }
 
 void Render::setPosition(render_id id, const glm::vec3 &position) {
-    if (RadarDebugEnabled()) {
-        if (!std::isfinite(position.x) || !std::isfinite(position.y) || !std::isfinite(position.z)) {
-            spdlog::warn("Radar debug: non-finite position for id={} pos=({},{},{})",
-                         id, position.x, position.y, position.z);
-        }
-    }
-    lastPositions[id] = position;
     if (auto it = mainEntities.find(id); it != mainEntities.end()) {
         device_->setPosition(it->second, position);
     }

@@ -25,7 +25,6 @@
 #include <stb_image.h>
 #include <array>
 #include <vector>
-#include <cstdlib>
 
 #if defined(BZ3_WINDOW_BACKEND_SDL3)
 #include <SDL3/SDL.h>
@@ -36,14 +35,6 @@
 namespace {
 constexpr bgfx::ViewId kUiOverlayView = 253;
 constexpr bgfx::ViewId kBrightnessView = 252;
-
-bool RadarDebugEnabled() {
-    static const bool enabled = []() {
-        const char* flag = std::getenv("BZ3_RADAR_DEBUG");
-        return flag && flag[0] == '1';
-    }();
-    return enabled;
-}
 
 struct NativeWindowInfo {
     void* nwh = nullptr;
@@ -865,12 +856,9 @@ void BgfxBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId 
     }
 
     const bool radarPass = (targetRecord != nullptr);
-    int radarEntitiesSeen = 0;
-    int radarDraws = 0;
-    int radarMissingMeshes = 0;
-    for (const auto& [id, entity] : entities) {
+    auto renderEntity = [&](const EntityRecord& entity) {
         if (entity.layer != layer || !entity.visible) {
-            continue;
+            return;
         }
         const glm::mat4 model =
             glm::translate(glm::mat4(1.0f), entity.position) *
@@ -879,7 +867,6 @@ void BgfxBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId 
 
         bgfx::setTransform(glm::value_ptr(model));
         const bool isShot = isShotModelPath(entity.modelPath);
-        const bool radarPass = (targetRecord != nullptr);
         const bool transparent = entity.transparent ||
                                  (entity.material != graphics::kInvalidMaterial &&
                                   materials.count(entity.material) &&
@@ -917,9 +904,6 @@ void BgfxBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId 
             }
             auto meshIt = meshes.find(meshId);
             if (meshIt == meshes.end()) {
-                if (radarPass && RadarDebugEnabled()) {
-                    radarMissingMeshes++;
-                }
                 return;
             }
             const MeshRecord& mesh = meshIt->second;
@@ -957,14 +941,8 @@ void BgfxBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId 
 
             bgfx::setState(state);
             bgfx::submit(viewId, meshProgram);
-            if (radarPass && RadarDebugEnabled()) {
-                radarDraws++;
-            }
         };
 
-        if (radarPass && RadarDebugEnabled()) {
-            radarEntitiesSeen++;
-        }
         if (!entity.meshes.empty()) {
             for (const auto meshId : entity.meshes) {
                 drawMesh(meshId);
@@ -972,15 +950,21 @@ void BgfxBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId 
         } else {
             drawMesh(entity.mesh);
         }
-    }
+    };
 
-    if (radarPass && RadarDebugEnabled()) {
-        static int radarFrameCounter = 0;
-        radarFrameCounter++;
-        if (radarFrameCounter % 60 == 0) {
-            spdlog::warn("Radar debug(bgfx): entities={} draws={} missingMeshes={}",
-                         radarEntitiesSeen, radarDraws, radarMissingMeshes);
+    for (const auto& [id, entity] : entities) {
+        (void)id;
+        if (entity.overlay) {
+            continue;
         }
+        renderEntity(entity);
+    }
+    for (const auto& [id, entity] : entities) {
+        (void)id;
+        if (!entity.overlay) {
+            continue;
+        }
+        renderEntity(entity);
     }
 
     if (wantsBrightness && targetRecord == &sceneTarget) {
@@ -1197,6 +1181,14 @@ void BgfxBackend::setTransparency(graphics::EntityId entity, bool transparency) 
         return;
     }
     it->second.transparent = transparency;
+}
+
+void BgfxBackend::setOverlay(graphics::EntityId entity, bool overlay) {
+    auto it = entities.find(entity);
+    if (it == entities.end()) {
+        return;
+    }
+    it->second.overlay = overlay;
 }
 
 void BgfxBackend::setCameraPosition(const glm::vec3& position) {

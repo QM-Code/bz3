@@ -46,7 +46,6 @@ private:
     std::unordered_map<render_id, graphics::EntityId> radarEntities;
     std::unordered_map<render_id, graphics::EntityId> radarCircles;
     std::unordered_map<render_id, std::filesystem::path> modelPaths;
-    std::unordered_map<render_id, glm::vec3> lastPositions;
 
     glm::vec3 cameraPosition{0.0f};
     glm::quat cameraRotation{1.0f, 0.0f, 0.0f, 0.0f};

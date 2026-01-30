@@ -971,9 +971,9 @@ void ForgeBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId
         updateDescriptorSet(renderer_, setIndex, meshDescriptorSet_, 3, params);
     }
 
-    for (const auto& [id, entity] : entities) {
+    auto renderEntity = [&](const EntityRecord& entity) {
         if (entity.layer != layer || !entity.visible) {
-            continue;
+            return;
         }
         visibleEntities++;
 
@@ -1075,6 +1075,21 @@ void ForgeBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId
         } else {
             drawMesh(entity.mesh);
         }
+    };
+
+    for (const auto& [id, entity] : entities) {
+        (void)id;
+        if (entity.overlay) {
+            continue;
+        }
+        renderEntity(entity);
+    }
+    for (const auto& [id, entity] : entities) {
+        (void)id;
+        if (!entity.overlay) {
+            continue;
+        }
+        renderEntity(entity);
     }
 
     if (!useSwapchain && renderTarget) {
@@ -1274,6 +1289,13 @@ void ForgeBackend::setTransparency(graphics::EntityId entity, bool transparency)
     auto it = entities.find(entity);
     if (it != entities.end()) {
         it->second.transparent = transparency;
+    }
+}
+
+void ForgeBackend::setOverlay(graphics::EntityId entity, bool overlay) {
+    auto it = entities.find(entity);
+    if (it != entities.end()) {
+        it->second.overlay = overlay;
     }
 }
 

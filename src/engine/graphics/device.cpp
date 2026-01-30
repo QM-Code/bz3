@@ -173,6 +173,12 @@ void GraphicsDevice::setTransparency(EntityId entity, bool transparency) {
     }
 }
 
+void GraphicsDevice::setOverlay(EntityId entity, bool overlay) {
+    if (backend_) {
+        backend_->setOverlay(entity, overlay);
+    }
+}
+
 void GraphicsDevice::setCameraPosition(const glm::vec3& position) {
     if (backend_) {
         backend_->setCameraPosition(position);

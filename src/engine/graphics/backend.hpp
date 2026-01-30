@@ -68,6 +68,7 @@ public:
     virtual void setScale(graphics::EntityId entity, const glm::vec3& scale) = 0;
     virtual void setVisible(graphics::EntityId entity, bool visible) = 0;
     virtual void setTransparency(graphics::EntityId entity, bool transparency) = 0;
+    virtual void setOverlay(graphics::EntityId entity, bool overlay) = 0;
 
     virtual void setCameraPosition(const glm::vec3& position) = 0;
     virtual void setCameraRotation(const glm::quat& rotation) = 0;

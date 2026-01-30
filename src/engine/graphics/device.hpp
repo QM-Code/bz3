@@ -56,6 +56,7 @@ public:
     void setScale(EntityId entity, const glm::vec3& scale);
     void setVisible(EntityId entity, bool visible);
     void setTransparency(EntityId entity, bool transparency);
+    void setOverlay(EntityId entity, bool overlay);
 
     void setCameraPosition(const glm::vec3& position);
     void setCameraRotation(const glm::quat& rotation);

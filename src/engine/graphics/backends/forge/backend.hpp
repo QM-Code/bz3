@@ -84,6 +84,7 @@ public:
     void setScale(graphics::EntityId entity, const glm::vec3& scale) override;
     void setVisible(graphics::EntityId entity, bool visible) override;
     void setTransparency(graphics::EntityId entity, bool transparency) override;
+    void setOverlay(graphics::EntityId entity, bool overlay) override;
 
     void setCameraPosition(const glm::vec3& position) override;
     void setCameraRotation(const glm::quat& rotation) override;
@@ -104,6 +105,7 @@ private:
         glm::vec3 scale{1.0f};
         bool visible = true;
         bool transparent = false;
+        bool overlay = false;
         graphics::MeshId mesh = graphics::kInvalidMesh;
         std::vector<graphics::MeshId> meshes;
         graphics::MaterialId material = graphics::kInvalidMaterial;
