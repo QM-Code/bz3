@@ -14,6 +14,22 @@ BZ3 is a C++20 client/server 3D game inspired by BZFlag.
 
 This project uses vcpkg to provide most native dependencies and the setup scripts automatically configure CMake with the correct toolchain.
 
+## Optional: The Forge renderer backend
+
+The Forge is not bundled and must be cloned manually if you want to build with `-DBZ3_RENDER_BACKEND=forge`.
+
+- Linux/macOS:
+
+  - `git clone https://github.com/ConfettiFX/The-Forge.git third_party/the-forge`
+- Windows (PowerShell or cmd):
+
+  - `git clone https://github.com/ConfettiFX/The-Forge.git third_party\the-forge`
+
+The setup scripts can do this automatically if you set `BZ3_SETUP_FORGE=1`:
+
+- Linux/macOS: `BZ3_SETUP_FORGE=1 ./setup.sh`
+- Windows: `set BZ3_SETUP_FORGE=1` then `setup.bat`
+
 ## Runtime Data
 
 The programs load assets/config from a data root resolved via the `BZ3_DATA_DIR` environment variable (configured by `src/game/common/data_path_spec.*`).
@@ -70,9 +86,11 @@ After building:
 ## Overview (Libraries in Use)
 
 Rendering and windowing
-- **threepp** (renderer/scene graph)
+- **bgfx** (renderer backend, default)
+- **Diligent** (renderer backend, optional)
 - **Filament** (renderer/scene graph, optional)
-- **OpenGL** + **GLFW** (window + context)
+- **SDL3** (windowing, default)
+- **SDL2** (windowing stub)
 - **Assimp** (model loading)
 
 UI
@@ -98,7 +116,7 @@ Other
 ## Notes
 
 - Most dependencies are provided by vcpkg (see `vcpkg.json`).
-- Some libraries are fetched via CMake FetchContent (notably `threepp`, `enet`, `pybind11`).
+- Some libraries are fetched via CMake FetchContent (notably `enet`, `pybind11`).
 - Python plugin bytecode is redirected to a writable cache: set `BZ3_PY_CACHE_DIR` to choose the location (defaults to `/tmp/bz3-pycache`). If the directory cannot be created, bytecode writing is disabled. Current behavior is acceptable for now; we may revisit a dedicated cache path later.
 
 ## Engine vs game
@@ -116,8 +134,8 @@ Entry points (public interfaces)
 - Windowing: `Window` in `src/engine/platform/window.hpp`
 - Graphics: `GraphicsDevice` in `src/engine/graphics/device.hpp`
 - Renderer orchestration: `Render` in `src/game/renderer/render.hpp`
-- UI: `UiSystem` in `src/game/ui/system.hpp`
-- UI render bridge: `ui::RenderBridge` in `src/game/ui/render_bridge.hpp`
+- UI: `UiSystem` in `src/game/ui/core/system.hpp`
+- UI render bridge: `ui::RenderBridge` in `src/game/ui/bridges/render_bridge.hpp`
 - Physics: `PhysicsWorld` in `src/engine/physics/physics_world.hpp`
 - Networking: `ClientNetwork` and `ServerNetwork` in `src/game/net/` (message-level); transports live in `src/engine/network/`
 - World runtime: `ClientWorldSession` and `ServerWorldSession` in `src/game/client/` and `src/game/server/`
@@ -127,17 +145,17 @@ Entry points (public interfaces)
 Backend factories (compile-time selection)
 - Audio: `src/engine/audio/backend_factory.cpp`
 - Windowing: `src/engine/platform/window_factory.cpp`
-- UI: `src/game/ui/backend_factory.cpp`
+- UI: `src/game/ui/core/backend_factory.cpp`
 - Physics: `src/engine/physics/backend_factory.cpp`
 - Networking: `src/game/net/backend_factory.cpp`
 - World: `src/engine/world/backend_factory.cpp`
 
 Backend layouts (examples)
 - `src/engine/audio/backends/miniaudio/` and `src/engine/audio/backends/sdl/`
-- `src/engine/platform/backends/glfw/` and `src/engine/platform/backends/sdl/`
-- `src/game/ui/backends/imgui/` and `src/game/ui/backends/rmlui/`
+- `src/engine/platform/backends/` (currently `sdl3`, with an `sdl2` stub)
+- `src/game/ui/frontends/imgui/` and `src/game/ui/frontends/rmlui/`
 - `src/engine/physics/backends/jolt/` and `src/engine/physics/backends/bullet/`
-- `src/engine/graphics/backends/threepp/` (future: ogre, wicked, etc.)
+- `src/engine/graphics/backends/bgfx/`, `src/engine/graphics/backends/diligent/`, `src/engine/graphics/backends/forge/`
 - `src/game/net/backends/enet/` (future: steam, webrtc, etc.)
 - `src/engine/world/backends/fs/` (future: zip, remote, etc.)
 - `src/engine/input/mapping/` (action-agnostic mapping: bindings, maps, mapper)
@@ -148,25 +166,25 @@ Backend layouts (examples)
 These CMake cache variables select backends at build time:
 
 - `BZ3_UI_BACKEND=imgui|rmlui`
-- `BZ3_WINDOW_BACKEND=glfw|sdl`
-- `BZ3_PHYSICS_BACKEND=jolt|bullet`
+- `BZ3_WINDOW_BACKEND=sdl3|sdl2`
+- `BZ3_PHYSICS_BACKEND=jolt|bullet|physx`
 - `BZ3_AUDIO_BACKEND=miniaudio|sdlaudio`
-- `BZ3_RENDER_BACKEND=threepp|filament`
+- `BZ3_RENDER_BACKEND=bgfx|diligent|forge`
 - `BZ3_NETWORK_BACKEND=enet`
 - `BZ3_WORLD_BACKEND=fs`
 
 Example:
 
 ```bash
-cmake -S . -B build-sdl-rmlui-bullet-sdlaudio-threepp-enet-fs \
-  -DBZ3_WINDOW_BACKEND=sdl \
+cmake -S . -B build-sdl3-rmlui-bullet-sdlaudio-bgfx-enet-fs \
+  -DBZ3_WINDOW_BACKEND=sdl3 \
   -DBZ3_UI_BACKEND=rmlui \
   -DBZ3_PHYSICS_BACKEND=bullet \
   -DBZ3_AUDIO_BACKEND=sdlaudio \
-  -DBZ3_RENDER_BACKEND=threepp \
+  -DBZ3_RENDER_BACKEND=bgfx \
   -DBZ3_NETWORK_BACKEND=enet \
   -DBZ3_WORLD_BACKEND=fs
-cmake --build build-sdl-rmlui-bullet-sdlaudio-threepp-enet-fs
+cmake --build build-sdl3-rmlui-bullet-sdlaudio-bgfx-enet-fs
 ```
 
 ## Input bindings

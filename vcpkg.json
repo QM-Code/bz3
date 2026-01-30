@@ -3,10 +3,21 @@
   "version": "0.1.0",
   "dependencies": [
     "glfw3",
-    "sdl3",
+    {
+      "name": "sdl3",
+      "features": [
+        "vulkan"
+      ]
+    },
     "glm",
-    "joltphysics",
+    {
+      "name": "joltphysics",
+      "features": [
+        "rtti"
+      ]
+    },
     "bullet3",
+    "physx",
     "assimp",
     "opengl",
     "glad",
@@ -35,7 +46,15 @@
     "protobuf",
     "curl",
     "openssl",
-    "md4c"
+    "md4c",
+    "bgfx",
+    {
+      "name": "bgfx",
+      "features": [
+        "tools"
+      ],
+      "host": true
+    }
   ],
   "builtin-baseline": "76a382b7b8ce7ed30bbf976aa9aecae868594d5e"
 }

@@ -2,7 +2,7 @@
 
 #include "engine/graphics/device.hpp"
 #include "core/types.hpp"
-#include "ui/types.hpp"
+#include "ui/core/types.hpp"
 
 #include <filesystem>
 #include <glm/glm.hpp>
@@ -50,14 +50,10 @@ private:
     glm::vec3 cameraPosition{0.0f};
     glm::quat cameraRotation{1.0f, 0.0f, 0.0f, 0.0f};
 
+    int lastFramebufferWidth = 0;
+    int lastFramebufferHeight = 0;
     float lastAspect = 1.0f;
     float radarFovDegrees = CAMERA_FOV;
-
-#if defined(BZ3_RENDER_BACKEND_FILAMENT)
-    graphics::RenderTargetId mainTarget = graphics::kDefaultRenderTarget;
-    int mainTargetWidth = 0;
-    int mainTargetHeight = 0;
-#endif
 
     Render(platform::Window &window);
     ~Render();
@@ -66,7 +62,6 @@ private:
     void resizeCallback(int width, int height);
 
     void ensureRadarResources();
-    void ensureMainTarget(int width, int height);
     void updateRadarFovLines();
     glm::quat computeRadarCameraRotation(const glm::vec3& radarCamPos) const;
 
@@ -86,11 +81,12 @@ public:
     void setCameraPosition(const glm::vec3 &position);
     void setCameraRotation(const glm::quat &rotation);
     void setUiOverlayTexture(const ui::RenderOutput& output);
+    void renderUiOverlay();
     void setBrightness(float brightness);
+    void present();
 
-    unsigned int getRadarTextureId() const;
-    unsigned int getMainTextureId() const;
-    std::pair<int, int> getMainTextureSize() const;
+    graphics::TextureHandle getRadarTexture() const;
+    graphics_backend::UiRenderTargetBridge* getUiRenderTargetBridge() const;
     void setRadarShaderPath(const std::filesystem::path& vertPath,
                             const std::filesystem::path& fragPath);
 

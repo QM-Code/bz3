@@ -1,20 +1,20 @@
 <div class="panel start-server-panel">
     <div class="panel-header start-server-header">
-        <span class="panel-header-title">Start Server</span>
+        <span class="panel-header-title" data-i18n="ui.console.start_server.title"></span>
     </div>
     <div class="start-server-body">
-        <div id="start-server-warning" class="status status-error hidden">bz3-server binary not found.</div>
+        <div id="start-server-warning" class="status status-error hidden" data-i18n="ui.console.start_server.server_binary_missing"></div>
         <div id="start-server-status" class="status hidden"></div>
 
         <div class="start-section">
-            <div class="section-title">New Server</div>
+            <div class="section-title" data-i18n="ui.console.start_server.new_server"></div>
             <div class="new-server-row header">
-                <div class="new-server-cell port">Port</div>
-                <div class="new-server-cell world">World Directory</div>
-                <div class="new-server-cell data">Data Directory</div>
-                <div class="new-server-cell ip">IP Address</div>
-                <div class="new-server-cell logging">Logging</div>
-                <div class="new-server-cell action">Actions</div>
+                <div class="new-server-cell port" data-i18n="ui.console.start_server.port"></div>
+                <div class="new-server-cell world" data-i18n="ui.console.start_server.world_directory"></div>
+                <div class="new-server-cell data" data-i18n="ui.console.start_server.data_directory"></div>
+                <div class="new-server-cell ip" data-i18n="ui.console.start_server.ip_address"></div>
+                <div class="new-server-cell logging" data-i18n="ui.console.start_server.logging"></div>
+                <div class="new-server-cell action" data-i18n="ui.console.start_server.action"></div>
             </div>
             <div class="new-server-row">
                 <div class="new-server-cell port">
@@ -39,7 +39,7 @@
                     <select id="server-log-level-select"></select>
                 </div>
                 <div class="new-server-cell action">
-                    <button id="server-start-button" class="primary">Start</button>
+                    <button id="server-start-button" class="primary" data-i18n="ui.console.start_server.start_button"></button>
                 </div>
             </div>
         </div>

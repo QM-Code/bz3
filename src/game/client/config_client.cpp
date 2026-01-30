@@ -4,6 +4,7 @@
 #include "common/json.hpp"
 #include "spdlog/spdlog.h"
 #include "common/data_path_resolver.hpp"
+#include "common/config_store.hpp"
 
 namespace {
 
@@ -144,20 +145,22 @@ ClientConfig LoadClientConfigFromFiles(const std::filesystem::path &defaultConfi
 } // namespace
 
 ClientConfig ClientConfig::Load(const std::string &path) {
+    const auto userConfigPath = bz::config::ConfigStore::Initialized()
+        ? bz::config::ConfigStore::UserConfigPath()
+        : bz::data::EnsureUserConfigFile("config.json");
+
     if (!path.empty()) {
         const std::filesystem::path defaultConfigPath(path);
-        const std::filesystem::path userConfigPath = bz::data::EnsureUserConfigFile("config.json");
         return LoadClientConfigFromFiles(defaultConfigPath, userConfigPath);
     }
 
-    if (!bz::data::ConfigCacheInitialized()) {
+    if (!bz::config::ConfigStore::Initialized()) {
         spdlog::debug("ClientConfig::Load: Config cache uninitialized; falling back to direct file load");
         const auto defaultConfigPath = bz::data::Resolve("client/config.json");
-        const auto userConfigPath = bz::data::EnsureUserConfigFile("config.json");
         return LoadClientConfigFromFiles(defaultConfigPath, userConfigPath);
     }
 
-    const auto &root = bz::data::ConfigCacheRoot();
+    const auto &root = bz::config::ConfigStore::Merged();
     if (!root.is_object()) {
         spdlog::warn("ClientConfig::Load: Configuration cache root is not a JSON object");
         return ClientConfig{};

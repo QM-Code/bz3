@@ -10,6 +10,7 @@
 #include "common/data_dir_override.hpp"
 #include "common/data_path_resolver.hpp"
 #include "common/config_helpers.hpp"
+#include "common/config_store.hpp"
 #include "common/json.hpp"
 #include <pybind11/embed.h>
 #include <csignal>
@@ -84,11 +85,11 @@ int main(int argc, char *argv[]) {
 
     const auto dataDirResult = bz::data::ApplyDataDirOverrideFromArgs(argc, argv, std::filesystem::path("server/config.json"));
 
-    const std::vector<bz::data::ConfigLayerSpec> baseConfigSpecs = {
-        {"common/config.json", "data/common/config.json", spdlog::level::err, true},
-        {"server/config.json", "data/server/config.json", spdlog::level::err, true}
+    const std::vector<bz::config::ConfigFileSpec> baseConfigSpecs = {
+        {"common/config.json", "data/common/config.json", spdlog::level::err, true, true},
+        {"server/config.json", "data/server/config.json", spdlog::level::err, true, true}
     };
-    bz::data::InitializeConfigCache(baseConfigSpecs);
+    bz::config::ConfigStore::Initialize(baseConfigSpecs, dataDirResult.userConfigPath);
 
     ServerCLIOptions cliOptions;
     try {
@@ -116,22 +117,19 @@ int main(int argc, char *argv[]) {
     }
     const std::filesystem::path configPath = worldDirPath / "config.json";
 
-    const std::vector<bz::data::ConfigLayerSpec> serverConfigSpecs = {
-        {"common/config.json", "data/common/config.json", spdlog::level::err, true},
-        {"server/config.json", "data/server/config.json", spdlog::level::err, true},
-        {dataDirResult.userConfigPath, "user config", spdlog::level::debug, false},
-        {configPath, "world config", spdlog::level::err, true}
-    };
+    if (auto worldConfigOpt = bz::data::LoadJsonFile(configPath, "world config", spdlog::level::err)) {
+        if (worldConfigOpt->is_object()) {
+            bz::config::ConfigStore::AddRuntimeLayer("world config", *worldConfigOpt, configPath.parent_path());
+        }
+    }
 
-    bz::data::InitializeConfigCache(serverConfigSpecs);
-
-    const auto *worldConfigPtr = bz::data::ConfigLayerByLabel("world config");
+    const auto *worldConfigPtr = bz::config::ConfigStore::LayerByLabel("world config");
     if (!worldConfigPtr || !worldConfigPtr->is_object()) {
         spdlog::error("main: Failed to load world config object from {}", configPath.string());
         return 1;
     }
 
-    const auto &mergedConfig = bz::data::ConfigCacheRoot();
+    const auto &mergedConfig = bz::config::ConfigStore::Merged();
     if (!mergedConfig.is_object()) {
         spdlog::error("main: Merged configuration is not a JSON object");
         return 1;
@@ -139,13 +137,13 @@ int main(int argc, char *argv[]) {
 
     uint16_t port = cliOptions.hostPort;
     if (!cliOptions.hostPortExplicit) {
-        port = bz::data::ReadUInt16Config({"network.ServerPort"}, port);
+        port = bz::config::ReadUInt16Config({"network.ServerPort"}, port);
     } else {
         port = cliOptions.hostPort;
     }
 
-    std::string serverName = bz::data::ReadStringConfig("serverName", "BZ OpenGL Server");
-    std::string worldName = bz::data::ReadStringConfig("worldName", worldDirPath.filename().string());
+    std::string serverName = bz::config::ReadStringConfig("serverName", "BZ Server");
+    std::string worldName = bz::config::ReadStringConfig("worldName", worldDirPath.filename().string());
     ServerEngine engine(port);
     g_engine = &engine;
     spdlog::trace("ServerEngine initialized successfully");

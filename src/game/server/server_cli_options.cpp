@@ -1,6 +1,7 @@
 #include "server/server_cli_options.hpp"
 
 #include "common/data_path_resolver.hpp"
+#include "common/config_store.hpp"
 #include "cxxopts.hpp"
 #include "common/json.hpp"
 #include <spdlog/spdlog.h>
@@ -12,7 +13,7 @@
 namespace {
 
 std::string ConfiguredPortDefault() {
-    if (const auto *portNode = bz::data::ConfigValue("network.ServerPort")) {
+    if (const auto *portNode = bz::config::ConfigStore::Get("network.ServerPort")) {
         if (portNode->is_string()) {
             return portNode->get<std::string>();
         }

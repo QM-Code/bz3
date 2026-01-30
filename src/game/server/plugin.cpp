@@ -188,7 +188,7 @@ std::optional<std::string> PluginAPI::getPlayerIP(client_id id) {
 }
 
 PYBIND11_EMBEDDED_MODULE(bzapi, m) {
-    m.doc() = "Plugin API for BZ OpenGL server plugins";
+    m.doc() = "Plugin API for BZ server plugins";
 
     // Register the enum
     pybind11::enum_<EventType>(m, "EventType")

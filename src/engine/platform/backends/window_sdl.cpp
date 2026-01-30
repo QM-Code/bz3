@@ -3,6 +3,8 @@
 #include <SDL3/SDL.h>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
+#include <cstdlib>
 #include <string>
 
 namespace platform {
@@ -281,12 +283,34 @@ void AppendTextInputEvents(std::vector<Event> &buffer, const char *text) {
     }
 }
 
+void SetEnvVar(const char *name, const char *value) {
+#if defined(_WIN32)
+    _putenv_s(name, value ? value : "");
+#else
+    if (value) {
+        setenv(name, value, 1);
+    } else {
+        unsetenv(name);
+    }
+#endif
+}
+
 } // namespace
 
 class WindowSdl final : public Window {
 public:
     explicit WindowSdl(const WindowConfig &config) {
-        const bool sdlInitOk = SDL_Init(SDL_INIT_VIDEO);
+        bool usedPreferredDriver = false;
+        if (!config.preferredVideoDriver.empty()) {
+            usedPreferredDriver = true;
+            SetEnvVar("SDL_VIDEODRIVER", config.preferredVideoDriver.c_str());
+        }
+        bool sdlInitOk = SDL_Init(SDL_INIT_VIDEO);
+        if (!sdlInitOk && usedPreferredDriver) {
+            spdlog::warn("SDL_Init failed with preferred driver '{}': {}", config.preferredVideoDriver, SDL_GetError());
+            SetEnvVar("SDL_VIDEODRIVER", nullptr);
+            sdlInitOk = SDL_Init(SDL_INIT_VIDEO);
+        }
         spdlog::info("SDL_Init(SDL_INIT_VIDEO) returned {}", sdlInitOk ? 1 : 0);
         if (!sdlInitOk) {
             spdlog::error("SDL failed to initialize: {}", SDL_GetError());
@@ -295,39 +319,19 @@ public:
         }
         spdlog::info("SDL video driver: {}", SDL_GetCurrentVideoDriver() ? SDL_GetCurrentVideoDriver() : "(null)");
 
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, config.glMajor);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, config.glMinor);
-        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, config.glCoreProfile ? SDL_GL_CONTEXT_PROFILE_CORE : SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
-        SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, config.samples > 0 ? 1 : 0);
-        SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, config.samples);
-
-        window = SDL_CreateWindow(config.title.c_str(), config.width, config.height, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+        uint32_t windowFlags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_VULKAN;
+        window = SDL_CreateWindow(config.title.c_str(), config.width, config.height, windowFlags);
         if (!window) {
             spdlog::error("SDL window failed to create: {}", SDL_GetError());
             SDL_Quit();
             return;
         }
-
-        glContext = SDL_GL_CreateContext(window);
-        if (!glContext) {
-            spdlog::error("SDL GL context failed to create: {}", SDL_GetError());
-            SDL_DestroyWindow(window);
-            window = nullptr;
-            SDL_Quit();
-            return;
-        }
-
-        SDL_GL_MakeCurrent(window, glContext);
         SDL_StartTextInput(window);
     }
 
     ~WindowSdl() override {
         if (window) {
             SDL_StopTextInput(window);
-        }
-        if (glContext) {
-            SDL_GL_DestroyContext(glContext);
-            glContext = nullptr;
         }
         if (window) {
             SDL_DestroyWindow(window);
@@ -449,20 +453,8 @@ public:
         }
     }
 
-    void swapBuffers() override {
-        if (window) {
-            SDL_GL_SwapWindow(window);
-        }
-    }
-
-    void makeContextCurrent() override {
-        if (window && glContext) {
-            SDL_GL_MakeCurrent(window, glContext);
-        }
-    }
-
     void setVsync(bool enabled) override {
-        SDL_GL_SetSwapInterval(enabled ? 1 : 0);
+        (void)enabled;
     }
 
     void setFullscreen(bool enabled) override {
@@ -562,13 +554,27 @@ public:
         return out;
     }
 
+    void setBrightness(float brightness) override {
+        if (!window) {
+            return;
+        }
+        const float clamped = std::clamp(brightness, 0.2f, 3.0f);
+        const float t = (clamped - 0.2f) / 2.8f;
+        const float opacity = std::clamp(0.2f + t * 0.8f, 0.2f, 1.0f);
+        SDL_SetWindowOpacity(window, opacity);
+    }
+
     void* nativeHandle() const override {
         return window;
     }
 
+    std::string getVideoDriver() const override {
+        const char* driver = SDL_GetCurrentVideoDriver();
+        return driver ? std::string(driver) : std::string();
+    }
+
 private:
     SDL_Window *window = nullptr;
-    SDL_GLContext glContext = nullptr;
     std::vector<Event> eventsBuffer;
     bool fullscreen = false;
     bool closeRequested = false;
@@ -582,7 +588,7 @@ private:
 
 namespace platform {
 
-std::unique_ptr<Window> CreateSdlWindow(const WindowConfig &config) {
+std::unique_ptr<Window> CreateSdl3Window(const WindowConfig &config) {
     return std::make_unique<WindowSdl>(config);
 }
 

@@ -44,7 +44,9 @@ body.in-game {
 
 #tab-bar {
     padding: 10px 16px 0px 16px;
-    display: inline-block;
+    display: flex;
+    align-items: center;
+    gap: 2px;
     white-space: nowrap;
 }
 
@@ -71,6 +73,10 @@ body.in-game {
     font-weight: bold;
     border-color: #ffffff;
     cursor: default;
+}
+
+#tab-documentation {
+    margin-left: auto;
 }
 
 #tab-content {
@@ -236,6 +242,29 @@ col
     padding: 4px 6px;
     border-bottom-width: 1px;
     border-bottom-color: #1c2731;
+}
+
+.status {
+    padding: 6px 10px;
+    border-radius: 6px;
+    border-width: 1px;
+    border-color: #22303d;
+    background-color: #101b25;
+    color: #c7d2db;
+}
+
+.status.hidden {
+    display: none;
+}
+
+.status-error {
+    border-color: #7a3131;
+    color: #ffb3b3;
+}
+
+.status-pending {
+    border-color: #6a5d2e;
+    color: #ffd98e;
 }
 
 .markdown col {

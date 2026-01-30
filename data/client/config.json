@@ -16,6 +16,16 @@
       "clientRadius": 1
     }
   },
+  "ui": {
+    "RenderScale": 1.0,
+    "hud": {
+      "scoreboard": true,
+      "chat": true,
+      "radar": true,
+      "fps": false,
+      "crosshair": true
+    }
+  },
   "keybindings": {
     "fire": [
       "ENTER",
@@ -141,7 +151,10 @@
               1.0,
               1.0
             ]
-          }
+          },
+          "Extras": [
+            "fonts/Tourney.ttf"
+          ]
         }
       }
     },
@@ -166,13 +179,19 @@
     "ConnectionTimeout": 5,
     "MaxRetries": 3
   },
+  "platform": {
+    "SdlVideoDriver": "wayland"
+  },
   "graphics": {
     "resolution": {
       "Width": 1280,
       "Height": 720
     },
     "Fullscreen": false,
-    "VSync": true
+    "VSync": true,
+    "Bgfx": {
+      "NoGl": true
+    }
   },
   "controls": {
     "MouseSensitivity": 1.0,

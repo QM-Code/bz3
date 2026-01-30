@@ -3,7 +3,7 @@
 #include <curl/curl.h>
 #include "common/json.hpp"
 #include "common/curl_global.hpp"
-#include "common/data_path_resolver.hpp"
+#include "common/config_helpers.hpp"
 #include "spdlog/spdlog.h"
 
 #include <sstream>
@@ -37,27 +37,15 @@ int parseIntegerField(const bz::json::Value &object, const char *key) {
 }
 
 std::string configuredServerPortString() {
-    if (const auto label = bz::data::ConfigValueString("network.ServerPort")) {
-        return *label;
+    const auto label = bz::config::ReadStringConfig("network.ServerPort", "");
+    if (!label.empty()) {
+        return label;
     }
-    if (const auto numeric = bz::data::ConfigValueUInt16("network.ServerPort")) {
-        return std::to_string(*numeric);
-    }
-    return std::string("0");
+    return std::to_string(bz::config::ReadUInt16Config({"network.ServerPort"}, 0));
 }
 
 uint16_t configuredServerPortValue() {
-    if (const auto numeric = bz::data::ConfigValueUInt16("network.ServerPort")) {
-        return *numeric;
-    }
-    if (const auto label = bz::data::ConfigValueString("network.ServerPort")) {
-        try {
-            return static_cast<uint16_t>(std::stoul(*label));
-        } catch (...) {
-            return 0;
-        }
-    }
-    return 0;
+    return bz::config::ReadUInt16Config({"network.ServerPort"}, 0);
 }
 
 std::string buildServersUrl(const std::string &baseHost) {

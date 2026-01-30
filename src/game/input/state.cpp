@@ -2,6 +2,7 @@
 
 #include "game/input/actions.hpp"
 #include "input/input.hpp"
+#include "common/i18n.hpp"
 
 namespace game_input {
 
@@ -50,7 +51,7 @@ InputState BuildInputState(const Input& input) {
 
 std::string SpawnHintText(const Input& input) {
     const auto hint = input.bindingListDisplay(kActionSpawn);
-    return "Press " + hint + " to spawn";
+    return bz::i18n::Get().format("ui.hud.spawn_hint", {{"binding", hint}});
 }
 
 } // namespace game_input

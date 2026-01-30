@@ -1,5 +1,7 @@
 #include "engine/graphics/device.hpp"
 
+#include <algorithm>
+
 namespace graphics {
 
 GraphicsDevice::GraphicsDevice(platform::Window& window) {
@@ -112,9 +114,9 @@ unsigned int GraphicsDevice::getRenderTargetTextureId(RenderTargetId target) con
     return backend_ ? backend_->getRenderTargetTextureId(target) : 0u;
 }
 
-void GraphicsDevice::setUiOverlayTexture(unsigned int textureId, int width, int height) {
+void GraphicsDevice::setUiOverlayTexture(const TextureHandle& texture) {
     if (backend_) {
-        backend_->setUiOverlayTexture(textureId, width, height);
+        backend_->setUiOverlayTexture(texture);
     }
 }
 
@@ -132,8 +134,13 @@ void GraphicsDevice::renderUiOverlay() {
 
 void GraphicsDevice::setBrightness(float brightness) {
     if (backend_) {
-        backend_->setBrightness(brightness);
+        const float clamped = std::clamp(brightness, 0.2f, 3.0f);
+        backend_->setBrightness(clamped);
     }
+}
+
+graphics_backend::UiRenderTargetBridge* GraphicsDevice::getUiRenderTargetBridge() const {
+    return backend_ ? backend_->getUiRenderTargetBridge() : nullptr;
 }
 
 void GraphicsDevice::setPosition(EntityId entity, const glm::vec3& position) {
@@ -163,6 +170,12 @@ void GraphicsDevice::setVisible(EntityId entity, bool visible) {
 void GraphicsDevice::setTransparency(EntityId entity, bool transparency) {
     if (backend_) {
         backend_->setTransparency(entity, transparency);
+    }
+}
+
+void GraphicsDevice::setOverlay(EntityId entity, bool overlay) {
+    if (backend_) {
+        backend_->setOverlay(entity, overlay);
     }
 }
 

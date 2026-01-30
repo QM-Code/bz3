@@ -10,10 +10,15 @@ struct ClientCLIOptions {
     std::string worldDir;
     std::string dataDir;
     std::string userConfigPath;
+    std::string language;
+    std::string theme;
     bool addrExplicit = false;
     bool worldExplicit = false;
     bool dataDirExplicit = false;
     bool userConfigExplicit = false;
+    bool languageExplicit = false;
+    bool themeExplicit = false;
+    bool devQuickStart = false;
     bool verbose = false;
     std::string logLevel;
     bool logLevelExplicit = false;

@@ -4,8 +4,10 @@
 #include "physics/backends/jolt/physics_world_jolt.hpp"
 #elif defined(BZ3_PHYSICS_BACKEND_BULLET)
 #include "physics/backends/bullet/physics_world_bullet.hpp"
+#elif defined(BZ3_PHYSICS_BACKEND_PHYSX)
+#include "physics/backends/physx/physics_world_physx.hpp"
 #else
-#error "BZ3 physics backend not set. Define BZ3_PHYSICS_BACKEND_JOLT or BZ3_PHYSICS_BACKEND_BULLET."
+#error "BZ3 physics backend not set. Define BZ3_PHYSICS_BACKEND_JOLT, BZ3_PHYSICS_BACKEND_BULLET, or BZ3_PHYSICS_BACKEND_PHYSX."
 #endif
 
 namespace physics_backend {
@@ -15,6 +17,8 @@ std::unique_ptr<PhysicsWorldBackend> CreatePhysicsWorldBackend() {
     return std::make_unique<PhysicsWorldJolt>();
 #elif defined(BZ3_PHYSICS_BACKEND_BULLET)
     return std::make_unique<PhysicsWorldBullet>();
+#elif defined(BZ3_PHYSICS_BACKEND_PHYSX)
+    return std::make_unique<PhysicsWorldPhysX>();
 #endif
 }
 

@@ -1,0 +1,41 @@
+date       time     [thread name/id ]                   file:line    v |
+2026-01-30 09:01:15 [MainThread     ]                   Log.c:193   INFO| Opened log file bz3.log
+2026-01-30 09:01:15 [MainThread     ]      GraphicsConfig.cpp:1016  INFO| Default GPU Data:
+2026-01-30 09:01:15 [MainThread     ]      GraphicsConfig.cpp:1017  INFO|     DefaultGPUPresetLevel set to medium
+2026-01-30 09:01:15 [MainThread     ]      GraphicsConfig.cpp:1019  INFO| GPU vendors:
+2026-01-30 09:01:15 [MainThread     ]      GraphicsConfig.cpp:1037  INFO|     intel: 0x8086
+2026-01-30 09:01:15 [MainThread     ]      GraphicsConfig.cpp:1037  INFO|     amd: 0x1002
+2026-01-30 09:01:15 [MainThread     ]      GraphicsConfig.cpp:1037  INFO|     nvidia: 0x10de
+2026-01-30 09:01:15 [MainThread     ]      GraphicsConfig.cpp:1182  INFO| GPU selection rules:
+2026-01-30 09:01:15 [MainThread     ]      GraphicsConfig.cpp:1191  INFO| Driver rejections:
+2026-01-30 09:01:15 [MainThread     ]      GraphicsConfig.cpp:1209  INFO| GPU configuration rules:
+2026-01-30 09:01:15 [MainThread     ]      GraphicsConfig.cpp:1221  INFO| Texture support rules:
+2026-01-30 09:01:15 [MainThread     ]      GraphicsConfig.cpp:1235  INFO| Extended configuration rules:
+2026-01-30 09:01:15 [MainThread     ]                Vulkan.c:3531  INFO| Creating VkInstance with 0 enabled instance layers:
+2026-01-30 09:01:15 [MainThread     ]                Vulkan.c:3534  INFO| Enabled instance extension count: 10
+2026-01-30 09:01:15 [MainThread     ]                Vulkan.c:3537  INFO| 	Extension 0: VK_KHR_device_group_creation
+2026-01-30 09:01:15 [MainThread     ]                Vulkan.c:3537  INFO| 	Extension 1: VK_KHR_display
+2026-01-30 09:01:15 [MainThread     ]                Vulkan.c:3537  INFO| 	Extension 2: VK_KHR_get_physical_device_properties2
+2026-01-30 09:01:15 [MainThread     ]                Vulkan.c:3537  INFO| 	Extension 3: VK_KHR_surface
+2026-01-30 09:01:15 [MainThread     ]                Vulkan.c:3537  INFO| 	Extension 4: VK_KHR_wayland_surface
+2026-01-30 09:01:15 [MainThread     ]                Vulkan.c:3537  INFO| 	Extension 5: VK_KHR_xlib_surface
+2026-01-30 09:01:15 [MainThread     ]                Vulkan.c:3537  INFO| 	Extension 6: VK_EXT_debug_report
+2026-01-30 09:01:15 [MainThread     ]                Vulkan.c:3537  INFO| 	Extension 7: VK_EXT_debug_utils
+2026-01-30 09:01:15 [MainThread     ]                Vulkan.c:3537  INFO| 	Extension 8: VK_EXT_direct_mode_display
+2026-01-30 09:01:15 [MainThread     ]                Vulkan.c:3537  INFO| 	Extension 9: VK_EXT_swapchain_colorspace
+2026-01-30 09:01:15 [MainThread     ]                Vulkan.c:4239  INFO| GPU[0] detected. Vendor ID: 0x10de, Model ID: 0x13c2, Preset: medium, GPU Name: NVIDIA GeForce GTX 970
+2026-01-30 09:01:15 [MainThread     ]                Vulkan.c:3681  INFO| GPU[0] is selected as default GPU
+2026-01-30 09:01:15 [MainThread     ]                Vulkan.c:3682  INFO| Name of selected gpu: NVIDIA GeForce GTX 970
+2026-01-30 09:01:15 [MainThread     ]                Vulkan.c:3683  INFO| Vendor id of selected gpu: 0x10de
+2026-01-30 09:01:15 [MainThread     ]                Vulkan.c:3684  INFO| Model id of selected gpu: 0x13c2
+2026-01-30 09:01:15 [MainThread     ]                Vulkan.c:3685  INFO| Preset of selected gpu: medium
+2026-01-30 09:01:15 [MainThread     ]                Vulkan.c:4015  INFO| Successfully loaded Dedicated Allocation extension
+2026-01-30 09:01:15 [MainThread     ]                Vulkan.c:4029  INFO| Successfully loaded Draw Indirect extension
+2026-01-30 09:01:15 [MainThread     ]                Vulkan.c:4050  INFO| Successfully loaded Descriptor Indexing extension
+2026-01-30 09:01:15 [MainThread     ]                Vulkan.c:4065  INFO| Successfully loaded 64 bit Shader Atomic extension
+2026-01-30 09:01:15 [MainThread     ]                Vulkan.c:4070  INFO| Successfully loaded Dynamic Rendering extension
+2026-01-30 09:01:15 [MainThread     ]                Vulkan.c:4075  INFO| Successfully loaded Device Fault extension
+2026-01-30 09:01:15 [MainThread     ]                Vulkan.c:4485  INFO| GPU supports `nonuniformEXT`
+2026-01-30 09:01:15 [MainThread     ]      ResourceLoader.cpp:2507   ERR| Failed to initialize ReloadServer
+2026-01-30 09:01:15 [MainThread     ]                Vulkan.c:4987  INFO| Adding Vulkan swapchain @ 1280x720
+2026-01-30 09:01:29 [MainThread     ]                   Log.c:153   INFO| Shutting down log system.

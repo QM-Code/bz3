@@ -13,10 +13,7 @@ struct WindowConfig {
     int width = 1280;
     int height = 720;
     std::string title = "BZ3";
-    int glMajor = 3;
-    int glMinor = 3;
-    bool glCoreProfile = true;
-    int samples = 4;
+    std::string preferredVideoDriver;
 };
 
 class Window {
@@ -30,8 +27,6 @@ public:
     virtual bool shouldClose() const = 0;
     virtual void requestClose() = 0;
 
-    virtual void swapBuffers() = 0;
-    virtual void makeContextCurrent() = 0;
     virtual void setVsync(bool enabled) = 0;
     virtual void setFullscreen(bool enabled) = 0;
     virtual bool isFullscreen() const = 0;
@@ -46,11 +41,14 @@ public:
     virtual void setClipboardText(std::string_view text) = 0;
     virtual std::string getClipboardText() const = 0;
 
+    virtual void setBrightness(float brightness) = 0;
+
     virtual void* nativeHandle() const = 0;
+    virtual std::string getVideoDriver() const = 0;
 };
 
 std::unique_ptr<Window> CreateWindow(const WindowConfig &config);
-std::unique_ptr<Window> CreateGlfwWindow(const WindowConfig &config);
-std::unique_ptr<Window> CreateSdlWindow(const WindowConfig &config);
+std::unique_ptr<Window> CreateSdl3Window(const WindowConfig &config);
+std::unique_ptr<Window> CreateSdl2Window(const WindowConfig &config);
 
 } // namespace platform

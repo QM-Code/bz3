@@ -51,6 +51,7 @@ enum ServerMsg_Type {
 
 struct ServerMsg {
     ServerMsg_Type type;
+    virtual ~ServerMsg() = default;
 };
 
 struct ServerMsg_PlayerJoin : ServerMsg {
@@ -162,6 +163,7 @@ enum ClientMsg_Type {
 struct ClientMsg {
     ClientMsg_Type type;
     client_id clientId;
+    virtual ~ClientMsg() = default;
 };
 
 struct ClientMsg_PlayerJoin : ClientMsg {

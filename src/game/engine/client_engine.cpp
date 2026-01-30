@@ -4,8 +4,10 @@
 #include "game/input/bindings.hpp"
 #include "game/input/state.hpp"
 #include "spdlog/spdlog.h"
-#include "ui/render_bridge.hpp"
-#include <glad/glad.h>
+#include "ui/bridges/render_bridge.hpp"
+#include "common/config_store.hpp"
+#include <cstdlib>
+#include "common/i18n.hpp"
 #include <cstdint>
 #include <vector>
 #include <utility>
@@ -16,15 +18,16 @@ class RenderBridgeImpl final : public ui::RenderBridge {
 public:
     explicit RenderBridgeImpl(Render *renderIn) : render(renderIn) {}
 
-    unsigned int getRadarTextureId() const override {
-        return render ? render->getRadarTextureId() : 0u;
+    graphics::TextureHandle getRadarTexture() const override {
+        return render ? render->getRadarTexture() : graphics::TextureHandle{};
+    }
+    graphics_backend::UiRenderTargetBridge* getUiRenderTargetBridge() const override {
+        return render ? render->getUiRenderTargetBridge() : nullptr;
     }
 
 private:
     Render *render = nullptr;
 };
-
- 
 
 } // namespace
 
@@ -36,25 +39,27 @@ ClientEngine::ClientEngine(platform::Window &window) {
     spdlog::trace("ClientEngine: Render initializing");
     render = new Render(window);
     spdlog::trace("ClientEngine: Render initialized successfully");
-    uiRenderBridge = std::make_unique<RenderBridgeImpl>(render);
+    auto* renderBridgeImpl = new RenderBridgeImpl(render);
+    uiRenderBridge.reset(renderBridgeImpl);
     physics = new PhysicsWorld();
     spdlog::trace("ClientEngine: Physics initialized successfully");
     input = new Input(window, game_input::DefaultKeybindings());
     spdlog::trace("ClientEngine: Input initialized successfully");
     ui = new UiSystem(window);
-    ui->setRenderBridge(uiRenderBridge.get());
+    ui->setRenderBridge(renderBridgeImpl);
     spdlog::trace("ClientEngine: UiSystem initialized successfully");
-    ui->setSpawnHint(game_input::SpawnHintText(*input));
+    lastLanguage = bz::i18n::Get().language();
+    ui->setDialogText(game_input::SpawnHintText(*input));
     audio = new Audio();
     spdlog::trace("ClientEngine: Audio initialized successfully");
 }
 
 ClientEngine::~ClientEngine() {
     delete network;
+    delete ui;
     delete render;
     delete physics;
     delete input;
-    delete ui;
     delete audio;
 }
 
@@ -82,46 +87,27 @@ void ClientEngine::step(TimeUtils::duration deltaTime) {
 }
 
 void ClientEngine::lateUpdate(TimeUtils::duration deltaTime) {
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glEnable(GL_DEPTH_TEST);
-    glDepthMask(GL_TRUE);
-
     render->update();
-
-#if defined(BZ3_RENDER_BACKEND_FILAMENT)
-    {
-        const unsigned int mainTex = render->getMainTextureId();
-        int fbWidth = 0;
-        int fbHeight = 0;
-        if (window) {
-            window->getFramebufferSize(fbWidth, fbHeight);
-        }
-        const auto [mainW, mainH] = render->getMainTextureSize();
-        if (mainTex != 0 && mainW > 0 && mainH > 0 && fbWidth > 0 && fbHeight > 0) {
-            static unsigned int blitFbo = 0;
-            if (blitFbo == 0) {
-                glGenFramebuffers(1, &blitFbo);
-            }
-            glBindFramebuffer(GL_READ_FRAMEBUFFER, blitFbo);
-            glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, mainTex, 0);
-            glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-            glViewport(0, 0, fbWidth, fbHeight);
-            glDisable(GL_DEPTH_TEST);
-            glDepthMask(GL_FALSE);
-            glBlitFramebuffer(0, 0, mainW, mainH, 0, 0, fbWidth, fbHeight, GL_COLOR_BUFFER_BIT, GL_LINEAR);
-            glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+    ui->update();
+    const std::string currentLanguage = bz::i18n::Get().language();
+    if (currentLanguage != lastLanguage) {
+        lastLanguage = currentLanguage;
+        if (input) {
+            ui->setDialogText(game_input::SpawnHintText(*input));
         }
     }
-#endif
-
-    ui->update();
+    render->setUiOverlayTexture(ui->getRenderOutput());
+    if (!std::getenv("BZ3_DISABLE_UI_OVERLAY")) {
+        render->renderUiOverlay();
+    }
+    render->present();
 
     render->setBrightness(ui->getRenderBrightness());
 
     if (ui->consumeKeybindingsReloadRequest()) {
         input->reloadKeyBindings();
-        ui->setSpawnHint(game_input::SpawnHintText(*input));
+        ui->setDialogText(game_input::SpawnHintText(*input));
     }
     network->flushPeekedMessages();
+    bz::config::ConfigStore::Tick();
 }

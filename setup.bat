@@ -5,6 +5,19 @@ REM Always run from the repo root (directory containing this script)
 set "ROOT_DIR=%~dp0"
 pushd "%ROOT_DIR%" || exit /b 1
 
+REM Optional: clone The Forge if requested.
+if /I "%BZ3_SETUP_FORGE%"=="1" (
+	if not exist "third_party\\the-forge\\Common_3" (
+		echo [setup] The Forge not found; cloning...
+		git clone https://github.com/ConfettiFX/The-Forge.git third_party\the-forge
+		if errorlevel 1 (
+			echo [setup] ERROR: failed to clone The Forge (is git installed?)
+			popd
+			exit /b 1
+		)
+	)
+)
+
 REM Download vcpkg if missing
 if not exist "vcpkg\" (
 	echo [setup] vcpkg\ not found; cloning...

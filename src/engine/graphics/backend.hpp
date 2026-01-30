@@ -1,6 +1,8 @@
 #pragma once
 
+#include "engine/graphics/texture_handle.hpp"
 #include "engine/graphics/types.hpp"
+#include "engine/graphics/ui_render_target_bridge.hpp"
 
 #include <filesystem>
 #include <glm/glm.hpp>
@@ -54,16 +56,19 @@ public:
 
     virtual unsigned int getRenderTargetTextureId(graphics::RenderTargetId target) const = 0;
 
-    virtual void setUiOverlayTexture(unsigned int textureId, int width, int height) { (void)textureId; (void)width; (void)height; }
+    virtual void setUiOverlayTexture(const graphics::TextureHandle& texture) { (void)texture; }
     virtual void setUiOverlayVisible(bool visible) { (void)visible; }
     virtual void renderUiOverlay() {}
     virtual void setBrightness(float brightness) { (void)brightness; }
+    virtual UiRenderTargetBridge* getUiRenderTargetBridge() { return nullptr; }
+    virtual const UiRenderTargetBridge* getUiRenderTargetBridge() const { return nullptr; }
 
     virtual void setPosition(graphics::EntityId entity, const glm::vec3& position) = 0;
     virtual void setRotation(graphics::EntityId entity, const glm::quat& rotation) = 0;
     virtual void setScale(graphics::EntityId entity, const glm::vec3& scale) = 0;
     virtual void setVisible(graphics::EntityId entity, bool visible) = 0;
     virtual void setTransparency(graphics::EntityId entity, bool transparency) = 0;
+    virtual void setOverlay(graphics::EntityId entity, bool overlay) = 0;
 
     virtual void setCameraPosition(const glm::vec3& position) = 0;
     virtual void setCameraRotation(const glm::quat& rotation) = 0;

@@ -6,7 +6,7 @@
 #include "physics/physics_world.hpp"
 #include "input/input.hpp"
 #include "game/input/state.hpp"
-#include "ui/system.hpp"
+#include "ui/core/system.hpp"
 #include "audio/audio.hpp"
 #include "platform/window.hpp"
 #include <string>
@@ -20,6 +20,7 @@ class ClientEngine {
 private:
     platform::Window *window;
     std::unique_ptr<ui::RenderBridge> uiRenderBridge;
+    std::string lastLanguage;
 
 public:
     ClientNetwork *network;

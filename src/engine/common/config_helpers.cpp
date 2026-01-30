@@ -1,17 +1,17 @@
 #include "common/config_helpers.hpp"
 
-#include "common/data_path_resolver.hpp"
+#include "common/config_store.hpp"
 #include "spdlog/spdlog.h"
 
 #include <algorithm>
 #include <cctype>
 #include <limits>
 
-namespace bz::data {
+namespace bz::config {
 
 bool ReadBoolConfig(std::initializer_list<const char*> paths, bool defaultValue) {
     for (const char* path : paths) {
-        if (const auto* value = ConfigValue(path)) {
+        if (const auto* value = ConfigStore::Get(path)) {
             if (value->is_boolean()) {
                 return value->get<bool>();
             }
@@ -39,16 +39,35 @@ bool ReadBoolConfig(std::initializer_list<const char*> paths, bool defaultValue)
 }
 
 uint16_t ReadUInt16Config(std::initializer_list<const char*> paths, uint16_t defaultValue) {
+    auto clampToUint16 = [](long long number) -> std::optional<uint16_t> {
+        if (number < 0 || number > std::numeric_limits<uint16_t>::max()) {
+            return std::nullopt;
+        }
+        return static_cast<uint16_t>(number);
+    };
     for (const char* path : paths) {
-        if (auto value = ConfigValueUInt16(path)) {
-            if (*value > 0) {
-                return *value;
+        if (const auto* value = ConfigStore::Get(path)) {
+            if (value->is_number_unsigned()) {
+                if (auto clamped = clampToUint16(static_cast<long long>(value->get<unsigned long long>()))) {
+                    if (*clamped > 0) {
+                        return *clamped;
+                    }
+                    spdlog::warn("Config '{}' must be positive; falling back", path);
+                    return defaultValue;
+                }
             }
-            spdlog::warn("Config '{}' must be positive; falling back", path);
-            return defaultValue;
+            if (value->is_number_integer()) {
+                if (auto clamped = clampToUint16(static_cast<long long>(value->get<long long>()))) {
+                    if (*clamped > 0) {
+                        return *clamped;
+                    }
+                    spdlog::warn("Config '{}' must be positive; falling back", path);
+                    return defaultValue;
+                }
+            }
         }
 
-        if (const auto* raw = ConfigValue(path); raw && raw->is_string()) {
+        if (const auto* raw = ConfigStore::Get(path); raw && raw->is_string()) {
             try {
                 const auto parsed = std::stoul(raw->get<std::string>());
                 if (parsed > 0 && parsed <= std::numeric_limits<uint16_t>::max()) {
@@ -65,7 +84,7 @@ uint16_t ReadUInt16Config(std::initializer_list<const char*> paths, uint16_t def
 
 float ReadFloatConfig(std::initializer_list<const char*> paths, float defaultValue) {
     for (const char* path : paths) {
-        if (const auto* value = ConfigValue(path)) {
+        if (const auto* value = ConfigStore::Get(path)) {
             if (value->is_number_float()) {
                 return static_cast<float>(value->get<double>());
             }
@@ -87,7 +106,7 @@ float ReadFloatConfig(std::initializer_list<const char*> paths, float defaultVal
 }
 
 std::string ReadStringConfig(const char *path, const std::string &defaultValue) {
-    if (const auto* value = ConfigValue(path)) {
+    if (const auto* value = ConfigStore::Get(path)) {
         if (value->is_string()) {
             return value->get<std::string>();
         }
@@ -95,4 +114,4 @@ std::string ReadStringConfig(const char *path, const std::string &defaultValue) 
     return defaultValue;
 }
 
-} // namespace bz::data
+} // namespace bz::config

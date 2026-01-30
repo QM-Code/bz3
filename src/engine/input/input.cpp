@@ -1,7 +1,7 @@
 #include "input/input.hpp"
 
 #include "platform/window.hpp"
-#include "common/data_path_resolver.hpp"
+#include "common/config_store.hpp"
 
 #include <optional>
 #include <spdlog/spdlog.h>
@@ -15,7 +15,7 @@ Input::Input(platform::Window &window, input::InputMap::DefaultBindingsMap defau
 void Input::loadKeyBindings() {
     std::optional<bz::json::Value> keybindingsConfig;
 
-    if (auto keybindingsOpt = bz::data::ConfigValueCopy("keybindings")) {
+    if (auto keybindingsOpt = bz::config::ConfigStore::GetCopy("keybindings")) {
         if (keybindingsOpt->is_object()) {
             keybindingsConfig = std::move(keybindingsOpt);
         } else {

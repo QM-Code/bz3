@@ -45,16 +45,18 @@ public:
 
     unsigned int getRenderTargetTextureId(RenderTargetId target) const;
 
-    void setUiOverlayTexture(unsigned int textureId, int width, int height);
+    void setUiOverlayTexture(const TextureHandle& texture);
     void setUiOverlayVisible(bool visible);
     void renderUiOverlay();
     void setBrightness(float brightness);
+    graphics_backend::UiRenderTargetBridge* getUiRenderTargetBridge() const;
 
     void setPosition(EntityId entity, const glm::vec3& position);
     void setRotation(EntityId entity, const glm::quat& rotation);
     void setScale(EntityId entity, const glm::vec3& scale);
     void setVisible(EntityId entity, bool visible);
     void setTransparency(EntityId entity, bool transparency);
+    void setOverlay(EntityId entity, bool overlay);
 
     void setCameraPosition(const glm::vec3& position);
     void setCameraRotation(const glm::quat& rotation);
