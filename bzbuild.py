@@ -97,13 +97,13 @@ else:
         usage()
 
 cmake_args = [
-    f"-DBZ3_WINDOW_BACKEND={window}",
-    f"-DBZ3_UI_BACKEND={ui}",
-    f"-DBZ3_PHYSICS_BACKEND={physics}",
-    f"-DBZ3_AUDIO_BACKEND={audio}",
-    f"-DBZ3_RENDER_BACKEND={render}",
-    f"-DBZ3_NETWORK_BACKEND={network}",
-    f"-DBZ3_WORLD_BACKEND={world}",
+    f"-DKARMA_WINDOW_BACKEND={window}",
+    f"-DKARMA_UI_BACKEND={ui}",
+    f"-DKARMA_PHYSICS_BACKEND={physics}",
+    f"-DKARMA_AUDIO_BACKEND={audio}",
+    f"-DKARMA_RENDER_BACKEND={render}",
+    f"-DKARMA_NETWORK_BACKEND={network}",
+    f"-DKARMA_WORLD_BACKEND={world}",
 ]
 
 if not os.path.isdir(build_dir):
@@ -138,7 +138,7 @@ if render in ("forge", "bgfx"):
         script_path = os.path.join(scripts_dir, "build_bgfx_shaders.sh")
         if os.path.isfile(script_path):
             env = os.environ.copy()
-            env.setdefault("BZ3_BUILD_DIR", os.path.abspath(build_dir))
+            env.setdefault("KARMA_BUILD_DIR", os.path.abspath(build_dir))
             run([script_path], env=env)
         else:
             print(f"Warning: bgfx shader build script not found at {script_path}", file=sys.stderr)

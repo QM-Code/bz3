@@ -4,9 +4,11 @@
 #include <string>
 #include <vector>
 #include <cstring>
+#include <utility>
 #include "spdlog/spdlog.h"
+#include "engine/app/engine_app.hpp"
 #include "engine/client_engine.hpp"
-#if defined(BZ3_RENDER_BACKEND_BGFX)
+#if defined(KARMA_RENDER_BACKEND_BGFX)
 #include "engine/graphics/backends/bgfx/backend.hpp"
 #endif
 #include "client/game.hpp"
@@ -30,7 +32,6 @@
 #include <unistd.h>
 #endif
 
-TimeUtils::time lastFrameTime;
 constexpr TimeUtils::duration MIN_DELTA_TIME = 1.0f / 120.0f;
 
 namespace {
@@ -53,7 +54,7 @@ struct QuickStartServer {
 
 std::string findServerBinary() {
     std::error_code ec;
-    const auto dataRoot = bz::data::DataRoot();
+    const auto dataRoot = karma::data::DataRoot();
     const auto root = dataRoot.parent_path();
 
     auto isExecutable = [](const std::filesystem::path &path) {
@@ -157,6 +158,149 @@ bool launchQuickStartServer(const ClientCLIOptions &cliOptions, QuickStartServer
     return true;
 #endif
 }
+
+class ClientLoopAdapter final : public karma::app::GameInterface {
+public:
+    ClientLoopAdapter(platform::Window &window,
+                      ClientEngine &engine,
+                      ServerConnector &serverConnector,
+                      CommunityBrowserController &communityBrowser,
+                      ClientCLIOptions cliOptions,
+                      std::unique_ptr<Game> &game)
+        : window_(window),
+          engine_(engine),
+          serverConnector_(serverConnector),
+          communityBrowser_(communityBrowser),
+          cliOptions_(std::move(cliOptions)),
+          game_(game) {}
+
+    bool onInit(karma::app::EngineContext &context) override {
+        engine_.render->setResourceRegistry(context.resources);
+        if (cliOptions_.devQuickStart) {
+            engine_.ui->console().show({});
+            if (launchQuickStartServer(cliOptions_, quickStartServer_)) {
+                quickStartPending_ = true;
+                quickStartLastAttempt_ = TimeUtils::GetCurrentTime();
+            }
+        } else if (cliOptions_.addrExplicit) {
+            serverConnector_.connect(cliOptions_.connectAddr,
+                                     cliOptions_.connectPort,
+                                     cliOptions_.playerName,
+                                     false,
+                                     false,
+                                     false);
+        }
+        return true;
+    }
+
+    void onShutdown(karma::app::EngineContext &) override {}
+
+    void onUpdate(karma::app::EngineContext &, float dt) override {
+        lastDt_ = dt;
+        if (dt < MIN_DELTA_TIME) {
+            TimeUtils::sleep(MIN_DELTA_TIME - dt);
+            return;
+        }
+
+        engine_.earlyUpdate(dt);
+
+        if (quickStartPending_ && !engine_.network->isConnected()) {
+            const TimeUtils::time now = TimeUtils::GetCurrentTime();
+            if (TimeUtils::GetElapsedTime(quickStartLastAttempt_, now) >= quickStartRetryDelay_) {
+                quickStartLastAttempt_ = now;
+                ++quickStartAttempts_;
+                if (serverConnector_.connect("localhost",
+                                             cliOptions_.connectPort,
+                                             cliOptions_.playerName,
+                                             false,
+                                             false,
+                                             false)) {
+                    quickStartPending_ = false;
+                    if (cliOptions_.devQuickStart) {
+                        engine_.ui->console().hide();
+                    }
+                } else if (quickStartAttempts_ >= quickStartMaxAttempts_) {
+                    spdlog::error("dev-quick-start: failed to connect after {} attempts.", quickStartAttempts_);
+                    quickStartPending_ = false;
+                }
+            }
+        }
+
+        const bool graveDown = window_.isKeyDown(platform::Key::GraveAccent);
+        if (graveDown && !prevGraveDown_) {
+            if (game_) {
+                auto &console = engine_.ui->console();
+                if (console.isVisible()) {
+                    console.hide();
+                } else {
+                    console.show({});
+                }
+            }
+        }
+        prevGraveDown_ = graveDown;
+
+        if (engine_.ui->console().consumeQuitRequest()) {
+            if (game_) {
+                engine_.network->disconnect("Disconnected from server.");
+            }
+        }
+
+        if (auto disconnectEvent = engine_.network->consumeDisconnectEvent()) {
+            if (game_) {
+                game_.reset();
+            }
+            communityBrowser_.handleDisconnected(disconnectEvent->reason);
+        }
+
+        const bool consoleVisible = engine_.ui->console().isVisible();
+        if (consoleVisible) {
+            engine_.inputState = {};
+        }
+        if (!consoleVisible && engine_.getInputState().toggleFullscreen) {
+            const bool wasFullscreen = window_.isFullscreen();
+            spdlog::info("Fullscreen toggle requested (before={})", wasFullscreen);
+            window_.setFullscreen(!wasFullscreen);
+            const bool nowFullscreen = window_.isFullscreen();
+            spdlog::info("Fullscreen toggle complete (after={})", nowFullscreen);
+            if (nowFullscreen == wasFullscreen) {
+                spdlog::warn("Fullscreen toggle had no effect");
+            }
+        }
+        if (consoleVisible) {
+            communityBrowser_.update();
+        }
+        if (game_) {
+            game_->earlyUpdate(dt);
+        }
+
+        engine_.step(dt);
+    }
+
+    void onRender(karma::app::EngineContext &) override {
+        if (game_) {
+            game_->lateUpdate(lastDt_);
+        }
+        engine_.lateUpdate(lastDt_);
+    }
+
+    bool shouldQuit() const override { return window_.shouldClose(); }
+
+private:
+    platform::Window &window_;
+    ClientEngine &engine_;
+    ServerConnector &serverConnector_;
+    CommunityBrowserController &communityBrowser_;
+    ClientCLIOptions cliOptions_;
+    std::unique_ptr<Game> &game_;
+    QuickStartServer quickStartServer_;
+    bool quickStartPending_ = false;
+    int quickStartAttempts_ = 0;
+    TimeUtils::time quickStartLastAttempt_ = TimeUtils::GetCurrentTime();
+    bool prevGraveDown_ = false;
+    const float quickStartRetryDelay_ = 0.5f;
+    const int quickStartMaxAttempts_ = 20;
+    float lastDt_ = 0.0f;
+};
 }
 
 spdlog::level::level_enum ParseLogLevel(const std::string &level) {
@@ -210,31 +354,33 @@ int main(int argc, char *argv[]) {
 
     game_common::ConfigureDataPathSpec();
 
-    const bz::data::DataDirOverrideResult dataDirResult = bz::data::ApplyDataDirOverrideFromArgs(argc, argv);
+    const karma::data::DataDirOverrideResult dataDirResult = karma::data::ApplyDataDirOverrideFromArgs(argc, argv);
 
     const auto clientUserConfigPathFs = dataDirResult.userConfigPath;
-    const std::vector<bz::config::ConfigFileSpec> clientConfigSpecs = {
+    const std::vector<karma::config::ConfigFileSpec> clientConfigSpecs = {
         {"common/config.json", "data/common/config.json", spdlog::level::err, true, true},
         {"client/config.json", "data/client/config.json", spdlog::level::err, true, true}
     };
-    bz::config::ConfigStore::Initialize(clientConfigSpecs, clientUserConfigPathFs);
-    bz::i18n::Get().loadFromConfig();
+    karma::config::ConfigStore::Initialize(clientConfigSpecs, clientUserConfigPathFs);
+    karma::i18n::Get().loadFromConfig();
 
-    const uint16_t configWidth = bz::config::ReadUInt16Config({"graphics.resolution.Width"}, 1280);
-    const uint16_t configHeight = bz::config::ReadUInt16Config({"graphics.resolution.Height"}, 720);
-    const bool fullscreenEnabled = bz::config::ReadBoolConfig({"graphics.Fullscreen"}, false);
-    const bool vsyncEnabled = bz::config::ReadBoolConfig({"graphics.VSync"}, true);
+    const uint16_t configWidth = karma::config::ReadUInt16Config({"graphics.resolution.Width"}, 1280);
+    const uint16_t configHeight = karma::config::ReadUInt16Config({"graphics.resolution.Height"}, 720);
+    const bool fullscreenEnabled = karma::config::ReadBoolConfig({"graphics.Fullscreen"}, false);
+    const bool vsyncEnabled = karma::config::ReadBoolConfig({"graphics.VSync"}, true);
 
     const ClientCLIOptions cliOptions = ParseClientCLIOptions(argc, argv);
     if (cliOptions.languageExplicit && !cliOptions.language.empty()) {
-        bz::i18n::Get().loadLanguage(cliOptions.language);
+        karma::i18n::Get().loadLanguage(cliOptions.language);
     }
     if (cliOptions.themeExplicit && !cliOptions.theme.empty()) {
-        SetEnvOverride("BZ3_BGFX_THEME", cliOptions.theme);
+        SetEnvOverride("KARMA_BGFX_THEME", cliOptions.theme);
     }
     const spdlog::level::level_enum logLevel = cliOptions.logLevelExplicit
         ? ParseLogLevel(cliOptions.logLevel)
-        : (cliOptions.verbose ? spdlog::level::trace : spdlog::level::info);
+        : (cliOptions.verbose >= 2 ? spdlog::level::trace
+           : cliOptions.verbose == 1 ? spdlog::level::debug
+           : spdlog::level::info);
     ConfigureLogging(logLevel, cliOptions.timestampLogging);
 
     const std::string clientUserConfigPath = clientUserConfigPathFs.string();
@@ -242,13 +388,13 @@ int main(int argc, char *argv[]) {
 
     const std::string initialWorldDir = (cliOptions.worldExplicit && !cliOptions.worldDir.empty())
         ? cliOptions.worldDir
-        : bz::data::Resolve("client-test").string();
+        : karma::data::Resolve("client-test").string();
 
     platform::WindowConfig windowConfig;
     windowConfig.width = configWidth;
     windowConfig.height = configHeight;
     windowConfig.title = "BZFlag v3";
-    windowConfig.preferredVideoDriver = bz::config::ReadStringConfig({"platform.SdlVideoDriver"}, "");
+    windowConfig.preferredVideoDriver = karma::config::ReadStringConfig({"platform.SdlVideoDriver"}, "");
     auto window = platform::CreateWindow(windowConfig);
     if (!window || !window->nativeHandle()) {
         spdlog::error("Window failed to create");
@@ -271,110 +417,19 @@ int main(int argc, char *argv[]) {
         clientUserConfigPath,
         serverConnector);
 
-    QuickStartServer quickStartServer;
-    bool quickStartPending = false;
-    int quickStartAttempts = 0;
-    TimeUtils::time quickStartLastAttempt = TimeUtils::GetCurrentTime();
-    const float quickStartRetryDelay = 0.5f;
-    const int quickStartMaxAttempts = 20;
-
-    if (cliOptions.devQuickStart) {
-        engine.ui->console().show({});
-        if (launchQuickStartServer(cliOptions, quickStartServer)) {
-            quickStartPending = true;
-            quickStartLastAttempt = TimeUtils::GetCurrentTime();
-        }
-    } else if (cliOptions.addrExplicit) {
-        serverConnector.connect(cliOptions.connectAddr, cliOptions.connectPort, cliOptions.playerName, false, false, false);
-    }
-
-    lastFrameTime = TimeUtils::GetCurrentTime();
-
     spdlog::trace("Starting main loop");
 
-    while (!window->shouldClose()) {
-        TimeUtils::time currTime = TimeUtils::GetCurrentTime();
-        TimeUtils::duration deltaTime = TimeUtils::GetElapsedTime(lastFrameTime, currTime);
-
-        if (deltaTime < MIN_DELTA_TIME) {
-            TimeUtils::sleep(MIN_DELTA_TIME - deltaTime);
-            continue;
-        }
-
-        lastFrameTime = currTime;
-
-        engine.earlyUpdate(deltaTime);
-
-        if (quickStartPending && !engine.network->isConnected()) {
-            const TimeUtils::time now = TimeUtils::GetCurrentTime();
-            if (TimeUtils::GetElapsedTime(quickStartLastAttempt, now) >= quickStartRetryDelay) {
-                quickStartLastAttempt = now;
-                ++quickStartAttempts;
-                if (serverConnector.connect("localhost", cliOptions.connectPort, cliOptions.playerName, false, false, false)) {
-                    quickStartPending = false;
-                    if (cliOptions.devQuickStart) {
-                        engine.ui->console().hide();
-                    }
-                } else if (quickStartAttempts >= quickStartMaxAttempts) {
-                    spdlog::error("dev-quick-start: failed to connect after {} attempts.", quickStartAttempts);
-                    quickStartPending = false;
-                }
-            }
-        }
-
-        static bool prevGraveDown = false;
-        const bool graveDown = window->isKeyDown(platform::Key::GraveAccent);
-        if (graveDown && !prevGraveDown) {
-            if (game) {
-                auto &console = engine.ui->console();
-                if (console.isVisible()) {
-                    console.hide();
-                } else {
-                    console.show({});
-                }
-            }
-        }
-        prevGraveDown = graveDown;
-
-        if (engine.ui->console().consumeQuitRequest()) {
-            if (game) {
-                engine.network->disconnect("Disconnected from server.");
-            }
-        }
-
-        if (auto disconnectEvent = engine.network->consumeDisconnectEvent()) {
-            if (game) {
-                game.reset();
-            }
-            communityBrowser.handleDisconnected(disconnectEvent->reason);
-        }
-
-        const bool consoleVisible = engine.ui->console().isVisible();
-        if (consoleVisible) {
-            engine.inputState = {};
-        }
-        if (!consoleVisible && engine.getInputState().toggleFullscreen) {
-            const bool wasFullscreen = window->isFullscreen();
-            spdlog::info("Fullscreen toggle requested (before={})", wasFullscreen);
-            window->setFullscreen(!wasFullscreen);
-            const bool nowFullscreen = window->isFullscreen();
-            spdlog::info("Fullscreen toggle complete (after={})", nowFullscreen);
-            if (nowFullscreen == wasFullscreen) {
-                spdlog::warn("Fullscreen toggle had no effect");
-            }
-        }
-        if (consoleVisible) {
-            communityBrowser.update();
-        }
-        if (game) {
-            game->earlyUpdate(deltaTime);
-            game->lateUpdate(deltaTime);
-        }
-
-        engine.step(deltaTime);
-        engine.lateUpdate(deltaTime);
-
-    }
-
-    return 0;
+    ClientLoopAdapter adapter(*window, engine, serverConnector, communityBrowser, cliOptions, game);
+    karma::app::EngineApp app;
+    app.context().window = window.get();
+    app.context().input = engine.input;
+    app.context().audio = engine.audio;
+    app.context().physics = engine.physics;
+    app.context().overlay = engine.ui;
+    engine.ecsWorld = app.context().ecsWorld;
+    engine.render->setEcsWorld(app.context().ecsWorld);
+    app.context().graphics = engine.render->getGraphicsDevice();
+    app.context().renderCore = engine.render->getRenderCore();
+    app.setGame(&adapter);
+    return app.run();
 }

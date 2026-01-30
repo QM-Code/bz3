@@ -4,7 +4,7 @@
 #include "game/input/bindings.hpp"
 #include "game/input/state.hpp"
 #include "spdlog/spdlog.h"
-#include "ui/bridges/render_bridge.hpp"
+#include "engine/ui/bridges/render_bridge.hpp"
 #include "common/config_store.hpp"
 #include <cstdlib>
 #include "common/i18n.hpp"
@@ -48,10 +48,11 @@ ClientEngine::ClientEngine(platform::Window &window) {
     ui = new UiSystem(window);
     ui->setRenderBridge(renderBridgeImpl);
     spdlog::trace("ClientEngine: UiSystem initialized successfully");
-    lastLanguage = bz::i18n::Get().language();
+    lastLanguage = karma::i18n::Get().language();
     ui->setDialogText(game_input::SpawnHintText(*input));
     audio = new Audio();
     spdlog::trace("ClientEngine: Audio initialized successfully");
+    ecsWorld = nullptr;
 }
 
 ClientEngine::~ClientEngine() {
@@ -87,27 +88,28 @@ void ClientEngine::step(TimeUtils::duration deltaTime) {
 }
 
 void ClientEngine::lateUpdate(TimeUtils::duration deltaTime) {
+    render->setBrightness(lastBrightness);
     render->update();
     ui->update();
-    const std::string currentLanguage = bz::i18n::Get().language();
+    const std::string currentLanguage = karma::i18n::Get().language();
     if (currentLanguage != lastLanguage) {
         lastLanguage = currentLanguage;
         if (input) {
             ui->setDialogText(game_input::SpawnHintText(*input));
         }
     }
-    render->setUiOverlayTexture(ui->getRenderOutput());
-    if (!std::getenv("BZ3_DISABLE_UI_OVERLAY")) {
+    const ui::RenderOutput output = ui->getRenderOutput();
+    render->setUiOverlayTexture(output);
+    if (!std::getenv("KARMA_DISABLE_UI_OVERLAY")) {
         render->renderUiOverlay();
     }
+    lastBrightness = ui->getRenderBrightness();
     render->present();
-
-    render->setBrightness(ui->getRenderBrightness());
 
     if (ui->consumeKeybindingsReloadRequest()) {
         input->reloadKeyBindings();
         ui->setDialogText(game_input::SpawnHintText(*input));
     }
     network->flushPeekedMessages();
-    bz::config::ConfigStore::Tick();
+    karma::config::ConfigStore::Tick();
 }

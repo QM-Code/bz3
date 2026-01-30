@@ -87,7 +87,7 @@ These modules are engine-agnostic or are toolkit glue that should be reusable by
 
 ### Phase 2 — Engine UI overlay (render-to-texture)
 - **Create `src/engine/ui/overlay.*`**:
-  - Define a small API for a renderable UI overlay (size, render target handle, visibility).
+  - Define a small API for a renderable UI overlay (`getRenderOutput()`, `getRenderBrightness()`).
   - Engine owns composition; game owns HUD/Console implementation.
 - **Move UI plumbing into engine**:
   - Move `src/game/ui/bridges/*` to `src/engine/ui/bridges/*`.
@@ -95,7 +95,7 @@ These modules are engine-agnostic or are toolkit glue that should be reusable by
   - Keep `src/game/ui/frontends/*`, `src/game/ui/controllers/*`, `src/game/ui/models/*` in game.
 - **Integrate into EngineApp**:
   - EngineApp composes overlay output into render pipeline.
-  - Game returns its overlay (HUD/Console) via `GameInterface`.
+  - Game returns its overlay (HUD/Console) via `GameInterface` or `EngineContext`.
 
 ### Phase 3 — ECS core in engine (required)
 - **Introduce `src/engine/ecs/*`**:

@@ -5,7 +5,7 @@
 #include "engine/graphics/ui_render_target_bridge.hpp"
 #include "platform/window.hpp"
 #include "spdlog/spdlog.h"
-#include "ui/bridges/ui_render_bridge.hpp"
+#include "engine/ui/bridges/ui_render_bridge.hpp"
 #include "ui/config/input_mapping.hpp"
 #include "ui/fonts/console_fonts.hpp"
 #include "ui/config/render_scale.hpp"
@@ -52,8 +52,8 @@ ImGuiBackend::ImGuiBackend(platform::Window &windowRef) : window(&windowRef) {
     spdlog::info("UiSystem: ImGui add default font");
     io.Fonts->AddFontDefault();
 
-    const auto assets = ui::fonts::GetConsoleFontAssets(bz::i18n::Get().language(), true);
-    const auto bigFontPath = bz::data::ResolveConfiguredAsset(assets.selection.regularFontKey);
+    const auto assets = ui::fonts::GetConsoleFontAssets(karma::i18n::Get().language(), true);
+    const auto bigFontPath = karma::data::ResolveConfiguredAsset(assets.selection.regularFontKey);
     const std::string bigFontPathStr = bigFontPath.string();
     spdlog::info("UiSystem: ImGui add big font from {}", bigFontPathStr);
     bigFont = io.Fonts->AddFontFromFileTTF(
@@ -72,7 +72,7 @@ ImGuiBackend::ImGuiBackend(platform::Window &windowRef) : window(&windowRef) {
     hud.setShowFps(hudModel.visibility.fps);
 
     consoleView.setLanguageCallback([this](const std::string &language) {
-#if defined(BZ3_RENDER_BACKEND_BGFX)
+#if defined(KARMA_RENDER_BACKEND_BGFX)
         pendingLanguage = language;
         languageReloadArmed = true;
 #else
@@ -138,7 +138,7 @@ void ImGuiBackend::handleEvents(const std::vector<platform::Event> &events) {
 void ImGuiBackend::update() {
     if (languageReloadArmed && pendingLanguage) {
         languageReloadArmed = false;
-        bz::i18n::Get().loadLanguage(*pendingLanguage);
+        karma::i18n::Get().loadLanguage(*pendingLanguage);
         pendingLanguage.reset();
         reloadFonts();
     }
@@ -220,8 +220,8 @@ void ImGuiBackend::reloadFonts() {
     io.Fonts->Clear();
     io.Fonts->AddFontDefault();
 
-    const auto assets = ui::fonts::GetConsoleFontAssets(bz::i18n::Get().language(), true);
-    const auto bigFontPath = bz::data::ResolveConfiguredAsset(assets.selection.regularFontKey);
+    const auto assets = ui::fonts::GetConsoleFontAssets(karma::i18n::Get().language(), true);
+    const auto bigFontPath = karma::data::ResolveConfiguredAsset(assets.selection.regularFontKey);
     const std::string bigFontPathStr = bigFontPath.string();
     bigFont = io.Fonts->AddFontFromFileTTF(
         bigFontPathStr.c_str(),

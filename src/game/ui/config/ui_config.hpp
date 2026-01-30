@@ -30,16 +30,16 @@ public:
     static std::string GetLanguage();
     static bool SetLanguage(const std::string &value);
 
-    static const bz::json::Value *GetCommunityCredentials();
-    static bool SetCommunityCredentials(const bz::json::Value &value);
+    static const karma::json::Value *GetCommunityCredentials();
+    static bool SetCommunityCredentials(const karma::json::Value &value);
     static bool EraseCommunityCredentials();
 
-    static std::optional<bz::json::Value> GetKeybindings();
-    static bool SetKeybindings(const bz::json::Value &value);
+    static std::optional<karma::json::Value> GetKeybindings();
+    static bool SetKeybindings(const karma::json::Value &value);
     static bool EraseKeybindings();
 
-    static std::optional<bz::json::Value> GetControllerKeybindings();
-    static bool SetControllerKeybindings(const bz::json::Value &value);
+    static std::optional<karma::json::Value> GetControllerKeybindings();
+    static bool SetControllerKeybindings(const karma::json::Value &value);
     static bool EraseControllerKeybindings();
 
     static bool GetHudScoreboard();

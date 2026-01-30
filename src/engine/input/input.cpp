@@ -13,9 +13,9 @@ Input::Input(platform::Window &window, input::InputMap::DefaultBindingsMap defau
 }
 
 void Input::loadKeyBindings() {
-    std::optional<bz::json::Value> keybindingsConfig;
+    std::optional<karma::json::Value> keybindingsConfig;
 
-    if (auto keybindingsOpt = bz::config::ConfigStore::GetCopy("keybindings")) {
+    if (auto keybindingsOpt = karma::config::ConfigStore::GetCopy("keybindings")) {
         if (keybindingsOpt->is_object()) {
             keybindingsConfig = std::move(keybindingsOpt);
         } else {
@@ -23,7 +23,7 @@ void Input::loadKeyBindings() {
         }
     }
 
-    const bz::json::Value *keybindingsJson = keybindingsConfig ? &(*keybindingsConfig) : nullptr;
+    const karma::json::Value *keybindingsJson = keybindingsConfig ? &(*keybindingsConfig) : nullptr;
     mapper_.loadBindings(keybindingsJson, defaultBindings_);
 }
 

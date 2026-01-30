@@ -9,7 +9,7 @@
 #include <cctype>
 #include <filesystem>
 
-namespace bz::i18n {
+namespace karma::i18n {
 namespace {
 
 std::string normalizeLanguage(std::string value) {
@@ -25,7 +25,7 @@ std::string normalizeLanguage(std::string value) {
     return value;
 }
 
-void flattenStrings(const bz::json::Value &node,
+void flattenStrings(const karma::json::Value &node,
                     const std::string &prefix,
                     std::unordered_map<std::string, std::string> &out) {
     if (node.is_string()) {
@@ -48,12 +48,12 @@ void flattenStrings(const bz::json::Value &node,
 std::unordered_map<std::string, std::string> loadLanguageStrings(const std::string &language,
                                                                  spdlog::level::level_enum missingLevel) {
     std::unordered_map<std::string, std::string> result;
-    const std::filesystem::path path = bz::data::Resolve(std::filesystem::path("strings") / (language + ".json"));
+    const std::filesystem::path path = karma::data::Resolve(std::filesystem::path("strings") / (language + ".json"));
     if (path.empty()) {
         spdlog::log(missingLevel, "i18n: data root not available when loading language '{}'.", language);
         return result;
     }
-    const auto jsonOpt = bz::data::LoadJsonFile(path, "strings/" + language + ".json", missingLevel);
+    const auto jsonOpt = karma::data::LoadJsonFile(path, "strings/" + language + ".json", missingLevel);
     if (!jsonOpt) {
         return result;
     }
@@ -64,7 +64,7 @@ std::unordered_map<std::string, std::string> loadLanguageStrings(const std::stri
 } // namespace
 
 void I18n::loadFromConfig() {
-    std::string language = bz::config::ReadStringConfig("language", "en");
+    std::string language = karma::config::ReadStringConfig("language", "en");
     language = normalizeLanguage(language);
     if (language.empty()) {
         language = "en";
@@ -126,4 +126,4 @@ I18n &Get() {
     return instance;
 }
 
-} // namespace bz::i18n
+} // namespace karma::i18n

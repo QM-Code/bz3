@@ -4,7 +4,7 @@
 
 namespace ui::input_mapping {
 
-#if defined(BZ3_UI_BACKEND_IMGUI)
+#if defined(KARMA_UI_BACKEND_IMGUI)
 ImGuiKey ToImGuiKey(platform::Key key) {
     switch (key) {
         case platform::Key::A: return ImGuiKey_A;
@@ -130,7 +130,7 @@ void UpdateImGuiModifiers(ImGuiIO &io, platform::Window *window) {
 }
 #endif
 
-#if defined(BZ3_UI_BACKEND_RMLUI)
+#if defined(KARMA_UI_BACKEND_RMLUI)
 Rml::Input::KeyIdentifier ToRmlKey(platform::Key key) {
     switch (key) {
         case platform::Key::A: return Rml::Input::KI_A;

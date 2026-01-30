@@ -3,12 +3,12 @@
 #include "spdlog/spdlog.h"
 #include "ui/console/null_console.hpp"
 
-#if defined(BZ3_UI_BACKEND_IMGUI)
+#if defined(KARMA_UI_BACKEND_IMGUI)
 #include "ui/frontends/imgui/backend.hpp"
-#elif defined(BZ3_UI_BACKEND_RMLUI)
+#elif defined(KARMA_UI_BACKEND_RMLUI)
 #include "ui/frontends/rmlui/backend.hpp"
 #else
-#error "BZ3 UI backend not set. Define BZ3_UI_BACKEND_IMGUI or BZ3_UI_BACKEND_RMLUI."
+#error "BZ3 UI backend not set. Define KARMA_UI_BACKEND_IMGUI or KARMA_UI_BACKEND_RMLUI."
 #endif
 
 namespace ui_backend {
@@ -43,13 +43,13 @@ private:
 } // namespace
 
 std::unique_ptr<Backend> CreateUiBackend(platform::Window &window) {
-    if (const char* noUi = std::getenv("BZ3_NO_UI"); noUi && noUi[0] != '\0') {
-        spdlog::warn("UiSystem: UI disabled via BZ3_NO_UI");
+    if (const char* noUi = std::getenv("KARMA_NO_UI"); noUi && noUi[0] != '\0') {
+        spdlog::warn("UiSystem: UI disabled via KARMA_NO_UI");
         return std::make_unique<NullBackend>();
     }
-#if defined(BZ3_UI_BACKEND_IMGUI)
+#if defined(KARMA_UI_BACKEND_IMGUI)
     return std::make_unique<ImGuiBackend>(window);
-#elif defined(BZ3_UI_BACKEND_RMLUI)
+#elif defined(KARMA_UI_BACKEND_RMLUI)
     return std::make_unique<RmlUiBackend>(window);
 #endif
 }

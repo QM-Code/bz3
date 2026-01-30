@@ -45,18 +45,18 @@ BindingsController::Result BindingsController::loadFromConfig() {
         buffer[0] = '\0';
     }
 
-    if (!bz::config::ConfigStore::Initialized()) {
+    if (!karma::config::ConfigStore::Initialized()) {
         result.ok = false;
         result.status = "Failed to load config; showing defaults.";
         result.statusIsError = true;
     }
 
-    const bz::json::Value *bindingsNode = nullptr;
+    const karma::json::Value *bindingsNode = nullptr;
     auto keybindingsNode = ui::UiConfig::GetKeybindings();
     if (keybindingsNode && keybindingsNode->is_object()) {
         bindingsNode = &(*keybindingsNode);
     }
-    const bz::json::Value *controllerNode = nullptr;
+    const karma::json::Value *controllerNode = nullptr;
     auto controllerBindingsNode = ui::UiConfig::GetControllerKeybindings();
     if (controllerBindingsNode && controllerBindingsNode->is_object()) {
         controllerNode = &(*controllerBindingsNode);
@@ -118,8 +118,8 @@ BindingsController::Result BindingsController::loadFromConfig() {
 
 BindingsController::Result BindingsController::saveToConfig() {
     Result result;
-    bz::json::Value keybindings = bz::json::Object();
-    bz::json::Value controllerBindings = bz::json::Object();
+    karma::json::Value keybindings = karma::json::Object();
+    karma::json::Value controllerBindings = karma::json::Object();
     bool hasBindings = false;
     bool hasControllerBindings = false;
 
@@ -154,7 +154,7 @@ BindingsController::Result BindingsController::saveToConfig() {
         }
     }
 
-    if (!bz::config::ConfigStore::Initialized()) {
+    if (!karma::config::ConfigStore::Initialized()) {
         result.ok = false;
         result.status = "Failed to save bindings.";
         result.statusIsError = true;

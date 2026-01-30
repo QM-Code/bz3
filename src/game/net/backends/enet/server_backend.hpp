@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-namespace network_backend {
+namespace game::net {
 
 class EnetServerBackend final : public ServerBackend {
 public:
@@ -23,15 +23,15 @@ public:
     std::vector<ServerMsgData>& receivedMessages() override { return receivedMessages_; }
 
 private:
-    client_id getClient(net::ConnectionHandle connection);
+    client_id getClient(::net::ConnectionHandle connection);
     client_id getNextClientId();
     void logUnsupportedMessageType();
 
-    std::unique_ptr<net::IServerTransport> transport_;
-    std::map<client_id, net::ConnectionHandle> clients_;
-    std::map<net::ConnectionHandle, client_id> clientByConnection_;
-    std::map<net::ConnectionHandle, std::string> ipByConnection_;
+    std::unique_ptr<::net::IServerTransport> transport_;
+    std::map<client_id, ::net::ConnectionHandle> clients_;
+    std::map<::net::ConnectionHandle, client_id> clientByConnection_;
+    std::map<::net::ConnectionHandle, std::string> ipByConnection_;
     std::vector<ServerMsgData> receivedMessages_;
 };
 
-} // namespace network_backend
+} // namespace game::net

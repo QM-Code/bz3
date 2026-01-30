@@ -1,7 +1,7 @@
 #include "game/net/server_network.hpp"
 
 ServerNetwork::ServerNetwork(uint16_t port, int maxClients, int numChannels) {
-    backend_ = network_backend::CreateServerBackend(port, maxClients, numChannels);
+    backend_ = game::net::CreateServerBackend(port, maxClients, numChannels);
 }
 
 ServerNetwork::~ServerNetwork() = default;

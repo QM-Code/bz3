@@ -3,7 +3,7 @@
 #include <imgui.h>
 #include <cstdint>
 
-#include "ui/frontends/imgui/texture_utils.hpp"
+#include "engine/ui/imgui/texture_utils.hpp"
 
 namespace ui {
 

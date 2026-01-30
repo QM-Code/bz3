@@ -6,7 +6,7 @@
 namespace input {
 namespace {
 
-std::vector<Binding> ParseBindings(const bz::json::Value* keybindings,
+std::vector<Binding> ParseBindings(const karma::json::Value* keybindings,
                                    std::string_view actionId,
                                    const std::vector<std::string>& defaults) {
     std::vector<Binding> bindings;
@@ -51,7 +51,7 @@ std::vector<Binding> ParseBindings(const bz::json::Value* keybindings,
 
 } // namespace
 
-void InputMap::load(const bz::json::Value* keybindings, const DefaultBindingsMap& defaults) {
+void InputMap::load(const karma::json::Value* keybindings, const DefaultBindingsMap& defaults) {
     bindings_.clear();
     for (const auto& [actionId, defaultList] : defaults) {
         bindings_[actionId] = ParseBindings(keybindings, actionId, defaultList);

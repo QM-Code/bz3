@@ -1,7 +1,7 @@
 #include "game/net/client_network.hpp"
 
 ClientNetwork::ClientNetwork() {
-    backend_ = network_backend::CreateClientBackend();
+    backend_ = game::net::CreateClientBackend();
 }
 
 ClientNetwork::~ClientNetwork() = default;

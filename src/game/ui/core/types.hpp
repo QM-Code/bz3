@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "engine/graphics/texture_handle.hpp"
+#include "engine/ui/types.hpp"
 
 struct ScoreboardEntry {
     std::string name;
@@ -11,16 +11,3 @@ struct ScoreboardEntry {
     bool communityAdmin = false;
     bool localAdmin = false;
 };
-
-namespace ui {
-
-struct RenderOutput {
-    graphics::TextureHandle texture{};
-    bool visible = true;
-
-    bool valid() const {
-        return visible && texture.valid();
-    }
-};
-
-} // namespace ui

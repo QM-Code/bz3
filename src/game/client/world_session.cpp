@@ -8,11 +8,11 @@
 
 ClientWorldSession::ClientWorldSession(Game &game, std::string worldDir)
         : game(game), backend_(world_backend::CreateWorldBackend()) {
-    const auto userConfigPath = bz::config::ConfigStore::Initialized()
-        ? bz::config::ConfigStore::UserConfigPath()
-        : bz::data::EnsureUserConfigFile("config.json");
+    const auto userConfigPath = karma::config::ConfigStore::Initialized()
+        ? karma::config::ConfigStore::UserConfigPath()
+        : karma::data::EnsureUserConfigFile("config.json");
 
-    const std::vector<bz::data::ConfigLayerSpec> layerSpecs = {
+    const std::vector<karma::data::ConfigLayerSpec> layerSpecs = {
         {"common/config.json", "data/common/config.json", spdlog::level::err, true},
         {"client/config.json", "data/client/config.json", spdlog::level::debug, false},
         {userConfigPath, "user config", spdlog::level::debug, false}
@@ -62,10 +62,10 @@ void ClientWorldSession::update() {
         if (!initMsg.worldData.empty()) {
             std::filesystem::path downloadsDir;
             if (const auto endpoint = game.engine.network->getServerEndpoint()) {
-                downloadsDir = bz::data::EnsureUserWorldDirectoryForServer(endpoint->host, endpoint->port);
+                downloadsDir = karma::data::EnsureUserWorldDirectoryForServer(endpoint->host, endpoint->port);
             } else {
                 spdlog::warn("ClientWorldSession: Server endpoint unknown; falling back to shared world directory");
-                downloadsDir = bz::data::EnsureUserWorldsDirectory();
+                downloadsDir = karma::data::EnsureUserWorldsDirectory();
             }
 
             content_.rootDir = downloadsDir;
@@ -79,10 +79,10 @@ void ClientWorldSession::update() {
                     spdlog::warn("ClientWorldSession: World config is not a JSON object: {}", worldConfigPath.string());
                 } else {
                     constexpr const char* worldConfigLabel = "world config";
-                    if (!bz::config::ConfigStore::AddRuntimeLayer(worldConfigLabel, *worldConfigOpt, downloadsDir)) {
+                    if (!karma::config::ConfigStore::AddRuntimeLayer(worldConfigLabel, *worldConfigOpt, downloadsDir)) {
                         spdlog::warn("ClientWorldSession: Failed to merge world config layer from {}", worldConfigPath.string());
                     } else {
-                        bz::data::MergeJsonObjects(content_.config, *worldConfigOpt);
+                        karma::data::MergeJsonObjects(content_.config, *worldConfigOpt);
                         content_.mergeLayer(*worldConfigOpt, downloadsDir);
                         if (defaultPlayerParameters_.empty()) {
                             defaultPlayerParameters_ = game_world::ExtractDefaultPlayerParameters(content_.config);

@@ -21,5 +21,5 @@ void ServerEngine::earlyUpdate(TimeUtils::duration deltaTime) {
 void ServerEngine::lateUpdate(TimeUtils::duration deltaTime) {
     physics->update(deltaTime);
     network->flushPeekedMessages();
-    bz::config::ConfigStore::Tick();
+    karma::config::ConfigStore::Tick();
 }

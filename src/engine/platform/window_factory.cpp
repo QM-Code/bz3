@@ -3,9 +3,9 @@
 namespace platform {
 
 std::unique_ptr<Window> CreateWindow(const WindowConfig &config) {
-#if defined(BZ3_WINDOW_BACKEND_SDL3)
+#if defined(KARMA_WINDOW_BACKEND_SDL3)
     return CreateSdl3Window(config);
-#elif defined(BZ3_WINDOW_BACKEND_SDL2)
+#elif defined(KARMA_WINDOW_BACKEND_SDL2)
     return CreateSdl2Window(config);
 #else
     return nullptr;

@@ -16,12 +16,12 @@
 #include <chrono>
 #include <cmath>
 
-#if defined(BZ3_RENDER_BACKEND_BGFX)
-#include "ui/frontends/rmlui/platform/renderer_bgfx.hpp"
-#elif defined(BZ3_RENDER_BACKEND_DILIGENT)
-#include "ui/frontends/rmlui/platform/renderer_diligent.hpp"
-#elif defined(BZ3_RENDER_BACKEND_FORGE)
-#include "ui/frontends/rmlui/platform/renderer_forge.hpp"
+#if defined(KARMA_RENDER_BACKEND_BGFX)
+#include "engine/ui/platform/rmlui/renderer_bgfx.hpp"
+#elif defined(KARMA_RENDER_BACKEND_DILIGENT)
+#include "engine/ui/platform/rmlui/renderer_diligent.hpp"
+#elif defined(KARMA_RENDER_BACKEND_FORGE)
+#include "engine/ui/platform/rmlui/renderer_forge.hpp"
 #else
 #error "RmlUi backend requires BGFX, Diligent, or Forge renderer."
 #endif
@@ -40,7 +40,7 @@
 #include "common/data_path_resolver.hpp"
 #include "common/config_store.hpp"
 #include "spdlog/spdlog.h"
-#include "ui/bridges/ui_render_bridge.hpp"
+#include "engine/ui/bridges/ui_render_bridge.hpp"
 #include "ui/fonts/console_fonts.hpp"
 #include "ui/config/input_mapping.hpp"
 #include "ui/config/render_scale.hpp"
@@ -50,7 +50,7 @@ namespace {
 
 std::string tabLabelForSpec(const ui::ConsoleTabSpec &spec) {
     if (spec.labelKey) {
-        return bz::i18n::Get().get(spec.labelKey);
+        return karma::i18n::Get().get(spec.labelKey);
     }
     if (spec.fallbackLabel) {
         return spec.fallbackLabel;
@@ -95,7 +95,7 @@ public:
                 spdlog::warn("RmlUi: {}", message);
                 break;
             case Rml::Log::Type::LT_INFO:
-                spdlog::info("RmlUi: {}", message);
+                spdlog::trace("RmlUi: {}", message);
                 break;
             case Rml::Log::Type::LT_DEBUG:
             case Rml::Log::Type::LT_ASSERT:
@@ -164,11 +164,11 @@ std::string escapeRmlText(const std::string &text) {
 
 struct RmlUiBackend::RmlUiState {
     SystemInterface_Platform systemInterface;
-#if defined(BZ3_RENDER_BACKEND_BGFX)
+#if defined(KARMA_RENDER_BACKEND_BGFX)
     RenderInterface_BGFX renderInterface;
-#elif defined(BZ3_RENDER_BACKEND_DILIGENT)
+#elif defined(KARMA_RENDER_BACKEND_DILIGENT)
     RenderInterface_Diligent renderInterface;
-#elif defined(BZ3_RENDER_BACKEND_FORGE)
+#elif defined(KARMA_RENDER_BACKEND_FORGE)
     RenderInterface_Forge renderInterface;
 #endif
     Rml::Context *context = nullptr;
@@ -207,19 +207,19 @@ RmlUiBackend::RmlUiBackend(platform::Window &windowRefIn) : windowRef(&windowRef
 
     Rml::SetSystemInterface(&state->systemInterface);
     Rml::SetRenderInterface(&state->renderInterface);
-#if defined(BZ3_RENDER_BACKEND_BGFX)
+#if defined(KARMA_RENDER_BACKEND_BGFX)
     if (!state->renderInterface) {
         spdlog::error("RmlUi: failed to initialize bgfx renderer.");
         return;
     }
     spdlog::info("RmlUi: bgfx renderer initialized.");
-#elif defined(BZ3_RENDER_BACKEND_DILIGENT)
+#elif defined(KARMA_RENDER_BACKEND_DILIGENT)
     if (!state->renderInterface) {
         spdlog::error("RmlUi: failed to initialize Diligent renderer.");
         return;
     }
     spdlog::info("RmlUi: Diligent renderer initialized.");
-#elif defined(BZ3_RENDER_BACKEND_FORGE)
+#elif defined(KARMA_RENDER_BACKEND_FORGE)
     if (!state->renderInterface) {
         spdlog::error("RmlUi: failed to initialize Forge renderer.");
         return;
@@ -250,10 +250,10 @@ RmlUiBackend::RmlUiBackend(platform::Window &windowRefIn) : windowRef(&windowRef
 
     float dpRatio = 1.0f;
     if (windowRef) { dpRatio = windowRef->getContentScale(); }
-#if defined(BZ3_RENDER_BACKEND_FORGE)
+#if defined(KARMA_RENDER_BACKEND_FORGE)
     const float scaledDpRatio = dpRatio;
 #else
-    #if defined(BZ3_RENDER_BACKEND_FORGE)
+    #if defined(KARMA_RENDER_BACKEND_FORGE)
     const float scaledDpRatio = dpRatio;
     #else
     const float scaledDpRatio = dpRatio / std::max(renderScale, 0.0001f);
@@ -262,10 +262,10 @@ RmlUiBackend::RmlUiBackend(platform::Window &windowRefIn) : windowRef(&windowRef
     state->lastDpRatio = scaledDpRatio;
     state->context->SetDensityIndependentPixelRatio(scaledDpRatio);
 
-    loadConfiguredFonts(bz::i18n::Get().language());
+    loadConfiguredFonts(karma::i18n::Get().language());
 
-    state->consolePath = bz::data::Resolve("client/ui/console.rml").string();
-    state->hudPath = bz::data::Resolve("client/ui/hud.rml").string();
+    state->consolePath = karma::data::Resolve("client/ui/console.rml").string();
+    state->hudPath = karma::data::Resolve("client/ui/hud.rml").string();
     state->hud = std::make_unique<ui::RmlUiHud>();
     auto communityPanel = std::make_unique<ui::RmlUiPanelCommunity>();
     auto *communityPanelPtr = communityPanel.get();
@@ -478,7 +478,7 @@ void RmlUiBackend::update() {
         return;
     }
 
-    const uint64_t revision = bz::config::ConfigStore::Revision();
+    const uint64_t revision = karma::config::ConfigStore::Revision();
     if (revision != state->lastConfigRevision) {
         state->lastConfigRevision = revision;
         for (const auto &panel : state->panels) {
@@ -572,7 +572,7 @@ void RmlUiBackend::update() {
         }
         state->context->Update();
         state->renderInterface.BeginFrame();
-        if (!std::getenv("BZ3_RMLUI_DISABLE_RENDER")) {
+        if (!std::getenv("KARMA_RMLUI_DISABLE_RENDER")) {
             state->context->Render();
         }
         state->renderInterface.EndFrame();
@@ -586,7 +586,7 @@ void RmlUiBackend::update() {
     if (state->reloadRequested) {
         state->reloadRequested = false;
         if (state->pendingLanguage) {
-            bz::i18n::Get().loadLanguage(*state->pendingLanguage);
+            karma::i18n::Get().loadLanguage(*state->pendingLanguage);
             state->pendingLanguage.reset();
         }
         loadHudDocument();
@@ -759,23 +759,23 @@ void RmlUiBackend::loadConfiguredFonts(const std::string &language) {
     state->emojiFontPath.clear();
 
     const ui::fonts::ConsoleFontAssets assets = ui::fonts::GetConsoleFontAssets(language, true);
-    const auto defaultRegularPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Regular.Font");
+    const auto defaultRegularPath = karma::data::ResolveConfiguredAsset("hud.fonts.console.Regular.Font");
     if (!defaultRegularPath.empty()) {
         state->regularFontPath = defaultRegularPath.string();
         loadFont(defaultRegularPath, false, "hud.fonts.console.Regular.Font");
     }
     if (assets.selection.regularFontKey != "hud.fonts.console.Regular.Font") {
-        const auto languageRegularPath = bz::data::ResolveConfiguredAsset(assets.selection.regularFontKey);
+        const auto languageRegularPath = karma::data::ResolveConfiguredAsset(assets.selection.regularFontKey);
         loadFont(languageRegularPath, true, assets.selection.regularFontKey.c_str());
     }
-    const auto titleFontPath = bz::data::ResolveConfiguredAsset(assets.titleKey);
+    const auto titleFontPath = karma::data::ResolveConfiguredAsset(assets.titleKey);
     loadFont(titleFontPath, false, assets.titleKey.c_str());
-    const auto headingFontPath = bz::data::ResolveConfiguredAsset(assets.headingKey);
+    const auto headingFontPath = karma::data::ResolveConfiguredAsset(assets.headingKey);
     loadFont(headingFontPath, false, assets.headingKey.c_str());
-    const auto buttonFontPath = bz::data::ResolveConfiguredAsset(assets.buttonKey);
+    const auto buttonFontPath = karma::data::ResolveConfiguredAsset(assets.buttonKey);
     loadFont(buttonFontPath, false, assets.buttonKey.c_str());
 
-    const auto emojiFontPath = bz::data::ResolveConfiguredAsset(assets.emojiKey);
+    const auto emojiFontPath = karma::data::ResolveConfiguredAsset(assets.emojiKey);
     if (!emojiFontPath.empty()) {
         state->emojiFontPath = emojiFontPath.string();
         loadFont(emojiFontPath, true, assets.emojiKey.c_str());
@@ -786,7 +786,7 @@ void RmlUiBackend::loadConfiguredFonts(const std::string &language) {
     }
 
     for (const auto &key : assets.selection.fallbackKeys) {
-        loadFont(bz::data::ResolveConfiguredAsset(key), true, key.c_str());
+        loadFont(karma::data::ResolveConfiguredAsset(key), true, key.c_str());
     }
 }
 
@@ -813,7 +813,7 @@ void RmlUiBackend::loadConsoleDocument() {
     state->bodyElement = nullptr;
     state->emojiMarkupCache.clear();
 
-    loadConfiguredFonts(bz::i18n::Get().language());
+    loadConfiguredFonts(karma::i18n::Get().language());
 
     Rml::Factory::ClearStyleSheetCache();
     Rml::Factory::ClearTemplateCache();
@@ -831,7 +831,7 @@ void RmlUiBackend::loadConsoleDocument() {
         spdlog::error("RmlUi: failed to load console RML from '{}'.", state->consolePath);
         return;
     }
-    ui::rmlui::ApplyTranslations(state->document, bz::i18n::Get());
+    ui::rmlui::ApplyTranslations(state->document, karma::i18n::Get());
     for (const auto &spec : ui::GetConsoleTabSpecs()) {
         if (!spec.key) {
             continue;

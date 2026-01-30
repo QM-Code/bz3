@@ -1,212 +1,26 @@
 #include "renderer/render.hpp"
+#include "engine/graphics/resources.hpp"
 
 #include "platform/window.hpp"
-#include "common/data_path_resolver.hpp"
 #include "spdlog/spdlog.h"
-
-#include <algorithm>
-#include <cmath>
-#include <glm/gtc/quaternion.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <limits>
-
-namespace {
-constexpr float kRadarOrthoHalfSize = 40.0f;
-constexpr float kRadarNear = 0.1f;
-constexpr float kRadarFar = 500.0f;
-constexpr float kRadarHeightAbovePlayer = 60.0f;
-constexpr float kRadarBeamLength = 80.0f;
-constexpr float kRadarBeamWidth = 0.3f;
-constexpr int kRadarTexSize = 512 * 2;
-
-graphics::MeshData makeDiskMesh(int segments = 64, float radius = 1.0f) {
-    graphics::MeshData mesh;
-    mesh.vertices.reserve(segments + 1);
-    mesh.indices.reserve(segments * 3);
-
-    mesh.vertices.emplace_back(0.0f, 0.0f, 0.0f);
-    for (int i = 0; i < segments; ++i) {
-        const float t = static_cast<float>(i) / static_cast<float>(segments) * 2.0f * static_cast<float>(M_PI);
-        const float ct = std::cos(t);
-        const float st = std::sin(t);
-        mesh.vertices.emplace_back(ct * radius, 0.0f, st * radius);
-    }
-
-    for (int i = 0; i < segments; ++i) {
-        const uint32_t center = 0;
-        const uint32_t a = static_cast<uint32_t>(i + 1);
-        const uint32_t b = static_cast<uint32_t>(((i + 1) % segments) + 1);
-        mesh.indices.insert(mesh.indices.end(), {center, a, b});
-    }
-
-    return mesh;
-}
-
-graphics::MeshData makeBeamMesh() {
-    graphics::MeshData mesh;
-    mesh.vertices = {
-        {-kRadarBeamWidth * 0.5f, 0.0f, 0.0f},
-        { kRadarBeamWidth * 0.5f, 0.0f, 0.0f},
-        { kRadarBeamWidth * 0.5f, 0.0f, -1.0f},
-        {-kRadarBeamWidth * 0.5f, 0.0f, -1.0f}
-    };
-    mesh.indices = {0, 1, 2, 0, 2, 3};
-    return mesh;
-}
-
-} // namespace
 
 Render::Render(platform::Window &windowIn)
     : window(&windowIn) {
-    device_ = std::make_unique<graphics::GraphicsDevice>(windowIn);
-    ensureRadarResources();
+    core_ = std::make_unique<engine::renderer::RenderCore>(windowIn);
+    radarRenderer_ = std::make_unique<game::renderer::RadarRenderer>(core_->device(), core_->scene());
 
 }
 
 Render::~Render() = default;
 
 void Render::resizeCallback(int width, int height) {
-    if (device_) {
-        device_->resize(width, height);
+    if (core_) {
+        core_->scene().resize(width, height);
     }
-}
-
-void Render::ensureRadarResources() {
-    if (!device_) {
-        return;
-    }
-
-    const unsigned int existingTexId =
-        (radarTarget == graphics::kDefaultRenderTarget) ? 0u : device_->getRenderTargetTextureId(radarTarget);
-    const bool needsRadarTarget = (radarTarget == graphics::kDefaultRenderTarget || existingTexId == 0u);
-    if (needsRadarTarget) {
-        if (radarTarget != graphics::kDefaultRenderTarget) {
-            spdlog::warn("Radar RT invalid (target={} texId=0). Recreating.", radarTarget);
-        }
-        if (radarTarget != graphics::kDefaultRenderTarget) {
-            device_->destroyRenderTarget(radarTarget);
-        }
-        graphics::RenderTargetDesc desc;
-        desc.width = kRadarTexSize;
-        desc.height = kRadarTexSize;
-        desc.depth = true;
-        desc.stencil = false;
-        radarTarget = device_->createRenderTarget(desc);
-        const unsigned int newTexId = device_->getRenderTargetTextureId(radarTarget);
-        if (newTexId == 0u) {
-            spdlog::warn("Radar RT creation returned texId=0 (target={})", radarTarget);
-        }
-    }
-
-    if (radarMaterial == graphics::kInvalidMaterial) {
-        graphics::MaterialDesc desc;
-        desc.transparent = true;
-        desc.depthTest = true;
-        desc.depthWrite = false;
-        desc.doubleSided = true;
-        desc.baseColor = {1.0f, 1.0f, 1.0f, 1.0f};
-        radarMaterial = device_->createMaterial(desc);
-        device_->setMaterialFloat(radarMaterial, "jumpHeight", 5.0f);
-    }
-
-    if (radarLineMaterial == graphics::kInvalidMaterial) {
-        graphics::MaterialDesc desc;
-        desc.unlit = true;
-        desc.transparent = true;
-        desc.depthTest = false;
-        desc.depthWrite = false;
-        desc.doubleSided = true;
-        desc.baseColor = {1.0f, 1.0f, 1.0f, 1.0f};
-        radarLineMaterial = device_->createMaterial(desc);
-    }
-
-    if (radarCircleMesh == graphics::kInvalidMesh) {
-        radarCircleMesh = device_->createMesh(makeDiskMesh());
-    }
-
-    if (radarBeamMesh == graphics::kInvalidMesh) {
-        radarBeamMesh = device_->createMesh(makeBeamMesh());
-    }
-}
-
-void Render::updateRadarFovLines() {
-    if (!device_) {
-        return;
-    }
-
-    ensureRadarResources();
-
-    if (radarFovLeft == graphics::kInvalidEntity) {
-        radarFovLeft = device_->createMeshEntity(radarBeamMesh, radarLayer, radarLineMaterial);
-    }
-    if (radarFovRight == graphics::kInvalidEntity) {
-        radarFovRight = device_->createMeshEntity(radarBeamMesh, radarLayer, radarLineMaterial);
-    }
-    device_->setOverlay(radarFovLeft, true);
-    device_->setOverlay(radarFovRight, true);
-
-    const float halfVertRad = glm::radians(radarFovDegrees * 0.5f);
-    const float halfHorizRad = std::atan(std::tan(halfVertRad) * lastAspect);
-
-    // Keep radar FOV lines fixed in radar screen space while the radar camera rotates with the player.
-    glm::vec3 forward = glm::mat3_cast(cameraRotation) * glm::vec3(0.0f, 0.0f, -1.0f);
-    forward.y = 0.0f;
-    float len2 = glm::dot(forward, forward);
-    if (len2 < 1e-6f) {
-        forward = glm::vec3(0.0f, 0.0f, -1.0f);
-    } else {
-        forward *= 1.0f / std::sqrt(len2);
-    }
-    const float yaw = std::atan2(forward.x, -forward.z);
-    const glm::quat baseYaw = glm::angleAxis(yaw, glm::vec3(0, 1, 0));
-
-    const glm::quat yawLeft = glm::angleAxis(halfHorizRad, glm::vec3(0, 1, 0));
-    const glm::quat yawRight = glm::angleAxis(-halfHorizRad, glm::vec3(0, 1, 0));
-
-    const glm::quat leftRot = glm::inverse(baseYaw) * yawLeft;
-    const glm::quat rightRot = glm::inverse(baseYaw) * yawRight;
-
-    auto maxRayToRadarEdge = [](const glm::vec3& dir) {
-        const float half = kRadarOrthoHalfSize;
-        const float dx = std::abs(dir.x);
-        const float dz = std::abs(dir.z);
-        float tx = dx > 1e-6f ? (half / dx) : std::numeric_limits<float>::infinity();
-        float tz = dz > 1e-6f ? (half / dz) : std::numeric_limits<float>::infinity();
-        return std::min(tx, tz);
-    };
-
-    const glm::vec3 leftDirScreen = yawLeft * glm::vec3(0.0f, 0.0f, -1.0f);
-    const glm::vec3 rightDirScreen = yawRight * glm::vec3(0.0f, 0.0f, -1.0f);
-    const float leftLength = maxRayToRadarEdge(leftDirScreen);
-    const float rightLength = maxRayToRadarEdge(rightDirScreen);
-
-    device_->setRotation(radarFovLeft, leftRot);
-    device_->setPosition(radarFovLeft, cameraPosition);
-    device_->setScale(radarFovLeft, glm::vec3(1.0f, 1.0f, leftLength));
-
-    device_->setRotation(radarFovRight, rightRot);
-    device_->setPosition(radarFovRight, cameraPosition);
-    device_->setScale(radarFovRight, glm::vec3(1.0f, 1.0f, rightLength));
-}
-
-glm::quat Render::computeRadarCameraRotation(const glm::vec3& radarCamPos) const {
-    // Player-forward-up: rotate radar so player forward is "up" on the radar.
-    glm::vec3 forward = glm::mat3_cast(cameraRotation) * glm::vec3(0.0f, 0.0f, -1.0f);
-    forward.y = 0.0f;
-    float len2 = glm::dot(forward, forward);
-    if (len2 < 1e-6f) {
-        forward = glm::vec3(0.0f, 0.0f, -1.0f);
-    } else {
-        forward *= 1.0f / std::sqrt(len2);
-    }
-    const glm::vec3 up = -forward;
-    const glm::mat4 view = glm::lookAt(radarCamPos, cameraPosition, up);
-    const glm::mat4 world = glm::inverse(view);
-    return glm::quat_cast(glm::mat3(world));
 }
 
 void Render::update() {
-    if (!device_) {
+    if (!core_) {
         return;
     }
 
@@ -226,281 +40,274 @@ void Render::update() {
         lastFramebufferWidth = width;
         lastFramebufferHeight = height;
         lastAspect = static_cast<float>(width) / static_cast<float>(height);
-        device_->resize(width, height);
+        core_->scene().resize(width, height);
     }
 
-    device_->beginFrame();
+    core_->scene().beginFrame();
 
-    ensureRadarResources();
-    updateRadarFovLines();
-
-    // Render radar layer to offscreen target
-    device_->setOrthographic(kRadarOrthoHalfSize, -kRadarOrthoHalfSize,
-                             kRadarOrthoHalfSize, -kRadarOrthoHalfSize,
-                             kRadarNear, kRadarFar);
-    const glm::vec3 radarCamPos = cameraPosition + glm::vec3(0.0f, kRadarHeightAbovePlayer, 0.0f);
-    device_->setCameraPosition(radarCamPos);
-    device_->setCameraRotation(computeRadarCameraRotation(radarCamPos));
-    device_->setMaterialFloat(radarMaterial, "playerY", cameraPosition.y);
-    device_->renderLayer(radarLayer, radarTarget);
+    if (radarRenderer_) {
+        radarRenderer_->render(core_->context().cameraPosition, core_->context().cameraRotation);
+    }
 
     // Render main layer to screen
-    device_->setPerspective(CAMERA_FOV, lastAspect, 0.1f, 1000.0f);
-    device_->setCameraPosition(cameraPosition);
-    device_->setCameraRotation(cameraRotation);
-    device_->renderLayer(mainLayer, graphics::kDefaultRenderTarget);
+    core_->context().aspect = lastAspect;
+    core_->scene().renderMain(core_->context());
 
+}
+
+void Render::setEcsWorld(ecs::World *world) {
+    ecsWorld = world;
+}
+
+void Render::setResourceRegistry(graphics::ResourceRegistry *resources) {
+    contextResources_ = resources;
+}
+
+void Render::registerEcsEntity(render_id id) {
+    if (!ecsWorld) {
+        return;
+    }
+    if (ecsEntities.find(id) != ecsEntities.end()) {
+        return;
+    }
+    const ecs::EntityId entity = ecsWorld->createEntity();
+    ecsEntities[id] = entity;
+    ecsWorld->set(entity, ecs::Transform{});
+}
+
+ecs::Transform *Render::getEcsTransform(render_id id) {
+    if (!ecsWorld) {
+        return nullptr;
+    }
+    auto it = ecsEntities.find(id);
+    if (it == ecsEntities.end()) {
+        return nullptr;
+    }
+    return ecsWorld->get<ecs::Transform>(it->second);
+}
+
+graphics::EntityId Render::getEcsGraphicsEntity(render_id id) const {
+    if (!ecsWorld) {
+        return graphics::kInvalidEntity;
+    }
+    auto it = ecsEntities.find(id);
+    if (it == ecsEntities.end()) {
+        return graphics::kInvalidEntity;
+    }
+    const ecs::RenderEntity *renderEntity = ecsWorld->get<ecs::RenderEntity>(it->second);
+    return renderEntity ? renderEntity->entityId : graphics::kInvalidEntity;
+}
+
+void Render::setEcsRenderMesh(render_id id, const std::filesystem::path& modelPath) {
+    if (!ecsWorld) {
+        return;
+    }
+    if (!contextResources_) {
+        spdlog::warn("Render: ResourceRegistry unavailable; ECS mesh not set for {}", modelPath.string());
+        return;
+    }
+    auto it = ecsEntities.find(id);
+    if (it == ecsEntities.end()) {
+        return;
+    }
+    graphics::LayerId desiredLayer = core_ ? core_->context().mainLayer : 0;
+    if (const auto *layer = ecsWorld->get<ecs::RenderLayer>(it->second)) {
+        desiredLayer = layer->layer;
+    }
+    if (core_) {
+        const graphics::EntityId gfxEntity = core_->device().createModelEntity(
+            modelPath,
+            desiredLayer,
+            graphics::kInvalidMaterial
+        );
+        if (gfxEntity != graphics::kInvalidEntity) {
+            ecsWorld->set(it->second, ecs::RenderEntity{gfxEntity});
+            ecsWorld->remove<ecs::RenderMesh>(it->second);
+            return;
+        }
+    }
+    const graphics::MeshId meshId = contextResources_->loadMesh(modelPath);
+    if (meshId == graphics::kInvalidMesh) {
+        return;
+    }
+    ecsWorld->set(it->second, ecs::RenderMesh{meshId});
 }
 
 render_id Render::create() {
     const render_id id = nextId++;
-    const auto entity = device_->createEntity(mainLayer);
-    mainEntities[id] = entity;
+    registerEcsEntity(id);
+    if (ecsWorld) {
+        ecsWorld->set(ecsEntities[id], ecs::RenderLayer{core_->context().mainLayer});
+    }
     return id;
 }
 
 render_id Render::create(std::string modelPath, bool addToRadar) {
     const render_id id = nextId++;
-    const auto entity = device_->createModelEntity(modelPath, mainLayer, graphics::kInvalidMaterial);
-    mainEntities[id] = entity;
-    modelPaths[id] = modelPath;
+    registerEcsEntity(id);
+    setEcsRenderMesh(id, modelPath);
+    if (ecsWorld) {
+        ecsWorld->set(ecsEntities[id], ecs::RenderLayer{core_->context().mainLayer});
+        if (contextResources_) {
+            ecsWorld->set(ecsEntities[id], ecs::Material{contextResources_->getDefaultMaterial()});
+        }
+    }
 
-    if (addToRadar) {
-        ensureRadarResources();
-        const auto radarEntity = device_->createModelEntity(modelPath, radarLayer, radarMaterial);
-        radarEntities[id] = radarEntity;
+    if (radarRenderer_) {
+        radarRenderer_->setModel(id, modelPath, addToRadar);
     }
 
     return id;
 }
 
 void Render::setModel(render_id id, const std::filesystem::path& modelPath, bool addToRadar) {
-    auto it = mainEntities.find(id);
-    if (it != mainEntities.end()) {
-        device_->setEntityModel(it->second, modelPath, graphics::kInvalidMaterial);
+    registerEcsEntity(id);
+    setEcsRenderMesh(id, modelPath);
+    if (ecsWorld) {
+        ecsWorld->set(ecsEntities[id], ecs::RenderLayer{core_->context().mainLayer});
+        if (contextResources_) {
+            ecsWorld->set(ecsEntities[id], ecs::Material{contextResources_->getDefaultMaterial()});
+        }
     }
-    modelPaths[id] = modelPath;
 
-    if (addToRadar) {
-        ensureRadarResources();
-        auto rit = radarEntities.find(id);
-        if (rit == radarEntities.end()) {
-            const auto radarEntity = device_->createModelEntity(modelPath, radarLayer, radarMaterial);
-            radarEntities[id] = radarEntity;
-        } else {
-            device_->setEntityModel(rit->second, modelPath, radarMaterial);
-        }
-    } else {
-        auto rit = radarEntities.find(id);
-        if (rit != radarEntities.end()) {
-            device_->destroyEntity(rit->second);
-            radarEntities.erase(rit);
-        }
+    if (radarRenderer_) {
+        radarRenderer_->setModel(id, modelPath, addToRadar);
     }
 }
 
 void Render::setRadarCircleGraphic(render_id id, float radius) {
-    ensureRadarResources();
-    auto it = radarCircles.find(id);
-    if (it == radarCircles.end()) {
-        const auto circleEntity = device_->createMeshEntity(radarCircleMesh, radarLayer, radarLineMaterial);
-        radarCircles[id] = circleEntity;
-        it = radarCircles.find(id);
+    if (radarRenderer_) {
+        radarRenderer_->setRadarCircleGraphic(id, radius);
     }
-    device_->setOverlay(it->second, true);
-
-    device_->setScale(it->second, glm::vec3(radius, 1.0f, radius));
 }
 
 void Render::setRadarFOVLinesAngle(float fovDegrees) {
-    radarFovDegrees = fovDegrees;
-    updateRadarFovLines();
+    if (radarRenderer_) {
+        radarRenderer_->setFovDegrees(fovDegrees);
+    }
 }
 
 void Render::destroy(render_id id) {
-    auto it = mainEntities.find(id);
-    if (it != mainEntities.end()) {
-        device_->destroyEntity(it->second);
-        mainEntities.erase(it);
+    if (radarRenderer_) {
+        radarRenderer_->destroy(id);
     }
-
-    auto rit = radarEntities.find(id);
-    if (rit != radarEntities.end()) {
-        device_->destroyEntity(rit->second);
-        radarEntities.erase(rit);
+    if (ecsWorld) {
+        if (auto it = ecsEntities.find(id); it != ecsEntities.end()) {
+            ecsWorld->destroyEntity(it->second);
+        }
     }
-
-    auto cit = radarCircles.find(id);
-    if (cit != radarCircles.end()) {
-        device_->destroyEntity(cit->second);
-        radarCircles.erase(cit);
-    }
-
-    modelPaths.erase(id);
+    ecsEntities.erase(id);
 }
 
 void Render::setPosition(render_id id, const glm::vec3 &position) {
-    if (auto it = mainEntities.find(id); it != mainEntities.end()) {
-        device_->setPosition(it->second, position);
+    if (radarRenderer_) {
+        radarRenderer_->setPosition(id, position);
     }
-    if (auto it = radarEntities.find(id); it != radarEntities.end()) {
-        device_->setPosition(it->second, position);
-    }
-    if (auto it = radarCircles.find(id); it != radarCircles.end()) {
-        device_->setPosition(it->second, position);
+    if (auto *transform = getEcsTransform(id)) {
+        transform->position = position;
     }
 }
 
 void Render::setRotation(render_id id, const glm::quat &rotation) {
-    if (auto it = mainEntities.find(id); it != mainEntities.end()) {
-        device_->setRotation(it->second, rotation);
+    if (radarRenderer_) {
+        radarRenderer_->setRotation(id, rotation);
     }
-    if (auto it = radarEntities.find(id); it != radarEntities.end()) {
-        device_->setRotation(it->second, rotation);
-    }
-    if (auto it = radarCircles.find(id); it != radarCircles.end()) {
-        device_->setRotation(it->second, rotation);
+    if (auto *transform = getEcsTransform(id)) {
+        transform->rotation = rotation;
     }
 }
 
 void Render::setScale(render_id id, const glm::vec3 &scale) {
-    if (auto it = mainEntities.find(id); it != mainEntities.end()) {
-        device_->setScale(it->second, scale);
+    if (radarRenderer_) {
+        radarRenderer_->setScale(id, scale);
     }
-    if (auto it = radarEntities.find(id); it != radarEntities.end()) {
-        device_->setScale(it->second, scale);
+    if (auto *transform = getEcsTransform(id)) {
+        transform->scale = scale;
     }
 }
 
 void Render::setVisible(render_id id, bool visible) {
-    if (auto it = mainEntities.find(id); it != mainEntities.end()) {
-        device_->setVisible(it->second, visible);
+    if (const auto gfxEntity = getEcsGraphicsEntity(id); gfxEntity != graphics::kInvalidEntity) {
+        core_->device().setVisible(gfxEntity, visible);
     }
-    if (auto it = radarEntities.find(id); it != radarEntities.end()) {
-        device_->setVisible(it->second, visible);
-    }
-    if (auto it = radarCircles.find(id); it != radarCircles.end()) {
-        device_->setVisible(it->second, visible);
+    if (radarRenderer_) {
+        radarRenderer_->setVisible(id, visible);
     }
 }
 
 void Render::setTransparency(render_id id, bool transparency) {
-    if (auto it = mainEntities.find(id); it != mainEntities.end()) {
-        device_->setTransparency(it->second, transparency);
+    if (const auto gfxEntity = getEcsGraphicsEntity(id); gfxEntity != graphics::kInvalidEntity) {
+        core_->device().setTransparency(gfxEntity, transparency);
     }
 }
 
 void Render::setCameraPosition(const glm::vec3 &position) {
-    cameraPosition = position;
-    if (device_) {
-        device_->setCameraPosition(position);
-    }
-    updateRadarFovLines();
+    core_->context().cameraPosition = position;
 }
 
 void Render::setCameraRotation(const glm::quat &rotation) {
-    cameraRotation = rotation;
-    if (device_) {
-        device_->setCameraRotation(rotation);
-    }
-    updateRadarFovLines();
+    core_->context().cameraRotation = rotation;
 }
 
 graphics::TextureHandle Render::getRadarTexture() const {
-    graphics::TextureHandle handle{};
-    if (!device_) {
-        return handle;
-    }
-    const unsigned int textureId = device_->getRenderTargetTextureId(radarTarget);
-    if (textureId == 0u && radarTarget != graphics::kDefaultRenderTarget) {
-        static bool loggedMissing = false;
-        if (!loggedMissing) {
-            spdlog::warn("Radar RT texture id is 0 (target={}); radar will appear blank.", radarTarget);
-            loggedMissing = true;
-        }
-    }
-    handle.id = static_cast<uint64_t>(textureId);
-    handle.width = static_cast<uint32_t>(kRadarTexSize);
-    handle.height = static_cast<uint32_t>(kRadarTexSize);
-    return handle;
+    return radarRenderer_ ? radarRenderer_->getRadarTexture() : graphics::TextureHandle{};
 }
 
 graphics_backend::UiRenderTargetBridge* Render::getUiRenderTargetBridge() const {
-    return device_ ? device_->getUiRenderTargetBridge() : nullptr;
+    return core_ ? core_->device().getUiRenderTargetBridge() : nullptr;
 }
 
 void Render::setUiOverlayTexture(const ui::RenderOutput& output) {
-    if (!device_) {
+    if (!core_) {
         return;
     }
-    device_->setUiOverlayTexture(output.texture);
-    device_->setUiOverlayVisible(output.valid());
+    core_->scene().setUiOverlayTexture(output.texture, output.valid());
 }
 
 void Render::renderUiOverlay() {
-    if (!device_) {
+    if (!core_) {
         return;
     }
-    device_->renderUiOverlay();
+    core_->scene().renderUiOverlay();
 }
 
 void Render::setBrightness(float brightness) {
-    if (!device_) {
+    if (!core_) {
         return;
     }
-    device_->setBrightness(brightness);
+    core_->scene().setBrightness(brightness);
 }
 
 void Render::present() {
-    if (!device_) {
+    if (!core_) {
         return;
     }
-    device_->endFrame();
+    core_->scene().endFrame();
 }
 
 void Render::setRadarShaderPath(const std::filesystem::path& vertPath,
                                 const std::filesystem::path& fragPath) {
-    ensureRadarResources();
-    graphics::MaterialDesc desc;
-    desc.vertexShaderPath = vertPath;
-    desc.fragmentShaderPath = fragPath;
-    desc.transparent = true;
-    desc.depthTest = true;
-    desc.depthWrite = false;
-    desc.doubleSided = true;
-    desc.baseColor = {1.0f, 1.0f, 1.0f, 1.0f};
-    if (radarMaterial == graphics::kInvalidMaterial) {
-        radarMaterial = device_->createMaterial(desc);
-    } else {
-        device_->updateMaterial(radarMaterial, desc);
-    }
-    device_->setMaterialFloat(radarMaterial, "jumpHeight", 5.0f);
-    device_->setMaterialFloat(radarMaterial, "playerY", cameraPosition.y);
-
-    for (const auto& [id, entity] : radarEntities) {
-        auto pathIt = modelPaths.find(id);
-        if (pathIt != modelPaths.end()) {
-            device_->setEntityModel(entity, pathIt->second, radarMaterial);
-        }
+    if (radarRenderer_) {
+        radarRenderer_->setRadarShaderPath(vertPath, fragPath, core_->context().cameraPosition.y);
     }
 }
 
 glm::mat4 Render::getViewProjectionMatrix() const {
-    return device_ ? device_->getViewProjectionMatrix() : glm::mat4(1.0f);
+    return core_ ? core_->scene().getViewProjectionMatrix() : glm::mat4(1.0f);
 }
 
 glm::mat4 Render::getViewMatrix() const {
-    return device_ ? device_->getViewMatrix() : glm::mat4(1.0f);
+    return core_ ? core_->scene().getViewMatrix() : glm::mat4(1.0f);
 }
 
 glm::mat4 Render::getProjectionMatrix() const {
-    return device_ ? device_->getProjectionMatrix() : glm::mat4(1.0f);
+    return core_ ? core_->scene().getProjectionMatrix() : glm::mat4(1.0f);
 }
 
 glm::vec3 Render::getCameraPosition() const {
-    return device_ ? device_->getCameraPosition() : glm::vec3(0.0f);
+    return core_ ? core_->context().cameraPosition : glm::vec3(0.0f);
 }
 
 glm::vec3 Render::getCameraForward() const {
-    return device_ ? device_->getCameraForward() : glm::vec3(0.0f, 0.0f, -1.0f);
+    return core_ ? core_->scene().getCameraForward() : glm::vec3(0.0f, 0.0f, -1.0f);
 }

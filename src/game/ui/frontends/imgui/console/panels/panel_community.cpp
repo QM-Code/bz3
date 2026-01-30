@@ -1,5 +1,5 @@
 #include "ui/frontends/imgui/console/console.hpp"
-#include "ui/frontends/imgui/texture_utils.hpp"
+#include "engine/ui/imgui/texture_utils.hpp"
 
 #include <algorithm>
 #include <cctype>

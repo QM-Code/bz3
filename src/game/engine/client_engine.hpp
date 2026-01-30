@@ -7,6 +7,7 @@
 #include "input/input.hpp"
 #include "game/input/state.hpp"
 #include "ui/core/system.hpp"
+#include "engine/ecs/world.hpp"
 #include "audio/audio.hpp"
 #include "platform/window.hpp"
 #include <string>
@@ -21,6 +22,7 @@ private:
     platform::Window *window;
     std::unique_ptr<ui::RenderBridge> uiRenderBridge;
     std::string lastLanguage;
+    float lastBrightness = 1.0f;
 
 public:
     ClientNetwork *network;
@@ -30,6 +32,7 @@ public:
     game_input::InputState inputState;
     UiSystem *ui;
     Audio *audio;
+    ecs::World *ecsWorld = nullptr;
 
     ClientEngine(platform::Window &window);
     ~ClientEngine();

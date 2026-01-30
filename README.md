@@ -25,21 +25,21 @@ The Forge is not bundled and must be cloned manually if you want to build with `
 
   - `git clone https://github.com/ConfettiFX/The-Forge.git third_party\the-forge`
 
-The setup scripts can do this automatically if you set `BZ3_SETUP_FORGE=1`:
+The setup scripts can do this automatically if you set `KARMA_SETUP_FORGE=1`:
 
-- Linux/macOS: `BZ3_SETUP_FORGE=1 ./setup.sh`
-- Windows: `set BZ3_SETUP_FORGE=1` then `setup.bat`
+- Linux/macOS: `KARMA_SETUP_FORGE=1 ./setup.sh`
+- Windows: `set KARMA_SETUP_FORGE=1` then `setup.bat`
 
 ## Runtime Data
 
-The programs load assets/config from a data root resolved via the `BZ3_DATA_DIR` environment variable (configured by `src/game/common/data_path_spec.*`).
+The programs load assets/config from a data root resolved via the `KARMA_DATA_DIR` environment variable (configured by `src/game/common/data_path_spec.*`).
 
 - Linux/macOS:
 
-  - `export BZ3_DATA_DIR="$PWD/data"`
+  - `export KARMA_DATA_DIR="$PWD/data"`
 - Windows (PowerShell):
 
-  - `$env:BZ3_DATA_DIR = "$pwd\data"`
+  - `$env:KARMA_DATA_DIR = "$pwd\data"`
 
 ## Install (Prerequisites)
 
@@ -117,7 +117,7 @@ Other
 
 - Most dependencies are provided by vcpkg (see `vcpkg.json`).
 - Some libraries are fetched via CMake FetchContent (notably `enet`, `pybind11`).
-- Python plugin bytecode is redirected to a writable cache: set `BZ3_PY_CACHE_DIR` to choose the location (defaults to `/tmp/bz3-pycache`). If the directory cannot be created, bytecode writing is disabled. Current behavior is acceptable for now; we may revisit a dedicated cache path later.
+- Python plugin bytecode is redirected to a writable cache: set `KARMA_PY_CACHE_DIR` to choose the location (defaults to `/tmp/bz3-pycache`). If the directory cannot be created, bytecode writing is disabled. Current behavior is acceptable for now; we may revisit a dedicated cache path later.
 
 ## Engine vs game
 
@@ -165,13 +165,13 @@ Backend layouts (examples)
 
 These CMake cache variables select backends at build time:
 
-- `BZ3_UI_BACKEND=imgui|rmlui`
-- `BZ3_WINDOW_BACKEND=sdl3|sdl2`
-- `BZ3_PHYSICS_BACKEND=jolt|bullet|physx`
-- `BZ3_AUDIO_BACKEND=miniaudio|sdlaudio`
-- `BZ3_RENDER_BACKEND=bgfx|diligent|forge`
-- `BZ3_NETWORK_BACKEND=enet`
-- `BZ3_WORLD_BACKEND=fs`
+- `KARMA_UI_BACKEND=imgui|rmlui`
+- `KARMA_WINDOW_BACKEND=sdl3|sdl2`
+- `KARMA_PHYSICS_BACKEND=jolt|bullet|physx`
+- `KARMA_AUDIO_BACKEND=miniaudio|sdlaudio`
+- `KARMA_RENDER_BACKEND=bgfx|diligent|forge`
+- `KARMA_NETWORK_BACKEND=enet`
+- `KARMA_WORLD_BACKEND=fs`
 
 Example:
 

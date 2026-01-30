@@ -1,23 +1,23 @@
 #include "physics/backend.hpp"
 
-#if defined(BZ3_PHYSICS_BACKEND_JOLT)
+#if defined(KARMA_PHYSICS_BACKEND_JOLT)
 #include "physics/backends/jolt/physics_world_jolt.hpp"
-#elif defined(BZ3_PHYSICS_BACKEND_BULLET)
+#elif defined(KARMA_PHYSICS_BACKEND_BULLET)
 #include "physics/backends/bullet/physics_world_bullet.hpp"
-#elif defined(BZ3_PHYSICS_BACKEND_PHYSX)
+#elif defined(KARMA_PHYSICS_BACKEND_PHYSX)
 #include "physics/backends/physx/physics_world_physx.hpp"
 #else
-#error "BZ3 physics backend not set. Define BZ3_PHYSICS_BACKEND_JOLT, BZ3_PHYSICS_BACKEND_BULLET, or BZ3_PHYSICS_BACKEND_PHYSX."
+#error "BZ3 physics backend not set. Define KARMA_PHYSICS_BACKEND_JOLT, KARMA_PHYSICS_BACKEND_BULLET, or KARMA_PHYSICS_BACKEND_PHYSX."
 #endif
 
 namespace physics_backend {
 
 std::unique_ptr<PhysicsWorldBackend> CreatePhysicsWorldBackend() {
-#if defined(BZ3_PHYSICS_BACKEND_JOLT)
+#if defined(KARMA_PHYSICS_BACKEND_JOLT)
     return std::make_unique<PhysicsWorldJolt>();
-#elif defined(BZ3_PHYSICS_BACKEND_BULLET)
+#elif defined(KARMA_PHYSICS_BACKEND_BULLET)
     return std::make_unique<PhysicsWorldBullet>();
-#elif defined(BZ3_PHYSICS_BACKEND_PHYSX)
+#elif defined(KARMA_PHYSICS_BACKEND_PHYSX)
     return std::make_unique<PhysicsWorldPhysX>();
 #endif
 }

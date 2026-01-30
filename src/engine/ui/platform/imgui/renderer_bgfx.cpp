@@ -1,4 +1,4 @@
-#include "ui/frontends/imgui/platform/renderer_bgfx.hpp"
+#include "engine/ui/platform/imgui/renderer_bgfx.hpp"
 
 #include <imgui.h>
 
@@ -6,7 +6,7 @@
 #include "common/file_utils.hpp"
 #include "engine/graphics/backends/bgfx/texture_utils.hpp"
 #include "spdlog/spdlog.h"
-#include "ui/frontends/imgui/texture_utils.hpp"
+#include "engine/ui/imgui/texture_utils.hpp"
 
 #include <algorithm>
 #include <cstring>
@@ -25,13 +25,13 @@ BgfxRenderer::BgfxRenderer() {
     sampler_ = bgfx::createUniform("s_tex", bgfx::UniformType::Sampler);
     scaleBias_ = bgfx::createUniform("u_scaleBias", bgfx::UniformType::Vec4);
 
-    const std::filesystem::path shaderDir = bz::data::Resolve("bgfx/shaders/bin/vk/imgui");
+    const std::filesystem::path shaderDir = karma::data::Resolve("bgfx/shaders/bin/vk/imgui");
 
     const auto vsPath = shaderDir / "vs_imgui.bin";
     const auto fsPath = shaderDir / "fs_imgui.bin";
 
-    auto vsBytes = bz::file::ReadFileBytes(vsPath);
-    auto fsBytes = bz::file::ReadFileBytes(fsPath);
+    auto vsBytes = karma::file::ReadFileBytes(vsPath);
+    auto fsBytes = karma::file::ReadFileBytes(fsPath);
     if (vsBytes.empty() || fsBytes.empty()) {
         spdlog::error("UiSystem: missing ImGui bgfx shaders '{}', '{}'", vsPath.string(), fsPath.string());
         destroyResources();

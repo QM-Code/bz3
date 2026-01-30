@@ -22,7 +22,7 @@
  * THE SOFTWARE.
  */
 
-#include "ui/frontends/rmlui/platform/renderer_bgfx.hpp"
+#include "engine/ui/platform/rmlui/renderer_bgfx.hpp"
 
 #include <RmlUi/Core/Core.h>
 #include <RmlUi/Core/FileInterface.h>
@@ -71,14 +71,14 @@ RenderInterface_BGFX::RenderInterface_BGFX() {
     uniform_translate = bgfx::createUniform("u_translate", bgfx::UniformType::Vec4);
     uniform_sampler = bgfx::createUniform("s_tex", bgfx::UniformType::Sampler);
 
-    const std::filesystem::path shader_dir = bz::data::Resolve("bgfx/shaders/bin/vk/rmlui");
+    const std::filesystem::path shader_dir = karma::data::Resolve("bgfx/shaders/bin/vk/rmlui");
     const auto vs_path = shader_dir / "vs_rmlui.bin";
     const auto fs_tex_path = shader_dir / "fs_rmlui_texture.bin";
     const auto fs_color_path = shader_dir / "fs_rmlui_color.bin";
 
-    const auto vs_bytes = bz::file::ReadFileBytes(vs_path);
-    const auto fs_tex_bytes = bz::file::ReadFileBytes(fs_tex_path);
-    const auto fs_color_bytes = bz::file::ReadFileBytes(fs_color_path);
+    const auto vs_bytes = karma::file::ReadFileBytes(vs_path);
+    const auto fs_tex_bytes = karma::file::ReadFileBytes(fs_tex_path);
+    const auto fs_color_bytes = karma::file::ReadFileBytes(fs_color_path);
     if (vs_bytes.empty() || fs_tex_bytes.empty() || fs_color_bytes.empty()) {
         Rml::Log::Message(Rml::Log::LT_ERROR, "RmlUi(BGFX): missing shader binaries.");
         destroyPrograms();

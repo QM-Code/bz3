@@ -32,7 +32,7 @@
 
 namespace {
 
-using bz::data::DataPathSpec;
+using karma::data::DataPathSpec;
 
 std::filesystem::path TryCanonical(const std::filesystem::path &path) {
     std::error_code ec;
@@ -148,7 +148,7 @@ std::filesystem::path DetectDataRoot(const std::optional<std::filesystem::path> 
 
 } // namespace
 
-namespace bz::data {
+namespace karma::data {
 
 void SetDataPathSpec(DataPathSpec spec) {
     std::lock_guard<std::mutex> lock(g_dataSpecMutex);
@@ -317,7 +317,7 @@ std::filesystem::path EnsureUserWorldDirectoryForServer(const std::string &host,
     return TryCanonical(serverDir);
 }
 
-std::optional<bz::json::Value> LoadJsonFile(const std::filesystem::path &path,
+std::optional<karma::json::Value> LoadJsonFile(const std::filesystem::path &path,
                                            const std::string &label,
                                            spdlog::level::level_enum missingLevel) {
     if (!std::filesystem::exists(path)) {
@@ -332,7 +332,7 @@ std::optional<bz::json::Value> LoadJsonFile(const std::filesystem::path &path,
     }
 
     try {
-        bz::json::Value json;
+        karma::json::Value json;
         stream >> json;
         return json;
     } catch (const std::exception &e) {
@@ -367,7 +367,7 @@ std::vector<ConfigLayer> LoadConfigLayers(const std::vector<ConfigLayerSpec> &sp
     return layers;
 }
 
-void MergeJsonObjects(bz::json::Value &destination, const bz::json::Value &source) {
+void MergeJsonObjects(karma::json::Value &destination, const karma::json::Value &source) {
     if (!destination.is_object() || !source.is_object()) {
         destination = source;
         return;
@@ -385,7 +385,7 @@ void MergeJsonObjects(bz::json::Value &destination, const bz::json::Value &sourc
     }
 }
 
-void CollectAssetEntries(const bz::json::Value &node,
+void CollectAssetEntries(const karma::json::Value &node,
                          const std::filesystem::path &baseDir,
                          std::map<std::string, std::filesystem::path> &assetMap,
                          const std::string &prefix) {
@@ -453,8 +453,8 @@ std::filesystem::path ResolveConfiguredAsset(const std::string &assetKey,
                                              const std::filesystem::path &defaultRelativePath) {
     const auto defaultPath = defaultRelativePath.empty() ? std::filesystem::path{} : Resolve(defaultRelativePath);
 
-    if (bz::config::ConfigStore::Initialized()) {
-        const auto resolved = bz::config::ConfigStore::ResolveAssetPath(assetKey, defaultPath);
+    if (karma::config::ConfigStore::Initialized()) {
+        const auto resolved = karma::config::ConfigStore::ResolveAssetPath(assetKey, defaultPath);
         if (resolved.empty() && defaultPath.empty()) {
             spdlog::warn("data_path_resolver: Asset '{}' not found in configuration layers", assetKey);
         }
@@ -486,4 +486,4 @@ std::filesystem::path ResolveConfiguredAsset(const std::string &assetKey,
     return defaultPath;
 }
 
-} // namespace bz::data
+} // namespace karma::data

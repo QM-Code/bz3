@@ -7,7 +7,7 @@
 #include <cctype>
 #include <limits>
 
-namespace bz::config {
+namespace karma::config {
 
 bool ReadBoolConfig(std::initializer_list<const char*> paths, bool defaultValue) {
     for (const char* path : paths) {
@@ -114,4 +114,4 @@ std::string ReadStringConfig(const char *path, const std::string &defaultValue) 
     return defaultValue;
 }
 
-} // namespace bz::config
+} // namespace karma::config

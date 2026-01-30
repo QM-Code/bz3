@@ -12,7 +12,7 @@ This file captures the Forge backend debugging work performed in this session, i
 - Platform: **Wayland + Vulkan** on Linux.
 - GPU: **NVIDIA GTX 970**.
 - Initial crashes were due to **driver mismatch** (NVML version mismatch). A reboot fixed that.
-- Vulkan validation layer is now installed and can be enabled with `BZ3_FORGE_ENABLE_VALIDATION=1`.
+- Vulkan validation layer is now installed and can be enabled with `KARMA_FORGE_ENABLE_VALIDATION=1`.
 
 ## High-level flow
 - Render loop is in `src/game/renderer/render.cpp`:
@@ -31,16 +31,16 @@ This file captures the Forge backend debugging work performed in this session, i
 - A forced swapchain **magenta clear** from `renderLayer` works (meaning the render pass is active).
 
 ## Important debug flags added
-- `BZ3_FORGE_DEBUG_CAMERA=1`: logs camera pos/rot + viewProj once per layer.
-- `BZ3_FORGE_DEBUG_CLEAR_SWAPCHAIN=1`: forces magenta clear in `renderLayer` for swapchain pass.
-- `BZ3_FORGE_DEBUG_MESH_TRI=1`: draw a clip-space triangle through mesh pipeline.
-- `BZ3_FORGE_DEBUG_ONLY_TRI=1`: skip normal entity rendering.
-- `BZ3_FORGE_DEBUG_SOLID_SHADER=1`: use a solid-color shader (no textures).
-- `BZ3_FORGE_DEBUG_UI_QUAD=1`: draw a fullscreen magenta quad using the UI overlay pipeline inside `renderLayer`.
-- `BZ3_FORGE_ENABLE_VALIDATION=1`: enable Vulkan validation layer (if installed).
-- `BZ3_FORGE_DEBUG_SINGLE_DESCRIPTOR=1`: update descriptor set once per frame to avoid validation errors.
-- `BZ3_FORGE_USE_LH=1`: switch to LH_ZO projection (test for handedness mismatch).
-- `BZ3_DISABLE_UI_OVERLAY=1`: skip UI overlay draw.
+- `KARMA_FORGE_DEBUG_CAMERA=1`: logs camera pos/rot + viewProj once per layer.
+- `KARMA_FORGE_DEBUG_CLEAR_SWAPCHAIN=1`: forces magenta clear in `renderLayer` for swapchain pass.
+- `KARMA_FORGE_DEBUG_MESH_TRI=1`: draw a clip-space triangle through mesh pipeline.
+- `KARMA_FORGE_DEBUG_ONLY_TRI=1`: skip normal entity rendering.
+- `KARMA_FORGE_DEBUG_SOLID_SHADER=1`: use a solid-color shader (no textures).
+- `KARMA_FORGE_DEBUG_UI_QUAD=1`: draw a fullscreen magenta quad using the UI overlay pipeline inside `renderLayer`.
+- `KARMA_FORGE_ENABLE_VALIDATION=1`: enable Vulkan validation layer (if installed).
+- `KARMA_FORGE_DEBUG_SINGLE_DESCRIPTOR=1`: update descriptor set once per frame to avoid validation errors.
+- `KARMA_FORGE_USE_LH=1`: switch to LH_ZO projection (test for handedness mismatch).
+- `KARMA_DISABLE_UI_OVERLAY=1`: skip UI overlay draw.
 
 ## Dead ends / things that did NOT fix it
 - Switching between **RH/LH projection** (no change).
@@ -78,18 +78,18 @@ When validation was enabled (after installing validation layer), these errors ap
    - `vkCmdEndRendering`: descriptor set was destroyed or updated while bound.
    - Root cause: descriptor sets updated many times per frame.
    - Fix added: descriptor sets now use a small ring (size 3), and per-frame set index.
-   - Optional flag `BZ3_FORGE_DEBUG_SINGLE_DESCRIPTOR=1` forces a single update to avoid validation issues.
+   - Optional flag `KARMA_FORGE_DEBUG_SINGLE_DESCRIPTOR=1` forces a single update to avoid validation issues.
 
 ## Current code changes (summary)
 These changes are already in the repo and may need cleanup later:
 
 ### backend.cpp
-- `computeProjectionMatrix()` uses RH_ZO by default; optional LH_ZO via `BZ3_FORGE_USE_LH=1`.
+- `computeProjectionMatrix()` uses RH_ZO by default; optional LH_ZO via `KARMA_FORGE_USE_LH=1`.
 - Removed render target binding in `beginFrame` to avoid dynamic rendering conflicts.
 - Added explicit transition of `whiteTexture_` from COPY_DEST to SHADER_RESOURCE.
 - Added debug triangle (mesh pipeline) and UI quad (UI pipeline) options.
-- Added mesh bounds logging via `BZ3_FORGE_DEBUG_MESH_BOUNDS=1`.
-- Added swapchain clear override via `BZ3_FORGE_DEBUG_CLEAR_SWAPCHAIN=1`.
+- Added mesh bounds logging via `KARMA_FORGE_DEBUG_MESH_BOUNDS=1`.
+- Added swapchain clear override via `KARMA_FORGE_DEBUG_CLEAR_SWAPCHAIN=1`.
 - Added ring descriptor set support (`kDescriptorSetRingSize=3`) for mesh, ui overlay, brightness.
 - Added `cmdBindRenderTargets(cmd, nullptr)` after render targets or brightness pass.
 
@@ -116,11 +116,11 @@ The validation errors suggest the backend is still violating Vulkan rules; fix t
 ## Next recommended steps
 1) **Re-run validation with current fixes** and see if errors persist.
    - Use:
-     - `BZ3_FORGE_ENABLE_VALIDATION=1`
-     - `BZ3_FORGE_DEBUG_SINGLE_DESCRIPTOR=1`
-     - `BZ3_FORGE_DEBUG_SOLID_SHADER=1`
-     - `BZ3_FORGE_DEBUG_MESH_TRI=1`
-     - `BZ3_FORGE_DEBUG_ONLY_TRI=1`
+     - `KARMA_FORGE_ENABLE_VALIDATION=1`
+     - `KARMA_FORGE_DEBUG_SINGLE_DESCRIPTOR=1`
+     - `KARMA_FORGE_DEBUG_SOLID_SHADER=1`
+     - `KARMA_FORGE_DEBUG_MESH_TRI=1`
+     - `KARMA_FORGE_DEBUG_ONLY_TRI=1`
 
 2) If errors persist, prioritize:
    - Fix any remaining dynamic rendering state errors (ensure `cmdBindRenderTargets(nullptr)` is called at all exit points).
@@ -138,9 +138,9 @@ The validation errors suggest the backend is still violating Vulkan rules; fix t
 - Build:
   - `./bzbuild.py sdl3 imgui jolt sdlaudio forge enet fs`
 - Run with debug flags:
-  - `BZ3_FORGE_DEBUG_CLEAR_SWAPCHAIN=1 ./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3`
-  - `BZ3_FORGE_ENABLE_VALIDATION=1 ./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3 -v`
-  - `BZ3_FORGE_DEBUG_SOLID_SHADER=1 BZ3_FORGE_DEBUG_MESH_TRI=1 BZ3_FORGE_DEBUG_ONLY_TRI=1 ./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3`
+  - `KARMA_FORGE_DEBUG_CLEAR_SWAPCHAIN=1 ./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3`
+  - `KARMA_FORGE_ENABLE_VALIDATION=1 ./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3 -v`
+  - `KARMA_FORGE_DEBUG_SOLID_SHADER=1 KARMA_FORGE_DEBUG_MESH_TRI=1 KARMA_FORGE_DEBUG_ONLY_TRI=1 ./build-sdl3-imgui-jolt-sdlaudio-forge-enet-fs/bz3`
 
 ## Known files touched during session
 - `src/engine/graphics/backends/forge/backend.cpp` (many debug flags and fixes)

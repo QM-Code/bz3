@@ -18,12 +18,12 @@ struct ConfigStoreState {
     std::mutex mutex;
     bool initialized = false;
     uint64_t revision = 0;
-    std::vector<bz::config::ConfigLayer> defaultLayers;
-    std::optional<bz::config::ConfigLayer> userLayer;
-    std::vector<bz::config::ConfigLayer> runtimeLayers;
-    bz::json::Value defaults = bz::json::Object();
-    bz::json::Value user = bz::json::Object();
-    bz::json::Value merged = bz::json::Object();
+    std::vector<karma::config::ConfigLayer> defaultLayers;
+    std::optional<karma::config::ConfigLayer> userLayer;
+    std::vector<karma::config::ConfigLayer> runtimeLayers;
+    karma::json::Value defaults = karma::json::Object();
+    karma::json::Value user = karma::json::Object();
+    karma::json::Value merged = karma::json::Object();
     std::unordered_map<std::string, std::filesystem::path> assetLookup;
     std::unordered_map<std::string, std::pair<int, std::size_t>> labelIndex;
     std::filesystem::path userConfigPath;
@@ -59,12 +59,12 @@ std::filesystem::path ResolveWithBase(const std::filesystem::path &baseDir, cons
     return TryCanonical(candidate);
 }
 
-const bz::json::Value *resolvePath(const bz::json::Value &root, std::string_view path) {
+const karma::json::Value *resolvePath(const karma::json::Value &root, std::string_view path) {
     if (path.empty()) {
         return &root;
     }
 
-    const bz::json::Value *current = &root;
+    const karma::json::Value *current = &root;
     std::size_t position = 0;
 
     while (position < path.size()) {
@@ -165,7 +165,7 @@ bool parsePathSegments(std::string_view path,
     return !out.empty();
 }
 
-void mergeJsonObjects(bz::json::Value &destination, const bz::json::Value &source) {
+void mergeJsonObjects(karma::json::Value &destination, const karma::json::Value &source) {
     if (!destination.is_object() || !source.is_object()) {
         destination = source;
         return;
@@ -181,7 +181,7 @@ void mergeJsonObjects(bz::json::Value &destination, const bz::json::Value &sourc
     }
 }
 
-void roundFloatValues(bz::json::Value &node) {
+void roundFloatValues(karma::json::Value &node) {
     if (node.is_object()) {
         for (auto it = node.begin(); it != node.end(); ++it) {
             roundFloatValues(it.value());
@@ -201,7 +201,7 @@ void roundFloatValues(bz::json::Value &node) {
     }
 }
 
-double readIntervalSeconds(const bz::json::Value &root, std::string_view path, double fallback) {
+double readIntervalSeconds(const karma::json::Value &root, std::string_view path, double fallback) {
     const auto *value = resolvePath(root, path);
     if (!value || !value->is_number()) {
         spdlog::error("config_store: Missing numeric config '{}'", path);
@@ -215,7 +215,7 @@ double readIntervalSeconds(const bz::json::Value &root, std::string_view path, d
     return seconds;
 }
 
-void collectAssetEntries(const bz::json::Value &node,
+void collectAssetEntries(const karma::json::Value &node,
                          const std::filesystem::path &baseDir,
                          std::unordered_map<std::string, std::filesystem::path> &assetMap,
                          const std::string &prefix = "") {
@@ -233,7 +233,7 @@ void collectAssetEntries(const bz::json::Value &node,
 }
 
 std::unordered_map<std::string, std::filesystem::path> buildAssetLookup(
-    const std::vector<bz::config::ConfigLayer> &layers) {
+    const std::vector<karma::config::ConfigLayer> &layers) {
     std::unordered_map<std::string, std::filesystem::path> lookup;
     for (const auto &layer : layers) {
         if (!layer.json.is_object()) {
@@ -259,18 +259,18 @@ std::unordered_map<std::string, std::filesystem::path> buildAssetLookup(
     return expanded;
 }
 
-std::vector<bz::config::ConfigLayer> loadLayers(const std::vector<bz::config::ConfigFileSpec> &specs) {
-    std::vector<bz::config::ConfigLayer> layers;
+std::vector<karma::config::ConfigLayer> loadLayers(const std::vector<karma::config::ConfigFileSpec> &specs) {
+    std::vector<karma::config::ConfigLayer> layers;
     layers.reserve(specs.size());
     for (const auto &spec : specs) {
         std::filesystem::path path = spec.path;
         if (spec.resolveRelativeToDataRoot && path.is_relative()) {
-            path = bz::data::Resolve(path);
+            path = karma::data::Resolve(path);
         }
         path = TryCanonical(path);
         const std::string label = spec.label.empty() ? path.string() : spec.label;
         spdlog::trace("config_store: loading config file '{}' (label: {})", path.string(), label);
-        auto jsonOpt = bz::data::LoadJsonFile(path, label, spec.missingLevel);
+        auto jsonOpt = karma::data::LoadJsonFile(path, label, spec.missingLevel);
         if (!jsonOpt) {
             if (spec.required) {
                 spdlog::error("config_store: Required config missing: {}", path.string());
@@ -288,7 +288,7 @@ std::vector<bz::config::ConfigLayer> loadLayers(const std::vector<bz::config::Co
 
 }
 
-namespace bz::config {
+namespace karma::config {
 
 void ConfigStore::Initialize(const std::vector<ConfigFileSpec> &defaultSpecs,
                              const std::filesystem::path &userConfigPath,
@@ -297,12 +297,12 @@ void ConfigStore::Initialize(const std::vector<ConfigFileSpec> &defaultSpecs,
     std::vector<ConfigLayer> runtime = loadLayers(runtimeSpecs);
 
     const std::filesystem::path resolvedUserPath = userConfigPath.empty()
-        ? bz::data::EnsureUserConfigFile("config.json")
+        ? karma::data::EnsureUserConfigFile("config.json")
         : TryCanonical(userConfigPath);
 
-    bz::json::Value userJson = bz::json::Object();
+    karma::json::Value userJson = karma::json::Object();
     spdlog::trace("config_store: loading user config '{}'", resolvedUserPath.string());
-    if (auto userOpt = bz::data::LoadJsonFile(resolvedUserPath, "user config", spdlog::level::debug)) {
+    if (auto userOpt = karma::data::LoadJsonFile(resolvedUserPath, "user config", spdlog::level::debug)) {
         if (userOpt->is_object()) {
             userJson = std::move(*userOpt);
         } else {
@@ -310,7 +310,7 @@ void ConfigStore::Initialize(const std::vector<ConfigFileSpec> &defaultSpecs,
         }
     }
 
-    bz::json::Value defaultsMerged = bz::json::Object();
+    karma::json::Value defaultsMerged = karma::json::Object();
     for (const auto &layer : defaults) {
         mergeJsonObjects(defaultsMerged, layer.json);
     }
@@ -350,22 +350,22 @@ uint64_t ConfigStore::Revision() {
     return g_state.revision;
 }
 
-const bz::json::Value &ConfigStore::Defaults() {
+const karma::json::Value &ConfigStore::Defaults() {
     std::lock_guard<std::mutex> lock(g_state.mutex);
     return g_state.defaults;
 }
 
-const bz::json::Value &ConfigStore::User() {
+const karma::json::Value &ConfigStore::User() {
     std::lock_guard<std::mutex> lock(g_state.mutex);
     return g_state.user;
 }
 
-const bz::json::Value &ConfigStore::Merged() {
+const karma::json::Value &ConfigStore::Merged() {
     std::lock_guard<std::mutex> lock(g_state.mutex);
     return g_state.merged;
 }
 
-const bz::json::Value *ConfigStore::Get(std::string_view path) {
+const karma::json::Value *ConfigStore::Get(std::string_view path) {
     std::lock_guard<std::mutex> lock(g_state.mutex);
     if (!g_state.initialized) {
         return nullptr;
@@ -388,14 +388,14 @@ const bz::json::Value *ConfigStore::Get(std::string_view path) {
     return resolvePath(g_state.merged, path);
 }
 
-std::optional<bz::json::Value> ConfigStore::GetCopy(std::string_view path) {
+std::optional<karma::json::Value> ConfigStore::GetCopy(std::string_view path) {
     if (const auto *value = Get(path)) {
-        return std::optional<bz::json::Value>(std::in_place, *value);
+        return std::optional<karma::json::Value>(std::in_place, *value);
     }
     return std::nullopt;
 }
 
-bool ConfigStore::Set(std::string_view path, bz::json::Value value) {
+bool ConfigStore::Set(std::string_view path, karma::json::Value value) {
     std::lock_guard<std::mutex> lock(g_state.mutex);
     if (!g_state.initialized) {
         return false;
@@ -439,9 +439,9 @@ bool ConfigStore::Erase(std::string_view path) {
     return true;
 }
 
-bool ConfigStore::ReplaceUserConfig(bz::json::Value userConfig, std::string *error) {
+bool ConfigStore::ReplaceUserConfig(karma::json::Value userConfig, std::string *error) {
     if (!userConfig.is_object()) {
-        userConfig = bz::json::Object();
+        userConfig = karma::json::Object();
     }
     std::lock_guard<std::mutex> lock(g_state.mutex);
     if (!g_state.initialized) {
@@ -502,7 +502,7 @@ bool ConfigStore::saveUserUnlocked(std::string *error, bool ignoreInterval) {
     }
 
     const std::filesystem::path path = g_state.userConfigPath.empty()
-        ? bz::data::EnsureUserConfigFile("config.json")
+        ? karma::data::EnsureUserConfigFile("config.json")
         : g_state.userConfigPath;
 
     std::error_code ec;
@@ -526,7 +526,7 @@ bool ConfigStore::saveUserUnlocked(std::string *error, bool ignoreInterval) {
     }
 
     try {
-        bz::json::Value rounded = g_state.user;
+        karma::json::Value rounded = g_state.user;
         roundFloatValues(rounded);
         spdlog::trace("config_store: writing user config '{}'", path.string());
         file << rounded.dump(4) << '\n';
@@ -548,7 +548,7 @@ const std::filesystem::path &ConfigStore::UserConfigPath() {
 }
 
 bool ConfigStore::AddRuntimeLayer(const std::string &label,
-                                  const bz::json::Value &layerJson,
+                                  const karma::json::Value &layerJson,
                                   const std::filesystem::path &baseDir) {
     if (!layerJson.is_object()) {
         spdlog::warn("config_store: Runtime layer '{}' ignored because it is not a JSON object", label);
@@ -592,7 +592,7 @@ bool ConfigStore::RemoveRuntimeLayer(const std::string &label) {
     return true;
 }
 
-const bz::json::Value *ConfigStore::LayerByLabel(const std::string &label) {
+const karma::json::Value *ConfigStore::LayerByLabel(const std::string &label) {
     std::lock_guard<std::mutex> lock(g_state.mutex);
     auto it = g_state.labelIndex.find(label);
     if (it == g_state.labelIndex.end()) {
@@ -654,35 +654,35 @@ void ConfigStore::rebuildMergedLocked() {
     }
 }
 
-bool ConfigStore::setValueAtPath(bz::json::Value &root, std::string_view path, bz::json::Value value) {
+bool ConfigStore::setValueAtPath(karma::json::Value &root, std::string_view path, karma::json::Value value) {
     std::vector<std::pair<std::string, std::optional<std::size_t>>> segments;
     if (!parsePathSegments(path, segments)) {
         return false;
     }
     if (!root.is_object()) {
-        root = bz::json::Object();
+        root = karma::json::Object();
     }
-    bz::json::Value *current = &root;
+    karma::json::Value *current = &root;
     for (std::size_t i = 0; i < segments.size(); ++i) {
         const auto &[key, index] = segments[i];
         const bool last = (i == segments.size() - 1);
         if (!key.empty()) {
             if (!current->is_object()) {
-                *current = bz::json::Object();
+                *current = karma::json::Object();
             }
             if (last && !index.has_value()) {
                 (*current)[key] = std::move(value);
                 return true;
             }
             if (!current->contains(key)) {
-                (*current)[key] = index.has_value() ? bz::json::Array() : bz::json::Object();
+                (*current)[key] = index.has_value() ? karma::json::Array() : karma::json::Object();
             }
             current = &(*current)[key];
         }
 
         if (index.has_value()) {
             if (!current->is_array()) {
-                *current = bz::json::Array();
+                *current = karma::json::Array();
             }
             while (current->size() <= *index) {
                 current->push_back(nullptr);
@@ -697,12 +697,12 @@ bool ConfigStore::setValueAtPath(bz::json::Value &root, std::string_view path, b
     return false;
 }
 
-bool ConfigStore::eraseValueAtPath(bz::json::Value &root, std::string_view path) {
+bool ConfigStore::eraseValueAtPath(karma::json::Value &root, std::string_view path) {
     std::vector<std::pair<std::string, std::optional<std::size_t>>> segments;
     if (!parsePathSegments(path, segments)) {
         return false;
     }
-    bz::json::Value *current = &root;
+    karma::json::Value *current = &root;
     for (std::size_t i = 0; i < segments.size(); ++i) {
         const auto &[key, index] = segments[i];
         const bool last = (i == segments.size() - 1);
@@ -734,4 +734,4 @@ bool ConfigStore::eraseValueAtPath(bz::json::Value &root, std::string_view path)
     return false;
 }
 
-} // namespace bz::config
+} // namespace karma::config

@@ -11,10 +11,10 @@ constexpr const char* kDisconnectReason = "Disconnected from server.";
 constexpr const char* kTimeoutReason = "Connection lost (timeout).";
 }
 
-namespace network_backend {
+namespace game::net {
 
 EnetClientBackend::EnetClientBackend() {
-    transport_ = net::createDefaultClientTransport();
+    transport_ = ::net::createDefaultClientTransport();
 }
 
 EnetClientBackend::~EnetClientBackend() {
@@ -46,26 +46,26 @@ void EnetClientBackend::update() {
         return;
     }
 
-    std::vector<net::Event> events;
+    std::vector<::net::Event> events;
     transport_->poll(events);
 
     for (const auto &evt : events) {
         switch (evt.type) {
-        case net::Event::Type::Receive: {
+        case ::net::Event::Type::Receive: {
             if (evt.payload.empty()) {
                 break;
             }
 
-            auto decoded = net::decodeServerMsg(evt.payload.data(), evt.payload.size());
+            auto decoded = ::net::decodeServerMsg(evt.payload.data(), evt.payload.size());
             if (!decoded) {
                 spdlog::warn("Received unknown/invalid ServerMsg payload");
                 break;
             }
 
-            receivedMessages_.push_back({ decoded.release() });
+            receivedMessages_.push_back(ClientMsgData{ decoded.release(), false });
             break;
         }
-        case net::Event::Type::Disconnect: {
+        case ::net::Event::Type::Disconnect: {
             spdlog::info("{}", kDisconnectReason);
             pendingDisconnect_ = DisconnectEvent{ kDisconnectReason };
             serverEndpoint_.reset();
@@ -75,7 +75,7 @@ void EnetClientBackend::update() {
             receivedMessages_.clear();
             break;
         }
-        case net::Event::Type::DisconnectTimeout: {
+        case ::net::Event::Type::DisconnectTimeout: {
             spdlog::info("{}", kTimeoutReason);
             pendingDisconnect_ = DisconnectEvent{ kTimeoutReason };
             serverEndpoint_.reset();
@@ -156,12 +156,12 @@ void EnetClientBackend::sendImpl(const ClientMsg &input, bool flush) {
         return;
     }
 
-    net::Delivery delivery = net::Delivery::Reliable;
+    ::net::Delivery delivery = ::net::Delivery::Reliable;
     if (input.type == ClientMsg_Type_PLAYER_LOCATION) {
-        delivery = net::Delivery::Unreliable;
+        delivery = ::net::Delivery::Unreliable;
     }
 
-    auto encoded = net::encodeClientMsg(input);
+    auto encoded = ::net::encodeClientMsg(input);
     if (!encoded.has_value()) {
         logUnsupportedMessageType();
         return;
@@ -170,4 +170,4 @@ void EnetClientBackend::sendImpl(const ClientMsg &input, bool flush) {
     transport_->send(encoded->data(), encoded->size(), delivery, flush);
 }
 
-} // namespace network_backend
+} // namespace game::net

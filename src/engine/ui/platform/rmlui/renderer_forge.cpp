@@ -2,7 +2,7 @@
  * RmlUi Forge renderer implementation for BZ3.
  */
 
-#include "ui/frontends/rmlui/platform/renderer_forge.hpp"
+#include "engine/ui/platform/rmlui/renderer_forge.hpp"
 
 #include <RmlUi/Core/Core.h>
 #include <RmlUi/Core/FileInterface.h>
@@ -170,7 +170,7 @@ void RenderInterface_Forge::BeginFrame() {
     bindDesc.mRenderTargets[0].pRenderTarget = uiTarget_;
     bindDesc.mRenderTargets[0].mLoadAction = LOAD_ACTION_CLEAR;
     bindDesc.mRenderTargets[0].mStoreAction = STORE_ACTION_STORE;
-    const bool debugClear = std::getenv("BZ3_RMLUI_DEBUG_CLEAR") != nullptr;
+    const bool debugClear = std::getenv("KARMA_RMLUI_DEBUG_CLEAR") != nullptr;
     if (debugClear) {
         bindDesc.mRenderTargets[0].mClearValue = {1.0f, 0.0f, 1.0f, 1.0f};
     } else {
@@ -191,7 +191,7 @@ void RenderInterface_Forge::BeginFrame() {
     debug_triangles_ = 0;
     debug_frame_++;
 
-    if (std::getenv("BZ3_RMLUI_DEBUG_TRIANGLE")) {
+    if (std::getenv("KARMA_RMLUI_DEBUG_TRIANGLE")) {
         ensureDebugTriangleBuffers();
         if (debugTriangleVB_ && debugTriangleIB_ && uniformBuffer_ && sampler_ && whiteTexture_) {
             UiVertex tri[3] = {
@@ -656,11 +656,11 @@ void RenderInterface_Forge::ensurePipeline() {
         return;
     }
 
-    const std::filesystem::path shaderDir = bz::data::Resolve("forge/shaders");
+    const std::filesystem::path shaderDir = karma::data::Resolve("forge/shaders");
     const auto vsPath = shaderDir / "rmlui.vert.spv";
     const auto fsPath = shaderDir / "rmlui.frag.spv";
-    auto vsBytes = bz::file::ReadFileBytes(vsPath);
-    auto fsBytes = bz::file::ReadFileBytes(fsPath);
+    auto vsBytes = karma::file::ReadFileBytes(vsPath);
+    auto fsBytes = karma::file::ReadFileBytes(fsPath);
     if (vsBytes.empty() || fsBytes.empty()) {
         spdlog::error("RmlUi(Forge): missing shaders '{}', '{}'", vsPath.string(), fsPath.string());
         return;

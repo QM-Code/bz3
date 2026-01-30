@@ -16,7 +16,7 @@ size_t CurlWriteCallback(char *ptr, size_t size, size_t nmemb, void *userdata) {
     return total;
 }
 
-int parseIntegerField(const bz::json::Value &object, const char *key) {
+int parseIntegerField(const karma::json::Value &object, const char *key) {
     if (!object.contains(key)) {
         return -1;
     }
@@ -37,15 +37,15 @@ int parseIntegerField(const bz::json::Value &object, const char *key) {
 }
 
 std::string configuredServerPortString() {
-    const auto label = bz::config::ReadStringConfig("network.ServerPort", "");
+    const auto label = karma::config::ReadStringConfig("network.ServerPort", "");
     if (!label.empty()) {
         return label;
     }
-    return std::to_string(bz::config::ReadUInt16Config({"network.ServerPort"}, 0));
+    return std::to_string(karma::config::ReadUInt16Config({"network.ServerPort"}, 0));
 }
 
 uint16_t configuredServerPortValue() {
-    return bz::config::ReadUInt16Config({"network.ServerPort"}, 0);
+    return karma::config::ReadUInt16Config({"network.ServerPort"}, 0);
 }
 
 std::string buildServersUrl(const std::string &baseHost) {
@@ -79,7 +79,7 @@ bool parseInfoResponse(const std::string &body,
                        std::string &communityName,
                        std::string &communityDetails) {
     try {
-        bz::json::Value jsonData = bz::json::Parse(body);
+        karma::json::Value jsonData = karma::json::Parse(body);
         if (auto nameIt = jsonData.find("community_name");
             nameIt != jsonData.end() && nameIt->is_string()) {
             communityName = nameIt->get<std::string>();
@@ -99,7 +99,7 @@ bool parseInfoResponse(const std::string &body,
 ServerListFetcher::ServerListFetcher(std::vector<ClientServerListSource> sources)
     : sources(std::move(sources)) {
     if (!this->sources.empty()) {
-        if (bz::net::EnsureCurlGlobalInit()) {
+        if (karma::net::EnsureCurlGlobalInit()) {
             curlInitialized = true;
         } else {
             spdlog::warn("ServerListFetcher: Failed to initialize cURL");
@@ -254,7 +254,7 @@ std::vector<ServerListFetcher::ServerRecord> ServerListFetcher::parseResponse(
     std::vector<ServerRecord> records;
 
     try {
-        bz::json::Value jsonData = bz::json::Parse(body);
+        karma::json::Value jsonData = karma::json::Parse(body);
         std::string listName;
         if (auto nameIt = jsonData.find("name"); nameIt != jsonData.end() && nameIt->is_string()) {
             listName = nameIt->get<std::string>();

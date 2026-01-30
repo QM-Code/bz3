@@ -1,6 +1,11 @@
 #pragma once
 
-#include "engine/graphics/device.hpp"
+#include "engine/ecs/components.hpp"
+#include "engine/ecs/world.hpp"
+#include "engine/renderer/render_context.hpp"
+#include "engine/renderer/render_core.hpp"
+#include "engine/renderer/scene_renderer.hpp"
+#include "game/renderer/radar_renderer.hpp"
 #include "core/types.hpp"
 #include "ui/core/types.hpp"
 
@@ -12,48 +17,32 @@
 #include <unordered_map>
 #include <utility>
 
-#define CAMERA_FOV 60.0f
-#define SCREEN_WIDTH 800.0f
-#define SCREEN_HEIGHT 600.0f
 
 namespace platform {
 class Window;
+}
+namespace graphics {
+class ResourceRegistry;
 }
 
 class Render {
     friend class ClientEngine;
 
 private:
-    std::unique_ptr<graphics::GraphicsDevice> device_;
+    std::unique_ptr<engine::renderer::RenderCore> core_;
     platform::Window* window = nullptr;
 
     render_id nextId = 1;
 
-    graphics::LayerId mainLayer = 0;
-    graphics::LayerId radarLayer = 1;
+    std::unique_ptr<game::renderer::RadarRenderer> radarRenderer_;
+    std::unordered_map<render_id, ecs::EntityId> ecsEntities;
 
-    graphics::RenderTargetId radarTarget = graphics::kDefaultRenderTarget;
-    graphics::MaterialId radarMaterial = graphics::kInvalidMaterial;
-    graphics::MaterialId radarLineMaterial = graphics::kInvalidMaterial;
-
-    graphics::MeshId radarCircleMesh = graphics::kInvalidMesh;
-    graphics::MeshId radarBeamMesh = graphics::kInvalidMesh;
-
-    graphics::EntityId radarFovLeft = graphics::kInvalidEntity;
-    graphics::EntityId radarFovRight = graphics::kInvalidEntity;
-
-    std::unordered_map<render_id, graphics::EntityId> mainEntities;
-    std::unordered_map<render_id, graphics::EntityId> radarEntities;
-    std::unordered_map<render_id, graphics::EntityId> radarCircles;
-    std::unordered_map<render_id, std::filesystem::path> modelPaths;
-
-    glm::vec3 cameraPosition{0.0f};
-    glm::quat cameraRotation{1.0f, 0.0f, 0.0f, 0.0f};
+    ecs::World *ecsWorld = nullptr;
+    graphics::ResourceRegistry *contextResources_ = nullptr;
 
     int lastFramebufferWidth = 0;
     int lastFramebufferHeight = 0;
     float lastAspect = 1.0f;
-    float radarFovDegrees = CAMERA_FOV;
 
     Render(platform::Window &window);
     ~Render();
@@ -61,9 +50,10 @@ private:
     void update();
     void resizeCallback(int width, int height);
 
-    void ensureRadarResources();
-    void updateRadarFovLines();
-    glm::quat computeRadarCameraRotation(const glm::vec3& radarCamPos) const;
+    void registerEcsEntity(render_id id);
+    ecs::Transform *getEcsTransform(render_id id);
+    graphics::EntityId getEcsGraphicsEntity(render_id id) const;
+    void setEcsRenderMesh(render_id id, const std::filesystem::path& modelPath);
 
 public:
     render_id create();
@@ -71,6 +61,11 @@ public:
     void setModel(render_id id, const std::filesystem::path& modelPath, bool addToRadar = true);
     void setRadarCircleGraphic(render_id id, float radius = 1.0f);
     void setRadarFOVLinesAngle(float fovDegrees);
+    void setEcsWorld(ecs::World *world);
+    void setResourceRegistry(graphics::ResourceRegistry *resources);
+    void setMainLayer(graphics::LayerId layer) { if (core_) { core_->context().mainLayer = layer; } }
+    engine::renderer::RenderContext &mainContext() { return core_->context(); }
+    const engine::renderer::RenderContext &mainContext() const { return core_->context(); }
 
     void destroy(render_id id);
     void setPosition(render_id id, const glm::vec3 &position);
@@ -89,6 +84,8 @@ public:
     graphics_backend::UiRenderTargetBridge* getUiRenderTargetBridge() const;
     void setRadarShaderPath(const std::filesystem::path& vertPath,
                             const std::filesystem::path& fragPath);
+    graphics::GraphicsDevice *getGraphicsDevice() const { return core_ ? &core_->device() : nullptr; }
+    engine::renderer::RenderCore *getRenderCore() const { return core_.get(); }
 
     glm::mat4 getViewProjectionMatrix() const;
     glm::mat4 getViewMatrix() const;

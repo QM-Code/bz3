@@ -51,7 +51,7 @@ InputState BuildInputState(const Input& input) {
 
 std::string SpawnHintText(const Input& input) {
     const auto hint = input.bindingListDisplay(kActionSpawn);
-    return bz::i18n::Get().format("ui.hud.spawn_hint", {{"binding", hint}});
+    return karma::i18n::Get().format("ui.hud.spawn_hint", {{"binding", hint}});
 }
 
 } // namespace game_input

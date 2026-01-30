@@ -3,7 +3,7 @@
 #include <curl/curl.h>
 #include <spdlog/spdlog.h>
 
-#if defined(BZ3_RENDER_BACKEND_BGFX)
+#if defined(KARMA_RENDER_BACKEND_BGFX)
 #include <bgfx/bgfx.h>
 #endif
 
@@ -71,7 +71,7 @@ void ThumbnailCache::processUploads() {
             continue;
         }
 
-#if defined(BZ3_RENDER_BACKEND_BGFX)
+#if defined(KARMA_RENDER_BACKEND_BGFX)
         const bgfx::Memory* mem = bgfx::copy(payload.pixels.data(),
                                              static_cast<uint32_t>(payload.width * payload.height * 4));
         const uint64_t flags = BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP |
@@ -110,7 +110,7 @@ void ThumbnailCache::clearTextures() {
         if (!thumb.texture.valid()) {
             continue;
         }
-#if defined(BZ3_RENDER_BACKEND_BGFX)
+#if defined(KARMA_RENDER_BACKEND_BGFX)
         const uint64_t token = thumb.texture.id;
         if (token > 0) {
             bgfx::TextureHandle handle{static_cast<uint16_t>(token - 1)};
@@ -158,7 +158,7 @@ void ThumbnailCache::queueRequest(const std::string &url) {
 
 void ThumbnailCache::workerProc() {
     auto fetchBytes = [](const std::string &url, std::vector<unsigned char> &body) {
-        if (!bz::net::EnsureCurlGlobalInit()) {
+        if (!karma::net::EnsureCurlGlobalInit()) {
             return false;
         }
 

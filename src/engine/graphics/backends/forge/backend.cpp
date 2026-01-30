@@ -10,7 +10,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#if defined(BZ3_WINDOW_BACKEND_SDL3)
+#if defined(KARMA_WINDOW_BACKEND_SDL3)
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_properties.h>
 #include <SDL3/SDL_video.h>
@@ -41,7 +41,7 @@ WindowHandle buildWindowHandle(platform::Window* window) {
     if (!window) {
         return handle;
     }
-#if defined(BZ3_WINDOW_BACKEND_SDL3)
+#if defined(KARMA_WINDOW_BACKEND_SDL3)
     auto* sdlWindow = static_cast<SDL_Window*>(window->nativeHandle());
     if (!sdlWindow) {
         return handle;
@@ -150,16 +150,16 @@ ForgeBackend::ForgeBackend(platform::Window& windowRef) : window(&windowRef) {
     framebufferWidth = fbWidth;
     framebufferHeight = fbHeight;
 
-    initMemAlloc("bz3");
+    initMemAlloc("karma");
     spdlog::warn("Graphics(Forge): initMemAlloc ok");
     ensureForgeConfigFiles();
     FileSystemInitDesc fsDesc{};
-    fsDesc.pAppName = "bz3";
+    fsDesc.pAppName = "karma";
     if (!initFileSystem(&fsDesc)) {
         spdlog::error("Graphics(Forge): initFileSystem failed");
         return;
     }
-    initLog("bz3", eALL);
+    initLog("karma", eALL);
     spdlog::warn("Graphics(Forge): initFileSystem/initLog ok");
     initGPUConfiguration(nullptr);
     spdlog::warn("Graphics(Forge): initGPUConfiguration ok");
@@ -170,7 +170,7 @@ ForgeBackend::ForgeBackend(platform::Window& windowRef) : window(&windowRef) {
 #if defined(VULKAN)
     static const char* kValidationLayer = "VK_LAYER_KHRONOS_validation";
     const bool enableValidation = []() {
-        const char* flag = std::getenv("BZ3_FORGE_ENABLE_VALIDATION");
+        const char* flag = std::getenv("KARMA_FORGE_ENABLE_VALIDATION");
         return flag && flag[0] == '1';
     }();
     if (enableValidation) {
@@ -179,7 +179,7 @@ ForgeBackend::ForgeBackend(platform::Window& windowRef) : window(&windowRef) {
         spdlog::warn("Graphics(Forge): Vulkan validation enabled (layer {})", kValidationLayer);
     }
 #endif
-    initRenderer("bz3", &rendererDesc, &renderer_);
+    initRenderer("karma", &rendererDesc, &renderer_);
     if (!renderer_) {
         spdlog::error("Graphics(Forge): failed to initialize renderer.");
         return;
@@ -237,7 +237,7 @@ ForgeBackend::ForgeBackend(platform::Window& windowRef) : window(&windowRef) {
     graphics_backend::forge_ui::SetContext(renderer_, graphicsQueue_, framebufferWidth, framebufferHeight, colorFormat);
     spdlog::warn("Graphics(Forge): ui bridge context ok");
 
-#if defined(BZ3_UI_BACKEND_IMGUI)
+#if defined(KARMA_UI_BACKEND_IMGUI)
     uiBridge_ = std::make_unique<ForgeRenderer>();
 #endif
     spdlog::warn("Graphics(Forge): initialized (SDL3 + Vulkan).");
@@ -451,7 +451,7 @@ void ForgeBackend::setEntityModel(graphics::EntityId entity,
         return;
     }
 
-    const auto resolved = bz::data::Resolve(modelPath);
+    const auto resolved = karma::data::Resolve(modelPath);
     MeshLoader::LoadOptions options;
     options.loadTextures = false;
     auto loaded = MeshLoader::loadGLB(resolved.string(), options);
@@ -570,7 +570,7 @@ graphics::MeshId ForgeBackend::createMesh(const graphics::MeshData& mesh) {
         const glm::vec2 uv = (i < mesh.texcoords.size()) ? mesh.texcoords[i] : glm::vec2(0.0f);
         packed[i] = {v.x, v.y, v.z, n.x, n.y, n.z, uv.x, uv.y};
     }
-    if (const char* dbg = std::getenv("BZ3_FORGE_DEBUG_MESH_BOUNDS"); dbg && dbg[0] == '1') {
+    if (const char* dbg = std::getenv("KARMA_FORGE_DEBUG_MESH_BOUNDS"); dbg && dbg[0] == '1') {
         glm::vec3 minv{std::numeric_limits<float>::max()};
         glm::vec3 maxv{std::numeric_limits<float>::lowest()};
         for (const auto& v : mesh.vertices) {
@@ -763,7 +763,7 @@ void ForgeBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId
     bindDesc.mRenderTargets[0].mLoadAction = LOAD_ACTION_CLEAR;
     bindDesc.mRenderTargets[0].mStoreAction = STORE_ACTION_STORE;
     const bool debugSwapchainClear = []() {
-        const char* flag = std::getenv("BZ3_FORGE_DEBUG_CLEAR_SWAPCHAIN");
+        const char* flag = std::getenv("KARMA_FORGE_DEBUG_CLEAR_SWAPCHAIN");
         return flag && flag[0] == '1';
     }();
     if ((useSwapchain || wantsBrightness) && debugSwapchainClear) {
@@ -787,7 +787,7 @@ void ForgeBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId
                    static_cast<float>(targetHeight), 0.0f, 1.0f);
     cmdSetScissor(cmd_, 0, 0, static_cast<uint32_t>(targetWidth), static_cast<uint32_t>(targetHeight));
     const bool debugUiQuad = []() {
-        const char* flag = std::getenv("BZ3_FORGE_DEBUG_UI_QUAD");
+        const char* flag = std::getenv("KARMA_FORGE_DEBUG_UI_QUAD");
         return flag && flag[0] == '1';
     }();
     if (debugUiQuad && target == graphics::kDefaultRenderTarget) {
@@ -875,7 +875,7 @@ void ForgeBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId
     int visibleEntities = 0;
     int meshesDrawn = 0;
     const bool debugCamera = []() {
-        const char* flag = std::getenv("BZ3_FORGE_DEBUG_CAMERA");
+        const char* flag = std::getenv("KARMA_FORGE_DEBUG_CAMERA");
         return flag && flag[0] == '1';
     }();
     static std::unordered_set<int> loggedLayerCamera;
@@ -893,11 +893,11 @@ void ForgeBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId
                      vp[12], vp[13], vp[14], vp[15]);
     }
     const bool debugMeshTri = []() {
-        const char* flag = std::getenv("BZ3_FORGE_DEBUG_MESH_TRI");
+        const char* flag = std::getenv("KARMA_FORGE_DEBUG_MESH_TRI");
         return flag && flag[0] == '1';
     }();
     const bool debugOnlyTri = []() {
-        const char* flag = std::getenv("BZ3_FORGE_DEBUG_ONLY_TRI");
+        const char* flag = std::getenv("KARMA_FORGE_DEBUG_ONLY_TRI");
         return flag && flag[0] == '1';
     }();
     if (debugMeshTri && target == graphics::kDefaultRenderTarget) {
@@ -1342,13 +1342,13 @@ glm::mat4 ForgeBackend::computeViewMatrix() const {
 glm::mat4 ForgeBackend::computeProjectionMatrix() const {
     if (usePerspective) {
         // Vulkan clip space depth is [0, 1]. Allow forcing LH for debugging camera handedness.
-        const char* forceLh = std::getenv("BZ3_FORGE_USE_LH");
+        const char* forceLh = std::getenv("KARMA_FORGE_USE_LH");
         if (forceLh && forceLh[0] == '1') {
             return glm::perspectiveLH_ZO(glm::radians(fovDegrees), aspectRatio, nearPlane, farPlane);
         }
         return glm::perspectiveRH_ZO(glm::radians(fovDegrees), aspectRatio, nearPlane, farPlane);
     }
-    const char* forceLh = std::getenv("BZ3_FORGE_USE_LH");
+    const char* forceLh = std::getenv("KARMA_FORGE_USE_LH");
     if (forceLh && forceLh[0] == '1') {
         return glm::orthoLH_ZO(orthoLeft, orthoRight, orthoBottom, orthoTop, nearPlane, farPlane);
     }
@@ -1363,11 +1363,11 @@ void ForgeBackend::ensureUiOverlayResources() {
         return;
     }
 
-    const std::filesystem::path shaderDir = bz::data::Resolve("forge/shaders");
+    const std::filesystem::path shaderDir = karma::data::Resolve("forge/shaders");
     const auto vsPath = shaderDir / "ui_overlay.vert.spv";
     const auto fsPath = shaderDir / "ui_overlay.frag.spv";
-    auto vsBytes = bz::file::ReadFileBytes(vsPath);
-    auto fsBytes = bz::file::ReadFileBytes(fsPath);
+    auto vsBytes = karma::file::ReadFileBytes(vsPath);
+    auto fsBytes = karma::file::ReadFileBytes(fsPath);
     if (vsBytes.empty() || fsBytes.empty()) {
         spdlog::error("Graphics(Forge): missing UI overlay shaders '{}', '{}'", vsPath.string(), fsPath.string());
         return;
@@ -1458,7 +1458,7 @@ void ForgeBackend::ensureUiOverlayResources() {
 
     BlendStateDesc blend{};
     const bool forceOpaque = []() {
-        const char* flag = std::getenv("BZ3_FORGE_DEBUG_OPAQUE");
+        const char* flag = std::getenv("KARMA_FORGE_DEBUG_OPAQUE");
         return flag && flag[0] == '1';
     }();
     blend.mColorWriteMasks[0] = COLOR_MASK_ALL;
@@ -1549,11 +1549,11 @@ void ForgeBackend::ensureBrightnessResources() {
         return;
     }
 
-    const std::filesystem::path shaderDir = bz::data::Resolve("forge/shaders");
+    const std::filesystem::path shaderDir = karma::data::Resolve("forge/shaders");
     const auto vsPath = shaderDir / "brightness.vert.spv";
     const auto fsPath = shaderDir / "brightness.frag.spv";
-    auto vsBytes = bz::file::ReadFileBytes(vsPath);
-    auto fsBytes = bz::file::ReadFileBytes(fsPath);
+    auto vsBytes = karma::file::ReadFileBytes(vsPath);
+    auto fsBytes = karma::file::ReadFileBytes(fsPath);
     if (vsBytes.empty() || fsBytes.empty()) {
         spdlog::error("Graphics(Forge): missing brightness shaders '{}', '{}'", vsPath.string(), fsPath.string());
         return;
@@ -1846,15 +1846,15 @@ void ForgeBackend::ensureMeshResources() {
         return;
     }
 
-    const std::filesystem::path shaderDir = bz::data::Resolve("forge/shaders");
+    const std::filesystem::path shaderDir = karma::data::Resolve("forge/shaders");
     const bool debugSolid = []() {
-        const char* flag = std::getenv("BZ3_FORGE_DEBUG_SOLID_SHADER");
+        const char* flag = std::getenv("KARMA_FORGE_DEBUG_SOLID_SHADER");
         return flag && flag[0] == '1';
     }();
     const auto vsPath = shaderDir / (debugSolid ? "mesh_debug.vert.spv" : "mesh.vert.spv");
     const auto fsPath = shaderDir / (debugSolid ? "mesh_debug.frag.spv" : "mesh.frag.spv");
-    auto vsBytes = bz::file::ReadFileBytes(vsPath);
-    auto fsBytes = bz::file::ReadFileBytes(fsPath);
+    auto vsBytes = karma::file::ReadFileBytes(vsPath);
+    auto fsBytes = karma::file::ReadFileBytes(fsPath);
     if (vsBytes.empty() || fsBytes.empty()) {
         spdlog::error("Graphics(Forge): missing mesh shaders '{}', '{}'", vsPath.string(), fsPath.string());
         return;

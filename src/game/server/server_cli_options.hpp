@@ -13,7 +13,7 @@ struct ServerCLIOptions {
     std::string userConfigPath;
     bool dataDirExplicit = false;
     bool userConfigExplicit = false;
-    bool verbose = false;
+    int verbose = 0;
     std::string logLevel;
     bool logLevelExplicit = false;
     bool timestampLogging = false;

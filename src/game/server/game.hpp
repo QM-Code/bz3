@@ -35,7 +35,7 @@ public:
         Game(class ServerEngine &engine,
             std::string serverName,
             std::string worldName,
-            bz::json::Value worldConfig,
+            karma::json::Value worldConfig,
             std::string worldDir,
             bool enableWorldZipping);
     ~Game();

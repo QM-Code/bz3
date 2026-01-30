@@ -5,7 +5,7 @@ This file provides quick, repo-specific instructions for coding agents.
 ## Project summary
 - BZ3 is a C++20 client/server 3D game inspired by BZFlag.
 - Two binaries: `bz3` (client) and `bz3-server` (server).
-- Runtime assets/config resolve from `BZ3_DATA_DIR` (usually `data/`).
+- Runtime assets/config resolve from `KARMA_DATA_DIR` (usually `data/`).
 
 ## Key directories
 - `src/game/client/`: client gameplay and main loop.
@@ -31,13 +31,13 @@ This file provides quick, repo-specific instructions for coding agents.
 Linux/macOS:
 - `./setup.sh`
 - `cmake --build build`
-- `BZ3_DATA_DIR="$PWD/data" ./build/bz3`
-- `BZ3_DATA_DIR="$PWD/data" ./build/bz3-server`
+- `KARMA_DATA_DIR="$PWD/data" ./build/bz3`
+- `KARMA_DATA_DIR="$PWD/data" ./build/bz3-server`
 
 Windows:
 - `setup.bat`
 - `cmake --build build --config Release`
-- `set BZ3_DATA_DIR=%CD%\data`
+- `set KARMA_DATA_DIR=%CD%\data`
 - `build\Release\bz3.exe`
 - `build\Release\bz3-server.exe`
 

@@ -1,10 +1,10 @@
-#include "ui/frontends/imgui/platform/renderer_diligent.hpp"
+#include "engine/ui/platform/imgui/renderer_diligent.hpp"
 
 #include <imgui.h>
 
 #include "engine/graphics/backends/diligent/ui_bridge.hpp"
 #include "spdlog/spdlog.h"
-#include "ui/frontends/imgui/texture_utils.hpp"
+#include "engine/ui/imgui/texture_utils.hpp"
 
 #include <DiligentCore/Graphics/GraphicsEngine/interface/Buffer.h>
 #include <DiligentCore/Graphics/GraphicsEngine/interface/DeviceContext.h>

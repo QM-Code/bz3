@@ -6,7 +6,7 @@
 #include <string>
 #include <string_view>
 
-namespace bz::json {
+namespace karma::json {
 
 using Value = nlohmann::json;
 
@@ -31,4 +31,4 @@ inline std::string Dump(const Value& value, int indent = -1) {
     return value.dump(indent);
 }
 
-} // namespace bz::json
+} // namespace karma::json

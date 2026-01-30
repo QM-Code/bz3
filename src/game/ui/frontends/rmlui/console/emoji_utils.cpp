@@ -184,7 +184,7 @@ std::string renderTextWithTwemoji(std::string_view text) {
         }
 
         const std::string fileName = buildTwemojiFilename(sequence);
-        const std::filesystem::path imagePath = bz::data::Resolve("client/ui/emoji/twemoji/" + fileName + ".png");
+        const std::filesystem::path imagePath = karma::data::Resolve("client/ui/emoji/twemoji/" + fileName + ".png");
         if (std::filesystem::exists(imagePath)) {
             const std::string srcPath = "emoji/twemoji/" + fileName + ".png";
             out.append("<img src=\"");

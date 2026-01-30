@@ -19,7 +19,7 @@ void UiSystem::handleEvents(const std::vector<platform::Event> &events) {
 }
 
 void UiSystem::update() {
-    const uint64_t revision = bz::config::ConfigStore::Revision();
+    const uint64_t revision = karma::config::ConfigStore::Revision();
     if (revision != lastConfigRevision) {
         lastConfigRevision = revision;
         hudModel.visibility.scoreboard = ui::UiConfig::GetHudScoreboard();
@@ -41,7 +41,7 @@ void UiSystem::reloadFonts() {
 }
 
 void UiSystem::setLanguage(const std::string &language) {
-    bz::i18n::Get().loadLanguage(language);
+    karma::i18n::Get().loadLanguage(language);
     backend->reloadFonts();
 }
 

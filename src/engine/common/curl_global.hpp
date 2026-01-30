@@ -1,5 +1,5 @@
 #pragma once
 
-namespace bz::net {
+namespace karma::net {
 bool EnsureCurlGlobalInit();
 }

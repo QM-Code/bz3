@@ -14,7 +14,7 @@ class CommunityHeartbeat {
 public:
     CommunityHeartbeat();
     ~CommunityHeartbeat();
-    void configureFromConfig(const bz::json::Value &mergedConfig,
+    void configureFromConfig(const karma::json::Value &mergedConfig,
                              uint16_t listenPort,
                              const std::string &communityOverride);
     void update(const Game &game);

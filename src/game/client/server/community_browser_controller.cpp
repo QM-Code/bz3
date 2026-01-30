@@ -56,7 +56,7 @@ bool isLanToken(const std::string &value) {
 }
 
 uint16_t configuredServerPort() {
-    return bz::config::ReadUInt16Config({"network.ServerPort"}, 0);
+    return karma::config::ReadUInt16Config({"network.ServerPort"}, 0);
 }
 
 uint16_t applyPortFallback(uint16_t candidate) {
@@ -199,7 +199,7 @@ bool fetchCommunityInfoOk(const std::string &baseUrl) {
         return false;
     }
     try {
-        auto json = bz::json::Parse(body);
+        auto json = karma::json::Parse(body);
         return json.is_object();
     } catch (...) {
         return false;
@@ -216,7 +216,7 @@ CommunityBrowserController::CommunityBrowserController(ClientEngine &engine,
       clientConfig(clientConfig),
       clientConfigPath(configPath),
       connector(connector) {
-    curlReady = bz::net::EnsureCurlGlobalInit();
+    curlReady = karma::net::EnsureCurlGlobalInit();
     if (!curlReady) {
         spdlog::warn("CommunityBrowserController: Failed to initialize cURL");
     }
@@ -1142,7 +1142,7 @@ void CommunityBrowserController::startServerDetailsRequest(const ui::CommunityBr
         }
 
         try {
-            bz::json::Value jsonData = bz::json::Parse(body);
+            karma::json::Value jsonData = karma::json::Parse(body);
             const auto *serverNode = jsonData.contains("server") ? &jsonData["server"] : nullptr;
             if (serverNode && serverNode->is_object()) {
                 if (auto nameIt = serverNode->find("name");

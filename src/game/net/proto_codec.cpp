@@ -12,33 +12,33 @@ std::vector<std::byte> toBytes(const std::string &buffer) {
     return std::vector<std::byte>(ptr, ptr + buffer.size());
 }
 
-void decodeVec3(const bz::Vec3 &input, glm::vec3 &output) {
+void decodeVec3(const karma::Vec3 &input, glm::vec3 &output) {
     output.x = input.x();
     output.y = input.y();
     output.z = input.z();
 }
 
-void encodeVec3(const glm::vec3 &input, bz::Vec3 *output) {
+void encodeVec3(const glm::vec3 &input, karma::Vec3 *output) {
     output->set_x(input.x);
     output->set_y(input.y);
     output->set_z(input.z);
 }
 
-void decodeQuat(const bz::Quat &input, glm::quat &output) {
+void decodeQuat(const karma::Quat &input, glm::quat &output) {
     output.w = input.w();
     output.x = input.x();
     output.y = input.y();
     output.z = input.z();
 }
 
-void encodeQuat(const glm::quat &input, bz::Quat *output) {
+void encodeQuat(const glm::quat &input, karma::Quat *output) {
     output->set_w(input.w);
     output->set_x(input.x);
     output->set_y(input.y);
     output->set_z(input.z);
 }
 
-void decodePlayerState(const bz::PlayerState &input, PlayerState &output) {
+void decodePlayerState(const karma::PlayerState &input, PlayerState &output) {
     output.name = input.name();
     decodeVec3(input.position(), output.position);
     decodeQuat(input.rotation(), output.rotation);
@@ -54,7 +54,7 @@ void decodePlayerState(const bz::PlayerState &input, PlayerState &output) {
     }
 }
 
-void encodePlayerState(const PlayerState &input, bz::PlayerState *output) {
+void encodePlayerState(const PlayerState &input, karma::PlayerState *output) {
     output->set_name(input.name);
     encodeVec3(input.position, output->mutable_position());
     encodeQuat(input.rotation, output->mutable_rotation());
@@ -77,34 +77,34 @@ std::unique_ptr<ServerMsg> decodeServerMsg(const std::byte *data, std::size_t si
         return nullptr;
     }
 
-    bz::ServerMsg msg;
+    karma::ServerMsg msg;
     if (!msg.ParseFromArray(data, static_cast<int>(size))) {
         return nullptr;
     }
 
     switch (msg.payload_case()) {
 
-    case bz::ServerMsg::kPlayerJoin: {
+    case karma::ServerMsg::kPlayerJoin: {
         auto out = std::make_unique<ServerMsg_PlayerJoin>();
         out->clientId = msg.player_join().client_id();
         decodePlayerState(msg.player_join().state(), out->state);
         return out;
     }
 
-    case bz::ServerMsg::kPlayerLeave: {
+    case karma::ServerMsg::kPlayerLeave: {
         auto out = std::make_unique<ServerMsg_PlayerLeave>();
         out->clientId = msg.player_leave().client_id();
         return out;
     }
 
-    case bz::ServerMsg::kPlayerState: {
+    case karma::ServerMsg::kPlayerState: {
         auto out = std::make_unique<ServerMsg_PlayerState>();
         out->clientId = msg.player_state().client_id();
         decodePlayerState(msg.player_state().state(), out->state);
         return out;
     }
 
-    case bz::ServerMsg::kPlayerParameters: {
+    case karma::ServerMsg::kPlayerParameters: {
         auto out = std::make_unique<ServerMsg_PlayerParameters>();
         out->clientId = msg.player_parameters().client_id();
         for (const auto& [key, val] : msg.player_parameters().params().params()) {
@@ -113,7 +113,7 @@ std::unique_ptr<ServerMsg> decodeServerMsg(const std::byte *data, std::size_t si
         return out;
     }
 
-    case bz::ServerMsg::kPlayerLocation: {
+    case karma::ServerMsg::kPlayerLocation: {
         auto out = std::make_unique<ServerMsg_PlayerLocation>();
         out->clientId = msg.player_location().client_id();
         decodeVec3(msg.player_location().position(), out->position);
@@ -122,7 +122,7 @@ std::unique_ptr<ServerMsg> decodeServerMsg(const std::byte *data, std::size_t si
         return out;
     }
 
-    case bz::ServerMsg::kPlayerSpawn: {
+    case karma::ServerMsg::kPlayerSpawn: {
         auto out = std::make_unique<ServerMsg_PlayerSpawn>();
         out->clientId = msg.player_spawn().client_id();
         decodeVec3(msg.player_spawn().position(), out->position);
@@ -131,20 +131,20 @@ std::unique_ptr<ServerMsg> decodeServerMsg(const std::byte *data, std::size_t si
         return out;
     }
 
-    case bz::ServerMsg::kPlayerDeath: {
+    case karma::ServerMsg::kPlayerDeath: {
         auto out = std::make_unique<ServerMsg_PlayerDeath>();
         out->clientId = msg.player_death().client_id();
         return out;
     }
 
-    case bz::ServerMsg::kSetScore: {
+    case karma::ServerMsg::kSetScore: {
         auto out = std::make_unique<ServerMsg_SetScore>();
         out->clientId = msg.set_score().client_id();
         out->score = msg.set_score().score();
         return out;
     }
 
-    case bz::ServerMsg::kCreateShot: {
+    case karma::ServerMsg::kCreateShot: {
         auto out = std::make_unique<ServerMsg_CreateShot>();
         out->globalShotId = msg.create_shot().global_shot_id();
         decodeVec3(msg.create_shot().position(), out->position);
@@ -152,14 +152,14 @@ std::unique_ptr<ServerMsg> decodeServerMsg(const std::byte *data, std::size_t si
         return out;
     }
 
-    case bz::ServerMsg::kRemoveShot: {
+    case karma::ServerMsg::kRemoveShot: {
         auto out = std::make_unique<ServerMsg_RemoveShot>();
         out->shotId = msg.remove_shot().shot_id();
         out->isGlobalId = msg.remove_shot().is_global_id();
         return out;
     }
 
-    case bz::ServerMsg::kInit: {
+    case karma::ServerMsg::kInit: {
         auto out = std::make_unique<ServerMsg_Init>();
         out->clientId = msg.init().client_id();
         out->serverName = msg.init().server_name();
@@ -176,7 +176,7 @@ std::unique_ptr<ServerMsg> decodeServerMsg(const std::byte *data, std::size_t si
         return out;
     }
 
-    case bz::ServerMsg::kChat: {
+    case karma::ServerMsg::kChat: {
         auto out = std::make_unique<ServerMsg_Chat>();
         out->fromId = msg.chat().from_id();
         out->toId = msg.chat().to_id();
@@ -194,14 +194,14 @@ std::unique_ptr<ClientMsg> decodeClientMsg(const std::byte *data, std::size_t si
         return nullptr;
     }
 
-    bz::ClientMsg msg;
+    karma::ClientMsg msg;
     if (!msg.ParseFromArray(data, static_cast<int>(size))) {
         return nullptr;
     }
 
     switch (msg.payload_case()) {
 
-    case bz::ClientMsg::kChat: {
+    case karma::ClientMsg::kChat: {
         auto out = std::make_unique<ClientMsg_Chat>();
         out->clientId = msg.client_id();
         out->toId = msg.chat().to_id();
@@ -209,7 +209,7 @@ std::unique_ptr<ClientMsg> decodeClientMsg(const std::byte *data, std::size_t si
         return out;
     }
 
-    case bz::ClientMsg::kPlayerLocation: {
+    case karma::ClientMsg::kPlayerLocation: {
         auto out = std::make_unique<ClientMsg_PlayerLocation>();
         out->clientId = msg.client_id();
         decodeVec3(msg.player_location().position(), out->position);
@@ -217,13 +217,13 @@ std::unique_ptr<ClientMsg> decodeClientMsg(const std::byte *data, std::size_t si
         return out;
     }
 
-    case bz::ClientMsg::kRequestPlayerSpawn: {
+    case karma::ClientMsg::kRequestPlayerSpawn: {
         auto out = std::make_unique<ClientMsg_RequestPlayerSpawn>();
         out->clientId = msg.client_id();
         return out;
     }
 
-    case bz::ClientMsg::kCreateShot: {
+    case karma::ClientMsg::kCreateShot: {
         auto out = std::make_unique<ClientMsg_CreateShot>();
         out->clientId = msg.client_id();
         out->localShotId = msg.create_shot().local_shot_id();
@@ -232,7 +232,7 @@ std::unique_ptr<ClientMsg> decodeClientMsg(const std::byte *data, std::size_t si
         return out;
     }
 
-    case bz::ClientMsg::kPlayerJoin: {
+    case karma::ClientMsg::kPlayerJoin: {
         auto out = std::make_unique<ClientMsg_PlayerJoin>();
         out->clientId = msg.client_id();
         out->ip = msg.player_join().ip();
@@ -244,7 +244,7 @@ std::unique_ptr<ClientMsg> decodeClientMsg(const std::byte *data, std::size_t si
         return out;
     }
 
-    case bz::ClientMsg::kPlayerLeave: {
+    case karma::ClientMsg::kPlayerLeave: {
         auto out = std::make_unique<ClientMsg_PlayerLeave>();
         out->clientId = msg.client_id();
         return out;
@@ -256,12 +256,12 @@ std::unique_ptr<ClientMsg> decodeClientMsg(const std::byte *data, std::size_t si
 }
 
 std::optional<std::vector<std::byte>> encodeClientMsg(const ClientMsg &input) {
-    bz::ClientMsg msg;
+    karma::ClientMsg msg;
     msg.set_client_id(input.clientId);
 
     switch (input.type) {
     case ClientMsg_Type_PLAYER_JOIN: {
-        msg.set_type(bz::ClientMsg::PLAYER_JOIN);
+        msg.set_type(karma::ClientMsg::PLAYER_JOIN);
         const auto &typed = static_cast<const ClientMsg_PlayerJoin&>(input);
         auto *join = msg.mutable_player_join();
         join->set_ip(typed.ip);
@@ -273,7 +273,7 @@ std::optional<std::vector<std::byte>> encodeClientMsg(const ClientMsg &input) {
         break;
     }
     case ClientMsg_Type_CHAT: {
-        msg.set_type(bz::ClientMsg::CHAT);
+        msg.set_type(karma::ClientMsg::CHAT);
         const auto &typed = static_cast<const ClientMsg_Chat&>(input);
         auto* chat = msg.mutable_chat();
         chat->set_to_id(typed.toId);
@@ -281,7 +281,7 @@ std::optional<std::vector<std::byte>> encodeClientMsg(const ClientMsg &input) {
         break;
     }
     case ClientMsg_Type_PLAYER_LOCATION: {
-        msg.set_type(bz::ClientMsg::PLAYER_LOCATION);
+        msg.set_type(karma::ClientMsg::PLAYER_LOCATION);
         const auto &typed = static_cast<const ClientMsg_PlayerLocation&>(input);
         auto* loc = msg.mutable_player_location();
         encodeVec3(typed.position, loc->mutable_position());
@@ -289,12 +289,12 @@ std::optional<std::vector<std::byte>> encodeClientMsg(const ClientMsg &input) {
         break;
     }
     case ClientMsg_Type_REQUEST_PLAYER_SPAWN: {
-        msg.set_type(bz::ClientMsg::REQUEST_PLAYER_SPAWN);
+        msg.set_type(karma::ClientMsg::REQUEST_PLAYER_SPAWN);
         msg.mutable_request_player_spawn();
         break;
     }
     case ClientMsg_Type_CREATE_SHOT: {
-        msg.set_type(bz::ClientMsg::CREATE_SHOT);
+        msg.set_type(karma::ClientMsg::CREATE_SHOT);
         const auto &typed = static_cast<const ClientMsg_CreateShot&>(input);
         auto* shot = msg.mutable_create_shot();
         shot->set_local_shot_id(typed.localShotId);
@@ -303,7 +303,7 @@ std::optional<std::vector<std::byte>> encodeClientMsg(const ClientMsg &input) {
         break;
     }
     case ClientMsg_Type_PLAYER_LEAVE: {
-        msg.set_type(bz::ClientMsg::PLAYER_LEAVE);
+        msg.set_type(karma::ClientMsg::PLAYER_LEAVE);
         msg.mutable_player_leave();
         break;
     }
@@ -317,11 +317,11 @@ std::optional<std::vector<std::byte>> encodeClientMsg(const ClientMsg &input) {
 }
 
 std::optional<std::vector<std::byte>> encodeServerMsg(const ServerMsg &input) {
-    bz::ServerMsg msg;
+    karma::ServerMsg msg;
 
     switch (input.type) {
     case ServerMsg_Type_PLAYER_JOIN: {
-        msg.set_type(bz::ServerMsg::PLAYER_JOIN);
+        msg.set_type(karma::ServerMsg::PLAYER_JOIN);
         const auto &typed = static_cast<const ServerMsg_PlayerJoin&>(input);
         auto* join = msg.mutable_player_join();
         join->set_client_id(typed.clientId);
@@ -329,13 +329,13 @@ std::optional<std::vector<std::byte>> encodeServerMsg(const ServerMsg &input) {
         break;
     }
     case ServerMsg_Type_PLAYER_LEAVE: {
-        msg.set_type(bz::ServerMsg::PLAYER_LEAVE);
+        msg.set_type(karma::ServerMsg::PLAYER_LEAVE);
         const auto &typed = static_cast<const ServerMsg_PlayerLeave&>(input);
         msg.mutable_player_leave()->set_client_id(typed.clientId);
         break;
     }
     case ServerMsg_Type_PLAYER_STATE: {
-        msg.set_type(bz::ServerMsg::PLAYER_STATE);
+        msg.set_type(karma::ServerMsg::PLAYER_STATE);
         const auto &typed = static_cast<const ServerMsg_PlayerState&>(input);
         auto* ps = msg.mutable_player_state();
         ps->set_client_id(typed.clientId);
@@ -343,7 +343,7 @@ std::optional<std::vector<std::byte>> encodeServerMsg(const ServerMsg &input) {
         break;
     }
     case ServerMsg_Type_PLAYER_PARAMETERS: {
-        msg.set_type(bz::ServerMsg::PLAYER_PARAMETERS);
+        msg.set_type(karma::ServerMsg::PLAYER_PARAMETERS);
         const auto &typed = static_cast<const ServerMsg_PlayerParameters&>(input);
         auto* pp = msg.mutable_player_parameters();
         pp->set_client_id(typed.clientId);
@@ -354,7 +354,7 @@ std::optional<std::vector<std::byte>> encodeServerMsg(const ServerMsg &input) {
         break;
     }
     case ServerMsg_Type_PLAYER_LOCATION: {
-        msg.set_type(bz::ServerMsg::PLAYER_LOCATION);
+        msg.set_type(karma::ServerMsg::PLAYER_LOCATION);
         const auto &typed = static_cast<const ServerMsg_PlayerLocation&>(input);
         auto* loc = msg.mutable_player_location();
         loc->set_client_id(typed.clientId);
@@ -364,7 +364,7 @@ std::optional<std::vector<std::byte>> encodeServerMsg(const ServerMsg &input) {
         break;
     }
     case ServerMsg_Type_PLAYER_SPAWN: {
-        msg.set_type(bz::ServerMsg::PLAYER_SPAWN);
+        msg.set_type(karma::ServerMsg::PLAYER_SPAWN);
         const auto &typed = static_cast<const ServerMsg_PlayerSpawn&>(input);
         auto* spawn = msg.mutable_player_spawn();
         spawn->set_client_id(typed.clientId);
@@ -374,13 +374,13 @@ std::optional<std::vector<std::byte>> encodeServerMsg(const ServerMsg &input) {
         break;
     }
     case ServerMsg_Type_PLAYER_DEATH: {
-        msg.set_type(bz::ServerMsg::PLAYER_DEATH);
+        msg.set_type(karma::ServerMsg::PLAYER_DEATH);
         const auto &typed = static_cast<const ServerMsg_PlayerDeath&>(input);
         msg.mutable_player_death()->set_client_id(typed.clientId);
         break;
     }
     case ServerMsg_Type_SET_SCORE: {
-        msg.set_type(bz::ServerMsg::SET_SCORE);
+        msg.set_type(karma::ServerMsg::SET_SCORE);
         const auto &typed = static_cast<const ServerMsg_SetScore&>(input);
         auto* setScore = msg.mutable_set_score();
         setScore->set_client_id(typed.clientId);
@@ -388,7 +388,7 @@ std::optional<std::vector<std::byte>> encodeServerMsg(const ServerMsg &input) {
         break;
     }
     case ServerMsg_Type_CREATE_SHOT: {
-        msg.set_type(bz::ServerMsg::CREATE_SHOT);
+        msg.set_type(karma::ServerMsg::CREATE_SHOT);
         const auto &typed = static_cast<const ServerMsg_CreateShot&>(input);
         auto* shot = msg.mutable_create_shot();
         shot->set_global_shot_id(typed.globalShotId);
@@ -397,7 +397,7 @@ std::optional<std::vector<std::byte>> encodeServerMsg(const ServerMsg &input) {
         break;
     }
     case ServerMsg_Type_REMOVE_SHOT: {
-        msg.set_type(bz::ServerMsg::REMOVE_SHOT);
+        msg.set_type(karma::ServerMsg::REMOVE_SHOT);
         const auto &typed = static_cast<const ServerMsg_RemoveShot&>(input);
         auto* remove = msg.mutable_remove_shot();
         remove->set_shot_id(typed.shotId);
@@ -405,7 +405,7 @@ std::optional<std::vector<std::byte>> encodeServerMsg(const ServerMsg &input) {
         break;
     }
     case ServerMsg_Type_CHAT: {
-        msg.set_type(bz::ServerMsg::CHAT);
+        msg.set_type(karma::ServerMsg::CHAT);
         const auto &typed = static_cast<const ServerMsg_Chat&>(input);
         auto* chat = msg.mutable_chat();
         chat->set_from_id(typed.fromId);
@@ -414,7 +414,7 @@ std::optional<std::vector<std::byte>> encodeServerMsg(const ServerMsg &input) {
         break;
     }
     case ServerMsg_Type_INIT: {
-        msg.set_type(bz::ServerMsg::INIT);
+        msg.set_type(karma::ServerMsg::INIT);
         const auto &typed = static_cast<const ServerMsg_Init&>(input);
         auto* init = msg.mutable_init();
         init->set_client_id(typed.clientId);

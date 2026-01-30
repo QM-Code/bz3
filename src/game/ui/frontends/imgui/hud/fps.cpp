@@ -30,7 +30,7 @@ void ImGuiHudFps::draw(ImGuiIO &io) {
     ImGuiWindowFlags_AlwaysAutoResize);
     char fpsBuffer[32];
     std::snprintf(fpsBuffer, sizeof(fpsBuffer), "%.1f", fpsValue);
-    const std::string fpsText = bz::i18n::Get().format("ui.hud.fps_label", {{"value", fpsBuffer}});
+    const std::string fpsText = karma::i18n::Get().format("ui.hud.fps_label", {{"value", fpsBuffer}});
     ImGui::TextUnformatted(fpsText.c_str());
     ImGui::End();
 }

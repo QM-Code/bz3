@@ -6,6 +6,6 @@
 
 namespace ui::rmlui {
 
-void ApplyTranslations(Rml::Element *root, const bz::i18n::I18n &i18n);
+void ApplyTranslations(Rml::Element *root, const karma::i18n::I18n &i18n);
 
 } // namespace ui::rmlui

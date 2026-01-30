@@ -31,7 +31,7 @@ void RmlUiPanel::load(Rml::ElementDocument *document) {
         return;
     }
 
-    const auto resolvedPath = bz::data::Resolve(panelRmlPath);
+    const auto resolvedPath = karma::data::Resolve(panelRmlPath);
     if (resolvedPath.empty() || !std::filesystem::exists(resolvedPath)) {
         return;
     }
@@ -44,7 +44,7 @@ void RmlUiPanel::load(Rml::ElementDocument *document) {
     std::stringstream buffer;
     buffer << file.rdbuf();
     panel->SetInnerRML(buffer.str());
-    rmlui::ApplyTranslations(panel, bz::i18n::Get());
+    rmlui::ApplyTranslations(panel, karma::i18n::Get());
     onLoaded(document);
 }
 

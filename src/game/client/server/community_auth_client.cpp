@@ -25,7 +25,7 @@ std::string normalizedHost(const std::string &host) {
 }
 
 bool performGet(const std::string &url, std::string &outBody) {
-    if (!bz::net::EnsureCurlGlobalInit()) {
+    if (!karma::net::EnsureCurlGlobalInit()) {
         return false;
     }
     CURL *curlHandle = curl_easy_init();
@@ -53,7 +53,7 @@ bool performGet(const std::string &url, std::string &outBody) {
 }
 
 bool performPost(const std::string &url, const std::string &formBody, std::string &outBody) {
-    if (!bz::net::EnsureCurlGlobalInit()) {
+    if (!karma::net::EnsureCurlGlobalInit()) {
         return false;
     }
     CURL *curlHandle = curl_easy_init();
@@ -185,7 +185,7 @@ void CommunityAuthClient::workerProc() {
             response.ok = false;
             response.error = "invalid_host";
     } else if (request.type == RequestType::UserRegistered) {
-            if (!bz::net::EnsureCurlGlobalInit()) {
+            if (!karma::net::EnsureCurlGlobalInit()) {
                 response.ok = false;
                 response.error = "curl_init_failed";
             } else {
@@ -203,7 +203,7 @@ void CommunityAuthClient::workerProc() {
                     response.error = "request_failed";
                 } else {
                     try {
-                        auto jsonData = bz::json::Parse(body);
+                        auto jsonData = karma::json::Parse(body);
                         response.ok = jsonData.value("ok", false);
                         response.communityName = jsonData.value("community_name", std::string{});
                         response.registered = jsonData.value("registered", false);
@@ -221,7 +221,7 @@ void CommunityAuthClient::workerProc() {
             }
             }
         } else {
-            if (!bz::net::EnsureCurlGlobalInit()) {
+            if (!karma::net::EnsureCurlGlobalInit()) {
                 response.ok = false;
                 response.error = "curl_init_failed";
             } else {
@@ -247,7 +247,7 @@ void CommunityAuthClient::workerProc() {
                     response.error = "request_failed";
                 } else {
                     try {
-                        auto jsonData = bz::json::Parse(body);
+                        auto jsonData = karma::json::Parse(body);
                         response.ok = jsonData.value("ok", false);
                         response.error = jsonData.value("error", std::string{});
                         response.communityAdmin = jsonData.value("community_admin", false);

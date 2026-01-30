@@ -48,7 +48,7 @@ std::filesystem::path CanonicalizePath(const std::filesystem::path &path) {
 std::filesystem::path EnsureConfigFileAtPath(const std::filesystem::path &path, const std::filesystem::path &defaultRelative) {
     if (path.empty()) {
         // Build a path under the user config directory respecting relative subfolders (e.g., server/config.json).
-        const auto baseDir = bz::data::UserConfigDirectory();
+        const auto baseDir = karma::data::UserConfigDirectory();
         const auto target = baseDir / defaultRelative;
 
         const auto parent = target.parent_path();
@@ -135,7 +135,7 @@ std::optional<std::filesystem::path> ExtractDataDirFromConfig(const std::filesys
     }
 
     try {
-        bz::json::Value configJson;
+        karma::json::Value configJson;
         stream >> configJson;
 
         if (!configJson.is_object()) {
@@ -171,7 +171,7 @@ void ValidateDataDirOrExit(const std::filesystem::path &path, const std::string 
     }
 
     std::error_code ec;
-    const auto spec = bz::data::GetDataPathSpec();
+    const auto spec = karma::data::GetDataPathSpec();
     if (!spec.requiredDataMarker.empty()) {
         const auto markerPath = path / spec.requiredDataMarker;
         if (!std::filesystem::exists(markerPath, ec) || !std::filesystem::is_regular_file(markerPath, ec)) {
@@ -187,7 +187,7 @@ void ValidateDataDirOrExit(const std::filesystem::path &path, const std::string 
 
 } // namespace
 
-namespace bz::data {
+namespace karma::data {
 
 DataDirOverrideResult ApplyDataDirOverrideFromArgs(int argc, char *argv[], const std::filesystem::path &defaultConfigRelative) {
     try {
@@ -199,25 +199,25 @@ DataDirOverrideResult ApplyDataDirOverrideFromArgs(int argc, char *argv[], const
 
         if (cliDataDir) {
             ValidateDataDirOrExit(*cliDataDir, std::string("-d ") + cliDataDir->string());
-            bz::data::SetDataRootOverride(*cliDataDir);
+            karma::data::SetDataRootOverride(*cliDataDir);
             spdlog::debug("Using data directory from CLI override: {}", cliDataDir->string());
             return {configPath, *cliDataDir};
         }
 
         if (configDataDir) {
             ValidateDataDirOrExit(*configDataDir, std::string("user config"), configPath);
-            bz::data::SetDataRootOverride(*configDataDir);
+            karma::data::SetDataRootOverride(*configDataDir);
             spdlog::debug("Using data directory from user config: {}", configDataDir->string());
             return {configPath, *configDataDir};
         }
 
-        const auto spec = bz::data::GetDataPathSpec();
+        const auto spec = karma::data::GetDataPathSpec();
 
         // Fall back to env var if present; otherwise fail with a friendly message.
         if (const char *envDataDir = std::getenv(spec.dataDirEnvVar.c_str()); envDataDir && *envDataDir) {
             const std::filesystem::path envPath(envDataDir);
             ValidateDataDirOrExit(envPath, std::string(spec.dataDirEnvVar) + ": " + envDataDir);
-            bz::data::SetDataRootOverride(envPath);
+            karma::data::SetDataRootOverride(envPath);
             spdlog::debug("Using data directory from {}: {}", spec.dataDirEnvVar, envPath.string());
             return {configPath, envPath};
         }
@@ -242,4 +242,4 @@ DataDirOverrideResult ApplyDataDirOverrideFromArgs(int argc, char *argv[], const
     }
 }
 
-} // namespace bz::data
+} // namespace karma::data

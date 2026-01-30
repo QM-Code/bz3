@@ -2,7 +2,7 @@
 
 namespace game_world {
 
-PlayerParameters ExtractDefaultPlayerParameters(const bz::json::Value& config) {
+PlayerParameters ExtractDefaultPlayerParameters(const karma::json::Value& config) {
     PlayerParameters params;
     if (!config.is_object()) {
         return params;

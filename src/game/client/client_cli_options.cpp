@@ -10,7 +10,7 @@
 namespace {
 
 std::string ConfiguredPortDefault() {
-    if (const auto *portNode = bz::config::ConfigStore::Get("network.ServerPort")) {
+    if (const auto *portNode = karma::config::ConfigStore::Get("network.ServerPort")) {
         if (portNode->is_string()) {
             return portNode->get<std::string>();
         }
@@ -62,7 +62,7 @@ ClientCLIOptions ParseClientCLIOptions(int argc, char *argv[]) {
     options.add_options()
         ("w,world", "World directory", cxxopts::value<std::string>());
     options.add_options()
-        ("d,data-dir", "Data directory (overrides BZ3_DATA_DIR)", cxxopts::value<std::string>());
+        ("d,data-dir", "Data directory (overrides KARMA_DATA_DIR)", cxxopts::value<std::string>());
     options.add_options()
         ("c,config", "User config file path", cxxopts::value<std::string>());
     options.add_options()
@@ -72,7 +72,7 @@ ClientCLIOptions ParseClientCLIOptions(int argc, char *argv[]) {
     options.add_options()
         ("dev-quick-start", "Dev helper: show console, start local server, auto-connect");
     options.add_options()
-        ("v,verbose", "Enable verbose logging (alias for --log-level trace)")
+        ("v,verbose", "Enable verbose logging (-v=debug, -vv=trace)")
         ("L,log-level", "Logging level (trace, debug, info, warn, err, critical, off)", cxxopts::value<std::string>());
     options.add_options()
         ("T,timestamp-logging", "Enable timestamped logging output");
@@ -109,7 +109,7 @@ ClientCLIOptions ParseClientCLIOptions(int argc, char *argv[]) {
     parsed.languageExplicit = result.count("language") > 0;
     parsed.themeExplicit = result.count("theme") > 0;
     parsed.devQuickStart = result.count("dev-quick-start") > 0;
-    parsed.verbose = result.count("verbose") > 0;
+    parsed.verbose = static_cast<int>(result.count("verbose"));
     parsed.logLevel = result.count("log-level") ? result["log-level"].as<std::string>() : std::string();
     parsed.logLevelExplicit = result.count("log-level") > 0;
     parsed.timestampLogging = result.count("timestamp-logging") > 0;

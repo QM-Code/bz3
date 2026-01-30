@@ -35,7 +35,7 @@ public:
     ServerWorldSession(Game &game,
                        std::string serverName,
                        std::string worldName,
-                       bz::json::Value worldConfig,
+                       karma::json::Value worldConfig,
                        std::string worldDir,
                        bool enableWorldZipping);
     ~ServerWorldSession();
@@ -44,7 +44,7 @@ public:
     void sendWorldInit(client_id clientId);
 
     std::filesystem::path resolveAssetPath(const std::string &assetName) const;
-    const bz::json::Value &config() const { return content_.config; }
+    const karma::json::Value &config() const { return content_.config; }
     const PlayerParameters &defaultPlayerParameters() const { return defaultPlayerParameters_; }
 
     Location pickSpawnLocation() const;

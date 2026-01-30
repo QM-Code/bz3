@@ -16,7 +16,7 @@ namespace {
 std::vector<std::string> g_loadedPlugins;
 }
 
-void PluginAPI::loadPythonPlugins(const bz::json::Value &configJson) {
+void PluginAPI::loadPythonPlugins(const karma::json::Value &configJson) {
     namespace py = pybind11;
     namespace fs = std::filesystem;
 
@@ -43,7 +43,7 @@ void PluginAPI::loadPythonPlugins(const bz::json::Value &configJson) {
         return;
     }
 
-    const fs::path dataRoot = bz::data::DataRoot();
+    const fs::path dataRoot = karma::data::DataRoot();
     const fs::path pluginDir = dataRoot / "plugins";
     const fs::path commandsDir = pluginDir / "commands";
     const fs::path sharedPythonDir = dataRoot / "python";

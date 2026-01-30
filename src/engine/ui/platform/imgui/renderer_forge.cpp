@@ -1,10 +1,10 @@
-#include "ui/frontends/imgui/platform/renderer_forge.hpp"
+#include "engine/ui/platform/imgui/renderer_forge.hpp"
 
 #include <imgui.h>
 
 #include "engine/graphics/backends/forge/ui_bridge.hpp"
 #include "Common_3/Resources/ResourceLoader/Interfaces/IResourceLoader.h"
-#include "ui/frontends/imgui/texture_utils.hpp"
+#include "engine/ui/imgui/texture_utils.hpp"
 
 #ifdef assume
 #undef assume
@@ -390,11 +390,11 @@ void ForgeRenderer::ensurePipeline() {
         return;
     }
 
-    const std::filesystem::path shaderDir = bz::data::Resolve("forge/shaders");
+    const std::filesystem::path shaderDir = karma::data::Resolve("forge/shaders");
     const auto vsPath = shaderDir / "imgui.vert.spv";
     const auto fsPath = shaderDir / "imgui.frag.spv";
-    auto vsBytes = bz::file::ReadFileBytes(vsPath);
-    auto fsBytes = bz::file::ReadFileBytes(fsPath);
+    auto vsBytes = karma::file::ReadFileBytes(vsPath);
+    auto fsBytes = karma::file::ReadFileBytes(fsPath);
     if (vsBytes.empty() || fsBytes.empty()) {
         spdlog::error("UiSystem(Forge): missing ImGui shaders '{}', '{}'", vsPath.string(), fsPath.string());
         return;

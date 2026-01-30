@@ -3,7 +3,7 @@
 #include <cstdint>
 
 #include "engine/graphics/texture_handle.hpp"
-#include "ui/core/types.hpp"
+#include "engine/ui/types.hpp"
 
 namespace ui {
 

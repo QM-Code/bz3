@@ -108,7 +108,7 @@ namespace py = pybind11;
 
 namespace PluginAPI {
     void registerCallback(EventType type, pybind11::function func);
-    void loadPythonPlugins(const bz::json::Value &configJson);
+    void loadPythonPlugins(const karma::json::Value &configJson);
     const std::vector<std::string>& getLoadedPluginScripts();
     
     void sendChatMessage(client_id fromId, client_id toId, const std::string &text);

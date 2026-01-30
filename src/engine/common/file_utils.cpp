@@ -2,7 +2,7 @@
 
 #include <fstream>
 
-namespace bz::file {
+namespace karma::file {
 
 std::vector<uint8_t> ReadFileBytes(const std::filesystem::path &path) {
     std::ifstream file(path, std::ios::binary);
@@ -22,4 +22,4 @@ std::vector<uint8_t> ReadFileBytes(const std::filesystem::path &path) {
     return buffer;
 }
 
-} // namespace bz::file
+} // namespace karma::file

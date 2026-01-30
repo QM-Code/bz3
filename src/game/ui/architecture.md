@@ -47,10 +47,11 @@ Key responsibilities:
 
 ### ImGui path
 - Uses `ui::RenderBridge` and `engine/graphics/ui_render_target_bridge.hpp` to render into a texture.
+- Platform renderers live under `src/engine/ui/platform/imgui/renderer_{bgfx,diligent,forge}.*`.
 - `ImGuiBackend::getRenderOutput()` returns a valid texture + visibility when the console or HUD drew.
 
 ### RmlUi path
-- Uses RmlUi `RenderInterface` implementations in `frontends/rmlui/platform/renderer_{bgfx,diligent,forge}`.
+- Uses RmlUi `RenderInterface` implementations in `src/engine/ui/platform/rmlui/renderer_{bgfx,diligent,forge}`.
 - `RenderOutput` is provided by both frontends and is always composited by the renderer.
 
 ## 5) Input handling

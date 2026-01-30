@@ -19,7 +19,7 @@ struct ClientCLIOptions {
     bool languageExplicit = false;
     bool themeExplicit = false;
     bool devQuickStart = false;
-    bool verbose = false;
+    int verbose = 0;
     std::string logLevel;
     bool logLevelExplicit = false;
     bool timestampLogging = false;

@@ -5,6 +5,6 @@
 
 namespace game_world {
 
-PlayerParameters ExtractDefaultPlayerParameters(const bz::json::Value& config);
+PlayerParameters ExtractDefaultPlayerParameters(const karma::json::Value& config);
 
 } // namespace game_world
