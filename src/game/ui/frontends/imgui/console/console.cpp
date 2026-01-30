@@ -13,10 +13,10 @@
 #include "common/data_path_resolver.hpp"
 #include "common/i18n.hpp"
 #include "spdlog/spdlog.h"
-#include "ui/config.hpp"
+#include "ui/config/config.hpp"
 #include "ui/console/tab_spec.hpp"
 #include "ui/fonts/console_fonts.hpp"
-#include "ui/ui_config.hpp"
+#include "ui/config/ui_config.hpp"
 
 namespace {
 std::string trimCopy(const std::string &value) {

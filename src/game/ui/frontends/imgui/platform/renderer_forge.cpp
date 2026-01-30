@@ -4,18 +4,19 @@
 
 #include "engine/graphics/backends/forge/ui_bridge.hpp"
 #include "Common_3/Resources/ResourceLoader/Interfaces/IResourceLoader.h"
+#include "ui/frontends/imgui/texture_utils.hpp"
 
 #ifdef assume
 #undef assume
 #endif
 
 #include "common/data_path_resolver.hpp"
+#include "common/file_utils.hpp"
 #include "spdlog/spdlog.h"
 
 #include <algorithm>
 #include <cstring>
 #include <filesystem>
-#include <fstream>
 #include <vector>
 
 namespace graphics_backend {
@@ -24,34 +25,6 @@ namespace {
 struct ImGuiConstants {
     float scaleBias[4];
 };
-
-ImTextureID toImTextureId(uint64_t value) {
-    ImTextureID out{};
-    std::memcpy(&out, &value, sizeof(ImTextureID));
-    return out;
-}
-
-uint64_t fromImTextureId(ImTextureID textureId) {
-    uint64_t value = 0;
-    std::memcpy(&value, &textureId, sizeof(ImTextureID));
-    return value;
-}
-
-std::vector<uint8_t> readFileBytes(const std::filesystem::path& path) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file.is_open()) {
-        return {};
-    }
-    file.seekg(0, std::ios::end);
-    const std::streamsize size = file.tellg();
-    if (size <= 0) {
-        return {};
-    }
-    file.seekg(0, std::ios::beg);
-    std::vector<uint8_t> buffer(static_cast<size_t>(size));
-    file.read(reinterpret_cast<char*>(buffer.data()), size);
-    return buffer;
-}
 
 } // namespace
 
@@ -139,7 +112,7 @@ void ForgeRenderer::rebuildImGuiFonts(ImFontAtlas* atlas) {
     }
 
     fontToken_ = graphics_backend::forge_ui::RegisterExternalTexture(fontTexture_);
-    atlas->SetTexID(toImTextureId(fontToken_));
+    atlas->SetTexID(ui::ToImGuiTextureId(fontToken_));
     fontsReady_ = fontTexture_ != nullptr;
 }
 
@@ -277,7 +250,7 @@ void ForgeRenderer::renderImGuiToTarget(ImDrawData* drawData) {
             cmdSetScissor(cmd_, static_cast<uint32_t>(clipX), static_cast<uint32_t>(clipY),
                           static_cast<uint32_t>(clipWf), static_cast<uint32_t>(clipHf));
 
-            uint64_t token = pcmd->TextureId ? fromImTextureId(pcmd->TextureId) : fontToken_;
+            uint64_t token = pcmd->TextureId ? ui::FromImGuiTextureId(pcmd->TextureId) : fontToken_;
             Texture* texture = static_cast<Texture*>(graphics_backend::forge_ui::ResolveExternalTexture(token));
             if (!texture) {
                 texture = fontTexture_;
@@ -417,8 +390,8 @@ void ForgeRenderer::ensurePipeline() {
     const std::filesystem::path shaderDir = bz::data::Resolve("forge/shaders");
     const auto vsPath = shaderDir / "imgui.vert.spv";
     const auto fsPath = shaderDir / "imgui.frag.spv";
-    auto vsBytes = readFileBytes(vsPath);
-    auto fsBytes = readFileBytes(fsPath);
+    auto vsBytes = bz::file::ReadFileBytes(vsPath);
+    auto fsBytes = bz::file::ReadFileBytes(fsPath);
     if (vsBytes.empty() || fsBytes.empty()) {
         spdlog::error("UiSystem(Forge): missing ImGui shaders '{}', '{}'", vsPath.string(), fsPath.string());
         return;

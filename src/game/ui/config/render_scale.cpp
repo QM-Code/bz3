@@ -1,8 +1,8 @@
-#include "ui/render_scale.hpp"
+#include "ui/config/render_scale.hpp"
 
 #include "common/config_store.hpp"
 #include "spdlog/spdlog.h"
-#include "ui/ui_config.hpp"
+#include "ui/config/ui_config.hpp"
 
 #include <algorithm>
 

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "ui/hud_settings.hpp"
-#include "ui/render_settings.hpp"
+#include "ui/config/hud_settings.hpp"
+#include "ui/config/render_settings.hpp"
 
 #include <cstdint>
 #include <string>

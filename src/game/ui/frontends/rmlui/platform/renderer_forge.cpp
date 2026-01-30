@@ -11,6 +11,7 @@
 #include <stb_image.h>
 
 #include "common/data_path_resolver.hpp"
+#include "common/file_utils.hpp"
 #include "engine/graphics/backends/forge/ui_bridge.hpp"
 #include "spdlog/spdlog.h"
 
@@ -22,7 +23,6 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
-#include <fstream>
 #include <vector>
 
 #ifdef Button4
@@ -71,22 +71,6 @@ uint32_t packColor(const ColorT& color) {
         | (static_cast<uint32_t>(color.green) << 8)
         | (static_cast<uint32_t>(color.blue) << 16)
         | (static_cast<uint32_t>(color.alpha) << 24);
-}
-
-std::vector<uint8_t> readFileBytes(const std::filesystem::path& path) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file.is_open()) {
-        return {};
-    }
-    file.seekg(0, std::ios::end);
-    const std::streamsize size = file.tellg();
-    if (size <= 0) {
-        return {};
-    }
-    file.seekg(0, std::ios::beg);
-    std::vector<uint8_t> buffer(static_cast<size_t>(size));
-    file.read(reinterpret_cast<char*>(buffer.data()), size);
-    return buffer;
 }
 
 } // namespace
@@ -663,8 +647,8 @@ void RenderInterface_Forge::ensurePipeline() {
     const std::filesystem::path shaderDir = bz::data::Resolve("forge/shaders");
     const auto vsPath = shaderDir / "rmlui.vert.spv";
     const auto fsPath = shaderDir / "rmlui.frag.spv";
-    auto vsBytes = readFileBytes(vsPath);
-    auto fsBytes = readFileBytes(fsPath);
+    auto vsBytes = bz::file::ReadFileBytes(vsPath);
+    auto fsBytes = bz::file::ReadFileBytes(fsPath);
     if (vsBytes.empty() || fsBytes.empty()) {
         spdlog::error("RmlUi(Forge): missing shaders '{}', '{}'", vsPath.string(), fsPath.string());
         return;

@@ -8,7 +8,7 @@
 #include "common/config_store.hpp"
 #include "game/input/bindings.hpp"
 #include "ui/console/keybindings.hpp"
-#include "ui/ui_config.hpp"
+#include "ui/config/ui_config.hpp"
 
 namespace ui {
 namespace {

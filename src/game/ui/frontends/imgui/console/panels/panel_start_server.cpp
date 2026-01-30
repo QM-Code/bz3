@@ -16,7 +16,7 @@
 
 #include "common/data_path_resolver.hpp"
 #include "common/i18n.hpp"
-#include "ui/config.hpp"
+#include "ui/config/config.hpp"
 
 #if !defined(_WIN32)
 #include <arpa/inet.h>

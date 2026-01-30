@@ -1,6 +1,6 @@
-#include "ui/render_settings.hpp"
+#include "ui/config/render_settings.hpp"
 
-#include "ui/ui_config.hpp"
+#include "ui/config/ui_config.hpp"
 
 #include <algorithm>
 #include <cmath>

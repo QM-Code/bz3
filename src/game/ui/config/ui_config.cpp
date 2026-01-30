@@ -1,4 +1,4 @@
-#include "ui/ui_config.hpp"
+#include "ui/config/ui_config.hpp"
 
 #include "common/config_store.hpp"
 

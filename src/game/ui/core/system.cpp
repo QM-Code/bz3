@@ -1,9 +1,9 @@
-#include "ui/system.hpp"
+#include "ui/core/system.hpp"
 
-#include "ui/backend.hpp"
+#include "ui/core/backend.hpp"
 #include "platform/window.hpp"
 #include "common/i18n.hpp"
-#include "ui/ui_config.hpp"
+#include "ui/config/ui_config.hpp"
 #include "common/config_store.hpp"
 #include "spdlog/spdlog.h"
 

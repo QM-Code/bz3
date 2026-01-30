@@ -6,7 +6,7 @@
 
 #include <RmlUi/Core/Element.h>
 
-#include "ui/types.hpp"
+#include "ui/core/types.hpp"
 
 namespace Rml {
 class ElementDocument;

@@ -6,7 +6,7 @@
 
 #include <RmlUi/Core/Event.h>
 
-#include "ui/types.hpp"
+#include "ui/core/types.hpp"
 #include "ui/frontends/rmlui/hud/chat.hpp"
 #include "ui/frontends/rmlui/hud/crosshair.hpp"
 #include "ui/frontends/rmlui/hud/dialog.hpp"

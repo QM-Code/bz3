@@ -343,7 +343,7 @@ There are two server discovery sources:
 2. **Remote server lists (HTTP JSON)**
      - Fetch: `src/game/client/server/server_list_fetcher.*` (libcurl)
      - Orchestration: `src/game/client/server/community_browser_controller.*`
-     - UI: `src/game/ui/backends/*/console/console.*`
+     - UI: `src/game/ui/frontends/*/console/console.*`
 
 The server browser controller merges results from LAN + remote lists into a single list of UI entries and delegates connection to `ServerConnector`.
 
@@ -370,8 +370,8 @@ Plugin callbacks are keyed by `ClientMsg_Type` and currently invoked from gamepl
 - **New networked feature**: `src/game/protos/messages.proto` + `src/game/net/*` + gameplay handler in `src/game/client/*` and/or `src/game/server/*`
 - **World loading / packaging**: `src/game/server/world_session.*` and `src/game/client/world_session.*`
 - **Physics issues**: `src/engine/physics/physics_world.*` (and GLB meshes used by world assets)
-- **UI/HUD**: `src/game/ui/` (backend entry + backends/*/hud)
-- **Community browser**: `src/game/client/server/*` (control) + `src/game/ui/backends/*/console/console.*` (view)
+- **UI/HUD**: `src/game/ui/` (backend entry + frontends/*/hud)
+- **Community browser**: `src/game/client/server/*` (control) + `src/game/ui/frontends/*/console/console.*` (view)
 - **Plugins / moderation / commands**: `src/game/server/plugin.*` and `data/plugins/*`
 
 ## Common gotchas

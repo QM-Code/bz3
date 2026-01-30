@@ -1,6 +1,6 @@
-#include "ui/hud_settings.hpp"
+#include "ui/config/hud_settings.hpp"
 
-#include "ui/ui_config.hpp"
+#include "ui/config/ui_config.hpp"
 
 namespace ui {
 

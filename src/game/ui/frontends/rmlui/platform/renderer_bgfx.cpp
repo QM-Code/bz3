@@ -35,10 +35,10 @@
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
-#include <fstream>
 #include <vector>
 
 #include "common/data_path_resolver.hpp"
+#include "common/file_utils.hpp"
 #include "spdlog/spdlog.h"
 
 namespace {
@@ -60,22 +60,6 @@ static uint32_t toAbgr(const Rml::ColourbPremultiplied& color) {
         | (static_cast<uint32_t>(color.red));
 }
 
-static std::vector<uint8_t> readFileBytes(const std::filesystem::path& path) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file.is_open()) {
-        return {};
-    }
-    file.seekg(0, std::ios::end);
-    const std::streamsize size = file.tellg();
-    if (size <= 0) {
-        return {};
-    }
-    file.seekg(0, std::ios::beg);
-    std::vector<uint8_t> buffer(static_cast<size_t>(size));
-    file.read(reinterpret_cast<char*>(buffer.data()), size);
-    return buffer;
-}
-
 } // namespace
 
 RenderInterface_BGFX::RenderInterface_BGFX() {
@@ -92,9 +76,9 @@ RenderInterface_BGFX::RenderInterface_BGFX() {
     const auto fs_tex_path = shader_dir / "fs_rmlui_texture.bin";
     const auto fs_color_path = shader_dir / "fs_rmlui_color.bin";
 
-    const auto vs_bytes = readFileBytes(vs_path);
-    const auto fs_tex_bytes = readFileBytes(fs_tex_path);
-    const auto fs_color_bytes = readFileBytes(fs_color_path);
+    const auto vs_bytes = bz::file::ReadFileBytes(vs_path);
+    const auto fs_tex_bytes = bz::file::ReadFileBytes(fs_tex_path);
+    const auto fs_color_bytes = bz::file::ReadFileBytes(fs_color_path);
     if (vs_bytes.empty() || fs_tex_bytes.empty() || fs_color_bytes.empty()) {
         Rml::Log::Message(Rml::Log::LT_ERROR, "RmlUi(BGFX): missing shader binaries.");
         destroyPrograms();

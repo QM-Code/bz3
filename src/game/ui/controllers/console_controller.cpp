@@ -1,6 +1,6 @@
 #include "ui/controllers/console_controller.hpp"
 
-#include "ui/ui_config.hpp"
+#include "ui/config/ui_config.hpp"
 
 namespace ui {
 

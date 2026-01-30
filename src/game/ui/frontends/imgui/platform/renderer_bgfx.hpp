@@ -4,8 +4,6 @@
 
 #include <bgfx/bgfx.h>
 #include <cstdint>
-#include <filesystem>
-#include <vector>
 
 
 namespace graphics_backend {
@@ -44,8 +42,6 @@ private:
     bool fontsReady_ = false;
 
     void destroyResources();
-    std::vector<uint8_t> readFileBytes(const std::filesystem::path& path) const;
-    static uint16_t toTextureHandle(uint64_t textureId);
 };
 
 } // namespace graphics_backend

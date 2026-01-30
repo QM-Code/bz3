@@ -1,32 +1,33 @@
 # UI AGENTS.md
 
 This file is UI-specific onboarding for future coding agents working under `src/game/ui/`.
-It complements the repo-level AGENTS.md and focuses on how the UI subsystem is organized,
-what the important files do, and where the current refactors are headed.
+It complements the repo-level AGENTS.md and focuses on how the UI subsystem is organized
+and what to tackle next.
 
 ## Quick map (what lives where)
 
-### Core UI entry points
-- `src/game/ui/system.*`:
+### Core UI entry points (`src/game/ui/core/`)
+- `src/game/ui/core/system.*`:
   - Owns the high-level UI system.
   - Bridges config changes into HUD visibility (via `ConfigStore`).
   - Calls `backend->update()` each frame.
   - Key logic: HUD visible when connected OR console is hidden (see `UiSystem::update`).
 
-- `src/game/ui/backend.hpp`:
+- `src/game/ui/core/backend.hpp`:
   - Interface for UI backends.
   - Both ImGui and RmlUi implement this.
   - Exposes `console()`, `setHudModel()`, `getRenderOutput()`, etc.
 
-- `src/game/ui/backend_factory.cpp`:
+- `src/game/ui/core/backend_factory.cpp`:
   - Picks ImGui or RmlUi backend at build time.
 
-### Render settings and HUD settings
-- `src/game/ui/render_settings.*`:
-  - Brightness state and dirty tracking.
-  - Currently used by both frontends.
-- `src/game/ui/hud_settings.*`:
-  - HUD visibility toggles (scoreboard/chat/radar/fps/crosshair).
+### Config + settings (`src/game/ui/config/`)
+- `ui_config.*`: typed ConfigStore facade.
+- `render_settings.*`: brightness state + dirty tracking.
+- `hud_settings.*`: HUD visibility toggles (scoreboard/chat/radar/fps/crosshair).
+- `render_scale.*`: UI render scale.
+- `input_mapping.*`: shared input mapping.
+- `config.*`: Start Server override config helpers.
 
 ### Frontend backends (ImGui + RmlUi)
 - ImGui: `src/game/ui/frontends/imgui/`
@@ -43,8 +44,7 @@ what the important files do, and where the current refactors are headed.
 - ImGui uses `engine/graphics/ui_bridge.hpp` and backend-specific bridges under
   `src/engine/graphics/backends/*`.
 - RmlUi uses render interfaces in `src/game/ui/frontends/rmlui/platform/renderer_{bgfx,diligent,forge}.*`.
-- RmlUi renderers currently do NOT expose output textures in a unified way; this is a known refactor target
-  (see `src/game/ui/TODO.md`).
+- RmlUi renderers expose output textures for the shared render bridge; see `ui/bridges/` + RmlUi platform renderers.
 
 ## Console vs HUD
 
@@ -65,20 +65,15 @@ what the important files do, and where the current refactors are headed.
   - ImGui Settings panel (`panel_settings.cpp`)
   - Console community credentials in both frontends.
 
-## Notable recent changes (current state)
+## Current focus (from TODO)
 
-- Tabs and layout:
-  - Both frontends now use the order: Community -> Start Server -> Settings -> Bindings -> ?.
-  - The "?" tab is right-aligned in both (RmlUi via CSS flex; ImGui via cursor positioning).
-- Documentation panel now shows: "This space intentionally left blank."
-- Themes were removed (ImGui theme panel deleted; RmlUi theme panel removed).
-- HUD visibility is controlled by connection state and console visibility.
-- Brightness is commit-on-release in both frontends; brightness pass disabled while dragging.
-- Keybindings were extracted to `src/game/ui/console/keybindings.*` for shared helpers.
+- Radar flicker/missing blips across all backends (renderer-side investigation).
+- Feature parity decisions for HUD + Settings/Bindings.
+- UI smoke harness for quick regression checks.
 
 ## Files worth reading first
 
-1) `src/game/ui/backend.hpp` and `src/game/ui/system.cpp` (core API + update rules)
+1) `src/game/ui/core/backend.hpp` and `src/game/ui/core/system.cpp` (core API + update rules)
 2) `src/game/ui/frontends/imgui/backend.cpp` (ImGui render loop + HUD/console draw order)
 3) `src/game/ui/frontends/rmlui/backend.cpp` (RmlUi context + HUD/console docs)
 4) `src/game/ui/frontends/imgui/console/console.*` (ImGui console tabs, panels, state)
@@ -98,18 +93,13 @@ what the important files do, and where the current refactors are headed.
 - Panels are instantiated in `backend.cpp` and registered to console view.
 - RML layout lives in `data/client/ui/*.rml` and styles in `*.rcss`.
 
-## Known TODOs / planned refactor (summary)
+## Known TODOs
 
-- Create a shared input mapping layer (`input_mapping.*`) to remove duplicated key/mod handling.
-- Create a ConfigStore facade (`ui_config.*`) to centralize typed config access.
-- Move UI state into renderer-agnostic models + controllers (HUD/Console/Settings/Bindings).
-- Unify render-to-texture output between ImGui and RmlUi.
-- Consolidate font loading logic and fallback behavior.
-- Remove remaining utility duplication (file reads, texture id conversions, null console).
+- Remaining work is tracked in `src/game/ui/TODO.md`.
 
 ## Gotchas
 
 - Console visibility and HUD visibility are deliberately coupled in `UiSystem::update`.
 - ConfigStore has save/merge intervals and revision tracking; use `Revision()` to resync UI state.
 - Start Server panels still write a JSON override file for server instances (left as-is for now).
-
+- Radar uses an offscreen render target; failures affect both ImGui/RmlUi equally.

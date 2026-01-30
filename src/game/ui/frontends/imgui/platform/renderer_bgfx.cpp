@@ -3,27 +3,18 @@
 #include <imgui.h>
 
 #include "common/data_path_resolver.hpp"
+#include "common/file_utils.hpp"
+#include "engine/graphics/backends/bgfx/texture_utils.hpp"
 #include "spdlog/spdlog.h"
+#include "ui/frontends/imgui/texture_utils.hpp"
 
 #include <algorithm>
 #include <cstring>
-#include <fstream>
 
 namespace graphics_backend {
 namespace {
 constexpr bgfx::ViewId kImGuiView = 255;
 
-ImTextureID toImTextureId(uint64_t value) {
-    ImTextureID out{};
-    std::memcpy(&out, &value, sizeof(ImTextureID));
-    return out;
-}
-
-uint64_t fromImTextureId(ImTextureID textureId) {
-    uint64_t value = 0;
-    std::memcpy(&value, &textureId, sizeof(ImTextureID));
-    return value;
-}
 }
 
 BgfxRenderer::BgfxRenderer() {
@@ -39,8 +30,8 @@ BgfxRenderer::BgfxRenderer() {
     const auto vsPath = shaderDir / "vs_imgui.bin";
     const auto fsPath = shaderDir / "fs_imgui.bin";
 
-    auto vsBytes = readFileBytes(vsPath);
-    auto fsBytes = readFileBytes(fsPath);
+    auto vsBytes = bz::file::ReadFileBytes(vsPath);
+    auto fsBytes = bz::file::ReadFileBytes(fsPath);
     if (vsBytes.empty() || fsBytes.empty()) {
         spdlog::error("UiSystem: missing ImGui bgfx shaders '{}', '{}'", vsPath.string(), fsPath.string());
         destroyResources();
@@ -176,7 +167,7 @@ void BgfxRenderer::rebuildImGuiFonts(ImFontAtlas* atlas) {
     }
 
     const uint64_t texId = static_cast<uint64_t>(fontTexture_.idx + 1);
-    atlas->SetTexID(toImTextureId(texId));
+    atlas->SetTexID(ui::ToImGuiTextureId(texId));
     fontsReady_ = true;
 }
 
@@ -254,7 +245,7 @@ void BgfxRenderer::renderImGuiToTarget(ImDrawData* drawData) {
 
                 bgfx::TextureHandle textureHandle = fontTexture_;
                 if (pcmd->TextureId) {
-                    const uint16_t idx = toTextureHandle(fromImTextureId(pcmd->TextureId));
+                    const uint16_t idx = bgfx_utils::ToBgfxTextureHandle(ui::FromImGuiTextureId(pcmd->TextureId));
                     textureHandle.idx = idx;
                 }
                 bgfx::setTexture(0, sampler_, textureHandle);
@@ -303,30 +294,5 @@ void BgfxRenderer::destroyResources() {
     ready_ = false;
     fontsReady_ = false;
 }
-
-std::vector<uint8_t> BgfxRenderer::readFileBytes(const std::filesystem::path& path) const {
-    std::ifstream file(path, std::ios::binary);
-    if (!file.is_open()) {
-        return {};
-    }
-    file.seekg(0, std::ios::end);
-    const std::streamsize size = file.tellg();
-    if (size <= 0) {
-        return {};
-    }
-    file.seekg(0, std::ios::beg);
-    std::vector<uint8_t> buffer(static_cast<size_t>(size));
-    file.read(reinterpret_cast<char*>(buffer.data()), size);
-    return buffer;
-}
-
-uint16_t BgfxRenderer::toTextureHandle(uint64_t textureId) {
-    const uint64_t value = textureId;
-    if (value == 0) {
-        return bgfx::kInvalidHandle;
-    }
-    return static_cast<uint16_t>(value - 1);
-}
-
 
 } // namespace graphics_backend

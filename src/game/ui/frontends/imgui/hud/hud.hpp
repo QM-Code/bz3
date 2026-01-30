@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "ui/types.hpp"
+#include "ui/core/types.hpp"
 #include "ui/frontends/imgui/hud/chat.hpp"
 #include "ui/frontends/imgui/hud/crosshair.hpp"
 #include "ui/frontends/imgui/hud/dialog.hpp"

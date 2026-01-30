@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <cstring>
 
 #include <imgui.h>
 
@@ -8,16 +9,23 @@
 
 namespace ui {
 
-inline ImTextureID ToImGuiTextureId(const graphics::TextureHandle& texture) {
-    const uint64_t token = texture.id;
+inline ImTextureID ToImGuiTextureId(uint64_t token) {
     if (token == 0) {
         return static_cast<ImTextureID>(0);
     }
-#if defined(BZ3_RENDER_BACKEND_BGFX)
-    return static_cast<ImTextureID>(token);
-#else
-    return static_cast<ImTextureID>(token);
-#endif
+    ImTextureID out{};
+    std::memcpy(&out, &token, sizeof(ImTextureID));
+    return out;
+}
+
+inline uint64_t FromImGuiTextureId(ImTextureID textureId) {
+    uint64_t value = 0;
+    std::memcpy(&value, &textureId, sizeof(ImTextureID));
+    return value;
+}
+
+inline ImTextureID ToImGuiTextureId(const graphics::TextureHandle& texture) {
+    return ToImGuiTextureId(texture.id);
 }
 
 } // namespace ui

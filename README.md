@@ -134,8 +134,8 @@ Entry points (public interfaces)
 - Windowing: `Window` in `src/engine/platform/window.hpp`
 - Graphics: `GraphicsDevice` in `src/engine/graphics/device.hpp`
 - Renderer orchestration: `Render` in `src/game/renderer/render.hpp`
-- UI: `UiSystem` in `src/game/ui/system.hpp`
-- UI render bridge: `ui::RenderBridge` in `src/game/ui/render_bridge.hpp`
+- UI: `UiSystem` in `src/game/ui/core/system.hpp`
+- UI render bridge: `ui::RenderBridge` in `src/game/ui/bridges/render_bridge.hpp`
 - Physics: `PhysicsWorld` in `src/engine/physics/physics_world.hpp`
 - Networking: `ClientNetwork` and `ServerNetwork` in `src/game/net/` (message-level); transports live in `src/engine/network/`
 - World runtime: `ClientWorldSession` and `ServerWorldSession` in `src/game/client/` and `src/game/server/`
@@ -145,7 +145,7 @@ Entry points (public interfaces)
 Backend factories (compile-time selection)
 - Audio: `src/engine/audio/backend_factory.cpp`
 - Windowing: `src/engine/platform/window_factory.cpp`
-- UI: `src/game/ui/backend_factory.cpp`
+- UI: `src/game/ui/core/backend_factory.cpp`
 - Physics: `src/engine/physics/backend_factory.cpp`
 - Networking: `src/game/net/backend_factory.cpp`
 - World: `src/engine/world/backend_factory.cpp`
@@ -153,7 +153,7 @@ Backend factories (compile-time selection)
 Backend layouts (examples)
 - `src/engine/audio/backends/miniaudio/` and `src/engine/audio/backends/sdl/`
 - `src/engine/platform/backends/` (currently `sdl3`, with an `sdl2` stub)
-- `src/game/ui/backends/imgui/` and `src/game/ui/backends/rmlui/`
+- `src/game/ui/frontends/imgui/` and `src/game/ui/frontends/rmlui/`
 - `src/engine/physics/backends/jolt/` and `src/engine/physics/backends/bullet/`
 - `src/engine/graphics/backends/bgfx/`, `src/engine/graphics/backends/diligent/`, `src/engine/graphics/backends/forge/`
 - `src/game/net/backends/enet/` (future: steam, webrtc, etc.)

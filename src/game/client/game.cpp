@@ -1,7 +1,7 @@
 #include "client/game.hpp"
 #include "spdlog/spdlog.h"
 #include <algorithm>
-#include "ui/system.hpp"
+#include "ui/core/system.hpp"
 
 Game::Game(ClientEngine &engine,
            std::string playerName,

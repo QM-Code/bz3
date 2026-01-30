@@ -2,7 +2,7 @@
 
 #include "engine/graphics/device.hpp"
 #include "core/types.hpp"
-#include "ui/types.hpp"
+#include "ui/core/types.hpp"
 
 #include <filesystem>
 #include <glm/glm.hpp>
@@ -50,6 +50,8 @@ private:
     glm::vec3 cameraPosition{0.0f};
     glm::quat cameraRotation{1.0f, 0.0f, 0.0f, 0.0f};
 
+    int lastFramebufferWidth = 0;
+    int lastFramebufferHeight = 0;
     float lastAspect = 1.0f;
     float radarFovDegrees = CAMERA_FOV;
 

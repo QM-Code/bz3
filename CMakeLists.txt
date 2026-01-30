@@ -377,6 +377,7 @@ list(APPEND CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/engine/common/i18n.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/common/data_path_resolver.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/common/data_dir_override.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/common/file_utils.cpp
 )
 file(GLOB_RECURSE SERVER_SOURCES CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/src/game/server/*.cpp")
 list(APPEND SERVER_SOURCES
@@ -388,6 +389,7 @@ list(APPEND SERVER_SOURCES
     ${PROJECT_SOURCE_DIR}/src/engine/common/i18n.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/common/data_path_resolver.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/common/data_dir_override.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/common/file_utils.cpp
 )
 ## Separate engine sources for client and server to avoid over-linking
 set(ENGINE_CLIENT_SOURCES
@@ -416,11 +418,11 @@ set(ENGINE_CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/game/input/bindings.cpp
     ${PROJECT_SOURCE_DIR}/src/game/input/state.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/platform/window_factory.cpp
-    ${PROJECT_SOURCE_DIR}/src/game/ui/system.cpp
-    ${PROJECT_SOURCE_DIR}/src/game/ui/backend_factory.cpp
-    ${PROJECT_SOURCE_DIR}/src/game/ui/config.cpp
-    ${PROJECT_SOURCE_DIR}/src/game/ui/ui_config.cpp
-    ${PROJECT_SOURCE_DIR}/src/game/ui/input_mapping.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/core/system.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/core/backend_factory.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/config/config.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/config/ui_config.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/config/input_mapping.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/controllers/console_controller.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/controllers/console_controller.hpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/controllers/hud_controller.cpp
@@ -431,9 +433,9 @@ set(ENGINE_CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/game/ui/controllers/settings_controller.hpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/console/keybindings.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/fonts/console_fonts.cpp
-    ${PROJECT_SOURCE_DIR}/src/game/ui/hud_settings.cpp
-    ${PROJECT_SOURCE_DIR}/src/game/ui/render_settings.cpp
-    ${PROJECT_SOURCE_DIR}/src/game/ui/render_scale.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/config/hud_settings.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/config/render_settings.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/config/render_scale.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/models/hud_model.hpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/models/console_model.hpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/models/settings_model.hpp
@@ -515,12 +517,12 @@ elseif(BZ3_UI_BACKEND STREQUAL "rmlui")
 endif()
 
 list(APPEND ENGINE_CLIENT_SOURCES
-    ${PROJECT_SOURCE_DIR}/src/game/ui/third_party/stb_image_impl.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/common/stb_image_impl.cpp
 )
 set(ENGINE_SERVER_SOURCES
     ${PROJECT_SOURCE_DIR}/src/game/engine/server_engine.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/geometry/mesh_loader.cpp
-    ${PROJECT_SOURCE_DIR}/src/game/ui/third_party/stb_image_impl.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/common/stb_image_impl.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/world/content.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/world/backend_factory.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/world/backends/fs/backend.cpp

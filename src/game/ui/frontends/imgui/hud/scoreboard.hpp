@@ -4,7 +4,7 @@
 
 struct ImGuiIO;
 
-#include "ui/types.hpp"
+#include "ui/core/types.hpp"
 
 namespace ui {
 

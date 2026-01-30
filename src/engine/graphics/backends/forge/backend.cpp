@@ -3,6 +3,7 @@
 #include "engine/graphics/backends/forge/ui_bridge.hpp"
 #include "engine/geometry/mesh_loader.hpp"
 #include "common/data_path_resolver.hpp"
+#include "common/file_utils.hpp"
 #include "platform/window.hpp"
 #include "spdlog/spdlog.h"
 
@@ -124,22 +125,6 @@ void ensureForgeConfigFiles() {
                "RD_OTHER_FILES = " << forgeDataDir.string() << "\n"
                "RD_LOG = " << forgeDataDir.string() << "\n";
     }
-}
-
-std::vector<uint8_t> readFileBytes(const std::filesystem::path& path) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file.is_open()) {
-        return {};
-    }
-    file.seekg(0, std::ios::end);
-    const std::streamsize size = file.tellg();
-    if (size <= 0) {
-        return {};
-    }
-    file.seekg(0, std::ios::beg);
-    std::vector<uint8_t> buffer(static_cast<size_t>(size));
-    file.read(reinterpret_cast<char*>(buffer.data()), size);
-    return buffer;
 }
 
 struct MeshVertex {
@@ -1370,8 +1355,8 @@ void ForgeBackend::ensureUiOverlayResources() {
     const std::filesystem::path shaderDir = bz::data::Resolve("forge/shaders");
     const auto vsPath = shaderDir / "ui_overlay.vert.spv";
     const auto fsPath = shaderDir / "ui_overlay.frag.spv";
-    auto vsBytes = readFileBytes(vsPath);
-    auto fsBytes = readFileBytes(fsPath);
+    auto vsBytes = bz::file::ReadFileBytes(vsPath);
+    auto fsBytes = bz::file::ReadFileBytes(fsPath);
     if (vsBytes.empty() || fsBytes.empty()) {
         spdlog::error("Graphics(Forge): missing UI overlay shaders '{}', '{}'", vsPath.string(), fsPath.string());
         return;
@@ -1556,8 +1541,8 @@ void ForgeBackend::ensureBrightnessResources() {
     const std::filesystem::path shaderDir = bz::data::Resolve("forge/shaders");
     const auto vsPath = shaderDir / "brightness.vert.spv";
     const auto fsPath = shaderDir / "brightness.frag.spv";
-    auto vsBytes = readFileBytes(vsPath);
-    auto fsBytes = readFileBytes(fsPath);
+    auto vsBytes = bz::file::ReadFileBytes(vsPath);
+    auto fsBytes = bz::file::ReadFileBytes(fsPath);
     if (vsBytes.empty() || fsBytes.empty()) {
         spdlog::error("Graphics(Forge): missing brightness shaders '{}', '{}'", vsPath.string(), fsPath.string());
         return;
@@ -1856,8 +1841,8 @@ void ForgeBackend::ensureMeshResources() {
     }();
     const auto vsPath = shaderDir / (debugSolid ? "mesh_debug.vert.spv" : "mesh.vert.spv");
     const auto fsPath = shaderDir / (debugSolid ? "mesh_debug.frag.spv" : "mesh.frag.spv");
-    auto vsBytes = readFileBytes(vsPath);
-    auto fsBytes = readFileBytes(fsPath);
+    auto vsBytes = bz::file::ReadFileBytes(vsPath);
+    auto fsBytes = bz::file::ReadFileBytes(fsPath);
     if (vsBytes.empty() || fsBytes.empty()) {
         spdlog::error("Graphics(Forge): missing mesh shaders '{}', '{}'", vsPath.string(), fsPath.string());
         return;

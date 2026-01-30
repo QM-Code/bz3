@@ -192,7 +192,6 @@ private:
     void ensureBrightnessResources();
     void ensureSceneTarget(int width, int height);
     void destroySceneTarget();
-    static uint16_t toTextureHandle(uint64_t textureId);
 
     std::unique_ptr<UiRenderTargetBridge> uiBridge_;
 };

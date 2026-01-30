@@ -19,7 +19,7 @@
 #include <spdlog/spdlog.h>
 
 #include "common/data_path_resolver.hpp"
-#include "ui/config.hpp"
+#include "ui/config/config.hpp"
 
 #if !defined(_WIN32)
 #include <arpa/inet.h>

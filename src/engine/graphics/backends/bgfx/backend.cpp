@@ -6,6 +6,8 @@
 #include "engine/common/data_path_resolver.hpp"
 #include "engine/common/config_helpers.hpp"
 #include "engine/common/config_store.hpp"
+#include "engine/common/file_utils.hpp"
+#include "engine/graphics/backends/bgfx/texture_utils.hpp"
 #include "engine/geometry/mesh_loader.hpp"
 #include "platform/window.hpp"
 
@@ -19,7 +21,6 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <spdlog/spdlog.h>
-#include <fstream>
 #include <cstdlib>
 #include <stb_image.h>
 #include <array>
@@ -79,26 +80,8 @@ NativeWindowInfo getNativeWindowInfo(platform::Window* window) {
 }
 
 
-std::vector<uint8_t> readFileToBytes(const std::filesystem::path& path) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file.is_open()) {
-        return {};
-    }
-    file.seekg(0, std::ios::end);
-    const std::streamsize size = file.tellg();
-    if (size <= 0) {
-        return {};
-    }
-    file.seekg(0, std::ios::beg);
-    std::vector<uint8_t> buffer(static_cast<size_t>(size));
-    if (!file.read(reinterpret_cast<char*>(buffer.data()), size)) {
-        return {};
-    }
-    return buffer;
-}
-
 bgfx::ShaderHandle loadShader(const std::filesystem::path& path) {
-    auto bytes = readFileToBytes(path);
+    auto bytes = bz::file::ReadFileBytes(path);
     if (bytes.empty()) {
         spdlog::error("Graphics(Bgfx): failed to read shader '{}'", path.string());
         return BGFX_INVALID_HANDLE;
@@ -1056,7 +1039,7 @@ void BgfxBackend::setUiOverlayTexture(const graphics::TextureHandle& texture) {
         return;
     }
     bgfx::TextureHandle handle;
-    handle.idx = toTextureHandle(texture.id);
+    handle.idx = bgfx_utils::ToBgfxTextureHandle(texture.id);
     uiOverlayTexture = handle;
     uiOverlayWidth = texture.width;
     uiOverlayHeight = texture.height;
@@ -1461,8 +1444,8 @@ void BgfxBackend::ensureUiOverlayResources() {
     const std::filesystem::path shaderDir = bz::data::Resolve("bgfx/shaders/bin/vk/imgui");
     const auto vsPath = shaderDir / "vs_imgui.bin";
     const auto fsPath = shaderDir / "fs_imgui.bin";
-    auto vsBytes = readFileToBytes(vsPath);
-    auto fsBytes = readFileToBytes(fsPath);
+    auto vsBytes = bz::file::ReadFileBytes(vsPath);
+    auto fsBytes = bz::file::ReadFileBytes(fsPath);
     if (vsBytes.empty() || fsBytes.empty()) {
         spdlog::error("Graphics(Bgfx): missing UI overlay shaders '{}', '{}'", vsPath.string(), fsPath.string());
         return;
@@ -1493,8 +1476,8 @@ void BgfxBackend::ensureBrightnessResources() {
     const std::filesystem::path shaderDir = getBgfxShaderDir("brightness");
     const auto vsPath = shaderDir / "vs_brightness.bin";
     const auto fsPath = shaderDir / "fs_brightness.bin";
-    auto vsBytes = readFileToBytes(vsPath);
-    auto fsBytes = readFileToBytes(fsPath);
+    auto vsBytes = bz::file::ReadFileBytes(vsPath);
+    auto fsBytes = bz::file::ReadFileBytes(fsPath);
     if (vsBytes.empty() || fsBytes.empty()) {
         spdlog::error("Graphics(Bgfx): missing brightness shaders '{}', '{}'", vsPath.string(), fsPath.string());
         return;
@@ -1580,13 +1563,6 @@ void BgfxBackend::destroySceneTarget() {
     }
     sceneTarget = {};
     sceneTargetValid = false;
-}
-
-uint16_t BgfxBackend::toTextureHandle(uint64_t textureId) {
-    if (textureId == 0) {
-        return bgfx::kInvalidHandle;
-    }
-    return static_cast<uint16_t>(textureId - 1);
 }
 
 } // namespace graphics_backend

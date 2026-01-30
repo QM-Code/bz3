@@ -9,7 +9,7 @@
 #include "platform/events.hpp"
 #include "ui/controllers/hud_controller.hpp"
 #include "ui/models/hud_model.hpp"
-#include "ui/types.hpp"
+#include "ui/core/types.hpp"
 #include "ui/console/console_interface.hpp"
 #include "ui/bridges/render_bridge.hpp"
 

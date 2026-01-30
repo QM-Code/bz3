@@ -6,9 +6,9 @@
 #include "platform/window.hpp"
 #include "spdlog/spdlog.h"
 #include "ui/bridges/ui_render_bridge.hpp"
-#include "ui/input_mapping.hpp"
+#include "ui/config/input_mapping.hpp"
 #include "ui/fonts/console_fonts.hpp"
-#include "ui/render_scale.hpp"
+#include "ui/config/render_scale.hpp"
 
 #include <cmath>
 

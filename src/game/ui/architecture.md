@@ -16,14 +16,14 @@ Both frontends render HUD first, then Console (so the console overlays the HUD).
 
 ## 2) Core API surface
 
-### `UiSystem` (`src/game/ui/system.*`)
+### `UiSystem` (`src/game/ui/core/system.*`)
 - Owns the chosen backend (created by `backend_factory.cpp`).
 - On each update:
   - Reads `ConfigStore::Revision()` and updates HUD visibility flags from config.
   - Sets `hudModel.visibility.hud` based on connection + console visibility.
   - Sends the model to the backend and calls `backend->update()`.
 
-### `ui::Backend` (`src/game/ui/backend.hpp`)
+### `ui::Backend` (`src/game/ui/core/backend.hpp`)
 Key responsibilities:
 - Console interface access: `console()` returns `ui::ConsoleInterface`.
 - Receives HUD state: `setHudModel(const ui::HudModel &)`.
@@ -40,7 +40,7 @@ Key responsibilities:
 
 ## 3) Backend selection
 
-- `src/game/ui/backend_factory.cpp` chooses ImGui or RmlUi based on build configuration.
+- `src/game/ui/core/backend_factory.cpp` chooses ImGui or RmlUi based on build configuration.
 - The rest of the engine only sees `UiSystem` / `ui::Backend`.
 
 ## 4) Rendering + render outputs
@@ -136,10 +136,10 @@ Any frontend changes that add UI elements generally require editing these asset 
 - **ConfigStore** is authoritative; do not read/write JSON files in UI code.
 - **Start Server panels** still write a JSON override file for spawned servers; this is an intentional exception for now.
 
-## 12) Known refactor direction (short)
+## 12) Refactor status (short)
 
-Summarized in `src/game/ui/TODO.md`:
-- Shared input mapping layer.
+Most of the original refactor plan is now implemented and tracked in `src/game/ui/TODO.md`:
+- Shared input mapping layer (both frontends).
 - Typed UI config facade around ConfigStore.
 - Renderer-agnostic models + controllers for HUD/Console/Settings/Bindings.
 - Unified render-to-texture output for both ImGui and RmlUi.
@@ -149,7 +149,7 @@ Summarized in `src/game/ui/TODO.md`:
 ## 13) "Where do I start?"
 
 Recommended read order:
-1) `src/game/ui/system.cpp` + `src/game/ui/backend.hpp`
+1) `src/game/ui/core/system.cpp` + `src/game/ui/core/backend.hpp`
 2) `src/game/ui/frontends/imgui/backend.cpp`
 3) `src/game/ui/frontends/rmlui/backend.cpp`
 4) `src/game/ui/frontends/imgui/console/console.cpp`

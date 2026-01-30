@@ -10,7 +10,7 @@
 
 #include "ui/frontends/imgui/hud/hud.hpp"
 #include "ui/frontends/imgui/console/console.hpp"
-#include "ui/backend.hpp"
+#include "ui/core/backend.hpp"
 
 namespace platform {
 class Window;

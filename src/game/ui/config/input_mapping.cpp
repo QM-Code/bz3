@@ -1,4 +1,4 @@
-#include "ui/input_mapping.hpp"
+#include "ui/config/input_mapping.hpp"
 
 #include "platform/window.hpp"
 

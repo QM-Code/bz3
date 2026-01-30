@@ -4,6 +4,7 @@
 
 #include "engine/graphics/backends/diligent/ui_bridge.hpp"
 #include "spdlog/spdlog.h"
+#include "ui/frontends/imgui/texture_utils.hpp"
 
 #include <DiligentCore/Graphics/GraphicsEngine/interface/Buffer.h>
 #include <DiligentCore/Graphics/GraphicsEngine/interface/DeviceContext.h>
@@ -34,18 +35,6 @@ struct ImGuiVertex {
 struct ImGuiConstants {
     float scaleBias[4];
 };
-
-uint64_t textureIdFromImTexture(ImTextureID textureId) {
-    uint64_t value = 0;
-    std::memcpy(&value, &textureId, sizeof(ImTextureID));
-    return value;
-}
-
-ImTextureID textureIdToImTexture(uint64_t value) {
-    ImTextureID out{};
-    std::memcpy(&out, &value, sizeof(ImTextureID));
-    return out;
-}
 
 } // namespace
 
@@ -379,7 +368,7 @@ void DiligentRenderer::rebuildImGuiFonts(ImFontAtlas* atlas) {
     }
 
     fontToken_ = graphics_backend::diligent_ui::RegisterExternalTexture(fontSrv_);
-    atlas->SetTexID(textureIdToImTexture(fontToken_));
+    atlas->SetTexID(ui::ToImGuiTextureId(fontToken_));
 }
 
 void DiligentRenderer::renderImGuiToTarget(ImDrawData* drawData) {
@@ -499,7 +488,7 @@ void DiligentRenderer::renderImGuiToTarget(ImDrawData* drawData) {
             Diligent::Rect scissor{clipX, clipY, clipX + clipW, clipY + clipH};
             ctx.context->SetScissorRects(1, &scissor, 0, 0);
 
-            uint64_t token = textureIdFromImTexture(pcmd->TextureId);
+            uint64_t token = ui::FromImGuiTextureId(pcmd->TextureId);
             if (token == 0) {
                 token = fontToken_;
             }

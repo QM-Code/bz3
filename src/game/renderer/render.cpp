@@ -76,7 +76,11 @@ void Render::ensureRadarResources() {
         return;
     }
 
-    if (radarTarget == graphics::kDefaultRenderTarget) {
+    if (radarTarget == graphics::kDefaultRenderTarget
+        || device_->getRenderTargetTextureId(radarTarget) == 0u) {
+        if (radarTarget != graphics::kDefaultRenderTarget) {
+            device_->destroyRenderTarget(radarTarget);
+        }
         graphics::RenderTargetDesc desc;
         desc.width = kRadarTexSize;
         desc.height = kRadarTexSize;
@@ -209,8 +213,12 @@ void Render::update() {
         width = 1;
     }
 
-    lastAspect = static_cast<float>(width) / static_cast<float>(height);
-    device_->resize(width, height);
+    if (width != lastFramebufferWidth || height != lastFramebufferHeight) {
+        lastFramebufferWidth = width;
+        lastFramebufferHeight = height;
+        lastAspect = static_cast<float>(width) / static_cast<float>(height);
+        device_->resize(width, height);
+    }
 
     device_->beginFrame();
 
