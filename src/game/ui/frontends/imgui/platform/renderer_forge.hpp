@@ -30,6 +30,7 @@ private:
     void ensurePipeline();
     void ensureBuffers(std::size_t vertexBytes, std::size_t indexBytes);
     void destroyResources();
+    uint32_t nextDescriptorSetIndex();
 
     Renderer* renderer_ = nullptr;
     Queue* queue_ = nullptr;
@@ -50,6 +51,7 @@ private:
     std::size_t indexBufferSize_ = 0;
     uint32_t colorFormat_ = 0;
     Descriptor descriptors_[3]{};
+    uint32_t descriptorSetCursor_ = 0;
 
     uint64_t fontToken_ = 0;
     uint64_t uiToken_ = 0;

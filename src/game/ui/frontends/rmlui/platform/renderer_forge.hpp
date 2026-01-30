@@ -99,6 +99,7 @@ private:
     void ensureDebugTriangleBuffers();
     const TextureData* lookupTexture(Rml::TextureHandle handle) const;
     void destroyResources();
+    uint32_t nextDescriptorSetIndex();
 
     bool ready = false;
     int viewport_width = 0;
@@ -134,6 +135,7 @@ private:
     Descriptor* descriptors_ = nullptr;
     Buffer* debugTriangleVB_ = nullptr;
     Buffer* debugTriangleIB_ = nullptr;
+    uint32_t descriptorSetCursor_ = 0;
 
     Rml::TextureHandle next_texture_id = 1;
     std::unordered_map<Rml::TextureHandle, TextureData> textures;

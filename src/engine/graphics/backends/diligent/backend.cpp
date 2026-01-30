@@ -1040,6 +1040,7 @@ float4 main(PSInput In) : SV_Target
                   pipeline_,
                   shaderBinding_,
                   "BZ3 Diligent PSO");
+    // Offscreen main scene still needs depth for correct world rendering.
     buildPipeline(Diligent::TEX_FORMAT_RGBA8_UNORM,
                   Diligent::TEX_FORMAT_D32_FLOAT,
                   true,

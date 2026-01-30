@@ -138,7 +138,7 @@ struct MeshConstants {
     float color[4];
 };
 
-constexpr uint32_t kDescriptorSetRingSize = 3;
+constexpr uint32_t kDescriptorSetRingSize = 1024;
 
 } // namespace
 
@@ -243,6 +243,12 @@ ForgeBackend::ForgeBackend(platform::Window& windowRef) : window(&windowRef) {
     spdlog::warn("Graphics(Forge): initialized (SDL3 + Vulkan).");
 }
 
+uint32_t ForgeBackend::nextDescriptorSetIndex() {
+    const uint32_t index = descriptorSetCursor_ % kDescriptorSetRingSize;
+    ++descriptorSetCursor_;
+    return index;
+}
+
 ForgeBackend::~ForgeBackend() {
     if (graphicsQueue_) {
         waitQueueIdle(graphicsQueue_);
@@ -309,6 +315,7 @@ void ForgeBackend::beginFrame() {
     if (!renderer_ || !swapChain_) {
         return;
     }
+    descriptorSetCursor_ = 0;
     if (renderFence_) {
         waitForFences(renderer_, 1, &renderFence_);
     }
@@ -779,13 +786,6 @@ void ForgeBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId
     cmdSetViewport(cmd_, 0.0f, 0.0f, static_cast<float>(targetWidth),
                    static_cast<float>(targetHeight), 0.0f, 1.0f);
     cmdSetScissor(cmd_, 0, 0, static_cast<uint32_t>(targetWidth), static_cast<uint32_t>(targetHeight));
-    const uint32_t setIndex = frameIndex_ % kDescriptorSetRingSize;
-
-    const bool singleDescriptor = []() {
-        const char* flag = std::getenv("BZ3_FORGE_DEBUG_SINGLE_DESCRIPTOR");
-        return flag && flag[0] == '1';
-    }();
-
     const bool debugUiQuad = []() {
         const char* flag = std::getenv("BZ3_FORGE_DEBUG_UI_QUAD");
         return flag && flag[0] == '1';
@@ -840,10 +840,11 @@ void ForgeBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId
             params[1].ppTextures = &texture;
             params[2].mIndex = 2;
             params[2].ppSamplers = &uiOverlaySampler_;
-            updateDescriptorSet(renderer_, setIndex, uiOverlayDescriptorSet_, 3, params);
+            const uint32_t uiSetIndex = nextDescriptorSetIndex();
+            updateDescriptorSet(renderer_, uiSetIndex, uiOverlayDescriptorSet_, 3, params);
 
             cmdBindPipeline(cmd_, uiOverlayPipeline_);
-            cmdBindDescriptorSet(cmd_, setIndex, uiOverlayDescriptorSet_);
+            cmdBindDescriptorSet(cmd_, uiSetIndex, uiOverlayDescriptorSet_);
             uint32_t stride = sizeof(UiVertex);
             uint64_t offset = 0;
             cmdBindVertexBuffer(cmd_, 1, &uiOverlayVertexBuffer_, &stride, &offset);
@@ -930,19 +931,18 @@ void ForgeBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId
         endUpdateResource(&ubUpdate);
 
         Texture* texture = whiteTexture_;
-        if (!singleDescriptor) {
-            DescriptorData params[3] = {};
-            params[0].mIndex = 0;
-            params[0].ppBuffers = &meshUniformBuffer_;
-            params[1].mIndex = 1;
-            params[1].ppTextures = &texture;
-            params[2].mIndex = 2;
-            params[2].ppSamplers = &meshSampler_;
-            updateDescriptorSet(renderer_, setIndex, meshDescriptorSet_, 3, params);
-        }
+        const uint32_t triSetIndex = nextDescriptorSetIndex();
+        DescriptorData params[3] = {};
+        params[0].mIndex = 0;
+        params[0].ppBuffers = &meshUniformBuffer_;
+        params[1].mIndex = 1;
+        params[1].ppTextures = &texture;
+        params[2].mIndex = 2;
+        params[2].ppSamplers = &meshSampler_;
+        updateDescriptorSet(renderer_, triSetIndex, meshDescriptorSet_, 3, params);
 
         cmdBindPipeline(cmd_, pipeline);
-        cmdBindDescriptorSet(cmd_, setIndex, meshDescriptorSet_);
+        cmdBindDescriptorSet(cmd_, triSetIndex, meshDescriptorSet_);
         uint32_t stride = sizeof(MeshVertex);
         uint64_t offset = 0;
         cmdBindVertexBuffer(cmd_, 1, &debugVB, &stride, &offset);
@@ -957,18 +957,6 @@ void ForgeBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId
 
     if (debugOnlyTri) {
         return;
-    }
-
-    if (singleDescriptor) {
-        Texture* texture = whiteTexture_;
-        DescriptorData params[3] = {};
-        params[0].mIndex = 0;
-        params[0].ppBuffers = &meshUniformBuffer_;
-        params[1].mIndex = 1;
-        params[1].ppTextures = &texture;
-        params[2].mIndex = 2;
-        params[2].ppSamplers = &meshSampler_;
-        updateDescriptorSet(renderer_, setIndex, meshDescriptorSet_, 3, params);
     }
 
     auto renderEntity = [&](const EntityRecord& entity) {
@@ -1046,19 +1034,18 @@ void ForgeBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId
                 }
                 loggedDraw = true;
             }
-            if (!singleDescriptor) {
-                DescriptorData params[3] = {};
-                params[0].mIndex = 0;
-                params[0].ppBuffers = &meshUniformBuffer_;
-                params[1].mIndex = 1;
-                params[1].ppTextures = &texture;
-                params[2].mIndex = 2;
-                params[2].ppSamplers = &meshSampler_;
-                updateDescriptorSet(renderer_, setIndex, meshDescriptorSet_, 3, params);
-            }
+            const uint32_t drawSetIndex = nextDescriptorSetIndex();
+            DescriptorData params[3] = {};
+            params[0].mIndex = 0;
+            params[0].ppBuffers = &meshUniformBuffer_;
+            params[1].mIndex = 1;
+            params[1].ppTextures = &texture;
+            params[2].mIndex = 2;
+            params[2].ppSamplers = &meshSampler_;
+            updateDescriptorSet(renderer_, drawSetIndex, meshDescriptorSet_, 3, params);
 
             cmdBindPipeline(cmd_, pipeline);
-            cmdBindDescriptorSet(cmd_, setIndex, meshDescriptorSet_);
+            cmdBindDescriptorSet(cmd_, drawSetIndex, meshDescriptorSet_);
             uint32_t stride = sizeof(MeshVertex);
             uint64_t offset = 0;
             Buffer* vb = mesh.vertexBuffer;
@@ -1178,7 +1165,7 @@ void ForgeBackend::renderUiOverlay() {
         }
         return;
     }
-    const uint32_t setIndex = frameIndex_ % kDescriptorSetRingSize;
+    const uint32_t setIndex = nextDescriptorSetIndex();
 
     RenderTarget* backBuffer = swapChain_->ppRenderTargets[frameIndex_];
     BindRenderTargetsDesc bindDesc{};
@@ -1772,7 +1759,7 @@ void ForgeBackend::renderBrightnessPass() {
         || !brightnessIndexBuffer_ || !brightnessUniformBuffer_ || !brightnessSampler_) {
         return;
     }
-    const uint32_t setIndex = frameIndex_ % kDescriptorSetRingSize;
+    const uint32_t setIndex = nextDescriptorSetIndex();
 
     RenderTarget* backBuffer = swapChain_->ppRenderTargets[frameIndex_];
     BindRenderTargetsDesc bindDesc{};
@@ -1940,6 +1927,7 @@ void ForgeBackend::ensureMeshResources() {
         texDesc.mSampleCount = SAMPLE_COUNT_1;
         texDesc.mDescriptors = DESCRIPTOR_TYPE_TEXTURE;
         texDesc.mStartState = RESOURCE_STATE_COPY_DEST;
+        texDesc.mFlags = TEXTURE_CREATION_FLAG_FORCE_2D;
         texDesc.pName = "Forge White Texture";
         TextureLoadDesc loadDesc{};
         loadDesc.pDesc = &texDesc;

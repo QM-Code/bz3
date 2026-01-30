@@ -65,6 +65,8 @@ struct UiConstants {
     float translate[4];
 };
 
+constexpr uint32_t kDescriptorSetRingSize = 1024;
+
 template <typename ColorT>
 uint32_t packColor(const ColorT& color) {
     return static_cast<uint32_t>(color.red)
@@ -86,6 +88,12 @@ RenderInterface_Forge::~RenderInterface_Forge() {
 RenderInterface_Forge::RenderInterface_Forge() {
     ready = ensureReady();
     spdlog::warn("RmlUi(Forge): ctor ready={}", ready ? "yes" : "no");
+}
+
+uint32_t RenderInterface_Forge::nextDescriptorSetIndex() {
+    const uint32_t index = descriptorSetCursor_ % kDescriptorSetRingSize;
+    ++descriptorSetCursor_;
+    return index;
 }
 
 void RenderInterface_Forge::SetViewport(int width, int height, int offset_x, int offset_y) {
@@ -149,6 +157,7 @@ void RenderInterface_Forge::BeginFrame() {
     }
 
     beginCmd(cmd_);
+    descriptorSetCursor_ = 0;
 
     RenderTargetBarrier rtBegin{};
     rtBegin.pRenderTarget = uiTarget_;
@@ -225,10 +234,11 @@ void RenderInterface_Forge::BeginFrame() {
             params[1].ppTextures = &drawTexture;
             params[2].mIndex = 2;
             params[2].ppSamplers = &sampler_;
-            updateDescriptorSet(renderer_, 0, descriptorSet_, 3, params);
+            const uint32_t setIndex = nextDescriptorSetIndex();
+            updateDescriptorSet(renderer_, setIndex, descriptorSet_, 3, params);
 
             cmdBindPipeline(cmd_, pipeline_);
-            cmdBindDescriptorSet(cmd_, 0, descriptorSet_);
+            cmdBindDescriptorSet(cmd_, setIndex, descriptorSet_);
             uint32_t stride = sizeof(UiVertex);
             uint64_t offset = 0;
             cmdBindVertexBuffer(cmd_, 0, &debugTriangleVB_, &stride, &offset);
@@ -246,6 +256,7 @@ void RenderInterface_Forge::EndFrame() {
         return;
     }
 
+    cmdBindRenderTargets(cmd_, nullptr);
     RenderTargetBarrier rtEnd{};
     rtEnd.pRenderTarget = uiTarget_;
     rtEnd.mCurrentState = RESOURCE_STATE_RENDER_TARGET;
@@ -426,10 +437,11 @@ void RenderInterface_Forge::RenderGeometry(Rml::CompiledGeometryHandle handle,
     params[1].ppTextures = &drawTexture;
     params[2].mIndex = 2;
     params[2].ppSamplers = &sampler_;
-    updateDescriptorSet(renderer_, 0, descriptorSet_, 3, params);
+    const uint32_t setIndex = nextDescriptorSetIndex();
+    updateDescriptorSet(renderer_, setIndex, descriptorSet_, 3, params);
 
     cmdBindPipeline(cmd_, pipeline_);
-    cmdBindDescriptorSet(cmd_, 0, descriptorSet_);
+    cmdBindDescriptorSet(cmd_, setIndex, descriptorSet_);
 
     uint32_t stride = sizeof(UiVertex);
     uint64_t offset = 0;
@@ -691,7 +703,7 @@ void RenderInterface_Forge::ensurePipeline() {
 
     DescriptorSetDesc setDesc{};
     setDesc.mIndex = 0;
-    setDesc.mMaxSets = 1;
+    setDesc.mMaxSets = kDescriptorSetRingSize;
     setDesc.mDescriptorCount = 3;
     setDesc.pDescriptors = descriptors_;
     addDescriptorSet(renderer_, &setDesc, &descriptorSet_);
@@ -789,6 +801,7 @@ void RenderInterface_Forge::ensureWhiteTexture() {
     textureDesc.mSampleCount = SAMPLE_COUNT_1;
     textureDesc.mStartState = RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
     textureDesc.mWidth = 1;
+    textureDesc.mFlags = TEXTURE_CREATION_FLAG_FORCE_2D;
     textureDesc.pName = "RmlUi Forge White Texture";
 
     TextureLoadDesc loadDesc{};

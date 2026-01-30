@@ -26,6 +26,8 @@ struct ImGuiConstants {
     float scaleBias[4];
 };
 
+constexpr uint32_t kDescriptorSetRingSize = 1024;
+
 } // namespace
 
 ForgeRenderer::ForgeRenderer() {
@@ -116,6 +118,12 @@ void ForgeRenderer::rebuildImGuiFonts(ImFontAtlas* atlas) {
     fontsReady_ = fontTexture_ != nullptr;
 }
 
+uint32_t ForgeRenderer::nextDescriptorSetIndex() {
+    const uint32_t index = descriptorSetCursor_ % kDescriptorSetRingSize;
+    ++descriptorSetCursor_;
+    return index;
+}
+
 void ForgeRenderer::renderImGuiToTarget(ImDrawData* drawData) {
     if (!drawData || drawData->TotalVtxCount <= 0) {
         return;
@@ -168,6 +176,7 @@ void ForgeRenderer::renderImGuiToTarget(ImDrawData* drawData) {
     }
 
     beginCmd(cmd_);
+    descriptorSetCursor_ = 0;
 
     RenderTargetBarrier rtBegin{};
     rtBegin.pRenderTarget = uiTarget_;
@@ -189,14 +198,6 @@ void ForgeRenderer::renderImGuiToTarget(ImDrawData* drawData) {
 
     cmdSetViewport(cmd_, 0.0f, 0.0f, static_cast<float>(fbWidth), static_cast<float>(fbHeight), 0.0f, 1.0f);
     cmdSetScissor(cmd_, 0, 0, static_cast<uint32_t>(fbWidth), static_cast<uint32_t>(fbHeight));
-
-    if (fontTexture_) {
-        TextureBarrier fontBarrier{};
-        fontBarrier.pTexture = fontTexture_;
-        fontBarrier.mCurrentState = RESOURCE_STATE_COPY_DEST;
-        fontBarrier.mNewState = RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        cmdResourceBarrier(cmd_, 0, nullptr, 1, &fontBarrier, 0, nullptr);
-    }
 
     ImGuiConstants constants{};
     const float sx = 2.0f / io.DisplaySize.x;
@@ -260,8 +261,9 @@ void ForgeRenderer::renderImGuiToTarget(ImDrawData* drawData) {
             params[1].mIndex = 1;
             params[1].ppTextures = &texture;
             params[2] = baseParams[2];
-            updateDescriptorSet(renderer_, 0, descriptorSet_, 3, params);
-            cmdBindDescriptorSet(cmd_, 0, descriptorSet_);
+            const uint32_t setIndex = nextDescriptorSetIndex();
+            updateDescriptorSet(renderer_, setIndex, descriptorSet_, 3, params);
+            cmdBindDescriptorSet(cmd_, setIndex, descriptorSet_);
 
             cmdDrawIndexed(cmd_, pcmd->ElemCount, static_cast<uint32_t>(globalIdxOffset + pcmd->IdxOffset),
                            static_cast<uint32_t>(globalVtxOffset + pcmd->VtxOffset));
@@ -272,6 +274,7 @@ void ForgeRenderer::renderImGuiToTarget(ImDrawData* drawData) {
 
     // debug draw removed
 
+    cmdBindRenderTargets(cmd_, nullptr);
     RenderTargetBarrier rtEnd{};
     rtEnd.pRenderTarget = uiTarget_;
     rtEnd.mCurrentState = RESOURCE_STATE_RENDER_TARGET;
@@ -429,7 +432,7 @@ void ForgeRenderer::ensurePipeline() {
 
     DescriptorSetDesc setDesc{};
     setDesc.mIndex = 0;
-    setDesc.mMaxSets = 1;
+    setDesc.mMaxSets = kDescriptorSetRingSize;
     setDesc.mDescriptorCount = 3;
     setDesc.pDescriptors = descriptors_;
     addDescriptorSet(renderer_, &setDesc, &descriptorSet_);

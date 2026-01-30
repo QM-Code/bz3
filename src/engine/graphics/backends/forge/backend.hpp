@@ -177,9 +177,11 @@ private:
     float orthoRight = 1.0f;
     float orthoTop = 1.0f;
     float orthoBottom = -1.0f;
+    uint32_t descriptorSetCursor_ = 0;
 
     glm::mat4 computeViewMatrix() const;
     glm::mat4 computeProjectionMatrix() const;
+    uint32_t nextDescriptorSetIndex();
 
     void ensureUiOverlayResources();
     void destroyUiOverlayResources();
