@@ -7,7 +7,7 @@
 #elif defined(KARMA_PHYSICS_BACKEND_PHYSX)
 #include "physics/backends/physx/physics_world_physx.hpp"
 #else
-#error "BZ3 physics backend not set. Define KARMA_PHYSICS_BACKEND_JOLT, KARMA_PHYSICS_BACKEND_BULLET, or KARMA_PHYSICS_BACKEND_PHYSX."
+#error "KARMA physics backend not set. Define KARMA_PHYSICS_BACKEND_JOLT, KARMA_PHYSICS_BACKEND_BULLET, or KARMA_PHYSICS_BACKEND_PHYSX."
 #endif
 
 namespace physics_backend {

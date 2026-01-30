@@ -5,7 +5,7 @@
 #elif defined(KARMA_AUDIO_BACKEND_SDL)
 #include "audio/backends/sdl/backend.hpp"
 #else
-#error "BZ3 audio backend not set. Define KARMA_AUDIO_BACKEND_MINIAUDIO or KARMA_AUDIO_BACKEND_SDL."
+#error "KARMA audio backend not set. Define KARMA_AUDIO_BACKEND_MINIAUDIO or KARMA_AUDIO_BACKEND_SDL."
 #endif
 
 namespace audio_backend {

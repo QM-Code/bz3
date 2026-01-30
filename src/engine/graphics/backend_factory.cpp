@@ -9,7 +9,7 @@
 #elif defined(KARMA_RENDER_BACKEND_FORGE)
 #include "engine/graphics/backends/forge/backend.hpp"
 #else
-#error "BZ3 render backend not set. Define KARMA_RENDER_BACKEND_DILIGENT, KARMA_RENDER_BACKEND_BGFX, or KARMA_RENDER_BACKEND_FORGE."
+#error "KARMA render backend not set. Define KARMA_RENDER_BACKEND_DILIGENT, KARMA_RENDER_BACKEND_BGFX, or KARMA_RENDER_BACKEND_FORGE."
 #endif
 
 namespace graphics_backend {

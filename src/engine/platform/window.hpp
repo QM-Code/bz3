@@ -12,7 +12,7 @@ namespace platform {
 struct WindowConfig {
     int width = 1280;
     int height = 720;
-    std::string title = "BZ3";
+    std::string title = "KARMA";
     std::string preferredVideoDriver;
 };
 

@@ -211,7 +211,7 @@ bool createCubemapRGBA8(Diligent::IRenderDevice* device,
     desc.Format = Diligent::TEX_FORMAT_RGBA8_UNORM;
     desc.BindFlags = Diligent::BIND_SHADER_RESOURCE;
     desc.Usage = Diligent::USAGE_IMMUTABLE;
-    desc.Name = "BZ3 Diligent Skybox";
+    desc.Name = "KARMA Diligent Skybox";
 
     std::array<Diligent::TextureSubResData, 6> subresources{};
     for (size_t i = 0; i < faces.size(); ++i) {
@@ -391,7 +391,7 @@ void DiligentBackend::setEntityModel(graphics::EntityId entity,
                     int c = 0;
                     stbi_uc* pixels = stbi_load(themePath.string().c_str(), &w, &h, &c, 4);
                     if (pixels && w > 0 && h > 0) {
-                        auto texture = createTextureRGBA8(device_, w, h, pixels, "BZ3 Diligent Theme");
+                        auto texture = createTextureRGBA8(device_, w, h, pixels, "KARMA Diligent Theme");
                         stbi_image_free(pixels);
                         if (texture) {
                             textureCache.emplace(key, texture);
@@ -415,7 +415,7 @@ void DiligentBackend::setEntityModel(graphics::EntityId entity,
                                                      submesh.albedo->width,
                                                      submesh.albedo->height,
                                                      submesh.albedo->pixels.data(),
-                                                     "BZ3 Diligent Albedo");
+                                                     "KARMA Diligent Albedo");
                     if (texture) {
                         textureCache.emplace(key, texture);
                         texIt = textureCache.find(key);
@@ -509,7 +509,7 @@ graphics::MeshId DiligentBackend::createMesh(const graphics::MeshData& mesh) {
     }
 
     Diligent::BufferDesc vbDesc;
-    vbDesc.Name = "BZ3 Diligent VB";
+    vbDesc.Name = "KARMA Diligent VB";
     vbDesc.Usage = Diligent::USAGE_IMMUTABLE;
     vbDesc.BindFlags = Diligent::BIND_VERTEX_BUFFER;
     vbDesc.Size = static_cast<Diligent::Uint32>(packed.size() * sizeof(Vertex));
@@ -519,7 +519,7 @@ graphics::MeshId DiligentBackend::createMesh(const graphics::MeshData& mesh) {
     device_->CreateBuffer(vbDesc, &vbData, &record.vertexBuffer);
 
     Diligent::BufferDesc ibDesc;
-    ibDesc.Name = "BZ3 Diligent IB";
+    ibDesc.Name = "KARMA Diligent IB";
     ibDesc.Usage = Diligent::USAGE_IMMUTABLE;
     ibDesc.BindFlags = Diligent::BIND_INDEX_BUFFER;
     ibDesc.Size = static_cast<Diligent::Uint32>(mesh.indices.size() * sizeof(uint32_t));
@@ -539,7 +539,7 @@ graphics::MeshId DiligentBackend::createMesh(const graphics::MeshData& mesh) {
         desc.Format = Diligent::TEX_FORMAT_RGBA8_UNORM;
         desc.BindFlags = Diligent::BIND_SHADER_RESOURCE;
         desc.Usage = Diligent::USAGE_IMMUTABLE;
-        desc.Name = "BZ3 Diligent White Texture";
+        desc.Name = "KARMA Diligent White Texture";
 
         Diligent::TextureData initData;
         Diligent::TextureSubResData sub{};
@@ -596,7 +596,7 @@ graphics::RenderTargetId DiligentBackend::createRenderTarget(const graphics::Ren
         colorDesc.MipLevels = 1;
         colorDesc.Format = Diligent::TEX_FORMAT_RGBA8_UNORM;
         colorDesc.BindFlags = Diligent::BIND_RENDER_TARGET | Diligent::BIND_SHADER_RESOURCE;
-        colorDesc.Name = "BZ3 Diligent RT Color";
+        colorDesc.Name = "KARMA Diligent RT Color";
         device_->CreateTexture(colorDesc, nullptr, &record.colorTexture);
         if (record.colorTexture) {
             record.rtv = record.colorTexture->GetDefaultView(Diligent::TEXTURE_VIEW_RENDER_TARGET);
@@ -612,7 +612,7 @@ graphics::RenderTargetId DiligentBackend::createRenderTarget(const graphics::Ren
             depthDesc.MipLevels = 1;
             depthDesc.Format = Diligent::TEX_FORMAT_D32_FLOAT;
             depthDesc.BindFlags = Diligent::BIND_DEPTH_STENCIL;
-            depthDesc.Name = "BZ3 Diligent RT Depth";
+            depthDesc.Name = "KARMA Diligent RT Depth";
             device_->CreateTexture(depthDesc, nullptr, &record.depthTexture);
             if (record.depthTexture) {
                 record.dsv = record.depthTexture->GetDefaultView(Diligent::TEXTURE_VIEW_DEPTH_STENCIL);
@@ -946,14 +946,14 @@ float4 main(PSInput In) : SV_Target
 
     Diligent::RefCntAutoPtr<Diligent::IShader> vs;
     shaderCI.Desc.ShaderType = Diligent::SHADER_TYPE_VERTEX;
-    shaderCI.Desc.Name = "BZ3 Diligent VS";
+    shaderCI.Desc.Name = "KARMA Diligent VS";
     shaderCI.EntryPoint = "main";
     shaderCI.Source = vsSource;
     device_->CreateShader(shaderCI, &vs);
 
     Diligent::RefCntAutoPtr<Diligent::IShader> ps;
     shaderCI.Desc.ShaderType = Diligent::SHADER_TYPE_PIXEL;
-    shaderCI.Desc.Name = "BZ3 Diligent PS";
+    shaderCI.Desc.Name = "KARMA Diligent PS";
     shaderCI.EntryPoint = "main";
     shaderCI.Source = psSource;
     device_->CreateShader(shaderCI, &ps);
@@ -965,7 +965,7 @@ float4 main(PSInput In) : SV_Target
 
     if (!constantBuffer_) {
         Diligent::BufferDesc cbDesc;
-        cbDesc.Name = "BZ3 Diligent CB";
+        cbDesc.Name = "KARMA Diligent CB";
         cbDesc.Size = sizeof(Constants);
         cbDesc.Usage = Diligent::USAGE_DYNAMIC;
         cbDesc.BindFlags = Diligent::BIND_UNIFORM_BUFFER;
@@ -1070,7 +1070,7 @@ float4 main(PSInput In) : SV_Target
                   false,
                   pipeline_,
                   shaderBinding_,
-                  "BZ3 Diligent PSO");
+                  "KARMA Diligent PSO");
     // Offscreen main scene still needs depth for correct world rendering.
     buildPipeline(Diligent::TEX_FORMAT_RGBA8_UNORM,
                   Diligent::TEX_FORMAT_D32_FLOAT,
@@ -1079,7 +1079,7 @@ float4 main(PSInput In) : SV_Target
                   false,
                   pipelineOffscreen_,
                   shaderBindingOffscreen_,
-                  "BZ3 Diligent PSO Offscreen");
+                  "KARMA Diligent PSO Offscreen");
     // Overlay entities (radar markers, lines) render without depth.
     buildPipeline(swapRtv,
                   swapDsv,
@@ -1088,7 +1088,7 @@ float4 main(PSInput In) : SV_Target
                   true,
                   pipelineOverlay_,
                   shaderBindingOverlay_,
-                  "BZ3 Diligent PSO Overlay");
+                  "KARMA Diligent PSO Overlay");
     buildPipeline(Diligent::TEX_FORMAT_RGBA8_UNORM,
                   Diligent::TEX_FORMAT_D32_FLOAT,
                   false,
@@ -1096,7 +1096,7 @@ float4 main(PSInput In) : SV_Target
                   true,
                   pipelineOverlayOffscreen_,
                   shaderBindingOverlayOffscreen_,
-                  "BZ3 Diligent PSO Overlay Offscreen");
+                  "KARMA Diligent PSO Overlay Offscreen");
 }
 
 void DiligentBackend::buildSkyboxResources() {
@@ -1185,14 +1185,14 @@ float4 main(float3 dir : TEXCOORD0) : SV_Target
 
     Diligent::RefCntAutoPtr<Diligent::IShader> vs;
     shaderCI.Desc.ShaderType = Diligent::SHADER_TYPE_VERTEX;
-    shaderCI.Desc.Name = "BZ3 Diligent Skybox VS";
+    shaderCI.Desc.Name = "KARMA Diligent Skybox VS";
     shaderCI.EntryPoint = "main";
     shaderCI.Source = vsSource;
     device_->CreateShader(shaderCI, &vs);
 
     Diligent::RefCntAutoPtr<Diligent::IShader> ps;
     shaderCI.Desc.ShaderType = Diligent::SHADER_TYPE_PIXEL;
-    shaderCI.Desc.Name = "BZ3 Diligent Skybox PS";
+    shaderCI.Desc.Name = "KARMA Diligent Skybox PS";
     shaderCI.EntryPoint = "main";
     shaderCI.Source = psSource;
     device_->CreateShader(shaderCI, &ps);
@@ -1203,7 +1203,7 @@ float4 main(float3 dir : TEXCOORD0) : SV_Target
     }
 
     Diligent::GraphicsPipelineStateCreateInfo psoCI;
-    psoCI.PSODesc.Name = "BZ3 Diligent Skybox PSO";
+    psoCI.PSODesc.Name = "KARMA Diligent Skybox PSO";
     psoCI.PSODesc.PipelineType = Diligent::PIPELINE_TYPE_GRAPHICS;
     psoCI.pVS = vs;
     psoCI.pPS = ps;
@@ -1252,7 +1252,7 @@ float4 main(float3 dir : TEXCOORD0) : SV_Target
     }
 
     Diligent::BufferDesc cbDesc;
-    cbDesc.Name = "BZ3 Diligent Skybox CB";
+    cbDesc.Name = "KARMA Diligent Skybox CB";
     cbDesc.Size = sizeof(SkyboxConstants);
     cbDesc.Usage = Diligent::USAGE_DYNAMIC;
     cbDesc.BindFlags = Diligent::BIND_UNIFORM_BUFFER;
@@ -1287,7 +1287,7 @@ float4 main(float3 dir : TEXCOORD0) : SV_Target
     };
 
     Diligent::BufferDesc vbDesc;
-    vbDesc.Name = "BZ3 Diligent Skybox VB";
+    vbDesc.Name = "KARMA Diligent Skybox VB";
     vbDesc.Usage = Diligent::USAGE_IMMUTABLE;
     vbDesc.BindFlags = Diligent::BIND_VERTEX_BUFFER;
     vbDesc.Size = sizeof(cubeVerts);
@@ -1352,13 +1352,13 @@ float4 main(float2 uv : TEXCOORD0) : SV_Target
 
     Diligent::RefCntAutoPtr<Diligent::IShader> vs;
     shaderCI.Desc.ShaderType = Diligent::SHADER_TYPE_VERTEX;
-    shaderCI.Desc.Name = "BZ3 Diligent UI Overlay VS";
+    shaderCI.Desc.Name = "KARMA Diligent UI Overlay VS";
     shaderCI.Source = vsSource;
     device_->CreateShader(shaderCI, &vs);
 
     Diligent::RefCntAutoPtr<Diligent::IShader> ps;
     shaderCI.Desc.ShaderType = Diligent::SHADER_TYPE_PIXEL;
-    shaderCI.Desc.Name = "BZ3 Diligent UI Overlay PS";
+    shaderCI.Desc.Name = "KARMA Diligent UI Overlay PS";
     shaderCI.Source = psSource;
     device_->CreateShader(shaderCI, &ps);
 
@@ -1368,7 +1368,7 @@ float4 main(float2 uv : TEXCOORD0) : SV_Target
     }
 
     Diligent::GraphicsPipelineStateCreateInfo psoCI;
-    psoCI.PSODesc.Name = "BZ3 Diligent UI Overlay PSO";
+    psoCI.PSODesc.Name = "KARMA Diligent UI Overlay PSO";
     psoCI.PSODesc.PipelineType = Diligent::PIPELINE_TYPE_GRAPHICS;
     psoCI.pVS = vs;
     psoCI.pPS = ps;
@@ -1441,7 +1441,7 @@ float4 main(float2 uv : TEXCOORD0) : SV_Target
     };
 
     Diligent::BufferDesc vbDesc;
-    vbDesc.Name = "BZ3 Diligent UI Overlay VB";
+    vbDesc.Name = "KARMA Diligent UI Overlay VB";
     vbDesc.Usage = Diligent::USAGE_IMMUTABLE;
     vbDesc.BindFlags = Diligent::BIND_VERTEX_BUFFER;
     vbDesc.Size = sizeof(verts);
@@ -1499,13 +1499,13 @@ float4 main(float2 uv : TEXCOORD0) : SV_Target
 
     Diligent::RefCntAutoPtr<Diligent::IShader> vs;
     shaderCI.Desc.ShaderType = Diligent::SHADER_TYPE_VERTEX;
-    shaderCI.Desc.Name = "BZ3 Diligent Brightness VS";
+    shaderCI.Desc.Name = "KARMA Diligent Brightness VS";
     shaderCI.Source = vsSource;
     device_->CreateShader(shaderCI, &vs);
 
     Diligent::RefCntAutoPtr<Diligent::IShader> ps;
     shaderCI.Desc.ShaderType = Diligent::SHADER_TYPE_PIXEL;
-    shaderCI.Desc.Name = "BZ3 Diligent Brightness PS";
+    shaderCI.Desc.Name = "KARMA Diligent Brightness PS";
     shaderCI.Source = psSource;
     device_->CreateShader(shaderCI, &ps);
 
@@ -1516,7 +1516,7 @@ float4 main(float2 uv : TEXCOORD0) : SV_Target
 
     if (!brightnessConstantBuffer_) {
         Diligent::BufferDesc cbDesc;
-        cbDesc.Name = "BZ3 Diligent Brightness CB";
+        cbDesc.Name = "KARMA Diligent Brightness CB";
         cbDesc.Size = sizeof(float) * 4;
         cbDesc.Usage = Diligent::USAGE_DYNAMIC;
         cbDesc.BindFlags = Diligent::BIND_UNIFORM_BUFFER;
@@ -1525,7 +1525,7 @@ float4 main(float2 uv : TEXCOORD0) : SV_Target
     }
 
     Diligent::GraphicsPipelineStateCreateInfo psoCI;
-    psoCI.PSODesc.Name = "BZ3 Diligent Brightness PSO";
+    psoCI.PSODesc.Name = "KARMA Diligent Brightness PSO";
     psoCI.PSODesc.PipelineType = Diligent::PIPELINE_TYPE_GRAPHICS;
     psoCI.pVS = vs;
     psoCI.pPS = ps;
@@ -1590,7 +1590,7 @@ float4 main(float2 uv : TEXCOORD0) : SV_Target
     };
 
     Diligent::BufferDesc vbDesc;
-    vbDesc.Name = "BZ3 Diligent Brightness VB";
+    vbDesc.Name = "KARMA Diligent Brightness VB";
     vbDesc.Usage = Diligent::USAGE_IMMUTABLE;
     vbDesc.BindFlags = Diligent::BIND_VERTEX_BUFFER;
     vbDesc.Size = sizeof(verts);
@@ -1627,7 +1627,7 @@ void DiligentBackend::ensureSceneTarget(int width, int height) {
         colorDesc.Format = Diligent::TEX_FORMAT_RGBA8_UNORM;
     }
     colorDesc.BindFlags = Diligent::BIND_RENDER_TARGET | Diligent::BIND_SHADER_RESOURCE;
-    colorDesc.Name = "BZ3 Diligent Scene Color";
+    colorDesc.Name = "KARMA Diligent Scene Color";
     device_->CreateTexture(colorDesc, nullptr, &sceneTarget_.colorTexture);
     if (sceneTarget_.colorTexture) {
         sceneTarget_.rtv = sceneTarget_.colorTexture->GetDefaultView(Diligent::TEXTURE_VIEW_RENDER_TARGET);
@@ -1645,7 +1645,7 @@ void DiligentBackend::ensureSceneTarget(int width, int height) {
         depthDesc.Format = Diligent::TEX_FORMAT_D32_FLOAT;
     }
     depthDesc.BindFlags = Diligent::BIND_DEPTH_STENCIL;
-    depthDesc.Name = "BZ3 Diligent Scene Depth";
+    depthDesc.Name = "KARMA Diligent Scene Depth";
     device_->CreateTexture(depthDesc, nullptr, &sceneTarget_.depthTexture);
     if (sceneTarget_.depthTexture) {
         sceneTarget_.dsv = sceneTarget_.depthTexture->GetDefaultView(Diligent::TEXTURE_VIEW_DEPTH_STENCIL);

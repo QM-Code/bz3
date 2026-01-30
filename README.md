@@ -16,7 +16,7 @@ This project uses vcpkg to provide most native dependencies and the setup script
 
 ## Optional: The Forge renderer backend
 
-The Forge is not bundled and must be cloned manually if you want to build with `-DBZ3_RENDER_BACKEND=forge`.
+The Forge is not bundled and must be cloned manually if you want to build with `-DKARMA_RENDER_BACKEND=forge`.
 
 - Linux/macOS:
 
@@ -177,13 +177,13 @@ Example:
 
 ```bash
 cmake -S . -B build-sdl3-rmlui-bullet-sdlaudio-bgfx-enet-fs \
-  -DBZ3_WINDOW_BACKEND=sdl3 \
-  -DBZ3_UI_BACKEND=rmlui \
-  -DBZ3_PHYSICS_BACKEND=bullet \
-  -DBZ3_AUDIO_BACKEND=sdlaudio \
-  -DBZ3_RENDER_BACKEND=bgfx \
-  -DBZ3_NETWORK_BACKEND=enet \
-  -DBZ3_WORLD_BACKEND=fs
+  -DKARMA_WINDOW_BACKEND=sdl3 \
+  -DKARMA_UI_BACKEND=rmlui \
+  -DKARMA_PHYSICS_BACKEND=bullet \
+  -DKARMA_AUDIO_BACKEND=sdlaudio \
+  -DKARMA_RENDER_BACKEND=bgfx \
+  -DKARMA_NETWORK_BACKEND=enet \
+  -DKARMA_WORLD_BACKEND=fs
 cmake --build build-sdl3-rmlui-bullet-sdlaudio-bgfx-enet-fs
 ```
 

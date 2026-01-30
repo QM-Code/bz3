@@ -1,5 +1,5 @@
 /*
- * RmlUi Forge renderer stub for BZ3.
+ * RmlUi Forge renderer stub for KARMA.
  * TODO: Implement actual Forge rendering.
  */
 #pragma once

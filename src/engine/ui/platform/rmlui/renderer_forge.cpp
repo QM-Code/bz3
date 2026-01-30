@@ -1,5 +1,5 @@
 /*
- * RmlUi Forge renderer implementation for BZ3.
+ * RmlUi Forge renderer implementation for KARMA.
  */
 
 #include "engine/ui/platform/rmlui/renderer_forge.hpp"

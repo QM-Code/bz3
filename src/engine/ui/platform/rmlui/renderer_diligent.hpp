@@ -1,5 +1,5 @@
 /*
- * RmlUi Diligent renderer stub for BZ3.
+ * RmlUi Diligent renderer stub for KARMA.
  * TODO: Implement actual Diligent rendering.
  */
 #pragma once
