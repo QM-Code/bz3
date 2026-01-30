@@ -1165,6 +1165,14 @@ void ForgeBackend::renderUiOverlay() {
     }
     Texture* texture = static_cast<Texture*>(graphics_backend::forge_ui::ResolveExternalTexture(uiOverlayTexture_.id));
     if (!texture) {
+        static bool loggedOnce = false;
+        if (!loggedOnce) {
+            spdlog::warn("Graphics(Forge): UI overlay texture resolve failed (token={}, size={}x{}).",
+                         static_cast<unsigned long long>(uiOverlayTexture_.id),
+                         uiOverlayTexture_.width,
+                         uiOverlayTexture_.height);
+            loggedOnce = true;
+        }
         return;
     }
     const uint32_t setIndex = frameIndex_ % kDescriptorSetRingSize;

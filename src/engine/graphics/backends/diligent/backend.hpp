@@ -154,6 +154,8 @@ private:
     Diligent::RefCntAutoPtr<Diligent::IShaderResourceBinding> uiOverlayBinding_;
     Diligent::RefCntAutoPtr<Diligent::IBuffer> uiOverlayVertexBuffer_;
     uint64_t uiOverlayToken_ = 0;
+    uint32_t uiOverlayWidth_ = 0;
+    uint32_t uiOverlayHeight_ = 0;
     bool uiOverlayVisible_ = false;
 
     float brightness_ = 1.0f;

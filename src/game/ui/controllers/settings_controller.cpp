@@ -1,6 +1,7 @@
 #include "ui/controllers/settings_controller.hpp"
 
 #include "ui/ui_config.hpp"
+#include "spdlog/spdlog.h"
 
 namespace ui {
 
@@ -12,6 +13,8 @@ std::string SettingsController::getConfiguredLanguage() const {
 }
 
 bool SettingsController::setLanguage(const std::string &code, std::string *error) {
+    const std::string previousLanguage =
+        model.language.empty() ? ui::UiConfig::GetLanguage() : model.language;
     if (!ui::UiConfig::SetLanguage(code)) {
         if (error) {
             *error = "Failed to save language.";
@@ -19,6 +22,7 @@ bool SettingsController::setLanguage(const std::string &code, std::string *error
         return false;
     }
     model.language = code;
+    spdlog::trace("UiSettings: language changed {} -> {}", previousLanguage, code);
     return true;
 }
 

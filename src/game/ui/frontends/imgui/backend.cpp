@@ -5,7 +5,9 @@
 #include "engine/graphics/ui_render_target_bridge.hpp"
 #include "platform/window.hpp"
 #include "spdlog/spdlog.h"
+#include "ui/bridges/ui_render_bridge.hpp"
 #include "ui/input_mapping.hpp"
+#include "ui/fonts/console_fonts.hpp"
 #include "ui/render_scale.hpp"
 
 #include <cmath>
@@ -50,7 +52,8 @@ ImGuiBackend::ImGuiBackend(platform::Window &windowRef) : window(&windowRef) {
     spdlog::info("UiSystem: ImGui add default font");
     io.Fonts->AddFontDefault();
 
-    const auto bigFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Regular.Font");
+    const auto assets = ui::fonts::GetConsoleFontAssets(bz::i18n::Get().language(), true);
+    const auto bigFontPath = bz::data::ResolveConfiguredAsset(assets.selection.regularFontKey);
     const std::string bigFontPathStr = bigFontPath.string();
     spdlog::info("UiSystem: ImGui add big font from {}", bigFontPathStr);
     bigFont = io.Fonts->AddFontFromFileTTF(
@@ -217,7 +220,8 @@ void ImGuiBackend::reloadFonts() {
     io.Fonts->Clear();
     io.Fonts->AddFontDefault();
 
-    const auto bigFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Regular.Font");
+    const auto assets = ui::fonts::GetConsoleFontAssets(bz::i18n::Get().language(), true);
+    const auto bigFontPath = bz::data::ResolveConfiguredAsset(assets.selection.regularFontKey);
     const std::string bigFontPathStr = bigFontPath.string();
     bigFont = io.Fonts->AddFontFromFileTTF(
         bigFontPathStr.c_str(),
@@ -277,13 +281,21 @@ void ImGuiBackend::setRenderBridge(const ui::RenderBridge *bridge) {
 }
 
 ui::RenderOutput ImGuiBackend::getRenderOutput() const {
-    ui::RenderOutput output;
     if (!uiBridge) {
-        return output;
+        return {};
     }
-    output.texture = uiBridge->getImGuiRenderTarget();
-    output.visible = outputVisible;
-    return output;
+    const graphics::TextureHandle texture = uiBridge->getImGuiRenderTarget();
+    if (outputVisible && !texture.valid()) {
+        static bool loggedOnce = false;
+        if (!loggedOnce) {
+            spdlog::warn("ImGui: output texture invalid while outputVisible=true (id={}, size={}x{}).",
+                         static_cast<unsigned long long>(texture.id),
+                         texture.width,
+                         texture.height);
+            loggedOnce = true;
+        }
+    }
+    return ui::UiRenderBridge::MakeOutput(texture, outputVisible);
 }
 
 bool ImGuiBackend::isRenderBrightnessDragActive() const {

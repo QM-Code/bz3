@@ -430,6 +430,7 @@ set(ENGINE_CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/game/ui/controllers/settings_controller.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/controllers/settings_controller.hpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/console/keybindings.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/fonts/console_fonts.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/hud_settings.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/render_settings.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/render_scale.cpp

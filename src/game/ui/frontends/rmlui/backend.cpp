@@ -40,249 +40,13 @@
 #include "common/data_path_resolver.hpp"
 #include "common/config_store.hpp"
 #include "spdlog/spdlog.h"
+#include "ui/bridges/ui_render_bridge.hpp"
+#include "ui/fonts/console_fonts.hpp"
 #include "ui/input_mapping.hpp"
 #include "ui/render_scale.hpp"
 
 namespace ui_backend {
 namespace {
-
-class NullConsole final : public ui::ConsoleInterface {
-public:
-    void show(const std::vector<ui::CommunityBrowserEntry> &entriesIn) override {
-        entries = entriesIn;
-        visible = true;
-    }
-
-    void setEntries(const std::vector<ui::CommunityBrowserEntry> &entriesIn) override {
-        entries = entriesIn;
-    }
-
-    void setListOptions(const std::vector<ui::ServerListOption> &options, int selectedIndexIn) override {
-        listOptions = options;
-        listSelectedIndex = selectedIndexIn;
-    }
-
-    void hide() override {
-        visible = false;
-    }
-
-    bool isVisible() const override {
-        return visible;
-    }
-
-    void setStatus(const std::string &statusTextIn, bool isErrorMessageIn) override {
-        statusText = statusTextIn;
-        statusIsError = isErrorMessageIn;
-    }
-
-    void setCommunityDetails(const std::string &detailsTextIn) override {
-        communityDetailsText = detailsTextIn;
-    }
-
-    void setServerDescriptionLoading(const std::string &key, bool loading) override {
-        serverDescriptionLoadingKey = key;
-        serverDescriptionLoading = loading;
-    }
-
-    bool isServerDescriptionLoading(const std::string &key) const override {
-        return serverDescriptionLoading && key == serverDescriptionLoadingKey;
-    }
-
-    void setServerDescriptionError(const std::string &key, const std::string &message) override {
-        serverDescriptionErrorKey = key;
-        serverDescriptionErrorText = message;
-    }
-
-    std::optional<std::string> getServerDescriptionError(const std::string &key) const override {
-        if (key.empty() || key != serverDescriptionErrorKey) {
-            return std::nullopt;
-        }
-        return serverDescriptionErrorText;
-    }
-
-    std::optional<ui::CommunityBrowserSelection> consumeSelection() override {
-        return consumeOptional(pendingSelection);
-    }
-
-    std::optional<int> consumeListSelection() override {
-        return consumeOptional(pendingListSelection);
-    }
-
-    std::optional<ui::ServerListOption> consumeNewListRequest() override {
-        return consumeOptional(pendingNewList);
-    }
-
-    std::optional<std::string> consumeDeleteListRequest() override {
-        return consumeOptional(pendingDeleteListHost);
-    }
-
-    void setListStatus(const std::string &statusTextIn, bool isErrorMessageIn) override {
-        listStatusText = statusTextIn;
-        listStatusIsError = isErrorMessageIn;
-    }
-
-    void clearNewListInputs() override {
-        newListHost.clear();
-    }
-
-    std::string getUsername() const override {
-        return username;
-    }
-
-    std::string getPassword() const override {
-        return password;
-    }
-
-    std::string getStoredPasswordHash() const override {
-        return storedPasswordHash;
-    }
-
-    void clearPassword() override {
-        password.clear();
-    }
-
-    void storeCommunityAuth(const std::string &communityHost,
-                            const std::string &usernameIn,
-                            const std::string &passhash,
-                            const std::string &saltIn) override {
-        (void)communityHost;
-        username = usernameIn;
-        storedPasswordHash = passhash;
-        salt = saltIn;
-    }
-
-    void setCommunityStatus(const std::string &text, MessageTone tone) override {
-        communityStatusText = text;
-        communityStatusTone = tone;
-    }
-
-    std::optional<ui::CommunityBrowserEntry> getSelectedEntry() const override {
-        if (selectedIndex < 0 || selectedIndex >= static_cast<int>(entries.size())) {
-            return std::nullopt;
-        }
-        return entries[static_cast<std::size_t>(selectedIndex)];
-    }
-
-    bool consumeRefreshRequest() override {
-        return consumeOptional(refreshRequested);
-    }
-
-    void setScanning(bool scanningIn) override {
-        scanning = scanningIn;
-    }
-
-    void setUserConfigPath(const std::string &path) override {
-        (void)path;
-    }
-
-    bool consumeFontReloadRequest() override {
-        return consumeOptional(fontReloadRequested);
-    }
-
-    bool consumeKeybindingsReloadRequest() override {
-        return false;
-    }
-
-    void setConnectionState(const ConnectionState &state) override {
-        connectionState = state;
-    }
-
-    ConnectionState getConnectionState() const override {
-        return connectionState;
-    }
-
-    bool consumeQuitRequest() override {
-        return consumeOptional(quitRequested);
-    }
-
-    void showErrorDialog(const std::string &) override {}
-
-private:
-    template <typename T>
-    std::optional<T> consumeOptional(std::optional<T> &value) {
-        if (!value) {
-            return std::nullopt;
-        }
-        std::optional<T> out = value;
-        value.reset();
-        return out;
-    }
-
-    bool consumeOptional(bool &value) {
-        const bool out = value;
-        value = false;
-        return out;
-    }
-
-    bool visible = false;
-    std::vector<ui::CommunityBrowserEntry> entries;
-    int selectedIndex = -1;
-    std::vector<ui::ServerListOption> listOptions;
-    int listSelectedIndex = -1;
-    std::string statusText;
-    bool statusIsError = false;
-    std::string communityDetailsText;
-    std::string communityStatusText;
-    MessageTone communityStatusTone = MessageTone::Notice;
-    std::string serverDescriptionLoadingKey;
-    bool serverDescriptionLoading = false;
-    std::string serverDescriptionErrorKey;
-    std::string serverDescriptionErrorText;
-    std::optional<ui::CommunityBrowserSelection> pendingSelection;
-    std::optional<int> pendingListSelection;
-    std::optional<ui::ServerListOption> pendingNewList;
-    std::optional<std::string> pendingDeleteListHost;
-    std::string listStatusText;
-    bool listStatusIsError = false;
-    std::string username;
-    std::string password;
-    std::string storedPasswordHash;
-    std::string salt;
-    std::string newListHost;
-    bool scanning = false;
-    bool fontReloadRequested = false;
-    bool refreshRequested = false;
-    bool quitRequested = false;
-    ConnectionState connectionState{};
-};
-
-class SystemInterface_Platform final : public Rml::SystemInterface {
-public:
-    void SetWindow(platform::Window *windowIn) { window = windowIn; }
-
-    double GetElapsedTime() override {
-        using namespace std::chrono;
-        const auto now = steady_clock::now();
-        return duration<double>(now - startTime).count();
-    }
-
-    void SetMouseCursor(const Rml::String &cursor_name) override {
-        if (!window) {
-            return;
-        }
-        const bool visible = (cursor_name != "none");
-        window->setCursorVisible(visible);
-    }
-
-    void SetClipboardText(const Rml::String &text) override {
-        if (!window) {
-            return;
-        }
-        window->setClipboardText(text);
-    }
-
-    void GetClipboardText(Rml::String &text) override {
-        if (!window) {
-            text.clear();
-            return;
-        }
-        text = window->getClipboardText();
-    }
-
-private:
-    platform::Window *window = nullptr;
-    std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
-};
 
 std::string tabLabelForSpec(const ui::ConsoleTabSpec &spec) {
     if (spec.labelKey) {
@@ -303,6 +67,64 @@ ui::RmlUiPanel *findPanelByKey(const std::vector<std::unique_ptr<ui::RmlUiPanel>
     }
     return nullptr;
 }
+
+class SystemInterface_Platform final : public Rml::SystemInterface {
+public:
+    void SetWindow(platform::Window *window) {
+        windowRef = window;
+        startTime = std::chrono::steady_clock::now();
+        hasStart = true;
+    }
+
+    double GetElapsedTime() override {
+        const auto now = std::chrono::steady_clock::now();
+        if (!hasStart) {
+            startTime = now;
+            hasStart = true;
+        }
+        const std::chrono::duration<double> elapsed = now - startTime;
+        return elapsed.count();
+    }
+
+    bool LogMessage(Rml::Log::Type type, const Rml::String &message) override {
+        switch (type) {
+            case Rml::Log::Type::LT_ERROR:
+                spdlog::error("RmlUi: {}", message);
+                break;
+            case Rml::Log::Type::LT_WARNING:
+                spdlog::warn("RmlUi: {}", message);
+                break;
+            case Rml::Log::Type::LT_INFO:
+                spdlog::info("RmlUi: {}", message);
+                break;
+            case Rml::Log::Type::LT_DEBUG:
+            case Rml::Log::Type::LT_ASSERT:
+            default:
+                spdlog::debug("RmlUi: {}", message);
+                break;
+        }
+        return true;
+    }
+
+    void SetClipboardText(const Rml::String &text) override {
+        if (windowRef) {
+            windowRef->setClipboardText(text);
+        }
+    }
+
+    void GetClipboardText(Rml::String &text) override {
+        if (windowRef) {
+            text = windowRef->getClipboardText();
+        } else {
+            text.clear();
+        }
+    }
+
+private:
+    platform::Window *windowRef = nullptr;
+    std::chrono::steady_clock::time_point startTime{};
+    bool hasStart = false;
+};
 
 class TabClickListener final : public Rml::EventListener {
 public:
@@ -366,6 +188,7 @@ struct RmlUiBackend::RmlUiState {
     std::unordered_set<std::string> loadedFontFiles;
     std::string consolePath;
     std::string hudPath;
+    std::string lastFontLanguage;
     uint64_t lastConfigRevision = 0;
     bool reloadRequested = false;
     bool reloadArmed = false;
@@ -838,15 +661,26 @@ ui::RenderOutput RmlUiBackend::getRenderOutput() const {
     if (!state->outputVisible) {
         return {};
     }
-    ui::RenderOutput out;
-    out.texture.id = static_cast<uint64_t>(state->renderInterface.GetOutputTextureId());
+    const uint64_t textureId = static_cast<uint64_t>(state->renderInterface.GetOutputTextureId());
+    if (textureId == 0) {
+        static bool loggedOnce = false;
+        if (!loggedOnce) {
+            spdlog::warn("RmlUi: output texture id is 0 while outputVisible=true (size={}x{}).",
+                         state->renderInterface.GetOutputWidth(),
+                         state->renderInterface.GetOutputHeight());
+            loggedOnce = true;
+        }
+        return {};
+    }
     const int outputWidth = state->renderInterface.GetOutputWidth();
     const int outputHeight = state->renderInterface.GetOutputHeight();
-    out.texture.width = outputWidth > 0 ? static_cast<uint32_t>(outputWidth) : 0u;
-    out.texture.height = outputHeight > 0 ? static_cast<uint32_t>(outputHeight) : 0u;
-    out.texture.format = graphics::TextureFormat::RGBA8_UNORM;
-    out.visible = state->outputVisible;
-    return out;
+    const uint32_t width = outputWidth > 0 ? static_cast<uint32_t>(outputWidth) : 0u;
+    const uint32_t height = outputHeight > 0 ? static_cast<uint32_t>(outputHeight) : 0u;
+    return ui::UiRenderBridge::MakeOutput(textureId,
+                                          width,
+                                          height,
+                                          graphics::TextureFormat::RGBA8_UNORM,
+                                          state->outputVisible);
 }
 
 float RmlUiBackend::getRenderBrightness() const {
@@ -904,7 +738,11 @@ void RmlUiBackend::loadConfiguredFonts(const std::string &language) {
     if (!state) {
         return;
     }
-    auto loadFont = [&](const std::filesystem::path &path, bool fallback) {
+    if (state->lastFontLanguage != language && !state->loadedFontFiles.empty()) {
+        state->loadedFontFiles.clear();
+    }
+    state->lastFontLanguage = language;
+    auto loadFont = [&](const std::filesystem::path &path, bool fallback, const char *label) {
         if (path.empty()) {
             return;
         }
@@ -920,55 +758,35 @@ void RmlUiBackend::loadConfiguredFonts(const std::string &language) {
     state->regularFontPath.clear();
     state->emojiFontPath.clear();
 
-    const auto regularFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Regular.Font");
-    if (!regularFontPath.empty()) {
-        state->regularFontPath = regularFontPath.string();
-        loadFont(regularFontPath, false);
+    const ui::fonts::ConsoleFontAssets assets = ui::fonts::GetConsoleFontAssets(language, true);
+    const auto defaultRegularPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Regular.Font");
+    if (!defaultRegularPath.empty()) {
+        state->regularFontPath = defaultRegularPath.string();
+        loadFont(defaultRegularPath, false, "hud.fonts.console.Regular.Font");
     }
-    const auto titleFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Title.Font");
-    loadFont(titleFontPath, false);
-    const auto headingFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Heading.Font");
-    loadFont(headingFontPath, false);
-    const auto buttonFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Button.Font");
-    loadFont(buttonFontPath, false);
+    if (assets.selection.regularFontKey != "hud.fonts.console.Regular.Font") {
+        const auto languageRegularPath = bz::data::ResolveConfiguredAsset(assets.selection.regularFontKey);
+        loadFont(languageRegularPath, true, assets.selection.regularFontKey.c_str());
+    }
+    const auto titleFontPath = bz::data::ResolveConfiguredAsset(assets.titleKey);
+    loadFont(titleFontPath, false, assets.titleKey.c_str());
+    const auto headingFontPath = bz::data::ResolveConfiguredAsset(assets.headingKey);
+    loadFont(headingFontPath, false, assets.headingKey.c_str());
+    const auto buttonFontPath = bz::data::ResolveConfiguredAsset(assets.buttonKey);
+    loadFont(buttonFontPath, false, assets.buttonKey.c_str());
 
-    const auto emojiFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Emoji.Font");
+    const auto emojiFontPath = bz::data::ResolveConfiguredAsset(assets.emojiKey);
     if (!emojiFontPath.empty()) {
         state->emojiFontPath = emojiFontPath.string();
-        loadFont(emojiFontPath, true);
+        loadFont(emojiFontPath, true, assets.emojiKey.c_str());
     }
 
-    if (const auto *extras = bz::config::ConfigStore::Get("assets.hud.fonts.console.Extras")) {
-        if (extras->is_array()) {
-            for (const auto &entry : *extras) {
-                if (!entry.is_string()) {
-                    continue;
-                }
-                const std::string extra = entry.get<std::string>();
-                std::filesystem::path extraPath;
-                if (extra.rfind("client/", 0) == 0 || extra.rfind("common/", 0) == 0) {
-                    extraPath = bz::data::Resolve(extra);
-                } else {
-                    extraPath = bz::data::Resolve(std::filesystem::path("client") / extra);
-                }
-                loadFont(extraPath, false);
-            }
-        }
+    for (const auto &extraPath : assets.extraPaths) {
+        loadFont(extraPath, false, "assets.hud.fonts.console.Extras");
     }
 
-    const std::string lang = language;
-    if (lang == "ru") {
-        loadFont(bz::data::ResolveConfiguredAsset("hud.fonts.console.FallbackLatin.Font"), true);
-    } else if (lang == "ar") {
-        loadFont(bz::data::ResolveConfiguredAsset("hud.fonts.console.FallbackArabic.Font"), true);
-    } else if (lang == "hi") {
-        loadFont(bz::data::ResolveConfiguredAsset("hud.fonts.console.FallbackDevanagari.Font"), true);
-    } else if (lang == "jp") {
-        loadFont(bz::data::ResolveConfiguredAsset("hud.fonts.console.FallbackCJK_JP.Font"), true);
-    } else if (lang == "ko") {
-        loadFont(bz::data::ResolveConfiguredAsset("hud.fonts.console.FallbackCJK_KR.Font"), true);
-    } else if (lang == "zh") {
-        loadFont(bz::data::ResolveConfiguredAsset("hud.fonts.console.FallbackCJK_SC.Font"), true);
+    for (const auto &key : assets.selection.fallbackKeys) {
+        loadFont(bz::data::ResolveConfiguredAsset(key), true, key.c_str());
     }
 }
 

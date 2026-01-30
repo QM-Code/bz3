@@ -15,6 +15,7 @@
 #include "spdlog/spdlog.h"
 #include "ui/config.hpp"
 #include "ui/console/tab_spec.hpp"
+#include "ui/fonts/console_fonts.hpp"
 #include "ui/ui_config.hpp"
 
 namespace {
@@ -77,60 +78,49 @@ void ConsoleView::initializeFonts(ImGuiIO &io) {
             spdlog::warn("Failed to load fallback font {} ({}).", label, fontPath.string());
         }
     };
-    auto addFallbacksForSize = [&](float size, const std::string &language) {
+    auto addFallbacksForSelection = [&](float size, ui::fonts::Script script) {
         const ImWchar *latinRanges = io.Fonts->GetGlyphRangesDefault();
         addFallbackFont("hud.fonts.console.FallbackLatin.Font", size, latinRanges, "FallbackLatin");
-        if (language == "ru") {
+        if (script == ui::fonts::Script::Cyrillic) {
             addFallbackFont("hud.fonts.console.FallbackLatin.Font", size, io.Fonts->GetGlyphRangesCyrillic(), "FallbackCyrillic");
-        } else if (language == "ar") {
+        } else if (script == ui::fonts::Script::Arabic) {
             static const ImWchar arabicRanges[] = {
                 0x0600, 0x06FF, 0x0750, 0x077F, 0x08A0, 0x08FF, 0xFB50, 0xFDFF, 0xFE70, 0xFEFF, 0
             };
             addFallbackFont("hud.fonts.console.FallbackArabic.Font", size, arabicRanges, "FallbackArabic");
-        } else if (language == "hi") {
+        } else if (script == ui::fonts::Script::Devanagari) {
             static const ImWchar devanagariRanges[] = { 0x0900, 0x097F, 0 };
             addFallbackFont("hud.fonts.console.FallbackDevanagari.Font", size, devanagariRanges, "FallbackDevanagari");
-        } else if (language == "jp") {
+        } else if (script == ui::fonts::Script::CjkJp) {
             addFallbackFont("hud.fonts.console.FallbackCJK_JP.Font", size, io.Fonts->GetGlyphRangesJapanese(), "FallbackCJK_JP");
-        } else if (language == "ko") {
+        } else if (script == ui::fonts::Script::CjkKr) {
             addFallbackFont("hud.fonts.console.FallbackCJK_KR.Font", size, io.Fonts->GetGlyphRangesKorean(), "FallbackCJK_KR");
-        } else if (language == "zh") {
+        } else if (script == ui::fonts::Script::CjkSc) {
             addFallbackFont("hud.fonts.console.FallbackCJK_SC.Font", size, io.Fonts->GetGlyphRangesChineseSimplifiedCommon(), "FallbackCJK_SC");
         }
     };
     const std::string language = bz::i18n::Get().language();
-    const char *regularFontKey = "hud.fonts.console.Regular.Font";
-    if (language == "ru") {
-        regularFontKey = "hud.fonts.console.FallbackLatin.Font";
-    } else if (language == "zh") {
-        regularFontKey = "hud.fonts.console.FallbackCJK_SC.Font";
-    } else if (language == "jp") {
-        regularFontKey = "hud.fonts.console.FallbackCJK_JP.Font";
-    } else if (language == "ko") {
-        regularFontKey = "hud.fonts.console.FallbackCJK_KR.Font";
-    } else if (language == "ar") {
-        regularFontKey = "hud.fonts.console.FallbackArabic.Font";
-    } else if (language == "hi") {
-        regularFontKey = "hud.fonts.console.FallbackDevanagari.Font";
-    }
+    const ui::fonts::ConsoleFontAssets assets = ui::fonts::GetConsoleFontAssets(language, true);
+    const ui::fonts::ConsoleFontSelection &selection = assets.selection;
+    const char *regularFontKey = selection.regularFontKey.c_str();
     const auto regularFontPath = bz::data::ResolveConfiguredAsset(regularFontKey);
     const std::string regularFontPathStr = regularFontPath.string();
     const ImWchar *regularRanges = nullptr;
-    if (language == "ru") {
+    if (selection.script == ui::fonts::Script::Cyrillic) {
         regularRanges = io.Fonts->GetGlyphRangesCyrillic();
-    } else if (language == "ar") {
+    } else if (selection.script == ui::fonts::Script::Arabic) {
         static const ImWchar arabicRanges[] = {
             0x0600, 0x06FF, 0x0750, 0x077F, 0x08A0, 0x08FF, 0xFB50, 0xFDFF, 0xFE70, 0xFEFF, 0
         };
         regularRanges = arabicRanges;
-    } else if (language == "hi") {
+    } else if (selection.script == ui::fonts::Script::Devanagari) {
         static const ImWchar devanagariRanges[] = { 0x0900, 0x097F, 0 };
         regularRanges = devanagariRanges;
-    } else if (language == "jp") {
+    } else if (selection.script == ui::fonts::Script::CjkJp) {
         regularRanges = io.Fonts->GetGlyphRangesJapanese();
-    } else if (language == "ko") {
+    } else if (selection.script == ui::fonts::Script::CjkKr) {
         regularRanges = io.Fonts->GetGlyphRangesKorean();
-    } else if (language == "zh") {
+    } else if (selection.script == ui::fonts::Script::CjkSc) {
         regularRanges = io.Fonts->GetGlyphRangesChineseSimplifiedCommon();
     }
     const float regularFontSize = ui::config::GetRequiredFloat("assets.hud.fonts.console.Regular.Size");
@@ -143,7 +133,7 @@ void ConsoleView::initializeFonts(ImGuiIO &io) {
     );
     regularColor = readColorConfig("assets.hud.fonts.console.Regular.Color", defaultTextColor);
     if (regularFont) {
-        addFallbacksForSize(regularFontSize, bz::i18n::Get().language());
+        addFallbacksForSelection(regularFontSize, selection.script);
     }
 
     if (!regularFont) {
@@ -152,7 +142,7 @@ void ConsoleView::initializeFonts(ImGuiIO &io) {
 
 
 
-    const auto titleFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Title.Font");
+    const auto titleFontPath = bz::data::ResolveConfiguredAsset(assets.titleKey);
     const std::string titleFontPathStr = titleFontPath.string();
     const float titleFontSize = ui::config::GetRequiredFloat("assets.hud.fonts.console.Title.Size");
     this->titleFontSize = titleFontSize;
@@ -166,7 +156,7 @@ void ConsoleView::initializeFonts(ImGuiIO &io) {
         spdlog::warn("Failed to load console title font for community browser ({}).", titleFontPathStr);
     }
 
-    const auto headingFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Heading.Font");
+    const auto headingFontPath = bz::data::ResolveConfiguredAsset(assets.headingKey);
     const std::string headingFontPathStr = headingFontPath.string();
     const float headingFontSize = ui::config::GetRequiredFloat("assets.hud.fonts.console.Heading.Size");
     this->headingFontSize = headingFontSize;
@@ -180,7 +170,7 @@ void ConsoleView::initializeFonts(ImGuiIO &io) {
         spdlog::warn("Failed to load console heading font for community browser ({}).", headingFontPathStr);
     }
 
-    const auto buttonFontPath = bz::data::ResolveConfiguredAsset("hud.fonts.console.Button.Font");
+    const auto buttonFontPath = bz::data::ResolveConfiguredAsset(assets.buttonKey);
     const std::string buttonFontPathStr = buttonFontPath.string();
     const float buttonFontSize = ui::config::GetRequiredFloat("assets.hud.fonts.console.Button.Size");
     buttonFont = io.Fonts->AddFontFromFileTTF(

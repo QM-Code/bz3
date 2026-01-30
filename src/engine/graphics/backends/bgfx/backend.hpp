@@ -165,6 +165,8 @@ private:
     bgfx::UniformHandle uiOverlayScaleBias = BGFX_INVALID_HANDLE;
     bgfx::VertexLayout uiOverlayLayout{};
     bgfx::TextureHandle uiOverlayTexture = BGFX_INVALID_HANDLE;
+    uint32_t uiOverlayWidth = 0;
+    uint32_t uiOverlayHeight = 0;
     bool uiOverlayVisible = false;
 
     uint64_t configRevision = 0;

@@ -686,9 +686,13 @@ unsigned int DiligentBackend::getRenderTargetTextureId(graphics::RenderTargetId 
 void DiligentBackend::setUiOverlayTexture(const graphics::TextureHandle& texture) {
     if (!texture.valid()) {
         uiOverlayToken_ = 0;
+        uiOverlayWidth_ = 0;
+        uiOverlayHeight_ = 0;
         return;
     }
     uiOverlayToken_ = texture.id;
+    uiOverlayWidth_ = texture.width;
+    uiOverlayHeight_ = texture.height;
 }
 
 void DiligentBackend::setUiOverlayVisible(bool visible) {
@@ -697,6 +701,16 @@ void DiligentBackend::setUiOverlayVisible(bool visible) {
 
 void DiligentBackend::renderUiOverlay() {
     if (!initialized || !context_ || !swapChain_) {
+        return;
+    }
+    if (uiOverlayVisible_ && uiOverlayToken_ == 0) {
+        static bool loggedOnce = false;
+        if (!loggedOnce) {
+            spdlog::warn("Graphics(Diligent): UI overlay visible but token is 0 (size={}x{}).",
+                         static_cast<unsigned int>(uiOverlayWidth_),
+                         static_cast<unsigned int>(uiOverlayHeight_));
+            loggedOnce = true;
+        }
         return;
     }
     if (!uiOverlayVisible_ || uiOverlayToken_ == 0) {
@@ -710,6 +724,14 @@ void DiligentBackend::renderUiOverlay() {
 
     auto* textureView = graphics_backend::diligent_ui::ResolveExternalTexture(uiOverlayToken_);
     if (!textureView) {
+        static bool loggedOnce = false;
+        if (!loggedOnce) {
+            spdlog::warn("Graphics(Diligent): UI overlay texture resolve failed (token={}, size={}x{}).",
+                         static_cast<unsigned long long>(uiOverlayToken_),
+                         static_cast<unsigned int>(uiOverlayWidth_),
+                         static_cast<unsigned int>(uiOverlayHeight_));
+            loggedOnce = true;
+        }
         return;
     }
     if (auto* var = uiOverlayBinding_->GetVariableByName(Diligent::SHADER_TYPE_PIXEL, "g_Texture")) {

@@ -1051,11 +1051,15 @@ void BgfxBackend::setUiOverlayTexture(const graphics::TextureHandle& texture) {
     }
     if (!texture.valid()) {
         uiOverlayTexture = BGFX_INVALID_HANDLE;
+        uiOverlayWidth = 0;
+        uiOverlayHeight = 0;
         return;
     }
     bgfx::TextureHandle handle;
     handle.idx = toTextureHandle(texture.id);
     uiOverlayTexture = handle;
+    uiOverlayWidth = texture.width;
+    uiOverlayHeight = texture.height;
 }
 
 void BgfxBackend::setUiOverlayVisible(bool visible) {
@@ -1063,7 +1067,21 @@ void BgfxBackend::setUiOverlayVisible(bool visible) {
 }
 
 void BgfxBackend::renderUiOverlay() {
-    if (!initialized || !uiOverlayVisible || !bgfx::isValid(uiOverlayTexture)) {
+    if (!initialized) {
+        return;
+    }
+    if (uiOverlayVisible && !bgfx::isValid(uiOverlayTexture)) {
+        static bool loggedOnce = false;
+        if (!loggedOnce) {
+            spdlog::warn("Graphics(Bgfx): UI overlay visible but texture invalid (id={}, size={}x{}).",
+                         static_cast<uint64_t>(uiOverlayTexture.idx),
+                         static_cast<uint32_t>(uiOverlayWidth),
+                         static_cast<uint32_t>(uiOverlayHeight));
+            loggedOnce = true;
+        }
+        return;
+    }
+    if (!uiOverlayVisible || !bgfx::isValid(uiOverlayTexture)) {
         return;
     }
     ensureUiOverlayResources();
