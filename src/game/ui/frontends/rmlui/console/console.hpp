@@ -7,6 +7,8 @@
 #include "common/json.hpp"
 
 #include "ui/console/console_interface.hpp"
+#include "ui/controllers/console_controller.hpp"
+#include "ui/models/console_model.hpp"
 
 namespace ui {
 
@@ -75,24 +77,11 @@ private:
     void refreshCommunityCredentials();
 
     bool visible = false;
-    std::vector<CommunityBrowserEntry> entries;
-    std::vector<ServerListOption> listOptions;
-    int listSelectedIndex = -1;
-    int selectedServerIndex = -1;
     int lastCredentialsListIndex = -1;
-    std::optional<int> pendingListSelection;
-    std::optional<ServerListOption> pendingNewList;
-    std::optional<CommunityBrowserSelection> pendingSelection;
     bool pendingQuitRequest = false;
-    bool pendingRefresh = false;
-    bool serverDescriptionLoading = false;
-    std::string serverDescriptionLoadingKey;
-    std::string serverDescriptionErrorKey;
-    std::string serverDescriptionErrorText;
-    std::string listStatusText;
-    bool listStatusIsError = false;
     std::string userConfigPath;
-    ConnectionState connectionState{};
+    ConsoleModel consoleModel;
+    ConsoleController consoleController{consoleModel};
     RmlUiPanelCommunity *communityPanel = nullptr;
     RmlUiPanelStartServer *startServerPanel = nullptr;
     RmlUiPanelSettings *settingsPanel = nullptr;

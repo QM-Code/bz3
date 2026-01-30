@@ -67,3 +67,24 @@ The UI subsystem should converge on a clean separation of renderer-agnostic mode
 ## Repo Hygiene Notes
 - Forge shader outputs + `forge_data/*` logs are currently in-tree for ongoing Forge work; leave them
   for now and clean up once the Forge workstream is done.
+
+## Backlog
+- Polish HUD chat buffer limits/cleanup: cap stored chat lines, trim oldest on overflow, and
+  decide whether limits should be per-session or config-driven. Ensure ImGui and RmlUi both
+  rebuild from the shared model without leaking focus or breaking scroll behavior.
+
+## Phase 5 follow-ups (detail)
+- Shared formatting utilities:
+  - Extract common console spacing/layout helpers (e.g., banner spacing, section headers,
+    label/value alignment) so both ImGui and RmlUi panels present consistent rhythm.
+  - Normalize status banner presentation (prefix/icon, padding, and error/pending tones) across
+    both frontends, including any future status lines in Community/Start Server panels.
+- Tab order spec refinements:
+  - Centralize tab order + labels in the shared spec, then ensure both frontends use it for
+    ordering, right-aligned placement, and refresh-on-activate behavior.
+  - Extend spec to include flags for conditional visibility (e.g., hide Start Server when
+    server binary missing) and align the fallback “panel missing” message in RmlUi.
+- Right-aligned “?” consistency:
+  - Ensure the documentation tab is right-aligned in both ImGui and RmlUi.
+  - Add a shared rule for minimum spacing from the tab row edge so the “?” tab doesn’t shift
+    when localized labels change widths.

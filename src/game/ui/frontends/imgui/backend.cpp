@@ -5,6 +5,7 @@
 #include "engine/graphics/ui_render_target_bridge.hpp"
 #include "platform/window.hpp"
 #include "spdlog/spdlog.h"
+#include "ui/input_mapping.hpp"
 #include "ui/render_scale.hpp"
 
 #include <cmath>
@@ -13,130 +14,6 @@ namespace ui_backend {
 namespace {
 bool hasOutputDrawData(const ImDrawData* drawData) {
     return drawData && drawData->TotalVtxCount > 0;
-}
-
-ImGuiKey toImGuiKey(platform::Key key) {
-    switch (key) {
-        case platform::Key::A: return ImGuiKey_A;
-        case platform::Key::B: return ImGuiKey_B;
-        case platform::Key::C: return ImGuiKey_C;
-        case platform::Key::D: return ImGuiKey_D;
-        case platform::Key::E: return ImGuiKey_E;
-        case platform::Key::F: return ImGuiKey_F;
-        case platform::Key::G: return ImGuiKey_G;
-        case platform::Key::H: return ImGuiKey_H;
-        case platform::Key::I: return ImGuiKey_I;
-        case platform::Key::J: return ImGuiKey_J;
-        case platform::Key::K: return ImGuiKey_K;
-        case platform::Key::L: return ImGuiKey_L;
-        case platform::Key::M: return ImGuiKey_M;
-        case platform::Key::N: return ImGuiKey_N;
-        case platform::Key::O: return ImGuiKey_O;
-        case platform::Key::P: return ImGuiKey_P;
-        case platform::Key::Q: return ImGuiKey_Q;
-        case platform::Key::R: return ImGuiKey_R;
-        case platform::Key::S: return ImGuiKey_S;
-        case platform::Key::T: return ImGuiKey_T;
-        case platform::Key::U: return ImGuiKey_U;
-        case platform::Key::V: return ImGuiKey_V;
-        case platform::Key::W: return ImGuiKey_W;
-        case platform::Key::X: return ImGuiKey_X;
-        case platform::Key::Y: return ImGuiKey_Y;
-        case platform::Key::Z: return ImGuiKey_Z;
-        case platform::Key::Num0: return ImGuiKey_0;
-        case platform::Key::Num1: return ImGuiKey_1;
-        case platform::Key::Num2: return ImGuiKey_2;
-        case platform::Key::Num3: return ImGuiKey_3;
-        case platform::Key::Num4: return ImGuiKey_4;
-        case platform::Key::Num5: return ImGuiKey_5;
-        case platform::Key::Num6: return ImGuiKey_6;
-        case platform::Key::Num7: return ImGuiKey_7;
-        case platform::Key::Num8: return ImGuiKey_8;
-        case platform::Key::Num9: return ImGuiKey_9;
-        case platform::Key::F1: return ImGuiKey_F1;
-        case platform::Key::F2: return ImGuiKey_F2;
-        case platform::Key::F3: return ImGuiKey_F3;
-        case platform::Key::F4: return ImGuiKey_F4;
-        case platform::Key::F5: return ImGuiKey_F5;
-        case platform::Key::F6: return ImGuiKey_F6;
-        case platform::Key::F7: return ImGuiKey_F7;
-        case platform::Key::F8: return ImGuiKey_F8;
-        case platform::Key::F9: return ImGuiKey_F9;
-        case platform::Key::F10: return ImGuiKey_F10;
-        case platform::Key::F11: return ImGuiKey_F11;
-        case platform::Key::F12: return ImGuiKey_F12;
-        case platform::Key::F13: return ImGuiKey_F13;
-        case platform::Key::F14: return ImGuiKey_F14;
-        case platform::Key::F15: return ImGuiKey_F15;
-        case platform::Key::F16: return ImGuiKey_F16;
-        case platform::Key::F17: return ImGuiKey_F17;
-        case platform::Key::F18: return ImGuiKey_F18;
-        case platform::Key::F19: return ImGuiKey_F19;
-        case platform::Key::F20: return ImGuiKey_F20;
-        case platform::Key::F21: return ImGuiKey_F21;
-        case platform::Key::F22: return ImGuiKey_F22;
-        case platform::Key::F23: return ImGuiKey_F23;
-        case platform::Key::F24: return ImGuiKey_F24;
-        case platform::Key::Space: return ImGuiKey_Space;
-        case platform::Key::Escape: return ImGuiKey_Escape;
-        case platform::Key::Enter: return ImGuiKey_Enter;
-        case platform::Key::Tab: return ImGuiKey_Tab;
-        case platform::Key::Backspace: return ImGuiKey_Backspace;
-        case platform::Key::Left: return ImGuiKey_LeftArrow;
-        case platform::Key::Right: return ImGuiKey_RightArrow;
-        case platform::Key::Up: return ImGuiKey_UpArrow;
-        case platform::Key::Down: return ImGuiKey_DownArrow;
-        case platform::Key::LeftBracket: return ImGuiKey_LeftBracket;
-        case platform::Key::RightBracket: return ImGuiKey_RightBracket;
-        case platform::Key::Minus: return ImGuiKey_Minus;
-        case platform::Key::Equal: return ImGuiKey_Equal;
-        case platform::Key::Apostrophe: return ImGuiKey_Apostrophe;
-        case platform::Key::GraveAccent: return ImGuiKey_GraveAccent;
-        case platform::Key::LeftShift: return ImGuiKey_LeftShift;
-        case platform::Key::RightShift: return ImGuiKey_RightShift;
-        case platform::Key::LeftControl: return ImGuiKey_LeftCtrl;
-        case platform::Key::RightControl: return ImGuiKey_RightCtrl;
-        case platform::Key::LeftAlt: return ImGuiKey_LeftAlt;
-        case platform::Key::RightAlt: return ImGuiKey_RightAlt;
-        case platform::Key::LeftSuper: return ImGuiKey_LeftSuper;
-        case platform::Key::RightSuper: return ImGuiKey_RightSuper;
-        case platform::Key::Menu: return ImGuiKey_Menu;
-        case platform::Key::Home: return ImGuiKey_Home;
-        case platform::Key::End: return ImGuiKey_End;
-        case platform::Key::PageUp: return ImGuiKey_PageUp;
-        case platform::Key::PageDown: return ImGuiKey_PageDown;
-        case platform::Key::Insert: return ImGuiKey_Insert;
-        case platform::Key::Delete: return ImGuiKey_Delete;
-        default: return ImGuiKey_None;
-    }
-}
-
-int toImGuiMouseButton(platform::MouseButton button) {
-    switch (button) {
-        case platform::MouseButton::Left: return 0;
-        case platform::MouseButton::Right: return 1;
-        case platform::MouseButton::Middle: return 2;
-        case platform::MouseButton::Button4: return 3;
-        case platform::MouseButton::Button5: return 4;
-        case platform::MouseButton::Button6: return 5;
-        case platform::MouseButton::Button7: return 6;
-        case platform::MouseButton::Button8: return 7;
-        default: return 0;
-    }
-}
-
-void UpdateModifiers(ImGuiIO &io, platform::Window *window) {
-    if (!window) {
-        return;
-    }
-    const bool shift = window->isKeyDown(platform::Key::LeftShift) || window->isKeyDown(platform::Key::RightShift);
-    const bool ctrl = window->isKeyDown(platform::Key::LeftControl) || window->isKeyDown(platform::Key::RightControl);
-    const bool alt = window->isKeyDown(platform::Key::LeftAlt) || window->isKeyDown(platform::Key::RightAlt);
-    const bool super = window->isKeyDown(platform::Key::LeftSuper) || window->isKeyDown(platform::Key::RightSuper);
-    io.AddKeyEvent(ImGuiKey_ModShift, shift);
-    io.AddKeyEvent(ImGuiKey_ModCtrl, ctrl);
-    io.AddKeyEvent(ImGuiKey_ModAlt, alt);
-    io.AddKeyEvent(ImGuiKey_ModSuper, super);
 }
 
 const char *GetClipboardText(void *user_data) {
@@ -218,7 +95,7 @@ void ImGuiBackend::handleEvents(const std::vector<platform::Event> &events) {
             case platform::EventType::KeyDown:
             case platform::EventType::KeyUp: {
                 const bool down = (event.type == platform::EventType::KeyDown);
-                const ImGuiKey key = toImGuiKey(event.key);
+                const ImGuiKey key = ui::input_mapping::ToImGuiKey(event.key);
                 if (key != ImGuiKey_None) {
                     io.AddKeyEvent(key, down);
                 }
@@ -233,7 +110,7 @@ void ImGuiBackend::handleEvents(const std::vector<platform::Event> &events) {
             case platform::EventType::MouseButtonDown:
             case platform::EventType::MouseButtonUp: {
                 const bool down = (event.type == platform::EventType::MouseButtonDown);
-                const int button = toImGuiMouseButton(event.mouseButton);
+                const int button = ui::input_mapping::ToImGuiMouseButton(event.mouseButton);
                 io.AddMouseButtonEvent(button, down);
                 break;
             }
@@ -291,7 +168,7 @@ void ImGuiBackend::update() {
     io.DisplaySize = ImVec2(static_cast<float>(fbWidth), static_cast<float>(fbHeight));
     io.DisplayFramebufferScale = ImVec2(renderScale, renderScale);
 
-    UpdateModifiers(io, window);
+    ui::input_mapping::UpdateImGuiModifiers(io, window);
     if (window) {
         window->setCursorVisible(!io.MouseDrawCursor);
     }
@@ -310,6 +187,8 @@ void ImGuiBackend::update() {
     hud.setScoreboardEntries(hudModel.scoreboardEntries);
     hud.setDialogText(hudModel.dialog.text);
     hud.setDialogVisible(hudModel.dialog.visible);
+    hud.setFpsValue(hudModel.fpsValue);
+    hud.setChatLines(hudModel.chatLines);
 
     const bool consoleVisible = consoleView.isVisible();
     const bool hudVisible = hudModel.visibility.hud;
@@ -389,11 +268,7 @@ bool ImGuiBackend::consumeKeybindingsReloadRequest() {
 
 void ImGuiBackend::setRenderBridge(const ui::RenderBridge *bridge) {
     renderBridge = bridge;
-}
-
-void ImGuiBackend::setImGuiRenderBridge(const ui::ImGuiRenderBridge *bridge) {
-    imguiBridge = bridge;
-    uiBridge = imguiBridge ? imguiBridge->getUiRenderTargetBridge() : nullptr;
+    uiBridge = renderBridge ? renderBridge->getUiRenderTargetBridge() : nullptr;
     if (uiBridge) {
         ImGuiIO &io = ImGui::GetIO();
         io.BackendRendererName = "bz3-imgui-bridge";

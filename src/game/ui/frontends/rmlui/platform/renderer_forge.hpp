@@ -96,6 +96,7 @@ private:
     void ensurePipeline();
     void ensureWhiteTexture();
     void ensureRenderTarget(int width, int height);
+    void ensureDebugTriangleBuffers();
     const TextureData* lookupTexture(Rml::TextureHandle handle) const;
     void destroyResources();
 
@@ -131,6 +132,8 @@ private:
     Sampler* sampler_ = nullptr;
     Texture* whiteTexture_ = nullptr;
     Descriptor* descriptors_ = nullptr;
+    Buffer* debugTriangleVB_ = nullptr;
+    Buffer* debugTriangleIB_ = nullptr;
 
     Rml::TextureHandle next_texture_id = 1;
     std::unordered_map<Rml::TextureHandle, TextureData> textures;

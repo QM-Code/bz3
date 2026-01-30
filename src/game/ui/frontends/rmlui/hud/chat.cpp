@@ -100,6 +100,15 @@ void RmlUiHudChat::addLine(const std::string &line) {
     }
 }
 
+void RmlUiHudChat::setLines(const std::vector<std::string> &linesIn) {
+    if (linesIn == lines) {
+        return;
+    }
+    lines = linesIn;
+    Rml::ElementDocument *document = logContent ? logContent->GetOwnerDocument() : nullptr;
+    rebuildLines(document);
+}
+
 std::string RmlUiHudChat::getSubmittedInput() const {
     return submittedInput;
 }

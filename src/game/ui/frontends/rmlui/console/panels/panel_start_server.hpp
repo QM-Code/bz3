@@ -17,6 +17,7 @@ class EventListener;
 #include "ui/console/console_types.hpp"
 #include "ui/frontends/rmlui/console/modal_dialog.hpp"
 #include "ui/frontends/rmlui/console/panels/panel.hpp"
+#include "ui/models/console_model.hpp"
 
 namespace ui {
 
@@ -25,6 +26,7 @@ public:
     RmlUiPanelStartServer();
     ~RmlUiPanelStartServer() override;
 
+    void setConsoleModel(ConsoleModel *model);
     void setListOptions(const std::vector<ServerListOption> &options, int selectedIndex);
 
 protected:
@@ -109,8 +111,7 @@ private:
     Rml::Element *logOutput = nullptr;
     RmlUiModalDialog errorDialog;
 
-    std::vector<ServerListOption> listOptions;
-    int listSelectedIndex = -1;
+    ConsoleModel *consoleModel = nullptr;
     int serverCommunityIndex = -1;
     int serverLogLevelIndex = 2;
     int serverPortValue = 11899;

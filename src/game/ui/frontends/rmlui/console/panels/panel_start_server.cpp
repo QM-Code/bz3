@@ -268,21 +268,29 @@ RmlUiPanelStartServer::~RmlUiPanelStartServer() {
     stopAllLocalServers();
 }
 
+void RmlUiPanelStartServer::setConsoleModel(ConsoleModel *model) {
+    consoleModel = model;
+}
+
 void RmlUiPanelStartServer::setListOptions(const std::vector<ServerListOption> &options, int selectedIndex) {
-    listOptions = options;
+    if (!consoleModel) {
+        return;
+    }
+    consoleModel->community.listOptions = options;
+    auto &listOptions = consoleModel->community.listOptions;
     if (listOptions.empty()) {
-        listSelectedIndex = -1;
+        consoleModel->community.listSelectedIndex = -1;
         serverCommunityIndex = -1;
     } else if (selectedIndex < 0) {
-        listSelectedIndex = 0;
+        consoleModel->community.listSelectedIndex = 0;
     } else if (selectedIndex >= static_cast<int>(listOptions.size())) {
-        listSelectedIndex = static_cast<int>(listOptions.size()) - 1;
+        consoleModel->community.listSelectedIndex = static_cast<int>(listOptions.size()) - 1;
     } else {
-        listSelectedIndex = selectedIndex;
+        consoleModel->community.listSelectedIndex = selectedIndex;
     }
 
     if (serverCommunityIndex < 0 || serverCommunityIndex >= static_cast<int>(listOptions.size())) {
-        serverCommunityIndex = listSelectedIndex;
+        serverCommunityIndex = consoleModel->community.listSelectedIndex;
     }
     updateCommunitySelect();
 }
@@ -431,6 +439,8 @@ void RmlUiPanelStartServer::handleAdvertiseChanged() {
 }
 
 void RmlUiPanelStartServer::handleStartServer() {
+    static const std::vector<ServerListOption> kEmptyList;
+    const auto &listOptions = consoleModel ? consoleModel->community.listOptions : kEmptyList;
     const std::string worldDir = trimCopy(worldPathValue);
     const std::string advertiseHost = trimCopy(advertiseHostValue);
     const bool useDefaultWorld = worldDir.empty();
@@ -600,6 +610,8 @@ void RmlUiPanelStartServer::updateCommunitySelect() {
     if (!communitySelect) {
         return;
     }
+    static const std::vector<ServerListOption> kEmptyList;
+    const auto &listOptions = consoleModel ? consoleModel->community.listOptions : kEmptyList;
     auto *select = rmlui_dynamic_cast<Rml::ElementFormControlSelect *>(communitySelect);
     if (!select) {
         return;

@@ -51,9 +51,31 @@ void RmlUiPanel::load(Rml::ElementDocument *document) {
 void RmlUiPanel::onLoaded(Rml::ElementDocument *) {}
 
 void RmlUiPanel::update() {
-    onUpdate();
+    onTick();
 }
 
 void RmlUiPanel::onUpdate() {}
+
+void RmlUiPanel::show() {
+    onShow();
+}
+
+void RmlUiPanel::hide() {
+    onHide();
+}
+
+void RmlUiPanel::configChanged() {
+    onConfigChanged();
+}
+
+void RmlUiPanel::onShow() {}
+
+void RmlUiPanel::onHide() {}
+
+void RmlUiPanel::onConfigChanged() {}
+
+void RmlUiPanel::onTick() {
+    onUpdate();
+}
 
 } // namespace ui

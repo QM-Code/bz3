@@ -37,6 +37,7 @@ public:
 
     void setDialogText(const std::string &text);
     void setDialogVisible(bool show);
+    void setChatLines(const std::vector<std::string> &lines);
 
     void addChatLine(const std::string &line);
     std::string getSubmittedChatInput() const;

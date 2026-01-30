@@ -8,32 +8,22 @@
 #include "common/config_store.hpp"
 #include <cstdlib>
 #include "common/i18n.hpp"
-#if defined(BZ3_UI_BACKEND_IMGUI)
-#include "ui/bridges/imgui_render_bridge.hpp"
-#endif
 #include <cstdint>
 #include <vector>
 #include <utility>
 
 namespace {
 
-class RenderBridgeImpl final : public ui::RenderBridge
-#if defined(BZ3_UI_BACKEND_IMGUI)
-    , public ui::ImGuiRenderBridge
-#endif
-{
+class RenderBridgeImpl final : public ui::RenderBridge {
 public:
     explicit RenderBridgeImpl(Render *renderIn) : render(renderIn) {}
 
     graphics::TextureHandle getRadarTexture() const override {
         return render ? render->getRadarTexture() : graphics::TextureHandle{};
     }
-
-#if defined(BZ3_UI_BACKEND_IMGUI)
     graphics_backend::UiRenderTargetBridge* getUiRenderTargetBridge() const override {
         return render ? render->getUiRenderTargetBridge() : nullptr;
     }
-#endif
 
 private:
     Render *render = nullptr;
@@ -57,9 +47,6 @@ ClientEngine::ClientEngine(platform::Window &window) {
     spdlog::trace("ClientEngine: Input initialized successfully");
     ui = new UiSystem(window);
     ui->setRenderBridge(renderBridgeImpl);
-#if defined(BZ3_UI_BACKEND_IMGUI)
-    ui->setImGuiRenderBridge(renderBridgeImpl);
-#endif
     spdlog::trace("ClientEngine: UiSystem initialized successfully");
     lastLanguage = bz::i18n::Get().language();
     ui->setDialogText(game_input::SpawnHintText(*input));

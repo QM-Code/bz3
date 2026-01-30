@@ -34,7 +34,7 @@ Key responsibilities:
 - Abstracts console operations (show/hide, list options, refresh requests, selections, status).
 - Both frontends implement this on their console view.
 
-### `HudModel` (`src/game/ui/hud_model.hpp`)
+### `HudModel` (`src/game/ui/models/hud_model.hpp`)
 - Shared model passed to both frontends.
 - Includes HUD visibility flags + data (scoreboard, dialog, etc.).
 
@@ -46,12 +46,12 @@ Key responsibilities:
 ## 4) Rendering + render outputs
 
 ### ImGui path
-- Uses `ui::ImGuiRenderBridge` and `engine/graphics/ui_render_target_bridge.hpp` to render into a texture.
+- Uses `ui::RenderBridge` and `engine/graphics/ui_render_target_bridge.hpp` to render into a texture.
 - `ImGuiBackend::getRenderOutput()` returns a valid texture + visibility when the console or HUD drew.
 
 ### RmlUi path
 - Uses RmlUi `RenderInterface` implementations in `frontends/rmlui/platform/renderer_{bgfx,diligent,forge}`.
-- `RenderOutput` is currently not fully wired (GetOutputTextureId is stubbed in some backends). This is a known refactor target.
+- `RenderOutput` is provided by both frontends and is always composited by the renderer.
 
 ## 5) Input handling
 
@@ -112,7 +112,7 @@ Any frontend changes that add UI elements generally require editing these asset 
    - Converts `platform::Event` -> ImGui input.
    - Begins ImGui frame.
    - Draws HUD first (if visible), then Console.
-   - Renders to UI render target via `ImGuiRenderBridge`.
+   - Renders to UI render target via `RenderBridge`.
 3. Renderer composites `ui::RenderOutput` texture onto the frame.
 
 ### RmlUi path (per frame)
@@ -121,7 +121,7 @@ Any frontend changes that add UI elements generally require editing these asset 
    - Converts `platform::Event` -> RmlUi input.
    - Updates HUD model + console state.
    - Renders RmlUi documents via its render interface.
-3. Renderer composites (currently not fully wired) `RenderOutput` from RmlUi.
+3. Renderer composites `RenderOutput` from RmlUi.
 
 ### Config change propagation
 1. `ConfigStore` revision increments on any Set/Erase/Replace.
@@ -132,7 +132,7 @@ Any frontend changes that add UI elements generally require editing these asset 
 
 - **HUD visibility logic** lives in `UiSystem::update` (depends on connection + console visibility).
 - **Crosshair leak** is handled by disabling crosshair when console is visible.
-- **RmlUi output texture** support is incomplete in BGFX/Diligent/Forge; if you need `RenderOutput`, fix those renderers.
+- **RmlUi output texture** is expected to be available across BGFX/Diligent/Forge.
 - **ConfigStore** is authoritative; do not read/write JSON files in UI code.
 - **Start Server panels** still write a JSON override file for spawned servers; this is an intentional exception for now.
 
@@ -155,4 +155,3 @@ Recommended read order:
 4) `src/game/ui/frontends/imgui/console/console.cpp`
 5) `src/game/ui/frontends/rmlui/console/console.cpp`
 6) `src/game/ui/TODO.md`
-

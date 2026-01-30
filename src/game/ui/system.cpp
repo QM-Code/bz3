@@ -3,12 +3,12 @@
 #include "ui/backend.hpp"
 #include "platform/window.hpp"
 #include "common/i18n.hpp"
-#include "ui/bridges/imgui_render_bridge.hpp"
 #include "ui/ui_config.hpp"
 #include "common/config_store.hpp"
 #include "spdlog/spdlog.h"
 
-UiSystem::UiSystem(platform::Window &window) {
+UiSystem::UiSystem(platform::Window &window)
+    : hudController(hudModel) {
     backend = ui_backend::CreateUiBackend(window);
 }
 
@@ -31,6 +31,7 @@ void UiSystem::update() {
     const bool consoleVisible = backend->console().isVisible();
     const bool connected = backend->console().getConnectionState().connected;
     hudModel.visibility.hud = connected || !consoleVisible;
+    hudController.tick();
     backend->setHudModel(hudModel);
     backend->update();
 }
@@ -57,11 +58,11 @@ void UiSystem::setScoreboardEntries(const std::vector<ScoreboardEntry> &entries)
 }
 
 void UiSystem::setDialogText(const std::string &text) {
-    hudModel.dialog.text = text;
+    hudController.setDialogText(text);
 }
 
 void UiSystem::addConsoleLine(const std::string &playerName, const std::string &line) {
-    backend->addConsoleLine(playerName, line);
+    hudController.addChatLine(playerName, line);
 }
 
 std::string UiSystem::getChatInputBuffer() const {
@@ -81,7 +82,7 @@ bool UiSystem::getChatInputFocus() const {
 }
 
 void UiSystem::setDialogVisible(bool show) {
-    hudModel.dialog.visible = show;
+    hudController.setDialogVisible(show);
 }
 
 bool UiSystem::consumeKeybindingsReloadRequest() {
@@ -90,10 +91,6 @@ bool UiSystem::consumeKeybindingsReloadRequest() {
 
 void UiSystem::setRenderBridge(const ui::RenderBridge *bridge) {
     backend->setRenderBridge(bridge);
-}
-
-void UiSystem::setImGuiRenderBridge(const ui::ImGuiRenderBridge *bridge) {
-    backend->setImGuiRenderBridge(bridge);
 }
 
 ui::RenderOutput UiSystem::getRenderOutput() const {

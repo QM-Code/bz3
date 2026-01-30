@@ -31,9 +31,9 @@ public:
 
     void Clear() {}
     void SetPresentToBackbuffer(bool) {}
-    unsigned int GetOutputTextureId() const { return 0; }
-    int GetOutputWidth() const { return viewport_width; }
-    int GetOutputHeight() const { return viewport_height; }
+    unsigned int GetOutputTextureId() const { return static_cast<unsigned int>(uiToken_); }
+    int GetOutputWidth() const { return uiWidth_ > 0 ? uiWidth_ : viewport_width; }
+    int GetOutputHeight() const { return uiHeight_ > 0 ? uiHeight_ : viewport_height; }
 
     Rml::CompiledGeometryHandle CompileGeometry(Rml::Span<const Rml::Vertex> vertices,
                                                 Rml::Span<const int> indices) override;
@@ -110,8 +110,15 @@ private:
     Diligent::RefCntAutoPtr<Diligent::ITexture> whiteTexture_;
     Diligent::ITextureView* whiteTextureView_ = nullptr;
     Rml::TextureHandle last_texture = 0;
+    uint64_t uiToken_ = 0;
+    Diligent::RefCntAutoPtr<Diligent::ITexture> uiTargetTexture_;
+    Diligent::ITextureView* uiTargetRtv_ = nullptr;
+    Diligent::ITextureView* uiTargetSrv_ = nullptr;
+    int uiWidth_ = 0;
+    int uiHeight_ = 0;
 
     void ensurePipeline();
     void ensureWhiteTexture();
+    void ensureRenderTarget(int width, int height);
     const TextureData* lookupTexture(Rml::TextureHandle handle) const;
 };

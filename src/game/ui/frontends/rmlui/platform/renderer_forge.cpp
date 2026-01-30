@@ -61,7 +61,7 @@ struct UiVertex {
 };
 
 struct UiConstants {
-    float scaleBias[4];
+    float transform[16];
     float translate[4];
 };
 
@@ -116,6 +116,12 @@ void RenderInterface_Forge::SetViewport(int width, int height, int offset_x, int
     if (ensureReady()) {
         ensureRenderTarget(viewport_width, viewport_height);
     }
+    static bool logged = false;
+    if (!logged) {
+        spdlog::warn("RmlUi(Forge): viewport {}x{} offset {}x{}",
+                     viewport_width, viewport_height, viewport_offset_x, viewport_offset_y);
+        logged = true;
+    }
 }
 
 void RenderInterface_Forge::BeginFrame() {
@@ -143,6 +149,13 @@ void RenderInterface_Forge::BeginFrame() {
         }
         return;
     }
+    static bool loggedBegin = false;
+    if (!loggedBegin) {
+        spdlog::warn("RmlUi(Forge): begin frame target {}x{}",
+                     uiTarget_ ? static_cast<int>(uiTarget_->mWidth) : -1,
+                     uiTarget_ ? static_cast<int>(uiTarget_->mHeight) : -1);
+        loggedBegin = true;
+    }
 
     if (cmdPool_) {
         resetCmdPool(renderer_, cmdPool_);
@@ -164,7 +177,12 @@ void RenderInterface_Forge::BeginFrame() {
     bindDesc.mRenderTargets[0].pRenderTarget = uiTarget_;
     bindDesc.mRenderTargets[0].mLoadAction = LOAD_ACTION_CLEAR;
     bindDesc.mRenderTargets[0].mStoreAction = STORE_ACTION_STORE;
-    bindDesc.mRenderTargets[0].mClearValue = {0.0f, 0.0f, 0.0f, 0.0f};
+    const bool debugClear = std::getenv("BZ3_RMLUI_DEBUG_CLEAR") != nullptr;
+    if (debugClear) {
+        bindDesc.mRenderTargets[0].mClearValue = {1.0f, 0.0f, 1.0f, 1.0f};
+    } else {
+        bindDesc.mRenderTargets[0].mClearValue = {0.0f, 0.0f, 0.0f, 0.0f};
+    }
     bindDesc.mRenderTargets[0].mOverrideClearValue = 1;
     bindDesc.mDepthStencil.pDepthStencil = nullptr;
     bindDesc.mDepthStencil.mLoadAction = LOAD_ACTION_DONTCARE;
@@ -180,76 +198,63 @@ void RenderInterface_Forge::BeginFrame() {
     debug_triangles_ = 0;
     debug_frame_++;
 
-    if (pipeline_ && descriptorSet_ && uniformBuffer_ && sampler_) {
-        UiVertex tri[3] = {
-            {viewport_width * 0.5f, viewport_height * 0.25f, 0.0f, 0.0f, 0xffffffffu},
-            {viewport_width * 0.25f, viewport_height * 0.75f, 0.0f, 0.0f, 0xffffffffu},
-            {viewport_width * 0.75f, viewport_height * 0.75f, 0.0f, 0.0f, 0xffffffffu},
-        };
-        uint32_t idx[3] = {0, 1, 2};
-        Buffer* vb = nullptr;
-        Buffer* ib = nullptr;
-        BufferLoadDesc vbDesc{};
-        vbDesc.mDesc.mDescriptors = DESCRIPTOR_TYPE_VERTEX_BUFFER;
-        vbDesc.mDesc.mMemoryUsage = RESOURCE_MEMORY_USAGE_GPU_ONLY;
-        vbDesc.mDesc.mSize = sizeof(tri);
-        vbDesc.mDesc.pName = "RmlUi Forge Debug VB";
-        vbDesc.pData = tri;
-        vbDesc.ppBuffer = &vb;
-        SyncToken vbToken{};
-        addResource(&vbDesc, &vbToken);
-        waitForToken(&vbToken);
+    if (std::getenv("BZ3_RMLUI_DEBUG_TRIANGLE")) {
+        ensureDebugTriangleBuffers();
+        if (debugTriangleVB_ && debugTriangleIB_ && uniformBuffer_ && sampler_ && whiteTexture_) {
+            UiVertex tri[3] = {
+                {-0.5f, -0.5f, 0.0f, 0.0f, 0xffffffffu},
+                { 0.0f,  0.5f, 0.0f, 0.0f, 0xffffffffu},
+                { 0.5f, -0.5f, 0.0f, 0.0f, 0xffffffffu},
+            };
+            uint16_t idx[3] = {0, 1, 2};
 
-        BufferLoadDesc ibDesc{};
-        ibDesc.mDesc.mDescriptors = DESCRIPTOR_TYPE_INDEX_BUFFER;
-        ibDesc.mDesc.mMemoryUsage = RESOURCE_MEMORY_USAGE_GPU_ONLY;
-        ibDesc.mDesc.mSize = sizeof(idx);
-        ibDesc.mDesc.pName = "RmlUi Forge Debug IB";
-        ibDesc.pData = idx;
-        ibDesc.ppBuffer = &ib;
-        SyncToken ibToken{};
-        addResource(&ibDesc, &ibToken);
-        waitForToken(&ibToken);
+            BufferUpdateDesc vbUpdate = { debugTriangleVB_ };
+            beginUpdateResource(&vbUpdate);
+            std::memcpy(vbUpdate.pMappedData, tri, sizeof(tri));
+            endUpdateResource(&vbUpdate);
 
-        UiConstants constants{};
-        constants.scaleBias[0] = 2.0f / static_cast<float>(viewport_width);
-        constants.scaleBias[1] = -2.0f / static_cast<float>(viewport_height);
-        constants.scaleBias[2] = -1.0f;
-        constants.scaleBias[3] = 1.0f;
-        constants.translate[0] = 0.0f;
-        constants.translate[1] = 0.0f;
-        constants.translate[2] = 0.0f;
-        constants.translate[3] = 0.0f;
-        BufferUpdateDesc cbUpdate = { uniformBuffer_ };
-        beginUpdateResource(&cbUpdate);
-        std::memcpy(cbUpdate.pMappedData, &constants, sizeof(constants));
-        endUpdateResource(&cbUpdate);
+            BufferUpdateDesc ibUpdate = { debugTriangleIB_ };
+            beginUpdateResource(&ibUpdate);
+            std::memcpy(ibUpdate.pMappedData, idx, sizeof(idx));
+            endUpdateResource(&ibUpdate);
 
-        Texture* drawTexture = whiteTexture_;
-        DescriptorData params[3] = {};
-        params[0].mIndex = 0;
-        params[0].ppBuffers = &uniformBuffer_;
-        params[1].mIndex = 1;
-        params[1].ppTextures = &drawTexture;
-        params[2].mIndex = 2;
-        params[2].ppSamplers = &sampler_;
-        updateDescriptorSet(renderer_, 0, descriptorSet_, 3, params);
+            UiConstants constants{};
+            std::memset(constants.transform, 0, sizeof(constants.transform));
+            constants.transform[0] = 1.0f;
+            constants.transform[5] = 1.0f;
+            constants.transform[10] = 1.0f;
+            constants.transform[15] = 1.0f;
+            constants.translate[0] = 0.0f;
+            constants.translate[1] = 0.0f;
+            constants.translate[2] = 0.0f;
+            constants.translate[3] = 0.0f;
+            BufferUpdateDesc cbUpdate = { uniformBuffer_ };
+            beginUpdateResource(&cbUpdate);
+            std::memcpy(cbUpdate.pMappedData, &constants, sizeof(constants));
+            endUpdateResource(&cbUpdate);
 
-        cmdBindPipeline(cmd_, pipeline_);
-        cmdBindDescriptorSet(cmd_, 0, descriptorSet_);
-        uint32_t stride = sizeof(UiVertex);
-        uint64_t offset = 0;
-        cmdBindVertexBuffer(cmd_, 1, &vb, &stride, &offset);
-        cmdBindIndexBuffer(cmd_, ib, INDEX_TYPE_UINT32, 0);
-        cmdDrawIndexed(cmd_, 3, 0, 0);
+            Texture* drawTexture = whiteTexture_;
+            DescriptorData params[3] = {};
+            params[0].mIndex = 0;
+            params[0].ppBuffers = &uniformBuffer_;
+            params[1].mIndex = 1;
+            params[1].ppTextures = &drawTexture;
+            params[2].mIndex = 2;
+            params[2].ppSamplers = &sampler_;
+            updateDescriptorSet(renderer_, 0, descriptorSet_, 3, params);
 
-        if (vb) {
-            removeResource(vb);
-        }
-        if (ib) {
-            removeResource(ib);
+            cmdBindPipeline(cmd_, pipeline_);
+            cmdBindDescriptorSet(cmd_, 0, descriptorSet_);
+            uint32_t stride = sizeof(UiVertex);
+            uint64_t offset = 0;
+            cmdBindVertexBuffer(cmd_, 0, &debugTriangleVB_, &stride, &offset);
+            cmdBindIndexBuffer(cmd_, debugTriangleIB_, INDEX_TYPE_UINT16, 0);
+            cmdDrawIndexed(cmd_, 3, 0, 0);
         }
     }
+
+    (void)viewport_offset_x;
+    (void)viewport_offset_y;
 }
 
 void RenderInterface_Forge::EndFrame() {
@@ -391,6 +396,20 @@ void RenderInterface_Forge::RenderGeometry(Rml::CompiledGeometryHandle handle,
     if (!drawTexture) {
         return;
     }
+    static bool loggedDraw = false;
+    if (!loggedDraw) {
+        spdlog::warn("RmlUi(Forge): draw translation {} {} scissor={} region {} {} {} {}",
+                     translation.x, translation.y,
+                     scissor_enabled ? "on" : "off",
+                     scissor_region.p0.x, scissor_region.p0.y,
+                     scissor_region.p1.x, scissor_region.p1.y);
+        spdlog::warn("RmlUi(Forge): transform [{} {} {} {}] [{} {} {} {}] [{} {} {} {}] [{} {} {} {}]",
+                     transform.data()[0], transform.data()[1], transform.data()[2], transform.data()[3],
+                     transform.data()[4], transform.data()[5], transform.data()[6], transform.data()[7],
+                     transform.data()[8], transform.data()[9], transform.data()[10], transform.data()[11],
+                     transform.data()[12], transform.data()[13], transform.data()[14], transform.data()[15]);
+        loggedDraw = true;
+    }
 
     if (scissor_enabled && scissor_region.Valid()) {
         const int x = std::max(0, scissor_region.p0.x);
@@ -405,10 +424,7 @@ void RenderInterface_Forge::RenderGeometry(Rml::CompiledGeometryHandle handle,
     }
 
     UiConstants constants{};
-    constants.scaleBias[0] = 2.0f / static_cast<float>(viewport_width);
-    constants.scaleBias[1] = -2.0f / static_cast<float>(viewport_height);
-    constants.scaleBias[2] = -1.0f;
-    constants.scaleBias[3] = 1.0f;
+    std::memcpy(constants.transform, transform.data(), sizeof(constants.transform));
     constants.translate[0] = translation.x;
     constants.translate[1] = translation.y;
     constants.translate[2] = 0.0f;
@@ -433,7 +449,7 @@ void RenderInterface_Forge::RenderGeometry(Rml::CompiledGeometryHandle handle,
 
     uint32_t stride = sizeof(UiVertex);
     uint64_t offset = 0;
-    cmdBindVertexBuffer(cmd_, 1, &geometry->vertexBuffer, &stride, &offset);
+    cmdBindVertexBuffer(cmd_, 0, &geometry->vertexBuffer, &stride, &offset);
     cmdBindIndexBuffer(cmd_, geometry->indexBuffer, INDEX_TYPE_UINT32, 0);
     cmdDrawIndexed(cmd_, geometry->indexCount, 0, 0);
     debug_draw_calls_++;
@@ -728,9 +744,9 @@ void RenderInterface_Forge::ensurePipeline() {
     layout.mAttribs[2].mOffset = sizeof(float) * 4;
 
     BlendStateDesc blend{};
-    blend.mSrcFactors[0] = BC_SRC_ALPHA;
+    blend.mSrcFactors[0] = BC_ONE;
     blend.mDstFactors[0] = BC_ONE_MINUS_SRC_ALPHA;
-    blend.mSrcAlphaFactors[0] = BC_SRC_ALPHA;
+    blend.mSrcAlphaFactors[0] = BC_ONE;
     blend.mDstAlphaFactors[0] = BC_ONE_MINUS_SRC_ALPHA;
     blend.mColorWriteMasks[0] = COLOR_MASK_ALL;
     blend.mRenderTargetMask = BLEND_STATE_TARGET_ALL;
@@ -892,16 +908,22 @@ void RenderInterface_Forge::destroyResources() {
         if (shader_) {
             removeShader(renderer_, shader_);
         }
-    if (descriptorSet_) {
-        removeDescriptorSet(renderer_, descriptorSet_);
-    }
-    delete[] descriptors_;
-    descriptors_ = nullptr;
-    if (sampler_) {
-        removeSampler(renderer_, sampler_);
-    }
+        if (descriptorSet_) {
+            removeDescriptorSet(renderer_, descriptorSet_);
+        }
+        delete[] descriptors_;
+        descriptors_ = nullptr;
+        if (sampler_) {
+            removeSampler(renderer_, sampler_);
+        }
         if (uniformBuffer_) {
             removeResource(uniformBuffer_);
+        }
+        if (debugTriangleVB_) {
+            removeResource(debugTriangleVB_);
+        }
+        if (debugTriangleIB_) {
+            removeResource(debugTriangleIB_);
         }
         if (uiTarget_) {
             removeRenderTarget(renderer_, uiTarget_);
@@ -916,12 +938,13 @@ void RenderInterface_Forge::destroyResources() {
             exitFence(renderer_, fence_);
         }
     }
-
     pipeline_ = nullptr;
     shader_ = nullptr;
     descriptorSet_ = nullptr;
     sampler_ = nullptr;
     uniformBuffer_ = nullptr;
+    debugTriangleVB_ = nullptr;
+    debugTriangleIB_ = nullptr;
     whiteTexture_ = nullptr;
     uiTarget_ = nullptr;
     cmd_ = nullptr;
@@ -930,4 +953,31 @@ void RenderInterface_Forge::destroyResources() {
     ready = false;
     uiWidth_ = 0;
     uiHeight_ = 0;
+}
+
+void RenderInterface_Forge::ensureDebugTriangleBuffers() {
+    if (!renderer_) {
+        return;
+    }
+    if (debugTriangleVB_ && debugTriangleIB_) {
+        return;
+    }
+
+    BufferLoadDesc vbDesc{};
+    vbDesc.mDesc.mDescriptors = DESCRIPTOR_TYPE_VERTEX_BUFFER;
+    vbDesc.mDesc.mMemoryUsage = RESOURCE_MEMORY_USAGE_CPU_TO_GPU;
+    vbDesc.mDesc.mFlags = BUFFER_CREATION_FLAG_PERSISTENT_MAP_BIT;
+    vbDesc.mDesc.mSize = sizeof(UiVertex) * 3;
+    vbDesc.mDesc.pName = "RmlUi Forge Debug VB";
+    vbDesc.ppBuffer = &debugTriangleVB_;
+    addResource(&vbDesc, nullptr);
+
+    BufferLoadDesc ibDesc{};
+    ibDesc.mDesc.mDescriptors = DESCRIPTOR_TYPE_INDEX_BUFFER;
+    ibDesc.mDesc.mMemoryUsage = RESOURCE_MEMORY_USAGE_CPU_TO_GPU;
+    ibDesc.mDesc.mFlags = BUFFER_CREATION_FLAG_PERSISTENT_MAP_BIT;
+    ibDesc.mDesc.mSize = sizeof(uint16_t) * 3;
+    ibDesc.mDesc.pName = "RmlUi Forge Debug IB";
+    ibDesc.ppBuffer = &debugTriangleIB_;
+    addResource(&ibDesc, nullptr);
 }

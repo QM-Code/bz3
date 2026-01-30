@@ -1412,13 +1412,12 @@ Texture2D g_Texture;
 SamplerState g_Texture_sampler;
 cbuffer Constants
 {
-    float g_Brightness;
-    float3 g_Pad;
+    float4 g_Brightness;
 };
 float4 main(float2 uv : TEXCOORD0) : SV_Target
 {
     float4 color = g_Texture.Sample(g_Texture_sampler, uv);
-    return color * g_Brightness;
+    return color * g_Brightness.x;
 }
 )";
 

@@ -312,6 +312,26 @@ void ConsoleView::drawCommunityPanel(const MessageColors &messageColors) {
     const bool hasHeadingFont = (headingFont != nullptr);
     const bool hasButtonFont = (buttonFont != nullptr);
     bool joinFromIdentity = false;
+    auto &community = consoleModel.community;
+    auto &entries = community.entries;
+    auto &selectedIndex = community.selectedIndex;
+    auto &listOptions = community.listOptions;
+    auto &listSelectedIndex = community.listSelectedIndex;
+    auto &statusText = community.statusText;
+    auto &statusIsError = community.statusIsError;
+    auto &listStatusText = community.listStatusText;
+    auto &listStatusIsError = community.listStatusIsError;
+    auto &communityStatusText = community.communityStatusText;
+    auto &communityStatusTone = community.statusTone;
+    auto &communityDetailsText = community.detailsText;
+    auto &communityLinkStatusText = community.communityLinkStatusText;
+    auto &communityLinkStatusIsError = community.communityLinkStatusIsError;
+    auto &serverLinkStatusText = community.serverLinkStatusText;
+    auto &serverLinkStatusIsError = community.serverLinkStatusIsError;
+    auto &serverDescriptionLoadingKey = community.serverDescriptionLoadingKey;
+    auto &serverDescriptionLoading = community.serverDescriptionLoading;
+    auto &serverDescriptionErrorKey = community.serverDescriptionErrorKey;
+    auto &serverDescriptionErrorText = community.serverDescriptionErrorText;
 
     ImVec2 contentAvail = ImGui::GetContentRegionAvail();
     const ImGuiStyle &style = ImGui::GetStyle();
@@ -366,7 +386,7 @@ void ConsoleView::drawCommunityPanel(const MessageColors &messageColors) {
             if (ImGui::Selectable(optionLabel.c_str(), selected)) {
                 if (!selected) {
                     listSelectedIndex = i;
-                    pendingListSelection = i;
+                    consoleController.queueListSelection(i);
                 }
             }
             if (selected) {
@@ -451,7 +471,7 @@ void ConsoleView::drawCommunityPanel(const MessageColors &messageColors) {
             } else {
                 listStatusText.clear();
                 listStatusIsError = false;
-                pendingNewList = ServerListOption{ std::string{}, urlValue };
+                consoleController.queueNewListRequest(ServerListOption{std::string{}, urlValue});
             }
         }
 
@@ -621,7 +641,7 @@ void ConsoleView::drawCommunityPanel(const MessageColors &messageColors) {
         }
         ImGui::PushStyleColor(ImGuiCol_Text, buttonColor);
         if (ImGui::Button("Refresh")) {
-            refreshRequested = true;
+            consoleController.requestRefresh();
         }
         ImGui::PopStyleColor();
         if (hasButtonFont) {
@@ -667,13 +687,13 @@ void ConsoleView::drawCommunityPanel(const MessageColors &messageColors) {
                                       ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowDoubleClick)) {
                     selectedIndex = i;
                     if (ImGui::IsMouseDoubleClicked(0)) {
-                        pendingSelection = CommunityBrowserSelection{
+                        consoleController.queueSelection(CommunityBrowserSelection{
                             entry.host,
                             entry.port,
                             false,
                             entry.sourceHost,
                             entry.worldName
-                        };
+                        });
                     }
                 }
                 ImGui::TableSetColumnIndex(1);
@@ -796,7 +816,7 @@ void ConsoleView::drawCommunityPanel(const MessageColors &messageColors) {
         }
 
         if (confirmDelete && !activeCommunityHost.empty()) {
-            pendingDeleteListHost = activeCommunityHost;
+            consoleController.queueDeleteListRequest(activeCommunityHost);
             ImGui::CloseCurrentPopup();
         }
 
@@ -806,13 +826,13 @@ void ConsoleView::drawCommunityPanel(const MessageColors &messageColors) {
     if (joinFromIdentity) {
         if (selectedIndex >= 0 && selectedIndex < static_cast<int>(entries.size())) {
             const auto &entry = entries[selectedIndex];
-            pendingSelection = CommunityBrowserSelection{
+            consoleController.queueSelection(CommunityBrowserSelection{
                 entry.host,
                 entry.port,
                 true,
                 entry.sourceHost,
                 entry.worldName
-            };
+            });
             statusText.clear();
             statusIsError = false;
         } else {

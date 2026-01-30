@@ -61,10 +61,18 @@ void RenderInterface_Diligent::SetViewport(int width, int height, int offset_x, 
                                              static_cast<float>(viewport_height), 0,
                                              -10000, 10000);
     transform = projection;
+    ensureRenderTarget(viewport_width, viewport_height);
 }
 
 void RenderInterface_Diligent::BeginFrame() {
     ensurePipeline();
+    ensureRenderTarget(viewport_width, viewport_height);
+    auto ctx = graphics_backend::diligent_ui::GetContext();
+    if (ctx.context && uiTargetRtv_) {
+        ctx.context->SetRenderTargets(1, &uiTargetRtv_, nullptr, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+        const float clearColor[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+        ctx.context->ClearRenderTarget(uiTargetRtv_, clearColor, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+    }
     debug_draw_calls = 0;
     debug_triangles = 0;
     debug_frame++;
@@ -143,7 +151,10 @@ void RenderInterface_Diligent::RenderGeometry(Rml::CompiledGeometryHandle handle
     }
 
     auto ctx = graphics_backend::diligent_ui::GetContext();
-    if (!ctx.device || !ctx.context || !ctx.swapChain || !pipeline_) {
+    if (!ctx.device || !ctx.context || !pipeline_) {
+        return;
+    }
+    if (!uiTargetRtv_) {
         return;
     }
 
@@ -164,9 +175,8 @@ void RenderInterface_Diligent::RenderGeometry(Rml::CompiledGeometryHandle handle
                                   Diligent::SET_VERTEX_BUFFERS_FLAG_RESET);
     ctx.context->SetIndexBuffer(geometry->indexBuffer, 0, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
 
-    Diligent::ITextureView* rtv = ctx.swapChain->GetCurrentBackBufferRTV();
-    Diligent::ITextureView* dsv = ctx.swapChain->GetDepthBufferDSV();
-    ctx.context->SetRenderTargets(1, &rtv, dsv, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+    Diligent::ITextureView* rtv = uiTargetRtv_;
+    ctx.context->SetRenderTargets(1, &rtv, nullptr, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
 
     Diligent::Viewport vp{};
     vp.TopLeftX = static_cast<float>(viewport_offset_x);
@@ -521,6 +531,63 @@ float4 main(PSInput In) : SV_Target
     }
 
     pipeline_->CreateShaderResourceBinding(&shaderBinding_, true);
+}
+
+void RenderInterface_Diligent::ensureRenderTarget(int width, int height) {
+    auto ctx = graphics_backend::diligent_ui::GetContext();
+    if (!ctx.device || !ctx.swapChain) {
+        return;
+    }
+    if (width <= 0 || height <= 0) {
+        if (uiToken_ != 0) {
+            graphics_backend::diligent_ui::UnregisterExternalTexture(uiToken_);
+            uiToken_ = 0;
+        }
+        uiTargetSrv_ = nullptr;
+        uiTargetRtv_ = nullptr;
+        uiTargetTexture_ = nullptr;
+        uiWidth_ = 0;
+        uiHeight_ = 0;
+        return;
+    }
+    if (width == uiWidth_ && height == uiHeight_ && uiTargetTexture_) {
+        return;
+    }
+
+    if (uiToken_ != 0) {
+        graphics_backend::diligent_ui::UnregisterExternalTexture(uiToken_);
+        uiToken_ = 0;
+    }
+    uiTargetSrv_ = nullptr;
+    uiTargetRtv_ = nullptr;
+    uiTargetTexture_ = nullptr;
+
+    const auto& scDesc = ctx.swapChain->GetDesc();
+    Diligent::TextureDesc desc;
+    desc.Type = Diligent::RESOURCE_DIM_TEX_2D;
+    desc.Width = static_cast<Diligent::Uint32>(width);
+    desc.Height = static_cast<Diligent::Uint32>(height);
+    desc.MipLevels = 1;
+    desc.Format = scDesc.ColorBufferFormat;
+    desc.BindFlags = Diligent::BIND_RENDER_TARGET | Diligent::BIND_SHADER_RESOURCE;
+    desc.Name = "RmlUi Diligent UI RT";
+    ctx.device->CreateTexture(desc, nullptr, &uiTargetTexture_);
+    if (!uiTargetTexture_) {
+        return;
+    }
+
+    uiTargetRtv_ = uiTargetTexture_->GetDefaultView(Diligent::TEXTURE_VIEW_RENDER_TARGET);
+    uiTargetSrv_ = uiTargetTexture_->GetDefaultView(Diligent::TEXTURE_VIEW_SHADER_RESOURCE);
+    if (!uiTargetRtv_ || !uiTargetSrv_) {
+        uiTargetTexture_ = nullptr;
+        uiTargetRtv_ = nullptr;
+        uiTargetSrv_ = nullptr;
+        return;
+    }
+
+    uiToken_ = graphics_backend::diligent_ui::RegisterExternalTexture(uiTargetSrv_);
+    uiWidth_ = width;
+    uiHeight_ = height;
 }
 
 void RenderInterface_Diligent::ensureWhiteTexture() {

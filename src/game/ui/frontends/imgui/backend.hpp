@@ -10,7 +10,6 @@
 
 #include "ui/frontends/imgui/hud/hud.hpp"
 #include "ui/frontends/imgui/console/console.hpp"
-#include "ui/bridges/imgui_render_bridge.hpp"
 #include "ui/backend.hpp"
 
 namespace platform {
@@ -38,7 +37,6 @@ public:
     bool getChatInputFocus() const override;
     bool consumeKeybindingsReloadRequest() override;
     void setRenderBridge(const ui::RenderBridge *bridge) override;
-    void setImGuiRenderBridge(const ui::ImGuiRenderBridge *bridge) override;
     ui::RenderOutput getRenderOutput() const override;
     float getRenderBrightness() const override { return consoleView.getRenderBrightness(); }
     bool isRenderBrightnessDragActive() const override;
@@ -51,7 +49,6 @@ private:
     ui::ImGuiHud hud;
     ui::HudModel hudModel;
     const ui::RenderBridge *renderBridge = nullptr;
-    const ui::ImGuiRenderBridge* imguiBridge = nullptr;
     graphics_backend::UiRenderTargetBridge* uiBridge = nullptr;
     bool languageReloadArmed = false;
     std::optional<std::string> pendingLanguage;

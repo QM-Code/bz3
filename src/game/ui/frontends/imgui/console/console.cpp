@@ -14,6 +14,7 @@
 #include "common/i18n.hpp"
 #include "spdlog/spdlog.h"
 #include "ui/config.hpp"
+#include "ui/console/tab_spec.hpp"
 #include "ui/ui_config.hpp"
 
 namespace {
@@ -219,7 +220,7 @@ void ConsoleView::draw(ImGuiIO &io) {
 
     ImGui::SetNextWindowPos(windowPos, ImGuiCond_Always);
     ImGui::SetNextWindowSize(windowSize, ImGuiCond_Always);
-    const float bgAlpha = connectionState.connected ? 0.95f : 1.0f;
+    const float bgAlpha = consoleModel.connectionState.connected ? 0.95f : 1.0f;
     ImGui::SetNextWindowBgAlpha(bgAlpha);
 
     ImGuiWindowFlags flags =
@@ -229,7 +230,7 @@ void ConsoleView::draw(ImGuiIO &io) {
         ImGuiWindowFlags_NoMove;
 
     const ImGuiStyle &style = ImGui::GetStyle();
-    if (!connectionState.connected) {
+    if (!consoleModel.connectionState.connected) {
         const ImVec2 screenMin(0.0f, 0.0f);
         const ImVec2 screenMax(io.DisplaySize.x, io.DisplaySize.y);
         ImVec4 bg = style.Colors[ImGuiCol_WindowBg];
@@ -254,42 +255,48 @@ void ConsoleView::draw(ImGuiIO &io) {
     }
 
     const MessageColors messageColors = getMessageColors();
+    const uint64_t revision = bz::config::ConfigStore::Revision();
+    if (revision != lastConfigRevision) {
+        lastConfigRevision = revision;
+        handleConfigChanged();
+    }
     if (ImGui::BeginTabBar("CommunityBrowserTabs", ImGuiTabBarFlags_FittingPolicyScroll)) {
-        const std::string tabCommunity = i18n.get("ui.console.tabs.community");
-        const std::string tabSettings = i18n.get("ui.console.tabs.settings");
-        const std::string tabBindings = i18n.get("ui.console.tabs.bindings");
-        const std::string tabStartServer = i18n.get("ui.console.tabs.start_server");
-        const bool communityTabOpen = ImGui::BeginTabItem((tabCommunity + "###TabCommunity").c_str());
-        if (ImGui::IsItemActivated() || ImGui::IsItemClicked()) {
-            refreshRequested = true;
+        std::string nextActiveTab = activeTabKey;
+        bool activeTabFound = false;
+        for (const auto &spec : ui::GetConsoleTabSpecs()) {
+            const std::string label = spec.labelKey ? i18n.get(spec.labelKey)
+                                                    : (spec.fallbackLabel ? spec.fallbackLabel : spec.key);
+            if (spec.rightAlign) {
+                const float tabWidth =
+                    ImGui::CalcTextSize(label.c_str()).x + (ImGui::GetStyle().FramePadding.x * 2.0f);
+                const float tabX = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - tabWidth;
+                if (tabX > ImGui::GetCursorPosX()) {
+                    ImGui::SetCursorPosX(tabX);
+                }
+            }
+            const std::string tabId = label + "###Tab" + spec.key;
+            const bool tabOpen = ImGui::BeginTabItem(tabId.c_str());
+            if (spec.refreshOnActivate && (ImGui::IsItemActivated() || ImGui::IsItemClicked())) {
+                consoleController.requestRefresh();
+            }
+            if (tabOpen) {
+                nextActiveTab = spec.key ? spec.key : "";
+                activeTabFound = true;
+                handleTabTick(nextActiveTab);
+                drawTabContent(spec.key, messageColors);
+                ImGui::EndTabItem();
+            }
         }
-        if (communityTabOpen) {
-            drawCommunityPanel(messageColors);
-            ImGui::EndTabItem();
+        if (activeTabFound && nextActiveTab != activeTabKey) {
+            if (!activeTabKey.empty()) {
+                handleTabHide(activeTabKey);
+            }
+            if (!nextActiveTab.empty()) {
+                handleTabShow(nextActiveTab);
+            }
+            activeTabKey = nextActiveTab;
         }
-        if (ImGui::BeginTabItem((tabStartServer + "###TabStartServer").c_str())) {
-            drawStartServerPanel(messageColors);
-            ImGui::EndTabItem();
-        }
-        if (ImGui::BeginTabItem((tabSettings + "###TabSettings").c_str())) {
-            drawSettingsPanel(messageColors);
-            ImGui::EndTabItem();
-        }
-        if (ImGui::BeginTabItem((tabBindings + "###TabBindings").c_str())) {
-            drawBindingsPanel(messageColors);
-            ImGui::EndTabItem();
-        }
-        const float docTabWidth =
-            ImGui::CalcTextSize("?").x + (ImGui::GetStyle().FramePadding.x * 2.0f);
-        const float docTabX = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - docTabWidth;
-        if (docTabX > ImGui::GetCursorPosX()) {
-            ImGui::SetCursorPosX(docTabX);
-        }
-        if (ImGui::BeginTabItem("?###TabDocumentation")) {
-            drawDocumentationPanel(messageColors);
-            ImGui::EndTabItem();
-        }
-    ImGui::EndTabBar();
+        ImGui::EndTabBar();
     }
 
     ImGui::End();
@@ -302,11 +309,60 @@ void ConsoleView::draw(ImGuiIO &io) {
     }
 }
 
+void ConsoleView::drawTabContent(const std::string &key, const MessageColors &colors) {
+    if (key == "community") {
+        drawCommunityPanel(colors);
+        return;
+    }
+    if (key == "start-server") {
+        drawStartServerPanel(colors);
+        return;
+    }
+    if (key == "settings") {
+        drawSettingsPanel(colors);
+        return;
+    }
+    if (key == "bindings") {
+        drawBindingsPanel(colors);
+        return;
+    }
+    if (key == "documentation") {
+        drawDocumentationPanel(colors);
+        return;
+    }
+    drawPlaceholderPanel("Panel missing", "This panel is not available.", colors);
+}
+
+void ConsoleView::handleConfigChanged() {
+    settingsModel.loaded = false;
+    bindingsModel.loaded = false;
+}
+
+void ConsoleView::handleTabShow(const std::string &key) {
+    if (key == "settings") {
+        settingsModel.loaded = false;
+    } else if (key == "bindings") {
+        bindingsModel.loaded = false;
+    }
+}
+
+void ConsoleView::handleTabHide(const std::string &key) {
+    if (key == "bindings") {
+        bindingsModel.selectedIndex = -1;
+    }
+}
+
+void ConsoleView::handleTabTick(const std::string & /*key*/) {
+    if (bindingsModel.selectedIndex >= static_cast<int>(ui::BindingsModel::kKeybindingCount)) {
+        bindingsModel.selectedIndex = -1;
+    }
+}
+
 void ConsoleView::setUserConfigPath(const std::string &path) {
     userConfigPath = path;
-    settingsLoaded = false;
-    bindingsLoaded = false;
-    renderSettings.reset();
+    settingsModel.loaded = false;
+    bindingsModel.loaded = false;
+    settingsModel.render.reset();
 }
 
 void ConsoleView::setLanguageCallback(std::function<void(const std::string &)> callback) {
@@ -330,11 +386,11 @@ void ConsoleView::requestKeybindingsReload() {
 }
 
 void ConsoleView::setConnectionState(const ConnectionState &state) {
-    connectionState = state;
+    consoleModel.connectionState = state;
 }
 
 ConsoleInterface::ConnectionState ConsoleView::getConnectionState() const {
-    return connectionState;
+    return consoleModel.connectionState;
 }
 
 bool ConsoleView::consumeQuitRequest() {
@@ -374,25 +430,22 @@ void ConsoleView::drawPlaceholderPanel(const char *heading,
 void ConsoleView::show(const std::vector<CommunityBrowserEntry> &newEntries) {
     visible = true;
     setEntries(newEntries);
-    pendingSelection.reset();
-    statusText = "Select a server to connect.";
-    statusIsError = false;
-    pendingListSelection.reset();
-    pendingNewList.reset();
-    pendingDeleteListHost.reset();
-    listStatusText.clear();
-    listStatusIsError = false;
-    communityStatusText.clear();
-    communityDetailsText.clear();
-    communityLinkStatusText.clear();
-    communityLinkStatusIsError = false;
-    serverLinkStatusText.clear();
-    serverLinkStatusIsError = false;
-    serverDescriptionLoadingKey.clear();
-    serverDescriptionLoading = false;
-    serverDescriptionErrorKey.clear();
-    serverDescriptionErrorText.clear();
-    communityStatusTone = MessageTone::Notice;
+    consoleController.clearPending();
+    consoleModel.community.statusText = "Select a server to connect.";
+    consoleModel.community.statusIsError = false;
+    consoleModel.community.listStatusText.clear();
+    consoleModel.community.listStatusIsError = false;
+    consoleModel.community.communityStatusText.clear();
+    consoleModel.community.detailsText.clear();
+    consoleModel.community.communityLinkStatusText.clear();
+    consoleModel.community.communityLinkStatusIsError = false;
+    consoleModel.community.serverLinkStatusText.clear();
+    consoleModel.community.serverLinkStatusIsError = false;
+    consoleModel.community.serverDescriptionLoadingKey.clear();
+    consoleModel.community.serverDescriptionLoading = false;
+    consoleModel.community.serverDescriptionErrorKey.clear();
+    consoleModel.community.serverDescriptionErrorText.clear();
+    consoleModel.community.statusTone = MessageTone::Notice;
     clearPassword();
     showNewCommunityInput = false;
     listUrlBuffer.fill(0);
@@ -404,129 +457,70 @@ ConsoleView::~ConsoleView() {
 }
 
 void ConsoleView::setEntries(const std::vector<CommunityBrowserEntry> &newEntries) {
-    entries = newEntries;
-    if (entries.empty()) {
-        selectedIndex = -1;
-    } else if (selectedIndex < 0) {
-        selectedIndex = 0;
-    } else if (selectedIndex >= static_cast<int>(entries.size())) {
-        selectedIndex = static_cast<int>(entries.size()) - 1;
+    consoleModel.community.entries = newEntries;
+    if (consoleModel.community.entries.empty()) {
+        consoleModel.community.selectedIndex = -1;
+    } else if (consoleModel.community.selectedIndex < 0) {
+        consoleModel.community.selectedIndex = 0;
+    } else if (consoleModel.community.selectedIndex >= static_cast<int>(consoleModel.community.entries.size())) {
+        consoleModel.community.selectedIndex = static_cast<int>(consoleModel.community.entries.size()) - 1;
     }
 }
 
 void ConsoleView::setListOptions(const std::vector<ServerListOption> &options, int selectedIndexIn) {
-    listOptions = options;
-    if (listOptions.empty()) {
-        listSelectedIndex = -1;
+    consoleModel.community.listOptions = options;
+    if (consoleModel.community.listOptions.empty()) {
+        consoleModel.community.listSelectedIndex = -1;
         serverCommunityIndex = -1;
         lastCredentialsListIndex = -1;
-        pendingListSelection.reset();
+        consoleController.clearPending();
         return;
     }
 
     if (selectedIndexIn < 0) {
-        listSelectedIndex = 0;
-    } else if (selectedIndexIn >= static_cast<int>(listOptions.size())) {
-        listSelectedIndex = static_cast<int>(listOptions.size()) - 1;
+        consoleModel.community.listSelectedIndex = 0;
+    } else if (selectedIndexIn >= static_cast<int>(consoleModel.community.listOptions.size())) {
+        consoleModel.community.listSelectedIndex = static_cast<int>(consoleModel.community.listOptions.size()) - 1;
     } else {
-        listSelectedIndex = selectedIndexIn;
+        consoleModel.community.listSelectedIndex = selectedIndexIn;
     }
 
-    if (serverCommunityIndex < 0 || serverCommunityIndex >= static_cast<int>(listOptions.size())) {
-        serverCommunityIndex = listSelectedIndex;
+    if (serverCommunityIndex < 0 || serverCommunityIndex >= static_cast<int>(consoleModel.community.listOptions.size())) {
+        serverCommunityIndex = consoleModel.community.listSelectedIndex;
     }
 }
 
 std::string ConsoleView::communityKeyForIndex(int index) const {
-    if (index < 0 || index >= static_cast<int>(listOptions.size())) {
-        return {};
-    }
-    const auto &option = listOptions[index];
-    if (option.name == "Local Area Network") {
-        return "LAN";
-    }
-    std::string host = option.host;
-    while (!host.empty() && host.back() == '/') {
-        host.pop_back();
-    }
-    return host;
+    return consoleController.communityKeyForIndex(index);
 }
 
 void ConsoleView::refreshCommunityCredentials() {
-    if (listSelectedIndex == lastCredentialsListIndex) {
+    if (consoleModel.community.listSelectedIndex == lastCredentialsListIndex) {
         return;
     }
-    lastCredentialsListIndex = listSelectedIndex;
+    lastCredentialsListIndex = consoleModel.community.listSelectedIndex;
     usernameBuffer.fill(0);
     passwordBuffer.fill(0);
     storedPasswordHash.clear();
 
-    const std::string key = communityKeyForIndex(listSelectedIndex);
-    if (key.empty()) {
-        return;
+    const auto creds = consoleController.loadCommunityCredentials(consoleModel.community.listSelectedIndex);
+    if (!creds.username.empty()) {
+        std::snprintf(usernameBuffer.data(), usernameBuffer.size(), "%s", creds.username.c_str());
     }
-
-    const auto *credsIt = ui::UiConfig::GetCommunityCredentials();
-    if (!credsIt || !credsIt->is_object()) {
-        return;
-    }
-    const auto entryIt = credsIt->find(key);
-    if (entryIt == credsIt->end() || !entryIt->is_object()) {
-        return;
-    }
-    const auto &entry = *entryIt;
-    if (auto userIt = entry.find("username"); userIt != entry.end() && userIt->is_string()) {
-        std::snprintf(usernameBuffer.data(), usernameBuffer.size(), "%s", userIt->get<std::string>().c_str());
-    }
-    if (key != "LAN") {
-        if (auto passIt = entry.find("passwordHash"); passIt != entry.end() && passIt->is_string()) {
-            const std::string passhash = passIt->get<std::string>();
-            if (!passhash.empty()) {
-                storedPasswordHash = passhash;
-            }
-        }
+    if (!creds.storedPasswordHash.empty()) {
+        storedPasswordHash = creds.storedPasswordHash;
     }
 }
 
 void ConsoleView::persistCommunityCredentials(bool passwordChanged) {
-    const std::string key = communityKeyForIndex(listSelectedIndex);
-    if (key.empty()) {
-        return;
-    }
-
-    bz::json::Value creds = bz::json::Object();
-    if (const auto *existing = ui::UiConfig::GetCommunityCredentials()) {
-        if (existing->is_object()) {
-            creds = *existing;
-        }
-    }
-
     const std::string username = trimCopy(usernameBuffer.data());
-    if (username.empty()) {
-        creds.erase(key);
-    } else {
-        if (!creds.contains(key) || !creds[key].is_object()) {
-            creds[key] = bz::json::Object();
-        }
-        creds[key]["username"] = username;
-        if (key == "LAN") {
-            if (creds[key].is_object()) {
-                creds[key].erase("passwordHash");
-                creds[key].erase("salt");
-            }
-        } else if (!storedPasswordHash.empty()) {
-            creds[key]["passwordHash"] = storedPasswordHash;
-        } else if (passwordChanged) {
-            if (creds[key].is_object()) {
-                creds[key].erase("passwordHash");
-            }
-        }
-    }
-
-    if (creds.empty()) {
-        ui::UiConfig::EraseCommunityCredentials();
-    } else {
-        ui::UiConfig::SetCommunityCredentials(creds);
+    const auto result = consoleController.persistCommunityCredentials(
+        consoleModel.community.listSelectedIndex,
+        username,
+        storedPasswordHash,
+        passwordChanged);
+    if (result.clearStoredPasswordHash) {
+        storedPasswordHash.clear();
     }
 }
 
@@ -561,7 +555,7 @@ void ConsoleView::storeCommunityAuth(const std::string &communityHost,
     }
     ui::UiConfig::SetCommunityCredentials(creds);
 
-    const std::string activeKey = communityKeyForIndex(listSelectedIndex);
+    const std::string activeKey = communityKeyForIndex(consoleModel.community.listSelectedIndex);
     if (activeKey == key) {
         std::snprintf(usernameBuffer.data(), usernameBuffer.size(), "%s", username.c_str());
         if (!passhash.empty()) {
@@ -573,27 +567,23 @@ void ConsoleView::storeCommunityAuth(const std::string &communityHost,
 void ConsoleView::hide() {
     visible = false;
     renderBrightnessDragging = false;
-    statusText.clear();
-    statusIsError = false;
-    pendingSelection.reset();
-    pendingListSelection.reset();
-    pendingNewList.reset();
-    pendingDeleteListHost.reset();
-    refreshRequested = false;
-    scanning = false;
-    listStatusText.clear();
-    listStatusIsError = false;
-    communityStatusText.clear();
-    communityDetailsText.clear();
-    communityLinkStatusText.clear();
-    communityLinkStatusIsError = false;
-    serverLinkStatusText.clear();
-    serverLinkStatusIsError = false;
-    serverDescriptionLoadingKey.clear();
-    serverDescriptionLoading = false;
-    serverDescriptionErrorKey.clear();
-    serverDescriptionErrorText.clear();
-    communityStatusTone = MessageTone::Notice;
+    consoleModel.community.statusText.clear();
+    consoleModel.community.statusIsError = false;
+    consoleController.clearPending();
+    consoleModel.community.scanning = false;
+    consoleModel.community.listStatusText.clear();
+    consoleModel.community.listStatusIsError = false;
+    consoleModel.community.communityStatusText.clear();
+    consoleModel.community.detailsText.clear();
+    consoleModel.community.communityLinkStatusText.clear();
+    consoleModel.community.communityLinkStatusIsError = false;
+    consoleModel.community.serverLinkStatusText.clear();
+    consoleModel.community.serverLinkStatusIsError = false;
+    consoleModel.community.serverDescriptionLoadingKey.clear();
+    consoleModel.community.serverDescriptionLoading = false;
+    consoleModel.community.serverDescriptionErrorKey.clear();
+    consoleModel.community.serverDescriptionErrorText.clear();
+    consoleModel.community.statusTone = MessageTone::Notice;
     clearPassword();
     showNewCommunityInput = false;
     thumbnails.shutdown();
@@ -604,87 +594,63 @@ bool ConsoleView::isVisible() const {
 }
 
 void ConsoleView::setStatus(const std::string &text, bool isErrorMessage) {
-    statusText = text;
-    statusIsError = isErrorMessage;
+    consoleModel.community.statusText = text;
+    consoleModel.community.statusIsError = isErrorMessage;
 }
 
 void ConsoleView::setCommunityDetails(const std::string &detailsText) {
-    communityDetailsText = detailsText;
+    consoleModel.community.detailsText = detailsText;
 }
 
 void ConsoleView::setServerDescriptionLoading(const std::string &key, bool loading) {
-    serverDescriptionLoadingKey = key;
-    serverDescriptionLoading = loading;
+    consoleModel.community.serverDescriptionLoadingKey = key;
+    consoleModel.community.serverDescriptionLoading = loading;
 }
 
 bool ConsoleView::isServerDescriptionLoading(const std::string &key) const {
-    if (!serverDescriptionLoading || key.empty()) {
+    if (!consoleModel.community.serverDescriptionLoading || key.empty()) {
         return false;
     }
-    return serverDescriptionLoadingKey == key;
+    return consoleModel.community.serverDescriptionLoadingKey == key;
 }
 
 void ConsoleView::setServerDescriptionError(const std::string &key, const std::string &message) {
-    serverDescriptionErrorKey = key;
-    serverDescriptionErrorText = message;
+    consoleModel.community.serverDescriptionErrorKey = key;
+    consoleModel.community.serverDescriptionErrorText = message;
 }
 
 std::optional<std::string> ConsoleView::getServerDescriptionError(const std::string &key) const {
-    if (key.empty() || serverDescriptionErrorKey.empty()) {
+    if (key.empty() || consoleModel.community.serverDescriptionErrorKey.empty()) {
         return std::nullopt;
     }
-    if (serverDescriptionErrorKey != key) {
+    if (consoleModel.community.serverDescriptionErrorKey != key) {
         return std::nullopt;
     }
-    if (serverDescriptionErrorText.empty()) {
+    if (consoleModel.community.serverDescriptionErrorText.empty()) {
         return std::nullopt;
     }
-    return serverDescriptionErrorText;
+    return consoleModel.community.serverDescriptionErrorText;
 }
 
 std::optional<CommunityBrowserSelection> ConsoleView::consumeSelection() {
-    if (!pendingSelection.has_value()) {
-        return std::nullopt;
-    }
-
-    auto selection = pendingSelection;
-    pendingSelection.reset();
-    return selection;
+    return consoleController.consumeSelection();
 }
 
 std::optional<int> ConsoleView::consumeListSelection() {
-    if (!pendingListSelection.has_value()) {
-        return std::nullopt;
-    }
-
-    auto selection = pendingListSelection;
-    pendingListSelection.reset();
-    return selection;
+    return consoleController.consumeListSelection();
 }
 
 std::optional<ServerListOption> ConsoleView::consumeNewListRequest() {
-    if (!pendingNewList.has_value()) {
-        return std::nullopt;
-    }
-
-    auto request = pendingNewList;
-    pendingNewList.reset();
-    return request;
+    return consoleController.consumeNewListRequest();
 }
 
 std::optional<std::string> ConsoleView::consumeDeleteListRequest() {
-    if (!pendingDeleteListHost.has_value()) {
-        return std::nullopt;
-    }
-
-    auto host = pendingDeleteListHost;
-    pendingDeleteListHost.reset();
-    return host;
+    return consoleController.consumeDeleteListRequest();
 }
 
 void ConsoleView::setListStatus(const std::string &text, bool isErrorMessage) {
-    listStatusText = text;
-    listStatusIsError = isErrorMessage;
+    consoleModel.community.listStatusText = text;
+    consoleModel.community.listStatusIsError = isErrorMessage;
 }
 
 void ConsoleView::clearNewListInputs() {
@@ -692,15 +658,16 @@ void ConsoleView::clearNewListInputs() {
 }
 
 void ConsoleView::setCommunityStatus(const std::string &text, MessageTone tone) {
-    communityStatusText = text;
-    communityStatusTone = tone;
+    consoleModel.community.communityStatusText = text;
+    consoleModel.community.statusTone = tone;
 }
 
 std::optional<CommunityBrowserEntry> ConsoleView::getSelectedEntry() const {
-    if (selectedIndex < 0 || selectedIndex >= static_cast<int>(entries.size())) {
+    if (consoleModel.community.selectedIndex < 0 ||
+        consoleModel.community.selectedIndex >= static_cast<int>(consoleModel.community.entries.size())) {
         return std::nullopt;
     }
-    return entries[static_cast<std::size_t>(selectedIndex)];
+    return consoleModel.community.entries[static_cast<std::size_t>(consoleModel.community.selectedIndex)];
 }
 
 std::string ConsoleView::getUsername() const {
@@ -720,15 +687,11 @@ void ConsoleView::clearPassword() {
 }
 
 bool ConsoleView::consumeRefreshRequest() {
-    if (!refreshRequested) {
-        return false;
-    }
-    refreshRequested = false;
-    return true;
+    return consoleController.consumeRefreshRequest();
 }
 
 void ConsoleView::setScanning(bool isScanning) {
-    scanning = isScanning;
+    consoleModel.community.scanning = isScanning;
 }
 
 ThumbnailTexture *ConsoleView::getOrLoadThumbnail(const std::string &url) {

@@ -47,7 +47,7 @@ public:
 
     void Clear() {}
     void SetPresentToBackbuffer(bool) {}
-    unsigned int GetOutputTextureId() const { return 0; }
+    unsigned int GetOutputTextureId() const { return outputTextureId; }
     int GetOutputWidth() const { return viewport_width; }
     int GetOutputHeight() const { return viewport_height; }
 
@@ -100,6 +100,7 @@ private:
     void destroyPrograms();
     void applyTransformUniform();
     const TextureData* lookupTexture(Rml::TextureHandle handle) const;
+    void ensureRenderTarget(int width, int height);
 
     bool ready = false;
     bgfx::ProgramHandle program_texture = BGFX_INVALID_HANDLE;
@@ -124,6 +125,11 @@ private:
     Rml::TextureHandle last_texture = {};
     std::unordered_map<Rml::TextureHandle, TextureData> textures;
     uintptr_t next_texture_id = 1;
+    bgfx::TextureHandle uiTargetTexture = BGFX_INVALID_HANDLE;
+    bgfx::FrameBufferHandle uiTargetFrameBuffer = BGFX_INVALID_HANDLE;
+    int uiWidth = 0;
+    int uiHeight = 0;
+    unsigned int outputTextureId = 0;
 
 };
 

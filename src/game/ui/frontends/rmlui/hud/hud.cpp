@@ -83,6 +83,10 @@ void RmlUiHud::setDialogVisible(bool show) {
     dialog.show(show);
 }
 
+void RmlUiHud::setChatLines(const std::vector<std::string> &lines) {
+    chat.setLines(lines);
+}
+
 void RmlUiHud::addChatLine(const std::string &line) {
     chat.addLine(line);
 }

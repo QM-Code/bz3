@@ -25,7 +25,6 @@
 #include "common/data_path_resolver.hpp"
 #include "ui/frontends/rmlui/console/emoji_utils.hpp"
 #include "spdlog/spdlog.h"
-#include "ui/ui_config.hpp"
 
 namespace ui {
 namespace {
@@ -387,10 +386,12 @@ public:
         }
         if (action == Action::Join) {
             panel->handleServerClick(index);
-            if (panel->selectedServerIndex == index &&
-                panel->selectedServerIndex >= 0 &&
-                panel->selectedServerIndex < static_cast<int>(panel->entries.size()) &&
-                panel->isConnectedToEntry(panel->entries[static_cast<std::size_t>(panel->selectedServerIndex)])) {
+            auto *community = panel->consoleModel ? &panel->consoleModel->community : nullptr;
+            if (community &&
+                community->selectedIndex == index &&
+                community->selectedIndex >= 0 &&
+                community->selectedIndex < static_cast<int>(community->entries.size()) &&
+                panel->isConnectedToEntry(community->entries[static_cast<std::size_t>(community->selectedIndex)])) {
                 panel->handleResume();
             } else {
                 panel->handleJoin();
@@ -496,6 +497,11 @@ private:
 
 RmlUiPanelCommunity::RmlUiPanelCommunity()
     : RmlUiPanel("community", "client/ui/console_panel_community.rml") {}
+
+void RmlUiPanelCommunity::setConsoleModel(ConsoleModel *model, ConsoleController *controller) {
+    consoleModel = model;
+    consoleController = controller;
+}
 
 void RmlUiPanelCommunity::bindCallbacks(std::function<void(int)> onSelection,
                                         std::function<void(const std::string &)> onAdd,
@@ -634,20 +640,30 @@ void RmlUiPanelCommunity::onLoaded(Rml::ElementDocument *doc) {
     deleteDialog.installListeners(listeners);
 
     clearAddStatus();
-    setListOptions(listOptions, selectedIndex);
-    setEntries(entries);
+    if (consoleModel) {
+        setListOptions(consoleModel->community.listOptions,
+                       consoleModel->community.listSelectedIndex);
+        setEntries(consoleModel->community.entries);
+    }
 }
 
 void RmlUiPanelCommunity::setCommunityDetails(const std::string &details) {
-    communityDetails = details;
+    if (consoleModel) {
+        consoleModel->community.detailsText = details;
+    }
     if (showingCommunityInfo) {
         updateServerDetails();
     }
 }
 
 void RmlUiPanelCommunity::setListOptions(const std::vector<ServerListOption> &options, int selected) {
-    listOptions = options;
-    selectedIndex = selected;
+    if (!consoleModel) {
+        return;
+    }
+    consoleModel->community.listOptions = options;
+    consoleModel->community.listSelectedIndex = selected;
+    auto &listOptions = consoleModel->community.listOptions;
+    auto &selectedIndex = consoleModel->community.listSelectedIndex;
     if (selectedIndex < 0 && !listOptions.empty()) {
         selectedIndex = 0;
     }
@@ -694,39 +710,27 @@ void RmlUiPanelCommunity::refreshCommunityCredentials() {
     }
     clearPasswordValue();
 
-    const std::string key = communityKeyForIndex(selectedIndex);
-    if (key.empty()) {
+    if (!consoleController) {
         return;
     }
-
-    const auto *credsIt = ui::UiConfig::GetCommunityCredentials();
-    if (!credsIt || !credsIt->is_object()) {
-        return;
+    const auto creds = consoleController->loadCommunityCredentials(consoleModel->community.listSelectedIndex);
+    if (!creds.username.empty()) {
+        setUsernameValue(creds.username);
     }
-    const auto entryIt = credsIt->find(key);
-    if (entryIt == credsIt->end() || !entryIt->is_object()) {
-        return;
-    }
-    const auto &entry = *entryIt;
-    if (auto userIt = entry.find("username"); userIt != entry.end() && userIt->is_string()) {
-        setUsernameValue(userIt->get<std::string>());
-    }
-    if (key != "LAN") {
-        if (auto passIt = entry.find("passwordHash"); passIt != entry.end() && passIt->is_string()) {
-            const std::string passhash = passIt->get<std::string>();
-            if (!passhash.empty()) {
-                storedPasswordHash = passhash;
-                setPasswordHintActive(true);
-            }
-        }
-    }
-    if (storedPasswordHash.empty()) {
+    if (!creds.storedPasswordHash.empty()) {
+        storedPasswordHash = creds.storedPasswordHash;
+        setPasswordHintActive(true);
+    } else {
         setPasswordHintActive(false);
     }
 }
 
 void RmlUiPanelCommunity::setEntries(const std::vector<CommunityBrowserEntry> &entriesIn) {
-    entries = entriesIn;
+    if (!consoleModel) {
+        return;
+    }
+    consoleModel->community.entries = entriesIn;
+    auto &entries = consoleModel->community.entries;
     if (!serverList) {
         return;
     }
@@ -779,8 +783,8 @@ void RmlUiPanelCommunity::setEntries(const std::vector<CommunityBrowserEntry> &e
         }
     }
 
-    if (selectedServerIndex >= static_cast<int>(entries.size())) {
-        selectedServerIndex = -1;
+    if (consoleModel->community.selectedIndex >= static_cast<int>(entries.size())) {
+        consoleModel->community.selectedIndex = -1;
     }
     updateServerDetails();
 }
@@ -791,17 +795,21 @@ void RmlUiPanelCommunity::setAddStatus(const std::string &text, bool isError) {
 }
 
 void RmlUiPanelCommunity::setServerDescriptionLoading(const std::string &key, bool loading) {
-    serverDescriptionLoadingKey = key;
-    serverDescriptionLoading = loading;
-    if (!loading && key.empty()) {
-        serverDescriptionLoadingKey.clear();
+    if (consoleModel) {
+        consoleModel->community.serverDescriptionLoadingKey = key;
+        consoleModel->community.serverDescriptionLoading = loading;
+        if (!loading && key.empty()) {
+            consoleModel->community.serverDescriptionLoadingKey.clear();
+        }
     }
     updateServerDetails();
 }
 
 void RmlUiPanelCommunity::setServerDescriptionError(const std::string &key, const std::string &message) {
-    serverDescriptionErrorKey = key;
-    serverDescriptionErrorText = message;
+    if (consoleModel) {
+        consoleModel->community.serverDescriptionErrorKey = key;
+        consoleModel->community.serverDescriptionErrorText = message;
+    }
     updateServerDetails();
 }
 
@@ -815,7 +823,9 @@ void RmlUiPanelCommunity::clearAddInput() {
 }
 
 void RmlUiPanelCommunity::setConnectionState(const ConsoleInterface::ConnectionState &state) {
-    connectionState = state;
+    if (consoleModel) {
+        consoleModel->connectionState = state;
+    }
     updateServerDetails();
 }
 
@@ -825,15 +835,6 @@ void RmlUiPanelCommunity::setUserConfigPath(const std::string &path) {
 
 void RmlUiPanelCommunity::showErrorDialog(const std::string &message) {
     errorDialog.show(escapeRmlText(message));
-}
-
-std::optional<std::string> RmlUiPanelCommunity::consumeDeleteListRequest() {
-    if (!pendingDeleteListHost.has_value()) {
-        return std::nullopt;
-    }
-    auto out = pendingDeleteListHost;
-    pendingDeleteListHost.reset();
-    return out;
 }
 
 void RmlUiPanelCommunity::setPasswordHintActive(bool active) {
@@ -900,6 +901,9 @@ void RmlUiPanelCommunity::handleSelection() {
     if (!selectElement || !onSelectionChanged) {
         return;
     }
+    if (!consoleModel) {
+        return;
+    }
     if (suppressSelectionEvents) {
         return;
     }
@@ -908,7 +912,7 @@ void RmlUiPanelCommunity::handleSelection() {
         return;
     }
     const int selection = select->GetSelection();
-    selectedIndex = selection;
+    consoleModel->community.listSelectedIndex = selection;
     onSelectionChanged(selection);
     refreshCommunityCredentials();
     if (passwordLabel) {
@@ -921,7 +925,7 @@ void RmlUiPanelCommunity::handleSelection() {
         communityDeleteButton->SetClass("hidden", isLanSelected());
     }
     showingCommunityInfo = true;
-    selectedServerIndex = -1;
+    consoleModel->community.selectedIndex = -1;
     updateServerDetails();
 }
 
@@ -957,13 +961,18 @@ void RmlUiPanelCommunity::handleRefresh() {
 }
 
 void RmlUiPanelCommunity::handleJoin() {
+    if (!consoleModel) {
+        return;
+    }
+    auto &community = consoleModel->community;
     spdlog::info("RmlUi Community: Join clicked (selectedServerIndex={}, entries={})",
-                 selectedServerIndex, entries.size());
-    if (selectedServerIndex < 0 || selectedServerIndex >= static_cast<int>(entries.size())) {
+                 community.selectedIndex, community.entries.size());
+    if (community.selectedIndex < 0 ||
+        community.selectedIndex >= static_cast<int>(community.entries.size())) {
         spdlog::warn("RmlUi Community: Join ignored (no valid selection)");
         return;
     }
-    const auto &entry = entries[static_cast<std::size_t>(selectedServerIndex)];
+    const auto &entry = community.entries[static_cast<std::size_t>(community.selectedIndex)];
     if (detailLanInfoSection) detailLanInfoSection->SetClass("hidden", true);
     if (detailServerSection) detailServerSection->SetClass("hidden", false);
     if (detailWebsiteSection) detailWebsiteSection->SetClass("hidden", false);
@@ -971,7 +980,7 @@ void RmlUiPanelCommunity::handleJoin() {
     if (detailDescriptionSection) detailDescriptionSection->SetClass("hidden", false);
     if (detailScreenshotSection) detailScreenshotSection->SetClass("hidden", false);
     if (hasActiveConnection() && !isConnectedToEntry(entry)) {
-        pendingJoinIndex = selectedServerIndex;
+        pendingJoinIndex = community.selectedIndex;
         const std::string serverName = !entry.worldName.empty()
             ? entry.worldName
             : (!entry.label.empty() ? entry.label : entry.host);
@@ -988,7 +997,7 @@ void RmlUiPanelCommunity::handleJoin() {
         spdlog::warn("RmlUi Community: Join ignored (no callback bound)");
         return;
     }
-    onJoinRequested(selectedServerIndex);
+    onJoinRequested(community.selectedIndex);
 }
 
 void RmlUiPanelCommunity::handleResume() {
@@ -1008,9 +1017,14 @@ void RmlUiPanelCommunity::handleConfirmJoin(bool accepted) {
         pendingJoinIndex = -1;
         return;
     }
+    if (!consoleModel) {
+        pendingJoinIndex = -1;
+        return;
+    }
+    auto &community = consoleModel->community;
     const int joinIndex = pendingJoinIndex;
     pendingJoinIndex = -1;
-    if (joinIndex < 0 || joinIndex >= static_cast<int>(entries.size())) {
+    if (joinIndex < 0 || joinIndex >= static_cast<int>(community.entries.size())) {
         return;
     }
     if (onJoinRequested) {
@@ -1043,89 +1057,66 @@ void RmlUiPanelCommunity::handleDeleteConfirm(bool accepted) {
     if (!accepted) {
         return;
     }
-    if (selectedIndex >= 0 && selectedIndex < static_cast<int>(listOptions.size())) {
-        const auto &opt = listOptions[static_cast<std::size_t>(selectedIndex)];
+    if (!consoleModel || !consoleController) {
+        return;
+    }
+    const auto &community = consoleModel->community;
+    if (community.listSelectedIndex >= 0 &&
+        community.listSelectedIndex < static_cast<int>(community.listOptions.size())) {
+        const auto &opt = community.listOptions[static_cast<std::size_t>(community.listSelectedIndex)];
         if (!opt.host.empty()) {
-            pendingDeleteListHost = opt.host;
+            consoleController->queueDeleteListRequest(opt.host);
         }
     }
 }
 
 void RmlUiPanelCommunity::showDeleteDialog() {
     std::string label = "this community";
-    if (selectedIndex >= 0 && selectedIndex < static_cast<int>(listOptions.size())) {
-        const auto &opt = listOptions[static_cast<std::size_t>(selectedIndex)];
-        label = !opt.name.empty() ? opt.name : opt.host;
+    if (consoleModel) {
+        const auto &community = consoleModel->community;
+        if (community.listSelectedIndex >= 0 &&
+            community.listSelectedIndex < static_cast<int>(community.listOptions.size())) {
+            const auto &opt = community.listOptions[static_cast<std::size_t>(community.listSelectedIndex)];
+            label = !opt.name.empty() ? opt.name : opt.host;
+        }
     }
     deleteDialog.show("Delete \"" + escapeRmlText(label) + "\"?");
 }
 
 std::string RmlUiPanelCommunity::communityKeyForIndex(int index) const {
-    if (index < 0 || index >= static_cast<int>(listOptions.size())) {
+    if (!consoleController) {
         return {};
     }
-    const auto &option = listOptions[index];
-    if (option.name == "Local Area Network") {
-        return "LAN";
-    }
-    std::string host = option.host;
-    while (!host.empty() && host.back() == '/') {
-        host.pop_back();
-    }
-    return host;
+    return consoleController->communityKeyForIndex(index);
 }
 
 void RmlUiPanelCommunity::persistCommunityCredentials(bool passwordChanged) {
-    const std::string key = communityKeyForIndex(selectedIndex);
-    if (key.empty()) {
+    if (!consoleModel || !consoleController) {
         return;
     }
-
-    bz::json::Value creds = bz::json::Object();
-    if (const auto *existing = ui::UiConfig::GetCommunityCredentials()) {
-        if (existing->is_object()) {
-            creds = *existing;
-        }
-    }
-
     const std::string username = getUsernameValue();
-    if (username.empty()) {
-        creds.erase(key);
-    } else {
-        if (!creds.contains(key) || !creds[key].is_object()) {
-            creds[key] = bz::json::Object();
-        }
-        creds[key]["username"] = username;
-        if (key == "LAN") {
-            if (creds[key].is_object()) {
-                creds[key].erase("passwordHash");
-                creds[key].erase("salt");
-            }
-        } else if (!storedPasswordHash.empty()) {
-            creds[key]["passwordHash"] = storedPasswordHash;
-        } else if (passwordChanged) {
-            if (creds[key].is_object()) {
-                creds[key].erase("passwordHash");
-            }
-            passwordHintActive = false;
-            storedPasswordHash.clear();
-        }
-    }
-    if (creds.empty()) {
-        ui::UiConfig::EraseCommunityCredentials();
-    } else {
-        ui::UiConfig::SetCommunityCredentials(creds);
+    const auto result = consoleController->persistCommunityCredentials(
+        consoleModel->community.listSelectedIndex,
+        username,
+        storedPasswordHash,
+        passwordChanged);
+    if (result.clearStoredPasswordHash) {
+        passwordHintActive = false;
+        storedPasswordHash.clear();
     }
 }
 
 void RmlUiPanelCommunity::handleCommunityInfoToggle() {
     showingCommunityInfo = true;
     if (showingCommunityInfo) {
-        selectedServerIndex = -1;
+        if (consoleModel) {
+            consoleModel->community.selectedIndex = -1;
+        }
     }
     updateServerDetails();
 
-    if (serverList) {
+    if (serverList && consoleModel) {
+        const auto &entries = consoleModel->community.entries;
         for (std::size_t i = 0; i < entries.size(); ++i) {
             const std::string rowId = "server-row-" + std::to_string(i);
             if (auto *row = document->GetElementById(rowId)) {
@@ -1140,10 +1131,14 @@ void RmlUiPanelCommunity::clearAddStatus() {
 }
 
 void RmlUiPanelCommunity::handleServerClick(int index) {
+    if (!consoleModel) {
+        return;
+    }
+    const auto &entries = consoleModel->community.entries;
     if (index < 0 || index >= static_cast<int>(entries.size())) {
         return;
     }
-    selectedServerIndex = index;
+    consoleModel->community.selectedIndex = index;
     showingCommunityInfo = false;
     if (onServerSelectionChanged) {
         onServerSelectionChanged(index);
@@ -1155,12 +1150,16 @@ void RmlUiPanelCommunity::updateServerDetails() {
     if (!detailName || !detailWebsite || !detailOverview || !detailDescription || !detailScreenshot) {
         return;
     }
+    if (!consoleModel) {
+        return;
+    }
+    auto &community = consoleModel->community;
 
     if (detailTitle) {
         detailTitle->SetInnerRML(showingCommunityInfo ? "Community Info" : "Server Details");
     }
     if (joinButton) {
-        joinButton->SetClass("hidden", showingCommunityInfo || selectedServerIndex < 0);
+        joinButton->SetClass("hidden", showingCommunityInfo || community.selectedIndex < 0);
     }
     if (quitButton) {
         quitButton->SetClass("hidden", true);
@@ -1203,24 +1202,27 @@ void RmlUiPanelCommunity::updateServerDetails() {
         detailWebsite->SetInnerRML("");
         detailWebsite->SetAttribute("href", "");
         detailOverview->SetInnerRML("");
-        if (communityDetails.empty()) {
+        if (community.detailsText.empty()) {
             detailDescription->SetInnerRML("No community details available.");
         } else {
-            const std::string rendered = renderMarkdownToRml(communityDetails);
-            detailDescription->SetInnerRML(rendered.empty() ? escapeRmlText(communityDetails) : rendered);
+            const std::string rendered = renderMarkdownToRml(community.detailsText);
+            detailDescription->SetInnerRML(rendered.empty()
+                                               ? escapeRmlText(community.detailsText)
+                                               : rendered);
         }
         detailScreenshot->SetInnerRML("");
         return;
     }
 
-    for (std::size_t i = 0; i < entries.size(); ++i) {
+    for (std::size_t i = 0; i < community.entries.size(); ++i) {
         const std::string rowId = "server-row-" + std::to_string(i);
         if (auto *row = document->GetElementById(rowId)) {
-            row->SetClass("selected", static_cast<int>(i) == selectedServerIndex);
+            row->SetClass("selected", static_cast<int>(i) == community.selectedIndex);
         }
     }
 
-    if (selectedServerIndex < 0 || selectedServerIndex >= static_cast<int>(entries.size())) {
+    if (community.selectedIndex < 0 ||
+        community.selectedIndex >= static_cast<int>(community.entries.size())) {
         detailName->SetInnerRML("Select a server");
         detailWebsite->SetInnerRML("");
         detailWebsite->SetAttribute("href", "");
@@ -1236,7 +1238,7 @@ void RmlUiPanelCommunity::updateServerDetails() {
         return;
     }
 
-    const auto &entry = entries[static_cast<std::size_t>(selectedServerIndex)];
+    const auto &entry = community.entries[static_cast<std::size_t>(community.selectedIndex)];
     const bool connectedEntry = isConnectedToEntry(entry);
     if (joinButton) {
         joinButton->SetInnerRML(connectedEntry ? "Resume" : "Join");
@@ -1258,10 +1260,15 @@ void RmlUiPanelCommunity::updateServerDetails() {
     detailWebsite->SetAttribute("href", website);
     detailOverview->SetInnerRML(overview.empty() ? "No overview available." : renderTextWithTwemoji(overview));
     if (description.empty()) {
-        if (serverDescriptionLoading && !detailsKey.empty() && detailsKey == serverDescriptionLoadingKey) {
+        if (community.serverDescriptionLoading &&
+            !detailsKey.empty() &&
+            detailsKey == community.serverDescriptionLoadingKey) {
             detailDescription->SetInnerRML("Fetching server description...");
-        } else if (!detailsKey.empty() && detailsKey == serverDescriptionErrorKey && !serverDescriptionErrorText.empty()) {
-            detailDescription->SetInnerRML("Description unavailable: " + escapeRmlText(serverDescriptionErrorText));
+        } else if (!detailsKey.empty() &&
+                   detailsKey == community.serverDescriptionErrorKey &&
+                   !community.serverDescriptionErrorText.empty()) {
+            detailDescription->SetInnerRML(
+                "Description unavailable: " + escapeRmlText(community.serverDescriptionErrorText));
         } else {
             detailDescription->SetInnerRML("No description provided.");
         }
@@ -1315,20 +1322,28 @@ std::string RmlUiPanelCommunity::buildServerWebsite(const CommunityBrowserEntry 
 }
 
 bool RmlUiPanelCommunity::hasActiveConnection() const {
-    return connectionState.connected;
+    return consoleModel && consoleModel->connectionState.connected;
 }
 
 bool RmlUiPanelCommunity::isLanSelected() const {
-    return selectedIndex >= 0 &&
-           selectedIndex < static_cast<int>(listOptions.size()) &&
-           listOptions[static_cast<std::size_t>(selectedIndex)].name == "Local Area Network";
+    if (!consoleModel) {
+        return false;
+    }
+    const auto &community = consoleModel->community;
+    return community.listSelectedIndex >= 0 &&
+           community.listSelectedIndex < static_cast<int>(community.listOptions.size()) &&
+           community.listOptions[static_cast<std::size_t>(community.listSelectedIndex)].name == "Local Area Network";
 }
 
 bool RmlUiPanelCommunity::isConnectedToEntry(const CommunityBrowserEntry &entry) const {
-    return connectionState.connected &&
-           connectionState.port == entry.port &&
-           !connectionState.host.empty() &&
-           connectionState.host == entry.host;
+    if (!consoleModel) {
+        return false;
+    }
+    const auto &state = consoleModel->connectionState;
+    return state.connected &&
+           state.port == entry.port &&
+           !state.host.empty() &&
+           state.host == entry.host;
 }
 
 } // namespace ui

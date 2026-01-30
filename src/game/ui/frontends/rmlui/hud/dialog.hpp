@@ -22,7 +22,7 @@ public:
 private:
     Rml::Element *overlay = nullptr;
     Rml::Element *textElement = nullptr;
-    std::string currentText = "Press U to spawn";
+    std::string currentText;
     bool visible = false;
     EmojiMarkupFn emojiMarkup;
 };

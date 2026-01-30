@@ -420,10 +420,23 @@ set(ENGINE_CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/game/ui/backend_factory.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/config.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/ui_config.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/input_mapping.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/controllers/console_controller.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/controllers/console_controller.hpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/controllers/hud_controller.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/controllers/hud_controller.hpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/controllers/bindings_controller.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/controllers/bindings_controller.hpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/controllers/settings_controller.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/controllers/settings_controller.hpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/console/keybindings.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/hud_settings.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/render_settings.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/render_scale.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/models/hud_model.hpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/models/console_model.hpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/models/settings_model.hpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/models/bindings_model.hpp
     ${PROJECT_SOURCE_DIR}/src/engine/audio/audio.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/audio/backend_factory.cpp
 )

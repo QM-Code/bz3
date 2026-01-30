@@ -12,8 +12,8 @@
 
 #include "common/config_store.hpp"
 #include "common/i18n.hpp"
+#include "ui/console/status_banner.hpp"
 #include "spdlog/spdlog.h"
-#include "ui/ui_config.hpp"
 
 namespace ui {
 namespace {
@@ -116,9 +116,9 @@ RmlUiPanelSettings::RmlUiPanelSettings()
 
 void RmlUiPanelSettings::setUserConfigPath(const std::string &path) {
     (void)path;
-    loaded = false;
-    renderSettings.reset();
-    hudSettings.reset();
+    settingsModel.loaded = false;
+    settingsModel.render.reset();
+    settingsModel.hud.reset();
     syncSettingsFromConfig();
     syncRenderBrightnessControls(true);
     syncHudControls();
@@ -210,18 +210,27 @@ void RmlUiPanelSettings::onUpdate() {
     if (!document) {
         return;
     }
-    if (!loaded) {
-        loaded = true;
+    if (!settingsModel.loaded) {
+        settingsModel.loaded = true;
         syncSettingsFromConfig();
         syncRenderBrightnessControls(true);
         syncHudControls();
         updateStatus();
     }
-    if (hudSettings.consumeDirty()) {
-        if (!hudSettings.saveToConfig()) {
-            showStatus("Failed to save HUD settings.", true);
+    if (settingsModel.hud.consumeDirty()) {
+        std::string error;
+        if (!settingsController.saveHudSettings(&error)) {
+            showStatus(error, true);
         }
     }
+}
+
+void RmlUiPanelSettings::onShow() {
+    settingsModel.loaded = false;
+}
+
+void RmlUiPanelSettings::onConfigChanged() {
+    settingsModel.loaded = false;
 }
 
 void RmlUiPanelSettings::rebuildLanguageOptions() {
@@ -256,8 +265,9 @@ void RmlUiPanelSettings::applyLanguageSelection(const std::string &code) {
     if (code == selectedLanguageFromConfig() && code == bz::i18n::Get().language()) {
         return;
     }
-    if (!ui::UiConfig::SetLanguage(code)) {
-        showStatus("Failed to save language.", true);
+    std::string error;
+    if (!settingsController.setLanguage(code, &error)) {
+        showStatus(error, true);
         return;
     }
     if (languageCallback) {
@@ -266,7 +276,7 @@ void RmlUiPanelSettings::applyLanguageSelection(const std::string &code) {
 }
 
 std::string RmlUiPanelSettings::selectedLanguageFromConfig() const {
-    const std::string configured = ui::UiConfig::GetLanguage();
+    const std::string configured = settingsController.getConfiguredLanguage();
     if (!configured.empty()) {
         return configured;
     }
@@ -274,7 +284,7 @@ std::string RmlUiPanelSettings::selectedLanguageFromConfig() const {
 }
 
 float RmlUiPanelSettings::getRenderBrightness() const {
-    return renderSettings.brightness();
+    return settingsModel.render.brightness();
 }
 
 bool RmlUiPanelSettings::isRenderBrightnessDragActive() const {
@@ -286,7 +296,7 @@ void RmlUiPanelSettings::clearRenderBrightnessDrag() {
 }
 
 void RmlUiPanelSettings::applyRenderBrightness(float value, bool fromUser) {
-    if (!renderSettings.setBrightness(value, fromUser)) {
+    if (!settingsModel.render.setBrightness(value, fromUser)) {
         return;
     }
     if (fromUser) {
@@ -297,11 +307,12 @@ void RmlUiPanelSettings::applyRenderBrightness(float value, bool fromUser) {
 }
 
 bool RmlUiPanelSettings::commitRenderBrightness() {
-    if (!renderSettings.saveToConfig()) {
-        showStatus("Failed to save render settings.", true);
+    std::string error;
+    if (!settingsController.saveRenderSettings(&error)) {
+        showStatus(error, true);
         return false;
     }
-    renderSettings.clearDirty();
+    settingsModel.render.clearDirty();
     return true;
 }
 
@@ -313,7 +324,7 @@ void RmlUiPanelSettings::syncRenderBrightnessControls(bool syncSlider) {
     if (syncSlider && brightnessSlider) {
         auto *input = rmlui_dynamic_cast<Rml::ElementFormControlInput*>(brightnessSlider);
         if (input) {
-            input->SetValue(std::to_string(renderSettings.brightness()));
+            input->SetValue(std::to_string(settingsModel.render.brightness()));
         }
     }
     syncRenderBrightnessLabel();
@@ -326,7 +337,7 @@ void RmlUiPanelSettings::syncRenderBrightnessLabel() {
     std::ostringstream oss;
     oss.setf(std::ios::fixed);
     oss.precision(2);
-    oss << renderSettings.brightness() << "x";
+    oss << settingsModel.render.brightness() << "x";
     brightnessValueLabel->SetInnerRML(oss.str());
 }
 
@@ -339,11 +350,11 @@ void RmlUiPanelSettings::syncHudControls() {
             toggle.off->SetClass("active", !value);
         }
     };
-    applyToggle(hudScoreboardToggle, hudSettings.scoreboardVisible());
-    applyToggle(hudChatToggle, hudSettings.chatVisible());
-    applyToggle(hudRadarToggle, hudSettings.radarVisible());
-    applyToggle(hudFpsToggle, hudSettings.fpsVisible());
-    applyToggle(hudCrosshairToggle, hudSettings.crosshairVisible());
+    applyToggle(hudScoreboardToggle, settingsModel.hud.scoreboardVisible());
+    applyToggle(hudChatToggle, settingsModel.hud.chatVisible());
+    applyToggle(hudRadarToggle, settingsModel.hud.radarVisible());
+    applyToggle(hudFpsToggle, settingsModel.hud.fpsVisible());
+    applyToggle(hudCrosshairToggle, settingsModel.hud.crosshairVisible());
 }
 
 void RmlUiPanelSettings::handleHudToggle(Rml::Element *target) {
@@ -351,25 +362,25 @@ void RmlUiPanelSettings::handleHudToggle(Rml::Element *target) {
         return;
     }
     if (target == hudScoreboardToggle.on) {
-        hudSettings.setScoreboardVisible(true, true);
+        settingsModel.hud.setScoreboardVisible(true, true);
     } else if (target == hudScoreboardToggle.off) {
-        hudSettings.setScoreboardVisible(false, true);
+        settingsModel.hud.setScoreboardVisible(false, true);
     } else if (target == hudChatToggle.on) {
-        hudSettings.setChatVisible(true, true);
+        settingsModel.hud.setChatVisible(true, true);
     } else if (target == hudChatToggle.off) {
-        hudSettings.setChatVisible(false, true);
+        settingsModel.hud.setChatVisible(false, true);
     } else if (target == hudRadarToggle.on) {
-        hudSettings.setRadarVisible(true, true);
+        settingsModel.hud.setRadarVisible(true, true);
     } else if (target == hudRadarToggle.off) {
-        hudSettings.setRadarVisible(false, true);
+        settingsModel.hud.setRadarVisible(false, true);
     } else if (target == hudFpsToggle.on) {
-        hudSettings.setFpsVisible(true, true);
+        settingsModel.hud.setFpsVisible(true, true);
     } else if (target == hudFpsToggle.off) {
-        hudSettings.setFpsVisible(false, true);
+        settingsModel.hud.setFpsVisible(false, true);
     } else if (target == hudCrosshairToggle.on) {
-        hudSettings.setCrosshairVisible(true, true);
+        settingsModel.hud.setCrosshairVisible(true, true);
     } else if (target == hudCrosshairToggle.off) {
-        hudSettings.setCrosshairVisible(false, true);
+        settingsModel.hud.setCrosshairVisible(false, true);
     } else {
         return;
     }
@@ -377,8 +388,8 @@ void RmlUiPanelSettings::handleHudToggle(Rml::Element *target) {
 }
 
 void RmlUiPanelSettings::showStatus(const std::string &message, bool isError) {
-    statusText = message;
-    statusIsError = isError;
+    settingsModel.statusText = message;
+    settingsModel.statusIsError = isError;
     updateStatus();
 }
 
@@ -386,13 +397,17 @@ void RmlUiPanelSettings::updateStatus() {
     if (!statusLabel) {
         return;
     }
-    if (statusText.empty()) {
+    const auto banner = ui::status_banner::MakeStatusBanner(settingsModel.statusText,
+                                                            settingsModel.statusIsError);
+    if (!banner.visible) {
         statusLabel->SetClass("hidden", true);
         return;
     }
     statusLabel->SetClass("hidden", false);
-    statusLabel->SetClass("status-error", statusIsError);
-    statusLabel->SetInnerRML(escapeRmlText(statusText));
+    statusLabel->SetClass("status-error", banner.tone == ui::MessageTone::Error);
+    statusLabel->SetClass("status-pending", banner.tone == ui::MessageTone::Pending);
+    const std::string text = ui::status_banner::FormatStatusText(banner);
+    statusLabel->SetInnerRML(escapeRmlText(text));
 }
 
 void RmlUiPanelSettings::syncSettingsFromConfig() {
@@ -400,8 +415,8 @@ void RmlUiPanelSettings::syncSettingsFromConfig() {
         return;
     }
 
-    renderSettings.loadFromConfig();
-    hudSettings.loadFromConfig();
+    settingsModel.render.loadFromConfig();
+    settingsModel.hud.loadFromConfig();
 }
 
 } // namespace ui

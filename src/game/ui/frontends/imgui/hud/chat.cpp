@@ -13,6 +13,10 @@ void ImGuiHudChat::addLine(const std::string &playerName, const std::string &lin
     consoleLines.push_back(fullLine);
 }
 
+void ImGuiHudChat::setLines(const std::vector<std::string> &lines) {
+    consoleLines = lines;
+}
+
 std::string ImGuiHudChat::getSubmittedInput() const {
     return submittedInputBuffer;
 }

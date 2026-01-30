@@ -36,9 +36,11 @@
 #include "ui/frontends/rmlui/console/panels/panel_documentation.hpp"
 #include "ui/frontends/rmlui/console/panels/panel_settings.hpp"
 #include "ui/frontends/rmlui/console/panels/panel_start_server.hpp"
+#include "ui/console/tab_spec.hpp"
 #include "common/data_path_resolver.hpp"
 #include "common/config_store.hpp"
 #include "spdlog/spdlog.h"
+#include "ui/input_mapping.hpp"
 #include "ui/render_scale.hpp"
 
 namespace ui_backend {
@@ -282,145 +284,24 @@ private:
     std::chrono::steady_clock::time_point startTime = std::chrono::steady_clock::now();
 };
 
-Rml::Input::KeyIdentifier toRmlKey(platform::Key key) {
-    switch (key) {
-        case platform::Key::A: return Rml::Input::KI_A;
-        case platform::Key::B: return Rml::Input::KI_B;
-        case platform::Key::C: return Rml::Input::KI_C;
-        case platform::Key::D: return Rml::Input::KI_D;
-        case platform::Key::E: return Rml::Input::KI_E;
-        case platform::Key::F: return Rml::Input::KI_F;
-        case platform::Key::G: return Rml::Input::KI_G;
-        case platform::Key::H: return Rml::Input::KI_H;
-        case platform::Key::I: return Rml::Input::KI_I;
-        case platform::Key::J: return Rml::Input::KI_J;
-        case platform::Key::K: return Rml::Input::KI_K;
-        case platform::Key::L: return Rml::Input::KI_L;
-        case platform::Key::M: return Rml::Input::KI_M;
-        case platform::Key::N: return Rml::Input::KI_N;
-        case platform::Key::O: return Rml::Input::KI_O;
-        case platform::Key::P: return Rml::Input::KI_P;
-        case platform::Key::Q: return Rml::Input::KI_Q;
-        case platform::Key::R: return Rml::Input::KI_R;
-        case platform::Key::S: return Rml::Input::KI_S;
-        case platform::Key::T: return Rml::Input::KI_T;
-        case platform::Key::U: return Rml::Input::KI_U;
-        case platform::Key::V: return Rml::Input::KI_V;
-        case platform::Key::W: return Rml::Input::KI_W;
-        case platform::Key::X: return Rml::Input::KI_X;
-        case platform::Key::Y: return Rml::Input::KI_Y;
-        case platform::Key::Z: return Rml::Input::KI_Z;
-        case platform::Key::Num0: return Rml::Input::KI_0;
-        case platform::Key::Num1: return Rml::Input::KI_1;
-        case platform::Key::Num2: return Rml::Input::KI_2;
-        case platform::Key::Num3: return Rml::Input::KI_3;
-        case platform::Key::Num4: return Rml::Input::KI_4;
-        case platform::Key::Num5: return Rml::Input::KI_5;
-        case platform::Key::Num6: return Rml::Input::KI_6;
-        case platform::Key::Num7: return Rml::Input::KI_7;
-        case platform::Key::Num8: return Rml::Input::KI_8;
-        case platform::Key::Num9: return Rml::Input::KI_9;
-        case platform::Key::F1: return Rml::Input::KI_F1;
-        case platform::Key::F2: return Rml::Input::KI_F2;
-        case platform::Key::F3: return Rml::Input::KI_F3;
-        case platform::Key::F4: return Rml::Input::KI_F4;
-        case platform::Key::F5: return Rml::Input::KI_F5;
-        case platform::Key::F6: return Rml::Input::KI_F6;
-        case platform::Key::F7: return Rml::Input::KI_F7;
-        case platform::Key::F8: return Rml::Input::KI_F8;
-        case platform::Key::F9: return Rml::Input::KI_F9;
-        case platform::Key::F10: return Rml::Input::KI_F10;
-        case platform::Key::F11: return Rml::Input::KI_F11;
-        case platform::Key::F12: return Rml::Input::KI_F12;
-        case platform::Key::F13: return Rml::Input::KI_F13;
-        case platform::Key::F14: return Rml::Input::KI_F14;
-        case platform::Key::F15: return Rml::Input::KI_F15;
-        case platform::Key::F16: return Rml::Input::KI_F16;
-        case platform::Key::F17: return Rml::Input::KI_F17;
-        case platform::Key::F18: return Rml::Input::KI_F18;
-        case platform::Key::F19: return Rml::Input::KI_F19;
-        case platform::Key::F20: return Rml::Input::KI_F20;
-        case platform::Key::F21: return Rml::Input::KI_F21;
-        case platform::Key::F22: return Rml::Input::KI_F22;
-        case platform::Key::F23: return Rml::Input::KI_F23;
-        case platform::Key::F24: return Rml::Input::KI_F24;
-        case platform::Key::Space: return Rml::Input::KI_SPACE;
-        case platform::Key::Escape: return Rml::Input::KI_ESCAPE;
-        case platform::Key::Enter: return Rml::Input::KI_RETURN;
-        case platform::Key::Tab: return Rml::Input::KI_TAB;
-        case platform::Key::Backspace: return Rml::Input::KI_BACK;
-        case platform::Key::Left: return Rml::Input::KI_LEFT;
-        case platform::Key::Right: return Rml::Input::KI_RIGHT;
-        case platform::Key::Up: return Rml::Input::KI_UP;
-        case platform::Key::Down: return Rml::Input::KI_DOWN;
-        case platform::Key::LeftBracket: return Rml::Input::KI_OEM_4;
-        case platform::Key::RightBracket: return Rml::Input::KI_OEM_6;
-        case platform::Key::Minus: return Rml::Input::KI_OEM_MINUS;
-        case platform::Key::Equal: return Rml::Input::KI_OEM_PLUS;
-        case platform::Key::Apostrophe: return Rml::Input::KI_OEM_7;
-        case platform::Key::GraveAccent: return Rml::Input::KI_OEM_3;
-        case platform::Key::LeftShift: return Rml::Input::KI_LSHIFT;
-        case platform::Key::RightShift: return Rml::Input::KI_RSHIFT;
-        case platform::Key::LeftControl: return Rml::Input::KI_LCONTROL;
-        case platform::Key::RightControl: return Rml::Input::KI_RCONTROL;
-        case platform::Key::LeftAlt: return Rml::Input::KI_LMENU;
-        case platform::Key::RightAlt: return Rml::Input::KI_RMENU;
-        case platform::Key::LeftSuper: return Rml::Input::KI_LMETA;
-        case platform::Key::RightSuper: return Rml::Input::KI_RMETA;
-        case platform::Key::Home: return Rml::Input::KI_HOME;
-        case platform::Key::End: return Rml::Input::KI_END;
-        case platform::Key::PageUp: return Rml::Input::KI_PRIOR;
-        case platform::Key::PageDown: return Rml::Input::KI_NEXT;
-        case platform::Key::Insert: return Rml::Input::KI_INSERT;
-        case platform::Key::Delete: return Rml::Input::KI_DELETE;
-        case platform::Key::CapsLock: return Rml::Input::KI_CAPITAL;
-        case platform::Key::NumLock: return Rml::Input::KI_NUMLOCK;
-        case platform::Key::ScrollLock: return Rml::Input::KI_SCROLL;
-        default: return Rml::Input::KI_UNKNOWN;
+std::string tabLabelForSpec(const ui::ConsoleTabSpec &spec) {
+    if (spec.labelKey) {
+        return bz::i18n::Get().get(spec.labelKey);
     }
+    if (spec.fallbackLabel) {
+        return spec.fallbackLabel;
+    }
+    return spec.key ? spec.key : "";
 }
 
-int toRmlMods(const platform::Modifiers &mods) {
-    int out = 0;
-    if (mods.control) {
-        out |= Rml::Input::KM_CTRL;
+ui::RmlUiPanel *findPanelByKey(const std::vector<std::unique_ptr<ui::RmlUiPanel>> &panels,
+                               const std::string &key) {
+    for (const auto &panel : panels) {
+        if (panel && panel->key() == key) {
+            return panel.get();
+        }
     }
-    if (mods.shift) {
-        out |= Rml::Input::KM_SHIFT;
-    }
-    if (mods.alt) {
-        out |= Rml::Input::KM_ALT;
-    }
-    if (mods.super) {
-        out |= Rml::Input::KM_META;
-    }
-    return out;
-}
-
-int currentRmlMods(platform::Window *window) {
-    if (!window) {
-        return 0;
-    }
-    platform::Modifiers mods;
-    mods.shift = window->isKeyDown(platform::Key::LeftShift) || window->isKeyDown(platform::Key::RightShift);
-    mods.control = window->isKeyDown(platform::Key::LeftControl) || window->isKeyDown(platform::Key::RightControl);
-    mods.alt = window->isKeyDown(platform::Key::LeftAlt) || window->isKeyDown(platform::Key::RightAlt);
-    mods.super = window->isKeyDown(platform::Key::LeftSuper) || window->isKeyDown(platform::Key::RightSuper);
-    return toRmlMods(mods);
-}
-
-int toRmlMouseButton(platform::MouseButton button) {
-    switch (button) {
-        case platform::MouseButton::Left: return 0;
-        case platform::MouseButton::Right: return 1;
-        case platform::MouseButton::Middle: return 2;
-        case platform::MouseButton::Button4: return 3;
-        case platform::MouseButton::Button5: return 4;
-        case platform::MouseButton::Button6: return 5;
-        case platform::MouseButton::Button7: return 6;
-        case platform::MouseButton::Button8: return 7;
-        default: return 0;
-    }
+    return nullptr;
 }
 
 class TabClickListener final : public Rml::EventListener {
@@ -485,6 +366,7 @@ struct RmlUiBackend::RmlUiState {
     std::unordered_set<std::string> loadedFontFiles;
     std::string consolePath;
     std::string hudPath;
+    uint64_t lastConfigRevision = 0;
     bool reloadRequested = false;
     bool reloadArmed = false;
     bool hardReloadRequested = false;
@@ -492,9 +374,6 @@ struct RmlUiBackend::RmlUiState {
     std::string regularFontPath;
     std::string emojiFontPath;
     std::unique_ptr<ui::RmlUiHud> hud;
-    double fpsLastTime = 0.0;
-    double fpsValue = 0.0;
-    int fpsFrames = 0;
     bool outputVisible = false;
 };
 
@@ -565,7 +444,6 @@ RmlUiBackend::RmlUiBackend(platform::Window &windowRefIn) : windowRef(&windowRef
     state->consolePath = bz::data::Resolve("client/ui/console.rml").string();
     state->hudPath = bz::data::Resolve("client/ui/hud.rml").string();
     state->hud = std::make_unique<ui::RmlUiHud>();
-    state->fpsLastTime = state->systemInterface.GetElapsedTime();
     auto communityPanel = std::make_unique<ui::RmlUiPanelCommunity>();
     auto *communityPanelPtr = communityPanel.get();
     state->panels.emplace_back(std::move(communityPanel));
@@ -673,10 +551,7 @@ void RmlUiBackend::handleEvents(const std::vector<platform::Event> &events) {
     for (const auto &event : events) {
         switch (event.type) {
             case platform::EventType::KeyDown: {
-                int mods = toRmlMods(event.mods);
-                if (mods == 0) {
-                    mods = currentRmlMods(windowRef);
-                }
+                const int mods = ui::input_mapping::RmlModsForEvent(event, windowRef);
                 if (event.key == platform::Key::R && (mods & Rml::Input::KM_CTRL)) {
                     state->reloadRequested = true;
                     state->reloadArmed = true;
@@ -688,18 +563,15 @@ void RmlUiBackend::handleEvents(const std::vector<platform::Event> &events) {
                 if (!isUiInputEnabled()) {
                     break;
                 }
-                state->context->ProcessKeyDown(toRmlKey(event.key), mods);
+                state->context->ProcessKeyDown(ui::input_mapping::ToRmlKey(event.key), mods);
                 break;
             }
             case platform::EventType::KeyUp: {
                 if (!isUiInputEnabled()) {
                     break;
                 }
-                int mods = toRmlMods(event.mods);
-                if (mods == 0) {
-                    mods = currentRmlMods(windowRef);
-                }
-                state->context->ProcessKeyUp(toRmlKey(event.key), mods);
+                const int mods = ui::input_mapping::RmlModsForEvent(event, windowRef);
+                state->context->ProcessKeyUp(ui::input_mapping::ToRmlKey(event.key), mods);
                 break;
             }
             case platform::EventType::TextInput: {
@@ -716,32 +588,23 @@ void RmlUiBackend::handleEvents(const std::vector<platform::Event> &events) {
                 if (!(consoleVisible || hudVisible)) {
                     break;
                 }
-                int mods = toRmlMods(event.mods);
-                if (mods == 0) {
-                    mods = currentRmlMods(windowRef);
-                }
-                state->context->ProcessMouseButtonDown(toRmlMouseButton(event.mouseButton), mods);
+                const int mods = ui::input_mapping::RmlModsForEvent(event, windowRef);
+                state->context->ProcessMouseButtonDown(ui::input_mapping::ToRmlMouseButton(event.mouseButton), mods);
                 break;
             }
             case platform::EventType::MouseButtonUp: {
                 if (!(consoleVisible || hudVisible)) {
                     break;
                 }
-                int mods = toRmlMods(event.mods);
-                if (mods == 0) {
-                    mods = currentRmlMods(windowRef);
-                }
-                state->context->ProcessMouseButtonUp(toRmlMouseButton(event.mouseButton), mods);
+                const int mods = ui::input_mapping::RmlModsForEvent(event, windowRef);
+                state->context->ProcessMouseButtonUp(ui::input_mapping::ToRmlMouseButton(event.mouseButton), mods);
                 break;
             }
             case platform::EventType::MouseMove: {
                 if (!(consoleVisible || hudVisible)) {
                     break;
                 }
-                int mods = toRmlMods(event.mods);
-                if (mods == 0) {
-                    mods = currentRmlMods(windowRef);
-                }
+                const int mods = ui::input_mapping::RmlModsForEvent(event, windowRef);
                 const int x = static_cast<int>(std::lround(event.x * renderScale));
                 const int y = static_cast<int>(std::lround(event.y * renderScale));
                 state->context->ProcessMouseMove(x, y, mods);
@@ -751,10 +614,7 @@ void RmlUiBackend::handleEvents(const std::vector<platform::Event> &events) {
                 if (!(consoleVisible || hudVisible)) {
                     break;
                 }
-                int mods = toRmlMods(event.mods);
-                if (mods == 0) {
-                    mods = currentRmlMods(windowRef);
-                }
+                const int mods = ui::input_mapping::RmlModsForEvent(event, windowRef);
                 state->context->ProcessMouseWheel(-static_cast<float>(event.scrollY), mods);
                 break;
             }
@@ -795,6 +655,16 @@ void RmlUiBackend::update() {
         return;
     }
 
+    const uint64_t revision = bz::config::ConfigStore::Revision();
+    if (revision != state->lastConfigRevision) {
+        state->lastConfigRevision = revision;
+        for (const auto &panel : state->panels) {
+            if (panel) {
+                panel->configChanged();
+            }
+        }
+    }
+
     if (renderBridge && state->hud) {
         state->hud->setRadarTexture(renderBridge->getRadarTexture());
     }
@@ -803,11 +673,15 @@ void RmlUiBackend::update() {
         state->hud->setScoreboardEntries(hudModel.scoreboardEntries);
         state->hud->setDialogText(hudModel.dialog.text);
         state->hud->setDialogVisible(hudModel.dialog.visible);
+        state->hud->setChatLines(hudModel.chatLines);
         state->hud->setScoreboardVisible(hudModel.visibility.scoreboard);
         state->hud->setChatVisible(hudModel.visibility.chat);
         state->hud->setRadarVisible(hudModel.visibility.radar);
         state->hud->setCrosshairVisible(hudModel.visibility.crosshair && !consoleVisible);
         state->hud->setFpsVisible(hudModel.visibility.hud && hudModel.visibility.fps);
+        if (hudModel.visibility.hud && hudModel.visibility.fps) {
+            state->hud->setFpsValue(hudModel.fpsValue);
+        }
     }
 
     int fbWidth = 0;
@@ -872,21 +746,12 @@ void RmlUiBackend::update() {
             }
         } else if (state->hud) {
             state->hud->update();
-            if (hudModel.visibility.hud && hudModel.visibility.fps) {
-                state->fpsFrames += 1;
-                const double now = state->systemInterface.GetElapsedTime();
-                const double elapsed = now - state->fpsLastTime;
-                if (elapsed >= 0.25) {
-                    state->fpsValue = state->fpsFrames / elapsed;
-                    state->fpsFrames = 0;
-                    state->fpsLastTime = now;
-                }
-                state->hud->setFpsValue(static_cast<float>(state->fpsValue));
-            }
         }
         state->context->Update();
         state->renderInterface.BeginFrame();
-        state->context->Render();
+        if (!std::getenv("BZ3_RMLUI_DISABLE_RENDER")) {
+            state->context->Render();
+        }
         state->renderInterface.EndFrame();
     }
 
@@ -1021,6 +886,15 @@ void RmlUiBackend::setActiveTab(const std::string &tabKey) {
             "<div style=\"padding: 8px 0;\">" + labelMarkup + " panel</div>");
     }
 
+    if (previousTab != tabKey) {
+        if (auto *panel = findPanelByKey(state->panels, previousTab)) {
+            panel->hide();
+        }
+        if (auto *panel = findPanelByKey(state->panels, tabKey)) {
+            panel->show();
+        }
+    }
+
     if (previousTab != tabKey && tabKey == "community" && consoleView) {
         consoleView->onRefreshRequested();
     }
@@ -1140,6 +1014,16 @@ void RmlUiBackend::loadConsoleDocument() {
         return;
     }
     ui::rmlui::ApplyTranslations(state->document, bz::i18n::Get());
+    for (const auto &spec : ui::GetConsoleTabSpecs()) {
+        if (!spec.key) {
+            continue;
+        }
+        const std::string elementId = std::string("tab-") + spec.key;
+        if (auto *element = state->document->GetElementById(elementId)) {
+            const std::string label = tabLabelForSpec(spec);
+            element->SetInnerRML(label);
+        }
+    }
 
     state->document->Show();
     state->bodyElement = state->document->GetElementById("main-body");

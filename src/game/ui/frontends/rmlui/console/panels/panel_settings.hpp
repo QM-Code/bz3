@@ -5,8 +5,8 @@
 #include <functional>
 #include <vector>
 
-#include "ui/hud_settings.hpp"
-#include "ui/render_settings.hpp"
+#include "ui/models/settings_model.hpp"
+#include "ui/controllers/settings_controller.hpp"
 
 namespace Rml {
 class Element;
@@ -33,6 +33,8 @@ public:
 protected:
     void onLoaded(Rml::ElementDocument *document) override;
     void onUpdate() override;
+    void onShow() override;
+    void onConfigChanged() override;
 
 private:
     class BrightnessListener;
@@ -57,9 +59,8 @@ private:
     Rml::ElementDocument *document = nullptr;
     Rml::Element *statusLabel = nullptr;
     Rml::Element *languageSelect = nullptr;
-    bool loaded = false;
-    bool statusIsError = false;
-    std::string statusText;
+    ui::SettingsModel settingsModel;
+    ui::SettingsController settingsController{settingsModel};
     std::vector<std::unique_ptr<Rml::EventListener>> listeners;
 
     Rml::Element *brightnessSlider = nullptr;
@@ -75,8 +76,6 @@ private:
     HudToggleButtons hudRadarToggle{};
     HudToggleButtons hudFpsToggle{};
     HudToggleButtons hudCrosshairToggle{};
-    RenderSettings renderSettings;
-    HudSettings hudSettings;
     std::function<void(const std::string &)> languageCallback;
     bool suppressLanguageSelection = false;
 };

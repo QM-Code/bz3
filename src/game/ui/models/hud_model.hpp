@@ -23,8 +23,10 @@ struct HudVisibility {
 
 struct HudModel {
     std::vector<ScoreboardEntry> scoreboardEntries;
+    std::vector<std::string> chatLines;
     HudDialog dialog;
     HudVisibility visibility;
+    float fpsValue = 0.0f;
 };
 
 } // namespace ui

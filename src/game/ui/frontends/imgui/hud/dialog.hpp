@@ -14,7 +14,7 @@ public:
     void draw(ImGuiIO &io, ImFont *bigFont);
 
 private:
-    std::string dialogText = "Press U to spawn";
+    std::string dialogText;
     bool visible = false;
 };
 

@@ -41,6 +41,14 @@ void ImGuiHud::setCrosshairVisible(bool show) {
     crosshairVisible = show;
 }
 
+void ImGuiHud::setFpsValue(float value) {
+    fps.setValue(value);
+}
+
+void ImGuiHud::setChatLines(const std::vector<std::string> &lines) {
+    chat.setLines(lines);
+}
+
 void ImGuiHud::addConsoleLine(const std::string &playerName, const std::string &line) {
     chat.addLine(playerName, line);
 }

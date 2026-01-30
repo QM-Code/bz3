@@ -2,7 +2,6 @@
 
 #include <functional>
 #include <memory>
-#include <optional>
 #include <vector>
 
 namespace Rml {
@@ -15,6 +14,8 @@ class EventListener;
 #include "ui/console/console_types.hpp"
 #include "ui/frontends/rmlui/console/modal_dialog.hpp"
 #include "ui/frontends/rmlui/console/panels/panel.hpp"
+#include "ui/models/console_model.hpp"
+#include "ui/controllers/console_controller.hpp"
 
 namespace ui {
 
@@ -22,6 +23,7 @@ class RmlUiPanelCommunity final : public RmlUiPanel {
 public:
     RmlUiPanelCommunity();
 
+    void setConsoleModel(ConsoleModel *model, ConsoleController *controller);
     void setListOptions(const std::vector<ServerListOption> &options, int selectedIndex);
     void setEntries(const std::vector<CommunityBrowserEntry> &entries);
     void setCommunityDetails(const std::string &details);
@@ -41,7 +43,6 @@ public:
     void setUserConfigPath(const std::string &path);
     void refreshCommunityCredentials();
     void showErrorDialog(const std::string &message);
-    std::optional<std::string> consumeDeleteListRequest();
     void bindCallbacks(std::function<void(int)> onSelection,
                        std::function<void(const std::string &)> onAdd,
                        std::function<void()> onRefresh,
@@ -114,22 +115,13 @@ private:
     RmlUiModalDialog confirmDialog;
     RmlUiModalDialog errorDialog;
     RmlUiModalDialog deleteDialog;
-    std::vector<ServerListOption> listOptions;
-    std::vector<CommunityBrowserEntry> entries;
-    int selectedIndex = -1;
-    int selectedServerIndex = -1;
+    ConsoleModel *consoleModel = nullptr;
+    ConsoleController *consoleController = nullptr;
     int pendingJoinIndex = -1;
     bool suppressSelectionEvents = false;
-    bool serverDescriptionLoading = false;
-    std::string serverDescriptionLoadingKey;
-    std::string serverDescriptionErrorKey;
-    std::string serverDescriptionErrorText;
     bool showingCommunityInfo = false;
-    std::string communityDetails;
-    ConsoleInterface::ConnectionState connectionState{};
     bool passwordHintActive = false;
     std::string storedPasswordHash;
-    std::optional<std::string> pendingDeleteListHost;
     std::function<void(int)> onSelectionChanged;
     std::function<void(const std::string &)> onAddRequested;
     std::function<void()> onRefreshRequested;

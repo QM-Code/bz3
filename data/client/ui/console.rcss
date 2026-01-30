@@ -262,6 +262,11 @@ col
     color: #ffb3b3;
 }
 
+.status-pending {
+    border-color: #6a5d2e;
+    color: #ffd98e;
+}
+
 .markdown col {
     box-sizing: border-box;
     display: table-column;

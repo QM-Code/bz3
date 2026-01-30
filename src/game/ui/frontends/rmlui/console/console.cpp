@@ -16,19 +16,22 @@ RmlUiConsole::RmlUiConsole() = default;
 
 void RmlUiConsole::attachCommunityPanel(RmlUiPanelCommunity *panel) {
     communityPanel = panel;
-    applyListOptionsToPanel();
     if (communityPanel) {
-        communityPanel->setConnectionState(connectionState);
+        communityPanel->setConsoleModel(&consoleModel, &consoleController);
+        communityPanel->setConnectionState(consoleModel.connectionState);
         if (!userConfigPath.empty()) {
             communityPanel->setUserConfigPath(userConfigPath);
         }
     }
+    applyListOptionsToPanel();
 }
 
 void RmlUiConsole::attachStartServerPanel(RmlUiPanelStartServer *panel) {
     startServerPanel = panel;
     if (startServerPanel) {
-        startServerPanel->setListOptions(listOptions, listSelectedIndex);
+        startServerPanel->setConsoleModel(&consoleModel);
+        startServerPanel->setListOptions(consoleModel.community.listOptions,
+                                         consoleModel.community.listSelectedIndex);
     }
 }
 
@@ -48,46 +51,50 @@ void RmlUiConsole::attachBindingsPanel(RmlUiPanelBindings *panel) {
 
 void RmlUiConsole::show(const std::vector<CommunityBrowserEntry> &entriesIn) {
     if (!entriesIn.empty()) {
-        entries = entriesIn;
+        consoleModel.community.entries = entriesIn;
     }
     visible = true;
+    consoleController.clearPending();
     if (communityPanel) {
-        communityPanel->setEntries(entries);
+        communityPanel->setEntries(consoleModel.community.entries);
     }
 }
 
 void RmlUiConsole::setEntries(const std::vector<CommunityBrowserEntry> &entriesIn) {
-    entries = entriesIn;
-    if (selectedServerIndex >= static_cast<int>(entries.size())) {
-        selectedServerIndex = -1;
+    consoleModel.community.entries = entriesIn;
+    if (consoleModel.community.selectedIndex >= static_cast<int>(consoleModel.community.entries.size())) {
+        consoleModel.community.selectedIndex = -1;
     }
     if (communityPanel) {
-        communityPanel->setEntries(entries);
+        communityPanel->setEntries(consoleModel.community.entries);
     }
 }
 
 void RmlUiConsole::setListOptions(const std::vector<ServerListOption> &options, int selectedIndex) {
-    listOptions = options;
-    if (listOptions.empty()) {
-        listSelectedIndex = -1;
+    consoleModel.community.listOptions = options;
+    if (consoleModel.community.listOptions.empty()) {
+        consoleModel.community.listSelectedIndex = -1;
+        consoleController.clearPending();
         return;
     }
     if (selectedIndex < 0) {
-        listSelectedIndex = 0;
-    } else if (selectedIndex >= static_cast<int>(listOptions.size())) {
-        listSelectedIndex = static_cast<int>(listOptions.size()) - 1;
+        consoleModel.community.listSelectedIndex = 0;
+    } else if (selectedIndex >= static_cast<int>(consoleModel.community.listOptions.size())) {
+        consoleModel.community.listSelectedIndex = static_cast<int>(consoleModel.community.listOptions.size()) - 1;
     } else {
-        listSelectedIndex = selectedIndex;
+        consoleModel.community.listSelectedIndex = selectedIndex;
     }
     applyListOptionsToPanel();
     refreshCommunityCredentials();
     if (startServerPanel) {
-        startServerPanel->setListOptions(listOptions, listSelectedIndex);
+        startServerPanel->setListOptions(consoleModel.community.listOptions,
+                                         consoleModel.community.listSelectedIndex);
     }
 }
 
 void RmlUiConsole::hide() {
     visible = false;
+    consoleController.clearPending();
 }
 
 bool RmlUiConsole::isVisible() const {
@@ -97,16 +104,17 @@ bool RmlUiConsole::isVisible() const {
 void RmlUiConsole::setStatus(const std::string &, bool) {}
 
 void RmlUiConsole::setCommunityDetails(const std::string &detailsText) {
+    consoleModel.community.detailsText = detailsText;
     if (communityPanel) {
         communityPanel->setCommunityDetails(detailsText);
     }
 }
 
 void RmlUiConsole::setServerDescriptionLoading(const std::string &key, bool loading) {
-    serverDescriptionLoadingKey = key;
-    serverDescriptionLoading = loading;
+    consoleModel.community.serverDescriptionLoadingKey = key;
+    consoleModel.community.serverDescriptionLoading = loading;
     if (!loading && key.empty()) {
-        serverDescriptionLoadingKey.clear();
+        consoleModel.community.serverDescriptionLoadingKey.clear();
     }
     if (communityPanel) {
         communityPanel->setServerDescriptionLoading(key, loading);
@@ -114,64 +122,47 @@ void RmlUiConsole::setServerDescriptionLoading(const std::string &key, bool load
 }
 
 bool RmlUiConsole::isServerDescriptionLoading(const std::string &key) const {
-    return serverDescriptionLoading && key == serverDescriptionLoadingKey;
+    return consoleModel.community.serverDescriptionLoading &&
+           key == consoleModel.community.serverDescriptionLoadingKey;
 }
 
 void RmlUiConsole::setServerDescriptionError(const std::string &key, const std::string &message) {
-    serverDescriptionErrorKey = key;
-    serverDescriptionErrorText = message;
+    consoleModel.community.serverDescriptionErrorKey = key;
+    consoleModel.community.serverDescriptionErrorText = message;
     if (communityPanel) {
         communityPanel->setServerDescriptionError(key, message);
     }
 }
 
 std::optional<std::string> RmlUiConsole::getServerDescriptionError(const std::string &key) const {
-    if (key.empty() || key != serverDescriptionErrorKey) {
+    if (key.empty() || key != consoleModel.community.serverDescriptionErrorKey) {
         return std::nullopt;
     }
-    return serverDescriptionErrorText;
+    return consoleModel.community.serverDescriptionErrorText;
 }
 
 std::optional<CommunityBrowserSelection> RmlUiConsole::consumeSelection() {
-    if (!pendingSelection.has_value()) {
-        return std::nullopt;
-    }
-    auto selection = pendingSelection;
-    pendingSelection.reset();
-    return selection;
+    return consoleController.consumeSelection();
 }
 
 std::optional<int> RmlUiConsole::consumeListSelection() {
-    if (!pendingListSelection.has_value()) {
-        return std::nullopt;
-    }
-    auto out = pendingListSelection;
-    pendingListSelection.reset();
-    return out;
+    return consoleController.consumeListSelection();
 }
 
 std::optional<ServerListOption> RmlUiConsole::consumeNewListRequest() {
-    if (!pendingNewList.has_value()) {
-        return std::nullopt;
-    }
-    auto out = pendingNewList;
-    pendingNewList.reset();
-    return out;
+    return consoleController.consumeNewListRequest();
 }
 
 std::optional<std::string> RmlUiConsole::consumeDeleteListRequest() {
-    if (communityPanel) {
-        return communityPanel->consumeDeleteListRequest();
-    }
-    return std::nullopt;
+    return consoleController.consumeDeleteListRequest();
 }
 
 
 void RmlUiConsole::setListStatus(const std::string &statusText, bool isErrorMessage) {
-    listStatusText = statusText;
-    listStatusIsError = isErrorMessage;
+    consoleModel.community.listStatusText = statusText;
+    consoleModel.community.listStatusIsError = isErrorMessage;
     if (communityPanel) {
-        communityPanel->setAddStatus(listStatusText, listStatusIsError);
+        communityPanel->setAddStatus(statusText, isErrorMessage);
     }
 }
 
@@ -223,24 +214,26 @@ void RmlUiConsole::storeCommunityAuth(const std::string &communityHost,
     }
 }
 
-void RmlUiConsole::setCommunityStatus(const std::string &, MessageTone) {}
+void RmlUiConsole::setCommunityStatus(const std::string &text, MessageTone tone) {
+    consoleModel.community.communityStatusText = text;
+    consoleModel.community.statusTone = tone;
+}
 
 std::optional<CommunityBrowserEntry> RmlUiConsole::getSelectedEntry() const {
-    if (selectedServerIndex < 0 || selectedServerIndex >= static_cast<int>(entries.size())) {
+    if (consoleModel.community.selectedIndex < 0 ||
+        consoleModel.community.selectedIndex >= static_cast<int>(consoleModel.community.entries.size())) {
         return std::nullopt;
     }
-    return entries[static_cast<std::size_t>(selectedServerIndex)];
+    return consoleModel.community.entries[static_cast<std::size_t>(consoleModel.community.selectedIndex)];
 }
 
 bool RmlUiConsole::consumeRefreshRequest() {
-    if (!pendingRefresh) {
-        return false;
-    }
-    pendingRefresh = false;
-    return true;
+    return consoleController.consumeRefreshRequest();
 }
 
-void RmlUiConsole::setScanning(bool) {}
+void RmlUiConsole::setScanning(bool scanning) {
+    consoleModel.community.scanning = scanning;
+}
 
 void RmlUiConsole::setUserConfigPath(const std::string &path) {
     userConfigPath = path;
@@ -268,14 +261,14 @@ bool RmlUiConsole::consumeKeybindingsReloadRequest() {
 }
 
 void RmlUiConsole::setConnectionState(const ConnectionState &state) {
-    connectionState = state;
+    consoleModel.connectionState = state;
     if (communityPanel) {
         communityPanel->setConnectionState(state);
     }
 }
 
 ConsoleInterface::ConnectionState RmlUiConsole::getConnectionState() const {
-    return connectionState;
+    return consoleModel.connectionState;
 }
 
 bool RmlUiConsole::consumeQuitRequest() {
@@ -293,13 +286,13 @@ void RmlUiConsole::showErrorDialog(const std::string &message) {
 }
 
 void RmlUiConsole::onCommunitySelection(int index) {
-    if (index < 0 || index >= static_cast<int>(listOptions.size())) {
+    if (index < 0 || index >= static_cast<int>(consoleModel.community.listOptions.size())) {
         return;
     }
-    if (listSelectedIndex != index) {
-        listSelectedIndex = index;
-        pendingListSelection = index;
-        selectedServerIndex = -1;
+    if (consoleModel.community.listSelectedIndex != index) {
+        consoleModel.community.listSelectedIndex = index;
+        consoleController.queueListSelection(index);
+        consoleModel.community.selectedIndex = -1;
     }
     refreshCommunityCredentials();
 }
@@ -308,7 +301,7 @@ void RmlUiConsole::onCommunityAddRequested(const std::string &host) {
     if (host.empty()) {
         return;
     }
-    pendingNewList = ServerListOption{std::string{}, host};
+    consoleController.queueNewListRequest(ServerListOption{std::string{}, host});
 }
 
 void RmlUiConsole::onCommunityAddCanceled() {
@@ -318,21 +311,21 @@ void RmlUiConsole::onCommunityAddCanceled() {
 }
 
 void RmlUiConsole::onRefreshRequested() {
-    pendingRefresh = true;
+    consoleController.requestRefresh();
 }
 
 void RmlUiConsole::onServerSelection(int index) {
-    if (index < 0 || index >= static_cast<int>(entries.size())) {
+    if (index < 0 || index >= static_cast<int>(consoleModel.community.entries.size())) {
         return;
     }
-    selectedServerIndex = index;
+    consoleModel.community.selectedIndex = index;
 }
 
 std::string RmlUiConsole::communityKeyForIndex(int index) const {
-    if (index < 0 || index >= static_cast<int>(listOptions.size())) {
+    if (index < 0 || index >= static_cast<int>(consoleModel.community.listOptions.size())) {
         return {};
     }
-    const auto &option = listOptions[index];
+    const auto &option = consoleModel.community.listOptions[index];
     if (option.name == "Local Area Network") {
         return "LAN";
     }
@@ -344,10 +337,10 @@ std::string RmlUiConsole::communityKeyForIndex(int index) const {
 }
 
 void RmlUiConsole::refreshCommunityCredentials() {
-    if (listSelectedIndex == lastCredentialsListIndex) {
+    if (consoleModel.community.listSelectedIndex == lastCredentialsListIndex) {
         return;
     }
-    lastCredentialsListIndex = listSelectedIndex;
+    lastCredentialsListIndex = consoleModel.community.listSelectedIndex;
     if (communityPanel) {
         communityPanel->refreshCommunityCredentials();
     }
@@ -355,18 +348,18 @@ void RmlUiConsole::refreshCommunityCredentials() {
 
 
 void RmlUiConsole::onJoinRequested(int index) {
-    if (index < 0 || index >= static_cast<int>(entries.size())) {
+    if (index < 0 || index >= static_cast<int>(consoleModel.community.entries.size())) {
         spdlog::warn("RmlUi Console: Join requested with invalid index {}", index);
         return;
     }
-    const auto &entry = entries[static_cast<std::size_t>(index)];
-    pendingSelection = CommunityBrowserSelection{
+    const auto &entry = consoleModel.community.entries[static_cast<std::size_t>(index)];
+    consoleController.queueSelection(CommunityBrowserSelection{
         entry.host,
         entry.port,
         true,
         entry.sourceHost,
         entry.worldName
-    };
+    });
     spdlog::info("RmlUi Console: Join queued host={} port={} sourceHost={} worldName={}",
                  entry.host, entry.port, entry.sourceHost, entry.worldName);
 }
@@ -379,7 +372,8 @@ void RmlUiConsole::applyListOptionsToPanel() {
     if (!communityPanel) {
         return;
     }
-    communityPanel->setListOptions(listOptions, listSelectedIndex);
+    communityPanel->setListOptions(consoleModel.community.listOptions,
+                                   consoleModel.community.listSelectedIndex);
 }
 
 } // namespace ui

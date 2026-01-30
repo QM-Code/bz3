@@ -9,23 +9,10 @@
 #include <string>
 #include <vector>
 
-#include "common/config_store.hpp"
-#include "common/json.hpp"
-#include "game/input/bindings.hpp"
+#include "ui/console/status_banner.hpp"
 #include "ui/console/keybindings.hpp"
-#include "ui/ui_config.hpp"
 
 namespace {
-
-const std::vector<std::string> &defaultBindingsForAction(std::string_view action) {
-    static const game_input::DefaultBindingsMap kDefaults = game_input::DefaultKeybindings();
-    static const std::vector<std::string> kEmpty;
-    auto it = kDefaults.find(std::string(action));
-    if (it == kDefaults.end()) {
-        return kEmpty;
-    }
-    return it->second;
-}
 
 void WriteBuffer(std::array<char, 128> &buffer, const std::string &value) {
     std::snprintf(buffer.data(), buffer.size(), "%s", value.c_str());
@@ -42,6 +29,11 @@ void AppendBinding(std::array<char, 128> &buffer, const std::string &value) {
 std::optional<std::string> DetectKeyboardBinding() {
     for (int key = ImGuiKey_NamedKey_BEGIN; key < ImGuiKey_NamedKey_END; ++key) {
         const ImGuiKey keyValue = static_cast<ImGuiKey>(key);
+#ifdef ImGuiKey_MouseLeft
+        if (keyValue >= ImGuiKey_MouseLeft && keyValue <= ImGuiKey_MouseWheelY) {
+            continue;
+        }
+#endif
 #ifdef ImGuiKey_GamepadStart
         if (keyValue >= ImGuiKey_GamepadStart && keyValue <= ImGuiKey_GamepadR3) {
             continue;
@@ -116,165 +108,40 @@ namespace ui {
 void ConsoleView::drawBindingsPanel(const MessageColors &colors) {
     const auto defs = ui::bindings::Definitions();
     auto resetBindings = [&]() {
-        const std::size_t count = std::min(defs.size(), kKeybindingCount);
-        for (std::size_t i = 0; i < count; ++i) {
-            std::vector<std::string> keyboardEntries;
-            std::vector<std::string> mouseEntries;
-            const auto &defaults = defaultBindingsForAction(defs[i].action);
-            for (const auto &value : defaults) {
-                if (ui::bindings::IsMouseBindingName(value)) {
-                    mouseEntries.push_back(value);
-                } else {
-                    keyboardEntries.push_back(value);
-                }
-            }
-            WriteBuffer(keybindingKeyboardBuffers[i], ui::bindings::JoinBindings(keyboardEntries));
-            WriteBuffer(keybindingMouseBuffers[i], ui::bindings::JoinBindings(mouseEntries));
-            keybindingControllerBuffers[i][0] = '\0';
-        }
-
-        ui::UiConfig::EraseKeybindings();
-        ui::UiConfig::EraseControllerKeybindings();
+        const auto result = bindingsController.resetToDefaults();
         requestKeybindingsReload();
-        bindingsStatusText = "Bindings reset to defaults.";
-        bindingsStatusIsError = false;
+        bindingsModel.statusText = result.status;
+        bindingsModel.statusIsError = result.statusIsError;
     };
     auto saveBindings = [&]() -> bool {
-        bz::json::Value keybindings = bz::json::Object();
-        bz::json::Value controllerBindings = bz::json::Object();
-        bool hasBindings = false;
-        bool hasControllerBindings = false;
-        const std::size_t count = std::min(defs.size(), kKeybindingCount);
-        for (std::size_t i = 0; i < count; ++i) {
-            std::vector<std::string> keyboardValues = ui::bindings::SplitBindings(keybindingKeyboardBuffers[i].data());
-            std::vector<std::string> mouseValues = ui::bindings::SplitBindings(keybindingMouseBuffers[i].data());
-            std::vector<std::string> controllerValues = ui::bindings::SplitBindings(keybindingControllerBuffers[i].data());
-
-            std::vector<std::string> combined;
-            combined.reserve(keyboardValues.size() + mouseValues.size());
-            for (const auto &value : keyboardValues) {
-                if (!value.empty()) {
-                    combined.push_back(value);
-                }
-            }
-            for (const auto &value : mouseValues) {
-                if (!value.empty()) {
-                    combined.push_back(value);
-                }
-            }
-
-            if (!combined.empty()) {
-                keybindings[defs[i].action] = combined;
-                hasBindings = true;
-            }
-
-            if (!controllerValues.empty()) {
-                controllerBindings[defs[i].action] = controllerValues;
-                hasControllerBindings = true;
-            }
-        }
-
-        bool ok = bz::config::ConfigStore::Initialized();
-        if (hasBindings) {
-            ok = ok && ui::UiConfig::SetKeybindings(keybindings);
-        } else {
-            ok = ok && ui::UiConfig::EraseKeybindings();
-        }
-        if (hasControllerBindings) {
-            ok = ok && ui::UiConfig::SetControllerKeybindings(controllerBindings);
-        } else {
-            ok = ok && ui::UiConfig::EraseControllerKeybindings();
-        }
-
-        if (!ok) {
-            bindingsStatusText = "Failed to save bindings.";
-            bindingsStatusIsError = true;
+        const auto result = bindingsController.saveToConfig();
+        bindingsModel.statusText = result.status;
+        bindingsModel.statusIsError = result.statusIsError;
+        if (!result.ok) {
             return false;
         }
         requestKeybindingsReload();
-        bindingsStatusText = "Bindings saved.";
-        bindingsStatusIsError = false;
         return true;
     };
 
-    if (!bindingsLoaded) {
-        bindingsLoaded = true;
-        bindingsStatusText.clear();
-        bindingsStatusIsError = false;
-        selectedBindingIndex = -1;
+    if (!bindingsModel.loaded) {
+        bindingsModel.loaded = true;
+        bindingsModel.statusText.clear();
+        bindingsModel.statusIsError = false;
+        bindingsModel.selectedIndex = -1;
 
-        if (!bz::config::ConfigStore::Initialized()) {
-            bindingsStatusText = "Failed to load config; showing defaults.";
-            bindingsStatusIsError = true;
-        }
-
-        const bz::json::Value *bindingsNode = nullptr;
-        auto keybindingsNode = ui::UiConfig::GetKeybindings();
-        if (keybindingsNode && keybindingsNode->is_object()) {
-            bindingsNode = &(*keybindingsNode);
-        }
-        const bz::json::Value *controllerNode = nullptr;
-        auto controllerBindingsNode = ui::UiConfig::GetControllerKeybindings();
-        if (controllerBindingsNode && controllerBindingsNode->is_object()) {
-            controllerNode = &(*controllerBindingsNode);
-        }
-
-        const std::size_t count = std::min(defs.size(), kKeybindingCount);
-        for (std::size_t i = 0; i < count; ++i) {
-            std::vector<std::string> keyboardEntries;
-            std::vector<std::string> mouseEntries;
-            std::vector<std::string> controllerEntries;
-
-            if (bindingsNode) {
-                auto it = bindingsNode->find(defs[i].action);
-                if (it != bindingsNode->end() && it->is_array()) {
-                    for (const auto &entry : *it) {
-                        if (!entry.is_string()) {
-                            continue;
-                        }
-                        const auto value = entry.get<std::string>();
-                        if (ui::bindings::IsMouseBindingName(value)) {
-                            mouseEntries.push_back(value);
-                        } else {
-                            keyboardEntries.push_back(value);
-                        }
-                    }
-                }
-            }
-
-            if (keyboardEntries.empty() && mouseEntries.empty()) {
-                const auto &defaults = defaultBindingsForAction(defs[i].action);
-                for (const auto &value : defaults) {
-                    if (ui::bindings::IsMouseBindingName(value)) {
-                        mouseEntries.push_back(value);
-                    } else {
-                        keyboardEntries.push_back(value);
-                    }
-                }
-            }
-
-            if (controllerNode) {
-                auto it = controllerNode->find(defs[i].action);
-                if (it != controllerNode->end() && it->is_array()) {
-                    for (const auto &entry : *it) {
-                        if (entry.is_string()) {
-                            controllerEntries.push_back(entry.get<std::string>());
-                        }
-                    }
-                }
-            }
-
-            WriteBuffer(keybindingKeyboardBuffers[i], ui::bindings::JoinBindings(keyboardEntries));
-            WriteBuffer(keybindingMouseBuffers[i], ui::bindings::JoinBindings(mouseEntries));
-            WriteBuffer(keybindingControllerBuffers[i], ui::bindings::JoinBindings(controllerEntries));
+        const auto result = bindingsController.loadFromConfig();
+        if (!result.status.empty()) {
+            bindingsModel.statusText = result.status;
+            bindingsModel.statusIsError = result.statusIsError;
         }
     }
 
     ImGui::TextDisabled("Select a cell, then press a key/button to add it. Changes apply on next launch.");
     ImGui::Spacing();
 
-    const int previousBindingIndex = selectedBindingIndex;
-    const BindingColumn previousBindingColumn = selectedBindingColumn;
+    const int previousBindingIndex = bindingsModel.selectedIndex;
+    const auto previousBindingColumn = bindingsModel.selectedColumn;
     bool selectionChanged = false;
     bool selectedCellHovered = false;
     bool anyBindingCellHovered = false;
@@ -284,25 +151,25 @@ void ConsoleView::drawBindingsPanel(const MessageColors &colors) {
         ImGui::TableSetupColumn("Mouse");
         ImGui::TableSetupColumn("Controller");
         ImGui::TableHeadersRow();
-        const std::size_t count = std::min(defs.size(), kKeybindingCount);
+        const std::size_t count = std::min(defs.size(), ui::BindingsModel::kKeybindingCount);
         for (std::size_t i = 0; i < count; ++i) {
             ImGui::TableNextRow();
             ImGui::TableSetColumnIndex(0);
             ImGui::TextUnformatted(defs[i].label);
 
-            auto drawBindingCell = [&](BindingColumn column,
+            auto drawBindingCell = [&](ui::BindingsModel::Column column,
                                        std::array<char, 128> &buffer,
                                        const char *columnId) {
-                const bool isSelected = (selectedBindingIndex == static_cast<int>(i) &&
-                                         selectedBindingColumn == column);
+                const bool isSelected = (bindingsModel.selectedIndex == static_cast<int>(i) &&
+                                         bindingsModel.selectedColumn == column);
                 std::string display = buffer.data();
                 if (display.empty()) {
                     display = "Unbound";
                 }
                 std::string label = display + "##Bind_" + defs[i].action + "_" + columnId;
                 if (ImGui::Selectable(label.c_str(), isSelected)) {
-                    selectedBindingIndex = static_cast<int>(i);
-                    selectedBindingColumn = column;
+                    bindingsModel.selectedIndex = static_cast<int>(i);
+                    bindingsModel.selectedColumn = column;
                     selectionChanged = true;
                 }
                 if (isSelected && ImGui::IsItemHovered()) {
@@ -314,23 +181,23 @@ void ConsoleView::drawBindingsPanel(const MessageColors &colors) {
             };
 
             ImGui::TableSetColumnIndex(1);
-            drawBindingCell(BindingColumn::Keyboard, keybindingKeyboardBuffers[i], "Keyboard");
+            drawBindingCell(ui::BindingsModel::Column::Keyboard, bindingsModel.keyboard[i], "Keyboard");
             ImGui::TableSetColumnIndex(2);
-            drawBindingCell(BindingColumn::Mouse, keybindingMouseBuffers[i], "Mouse");
+            drawBindingCell(ui::BindingsModel::Column::Mouse, bindingsModel.mouse[i], "Mouse");
             ImGui::TableSetColumnIndex(3);
-            drawBindingCell(BindingColumn::Controller, keybindingControllerBuffers[i], "Controller");
+            drawBindingCell(ui::BindingsModel::Column::Controller, bindingsModel.controller[i], "Controller");
         }
         ImGui::EndTable();
     }
 
-    if (previousBindingIndex >= 0 && previousBindingColumn == BindingColumn::Keyboard) {
+    if (previousBindingIndex >= 0 && previousBindingColumn == ui::BindingsModel::Column::Keyboard) {
         if (selectionChanged) {
             saveBindings();
         } else if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !selectedCellHovered) {
             if (anyBindingCellHovered || !ImGui::IsAnyItemHovered()) {
                 saveBindings();
                 if (!anyBindingCellHovered) {
-                    selectedBindingIndex = -1;
+                    bindingsModel.selectedIndex = -1;
                 }
             }
         }
@@ -339,37 +206,37 @@ void ConsoleView::drawBindingsPanel(const MessageColors &colors) {
     ImGui::Spacing();
     const char *selectedLabel = "None";
     const char *selectedColumn = "None";
-    if (selectedBindingIndex >= 0 && selectedBindingIndex < static_cast<int>(defs.size())) {
-        selectedLabel = defs[static_cast<std::size_t>(selectedBindingIndex)].label;
-        selectedColumn = (selectedBindingColumn == BindingColumn::Keyboard)
+    if (bindingsModel.selectedIndex >= 0 && bindingsModel.selectedIndex < static_cast<int>(defs.size())) {
+        selectedLabel = defs[static_cast<std::size_t>(bindingsModel.selectedIndex)].label;
+        selectedColumn = (bindingsModel.selectedColumn == ui::BindingsModel::Column::Keyboard)
             ? "Keyboard"
-            : (selectedBindingColumn == BindingColumn::Mouse ? "Mouse" : "Controller");
+            : (bindingsModel.selectedColumn == ui::BindingsModel::Column::Mouse ? "Mouse" : "Controller");
     }
     ImGui::TextDisabled("Selected cell: %s / %s", selectedLabel, selectedColumn);
 
-    if (selectedBindingIndex >= 0) {
+    if (bindingsModel.selectedIndex >= 0) {
         const bool skipMouseCapture = selectionChanged || ImGui::IsAnyItemActive();
         std::optional<std::string> captured;
 
-        if (selectedBindingColumn == BindingColumn::Keyboard) {
+        if (bindingsModel.selectedColumn == ui::BindingsModel::Column::Keyboard) {
             captured = DetectKeyboardBinding();
             if (captured) {
-                AppendBinding(keybindingKeyboardBuffers[selectedBindingIndex], *captured);
+                AppendBinding(bindingsModel.keyboard[bindingsModel.selectedIndex], *captured);
             }
-        } else if (selectedBindingColumn == BindingColumn::Mouse) {
+        } else if (bindingsModel.selectedColumn == ui::BindingsModel::Column::Mouse) {
             if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
                 saveBindings();
-                selectedBindingIndex = -1;
+                bindingsModel.selectedIndex = -1;
             } else {
                 captured = DetectMouseBinding(skipMouseCapture);
                 if (captured) {
-                    AppendBinding(keybindingMouseBuffers[selectedBindingIndex], *captured);
+                    AppendBinding(bindingsModel.mouse[bindingsModel.selectedIndex], *captured);
                 }
             }
         } else {
             captured = DetectControllerBinding();
             if (captured) {
-                AppendBinding(keybindingControllerBuffers[selectedBindingIndex], *captured);
+                AppendBinding(bindingsModel.controller[bindingsModel.selectedIndex], *captured);
             }
         }
     }
@@ -380,13 +247,13 @@ void ConsoleView::drawBindingsPanel(const MessageColors &colors) {
     bool resetClicked = ImGui::Button("Reset to Defaults");
     ImGui::SameLine();
     if (ImGui::Button("Clear Selected")) {
-        if (selectedBindingIndex >= 0) {
-            if (selectedBindingColumn == BindingColumn::Keyboard) {
-                keybindingKeyboardBuffers[selectedBindingIndex][0] = '\0';
-            } else if (selectedBindingColumn == BindingColumn::Mouse) {
-                keybindingMouseBuffers[selectedBindingIndex][0] = '\0';
+        if (bindingsModel.selectedIndex >= 0) {
+            if (bindingsModel.selectedColumn == ui::BindingsModel::Column::Keyboard) {
+                bindingsModel.keyboard[bindingsModel.selectedIndex][0] = '\0';
+            } else if (bindingsModel.selectedColumn == ui::BindingsModel::Column::Mouse) {
+                bindingsModel.mouse[bindingsModel.selectedIndex][0] = '\0';
             } else {
-                keybindingControllerBuffers[selectedBindingIndex][0] = '\0';
+                bindingsModel.controller[bindingsModel.selectedIndex][0] = '\0';
             }
         }
     }
@@ -416,9 +283,19 @@ void ConsoleView::drawBindingsPanel(const MessageColors &colors) {
         ImGui::EndPopup();
     }
 
-    if (!bindingsStatusText.empty()) {
-        ImVec4 statusColor = bindingsStatusIsError ? colors.error : colors.notice;
-        ImGui::TextColored(statusColor, "%s", bindingsStatusText.c_str());
+    const auto banner = ui::status_banner::MakeStatusBanner(bindingsModel.statusText,
+                                                            bindingsModel.statusIsError);
+    if (banner.visible) {
+        ImGui::Spacing();
+        ImVec4 statusColor = colors.notice;
+        if (banner.tone == ui::MessageTone::Error) {
+            statusColor = colors.error;
+        } else if (banner.tone == ui::MessageTone::Pending) {
+            statusColor = colors.pending;
+        }
+        const std::string text = ui::status_banner::FormatStatusText(banner);
+        ImGui::TextColored(statusColor, "%s", text.c_str());
+        ImGui::Spacing();
     }
 }
 

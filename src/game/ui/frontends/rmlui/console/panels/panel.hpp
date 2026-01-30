@@ -16,10 +16,17 @@ public:
     const std::string &key() const;
     void load(Rml::ElementDocument *document);
     void update();
+    void show();
+    void hide();
+    void configChanged();
 
 protected:
     virtual void onLoaded(Rml::ElementDocument *document);
     virtual void onUpdate();
+    virtual void onShow();
+    virtual void onHide();
+    virtual void onConfigChanged();
+    virtual void onTick();
 
 private:
     std::string panelKey;

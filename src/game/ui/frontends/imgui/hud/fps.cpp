@@ -10,6 +10,10 @@ void ImGuiHudFps::setVisible(bool show) {
     visible = show;
 }
 
+void ImGuiHudFps::setValue(float value) {
+    fpsValue = value;
+}
+
 void ImGuiHudFps::draw(ImGuiIO &io) {
     if (!visible) {
         return;
@@ -22,10 +26,10 @@ void ImGuiHudFps::draw(ImGuiIO &io) {
         ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoMove |
         ImGuiWindowFlags_NoScrollbar |
-        ImGuiWindowFlags_NoSavedSettings |
-        ImGuiWindowFlags_AlwaysAutoResize);
+    ImGuiWindowFlags_NoSavedSettings |
+    ImGuiWindowFlags_AlwaysAutoResize);
     char fpsBuffer[32];
-    std::snprintf(fpsBuffer, sizeof(fpsBuffer), "%.1f", io.Framerate);
+    std::snprintf(fpsBuffer, sizeof(fpsBuffer), "%.1f", fpsValue);
     const std::string fpsText = bz::i18n::Get().format("ui.hud.fps_label", {{"value", fpsBuffer}});
     ImGui::TextUnformatted(fpsText.c_str());
     ImGui::End();

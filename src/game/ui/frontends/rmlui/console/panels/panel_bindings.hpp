@@ -11,6 +11,8 @@ class EventListener;
 }
 
 #include "ui/frontends/rmlui/console/modal_dialog.hpp"
+#include "ui/controllers/bindings_controller.hpp"
+#include "ui/models/bindings_model.hpp"
 #include "ui/frontends/rmlui/console/panels/panel.hpp"
 
 namespace ui {
@@ -24,14 +26,11 @@ public:
 protected:
     void onLoaded(Rml::ElementDocument *document) override;
     void onUpdate() override;
+    void onShow() override;
+    void onHide() override;
+    void onConfigChanged() override;
 
 private:
-    enum class BindingColumn {
-        Keyboard = 0,
-        Mouse = 1,
-        Controller = 2
-    };
-
     struct BindingRow {
         Rml::Element *action = nullptr;
         Rml::Element *keyboard = nullptr;
@@ -48,7 +47,7 @@ private:
     void rebuildBindings();
     void updateSelectedLabel();
     void updateStatus();
-    void setSelected(int index, BindingColumn column);
+    void setSelected(int index, ui::BindingsModel::Column column);
     void clearSelection();
     void clearSelected();
     void saveBindings();
@@ -70,16 +69,9 @@ private:
     Rml::Element *resetButton = nullptr;
 
     std::vector<BindingRow> rows;
-    std::vector<std::string> keyboardBindings;
-    std::vector<std::string> mouseBindings;
-    std::vector<std::string> controllerBindings;
-    int selectedIndex = -1;
-    BindingColumn selectedColumn = BindingColumn::Keyboard;
     bool selectionJustChanged = false;
-    bool loaded = false;
-    bool statusIsError = false;
-    bool keybindingsReloadRequested = false;
-    std::string statusText;
+    ui::BindingsModel bindingsModel;
+    ui::BindingsController bindingsController{bindingsModel};
     std::vector<std::unique_ptr<Rml::EventListener>> listeners;
     std::vector<std::unique_ptr<Rml::EventListener>> rowListeners;
     RmlUiModalDialog resetDialog;

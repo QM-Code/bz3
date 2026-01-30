@@ -23,6 +23,7 @@ public:
     void update();
 
     void addLine(const std::string &line);
+    void setLines(const std::vector<std::string> &linesIn);
     std::string getSubmittedInput() const;
     void clearSubmittedInput();
 

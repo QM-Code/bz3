@@ -490,6 +490,7 @@ void ConsoleView::drawStartServerPanel(const MessageColors &colors) {
     const float spacing = style.ItemSpacing.x;
     const float available = totalWidth - (ipWidth + portWidth + communityWidth + loggingWidth + actionWidth) - (spacing * 7.0f);
     const float worldWidth = std::max(160.0f, available);
+    auto &listOptions = consoleModel.community.listOptions;
 
     static const char *kLogLevels[] = {"trace", "debug", "info", "warn", "err", "critical", "off"};
     constexpr int kLogLevelCount = static_cast<int>(sizeof(kLogLevels) / sizeof(kLogLevels[0]));

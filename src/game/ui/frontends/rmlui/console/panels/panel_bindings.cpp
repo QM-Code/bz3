@@ -6,26 +6,16 @@
 #include <RmlUi/Core/Input.h>
 
 #include <algorithm>
+#include <array>
 #include <cctype>
+#include <cstdio>
 #include <sstream>
 
-#include "common/config_store.hpp"
-#include "game/input/bindings.hpp"
+#include "ui/console/status_banner.hpp"
 #include "ui/console/keybindings.hpp"
-#include "ui/ui_config.hpp"
 
 namespace ui {
 namespace {
-
-const std::vector<std::string>& defaultBindingsForAction(std::string_view action) {
-    static const game_input::DefaultBindingsMap kDefaults = game_input::DefaultKeybindings();
-    static const std::vector<std::string> kEmpty;
-    auto it = kDefaults.find(std::string(action));
-    if (it == kDefaults.end()) {
-        return kEmpty;
-    }
-    return it->second;
-}
 
 std::string escapeRmlText(std::string_view text) {
     std::string out;
@@ -43,11 +33,15 @@ std::string escapeRmlText(std::string_view text) {
     return out;
 }
 
+void WriteBuffer(std::array<char, 128> &buffer, const std::string &value) {
+    std::snprintf(buffer.data(), buffer.size(), "%s", value.c_str());
+}
+
 } // namespace
 
 class RmlUiPanelBindings::BindingCellListener final : public Rml::EventListener {
 public:
-    BindingCellListener(RmlUiPanelBindings *panelIn, int rowIndexIn, BindingColumn columnIn)
+    BindingCellListener(RmlUiPanelBindings *panelIn, int rowIndexIn, ui::BindingsModel::Column columnIn)
         : panel(panelIn), rowIndex(rowIndexIn), column(columnIn) {}
 
     void ProcessEvent(Rml::Event &) override {
@@ -59,7 +53,7 @@ public:
 private:
     RmlUiPanelBindings *panel = nullptr;
     int rowIndex = 0;
-    BindingColumn column = BindingColumn::Keyboard;
+    ui::BindingsModel::Column column = ui::BindingsModel::Column::Keyboard;
 };
 
 class RmlUiPanelBindings::SettingsActionListener final : public Rml::EventListener {
@@ -129,12 +123,11 @@ RmlUiPanelBindings::RmlUiPanelBindings()
 
 void RmlUiPanelBindings::setUserConfigPath(const std::string &path) {
     (void)path;
-    loaded = false;
-    statusText.clear();
-    statusIsError = false;
-    keybindingsReloadRequested = false;
-    selectedIndex = -1;
-    selectedColumn = BindingColumn::Keyboard;
+    bindingsModel.loaded = false;
+    bindingsModel.statusText.clear();
+    bindingsModel.statusIsError = false;
+    bindingsModel.selectedIndex = -1;
+    bindingsModel.selectedColumn = ui::BindingsModel::Column::Keyboard;
     selectionJustChanged = false;
 
     if (document) {
@@ -146,8 +139,8 @@ void RmlUiPanelBindings::setUserConfigPath(const std::string &path) {
 }
 
 bool RmlUiPanelBindings::consumeKeybindingsReloadRequest() {
-    const bool requested = keybindingsReloadRequested;
-    keybindingsReloadRequested = false;
+    const bool requested = bindingsModel.keybindingsReloadRequested;
+    bindingsModel.keybindingsReloadRequested = false;
     return requested;
 }
 
@@ -211,7 +204,7 @@ void RmlUiPanelBindings::onUpdate() {
     if (!document) {
         return;
     }
-    if (!loaded) {
+    if (!bindingsModel.loaded) {
         loadBindings();
         rebuildBindings();
         updateSelectedLabel();
@@ -221,74 +214,9 @@ void RmlUiPanelBindings::onUpdate() {
 }
 
 void RmlUiPanelBindings::loadBindings() {
-    loaded = true;
-    keyboardBindings.assign(std::size(ui::bindings::Definitions()), std::string());
-    mouseBindings.assign(std::size(ui::bindings::Definitions()), std::string());
-    controllerBindings.assign(std::size(ui::bindings::Definitions()), std::string());
-
-    if (!bz::config::ConfigStore::Initialized()) {
-        showStatus("Failed to load config; showing defaults.", true);
-    }
-
-    const bz::json::Value *bindingsNode = nullptr;
-    auto keybindingsNode = ui::UiConfig::GetKeybindings();
-    if (keybindingsNode && keybindingsNode->is_object()) {
-        bindingsNode = &(*keybindingsNode);
-    }
-    const bz::json::Value *controllerNode = nullptr;
-    auto controllerBindingsNode = ui::UiConfig::GetControllerKeybindings();
-    if (controllerBindingsNode && controllerBindingsNode->is_object()) {
-        controllerNode = &(*controllerBindingsNode);
-    }
-
-    auto defs = ui::bindings::Definitions();
-    for (std::size_t i = 0; i < defs.size(); ++i) {
-        std::vector<std::string> keyboardEntries;
-        std::vector<std::string> mouseEntries;
-        std::vector<std::string> controllerEntries;
-
-        if (bindingsNode) {
-            auto it = bindingsNode->find(defs[i].action);
-            if (it != bindingsNode->end() && it->is_array()) {
-                for (const auto &entry : *it) {
-                    if (!entry.is_string()) {
-                        continue;
-                    }
-                    const auto value = entry.get<std::string>();
-                    if (ui::bindings::IsMouseBindingName(value)) {
-                        mouseEntries.push_back(value);
-                    } else {
-                        keyboardEntries.push_back(value);
-                    }
-                }
-            }
-        }
-
-        if (keyboardEntries.empty() && mouseEntries.empty()) {
-            const auto &defaults = defaultBindingsForAction(defs[i].action);
-            for (const auto &value : defaults) {
-                if (ui::bindings::IsMouseBindingName(value)) {
-                    mouseEntries.push_back(value);
-                } else {
-                    keyboardEntries.push_back(value);
-                }
-            }
-        }
-
-        if (controllerNode) {
-            auto it = controllerNode->find(defs[i].action);
-            if (it != controllerNode->end() && it->is_array()) {
-                for (const auto &entry : *it) {
-                    if (entry.is_string()) {
-                        controllerEntries.push_back(entry.get<std::string>());
-                    }
-                }
-            }
-        }
-
-        keyboardBindings[i] = ui::bindings::JoinBindings(keyboardEntries);
-        mouseBindings[i] = ui::bindings::JoinBindings(mouseEntries);
-        controllerBindings[i] = ui::bindings::JoinBindings(controllerEntries);
+    const auto result = bindingsController.loadFromConfig();
+    if (!result.status.empty()) {
+        showStatus(result.status, result.statusIsError);
     }
 }
 
@@ -299,7 +227,9 @@ void RmlUiPanelBindings::rebuildBindings() {
     bindingsList->SetInnerRML("");
     rowListeners.clear();
     rows.clear();
-    rows.reserve(std::size(ui::bindings::Definitions()));
+    auto defs = ui::bindings::Definitions();
+    const std::size_t count = std::min(defs.size(), ui::BindingsModel::kKeybindingCount);
+    rows.reserve(count);
 
     auto appendElement = [&](Rml::Element *parent, const char *tag) -> Rml::Element* {
         auto child = document->CreateElement(tag);
@@ -308,8 +238,7 @@ void RmlUiPanelBindings::rebuildBindings() {
         return ptr;
     };
 
-    auto defs = ui::bindings::Definitions();
-    for (std::size_t i = 0; i < defs.size(); ++i) {
+    for (std::size_t i = 0; i < count; ++i) {
         auto *row = appendElement(bindingsList, "div");
         row->SetClass("bindings-row", true);
 
@@ -318,7 +247,7 @@ void RmlUiPanelBindings::rebuildBindings() {
         actionCell->SetClass("action", true);
         actionCell->SetInnerRML(escapeRmlText(defs[i].label));
 
-        auto makeBindingCell = [&](BindingColumn column, const std::string &value, const char *columnClass) -> Rml::Element* {
+        auto makeBindingCell = [&](ui::BindingsModel::Column column, const std::string &value, const char *columnClass) -> Rml::Element* {
             auto *cell = appendElement(row, "div");
             cell->SetClass("bindings-cell", true);
             cell->SetClass(columnClass, true);
@@ -334,9 +263,9 @@ void RmlUiPanelBindings::rebuildBindings() {
 
         BindingRow bindingRow;
         bindingRow.action = actionCell;
-        bindingRow.keyboard = makeBindingCell(BindingColumn::Keyboard, keyboardBindings[i], "keyboard");
-        bindingRow.mouse = makeBindingCell(BindingColumn::Mouse, mouseBindings[i], "mouse");
-        bindingRow.controller = makeBindingCell(BindingColumn::Controller, controllerBindings[i], "controller");
+        bindingRow.keyboard = makeBindingCell(ui::BindingsModel::Column::Keyboard, bindingsModel.keyboard[i].data(), "keyboard");
+        bindingRow.mouse = makeBindingCell(ui::BindingsModel::Column::Mouse, bindingsModel.mouse[i].data(), "mouse");
+        bindingRow.controller = makeBindingCell(ui::BindingsModel::Column::Controller, bindingsModel.controller[i].data(), "controller");
         rows.push_back(bindingRow);
     }
     updateSelectedLabel();
@@ -351,11 +280,12 @@ void RmlUiPanelBindings::updateSelectedLabel() {
     }
     std::string label = "Selected cell: None";
     auto defs = ui::bindings::Definitions();
-    if (selectedIndex >= 0 && selectedIndex < static_cast<int>(defs.size())) {
-        const char *colName = selectedColumn == BindingColumn::Keyboard
+    const std::size_t count = std::min(defs.size(), ui::BindingsModel::kKeybindingCount);
+    if (bindingsModel.selectedIndex >= 0 && bindingsModel.selectedIndex < static_cast<int>(count)) {
+        const char *colName = bindingsModel.selectedColumn == ui::BindingsModel::Column::Keyboard
             ? "Keyboard"
-            : (selectedColumn == BindingColumn::Mouse ? "Mouse" : "Controller");
-        label = std::string("Selected cell: ") + defs[static_cast<std::size_t>(selectedIndex)].label + " / " + colName;
+            : (bindingsModel.selectedColumn == ui::BindingsModel::Column::Mouse ? "Mouse" : "Controller");
+        label = std::string("Selected cell: ") + defs[static_cast<std::size_t>(bindingsModel.selectedIndex)].label + " / " + colName;
     }
     selectedLabel->SetInnerRML(escapeRmlText(label));
 }
@@ -364,36 +294,40 @@ void RmlUiPanelBindings::updateStatus() {
     if (!statusLabel) {
         return;
     }
-    if (statusText.empty()) {
+    const auto banner = ui::status_banner::MakeStatusBanner(bindingsModel.statusText,
+                                                            bindingsModel.statusIsError);
+    if (!banner.visible) {
         statusLabel->SetClass("hidden", true);
         return;
     }
     statusLabel->SetClass("hidden", false);
-    statusLabel->SetClass("status-error", statusIsError);
-    statusLabel->SetInnerRML(escapeRmlText(statusText));
+    statusLabel->SetClass("status-error", banner.tone == ui::MessageTone::Error);
+    statusLabel->SetClass("status-pending", banner.tone == ui::MessageTone::Pending);
+    const std::string text = ui::status_banner::FormatStatusText(banner);
+    statusLabel->SetInnerRML(escapeRmlText(text));
 }
 
-void RmlUiPanelBindings::setSelected(int index, BindingColumn column) {
-    selectedIndex = index;
-    selectedColumn = column;
+void RmlUiPanelBindings::setSelected(int index, ui::BindingsModel::Column column) {
+    bindingsModel.selectedIndex = index;
+    bindingsModel.selectedColumn = column;
     selectionJustChanged = true;
     for (std::size_t i = 0; i < rows.size(); ++i) {
-        auto setSelected = [&](Rml::Element *element, BindingColumn col) {
+        auto setSelected = [&](Rml::Element *element, ui::BindingsModel::Column col) {
             if (!element) {
                 return;
             }
-            const bool selected = (static_cast<int>(i) == selectedIndex && col == selectedColumn);
+            const bool selected = (static_cast<int>(i) == bindingsModel.selectedIndex && col == bindingsModel.selectedColumn);
             element->SetClass("selected", selected);
         };
-        setSelected(rows[i].keyboard, BindingColumn::Keyboard);
-        setSelected(rows[i].mouse, BindingColumn::Mouse);
-        setSelected(rows[i].controller, BindingColumn::Controller);
+        setSelected(rows[i].keyboard, ui::BindingsModel::Column::Keyboard);
+        setSelected(rows[i].mouse, ui::BindingsModel::Column::Mouse);
+        setSelected(rows[i].controller, ui::BindingsModel::Column::Controller);
     }
     updateSelectedLabel();
 }
 
 void RmlUiPanelBindings::clearSelection() {
-    selectedIndex = -1;
+    bindingsModel.selectedIndex = -1;
     for (auto &row : rows) {
         if (row.keyboard) {
             row.keyboard->SetClass("selected", false);
@@ -409,98 +343,32 @@ void RmlUiPanelBindings::clearSelection() {
 }
 
 void RmlUiPanelBindings::clearSelected() {
-    if (selectedIndex < 0 || selectedIndex >= static_cast<int>(keyboardBindings.size())) {
+    if (bindingsModel.selectedIndex < 0 || bindingsModel.selectedIndex >= static_cast<int>(rows.size())) {
         return;
     }
-    if (selectedColumn == BindingColumn::Keyboard) {
-        keyboardBindings[selectedIndex].clear();
-    } else if (selectedColumn == BindingColumn::Mouse) {
-        mouseBindings[selectedIndex].clear();
+    if (bindingsModel.selectedColumn == ui::BindingsModel::Column::Keyboard) {
+        bindingsModel.keyboard[bindingsModel.selectedIndex][0] = '\0';
+    } else if (bindingsModel.selectedColumn == ui::BindingsModel::Column::Mouse) {
+        bindingsModel.mouse[bindingsModel.selectedIndex][0] = '\0';
     } else {
-        controllerBindings[selectedIndex].clear();
+        bindingsModel.controller[bindingsModel.selectedIndex][0] = '\0';
     }
     rebuildBindings();
 }
 
 void RmlUiPanelBindings::saveBindings() {
-    bz::json::Value keybindings = bz::json::Object();
-    bz::json::Value controllerJson = bz::json::Object();
-    bool hasBindings = false;
-    bool hasController = false;
-
-    auto defs = ui::bindings::Definitions();
-    for (std::size_t i = 0; i < defs.size(); ++i) {
-        const std::vector<std::string> keyboardValues = ui::bindings::SplitBindings(keyboardBindings[i]);
-        const std::vector<std::string> mouseValues = ui::bindings::SplitBindings(mouseBindings[i]);
-        const std::vector<std::string> controllerValues = ui::bindings::SplitBindings(controllerBindings[i]);
-
-        std::vector<std::string> combined;
-        combined.reserve(keyboardValues.size() + mouseValues.size());
-        for (const auto &value : keyboardValues) {
-            if (!value.empty()) {
-                combined.push_back(value);
-            }
-        }
-        for (const auto &value : mouseValues) {
-            if (!value.empty()) {
-                combined.push_back(value);
-            }
-        }
-
-        if (!combined.empty()) {
-            keybindings[defs[i].action] = combined;
-            hasBindings = true;
-        }
-
-        if (!controllerValues.empty()) {
-            controllerJson[defs[i].action] = controllerValues;
-            hasController = true;
-        }
-    }
-
-    if (hasBindings) {
-        if (!ui::UiConfig::SetKeybindings(keybindings)) {
-            showStatus("Failed to save bindings.", true);
-            return;
-        }
-    } else {
-        ui::UiConfig::EraseKeybindings();
-    }
-
-    if (hasController) {
-        if (!ui::UiConfig::SetControllerKeybindings(controllerJson)) {
-            showStatus("Failed to save bindings.", true);
-            return;
-        }
-    } else {
-        ui::UiConfig::EraseControllerKeybindings();
+    const auto result = bindingsController.saveToConfig();
+    showStatus(result.status, result.statusIsError);
+    if (!result.ok) {
+        return;
     }
     requestKeybindingsReload();
-    showStatus("Bindings saved.", false);
 }
 
 void RmlUiPanelBindings::resetBindings() {
-    auto defs = ui::bindings::Definitions();
-    for (std::size_t i = 0; i < defs.size(); ++i) {
-        std::vector<std::string> keyboardEntries;
-        std::vector<std::string> mouseEntries;
-        const auto &defaults = defaultBindingsForAction(defs[i].action);
-        for (const auto &value : defaults) {
-            if (ui::bindings::IsMouseBindingName(value)) {
-                mouseEntries.push_back(value);
-            } else {
-                keyboardEntries.push_back(value);
-            }
-        }
-        keyboardBindings[i] = ui::bindings::JoinBindings(keyboardEntries);
-        mouseBindings[i] = ui::bindings::JoinBindings(mouseEntries);
-        controllerBindings[i].clear();
-    }
-
-    ui::UiConfig::EraseKeybindings();
-    ui::UiConfig::EraseControllerKeybindings();
+    const auto result = bindingsController.resetToDefaults();
     requestKeybindingsReload();
-    showStatus("Bindings reset to defaults.", false);
+    showStatus(result.status, result.statusIsError);
 
     rebuildBindings();
 }
@@ -510,59 +378,71 @@ void RmlUiPanelBindings::showResetDialog() {
 }
 
 void RmlUiPanelBindings::showStatus(const std::string &message, bool isError) {
-    statusText = message;
-    statusIsError = isError;
+    bindingsModel.statusText = message;
+    bindingsModel.statusIsError = isError;
     updateStatus();
 }
 
 void RmlUiPanelBindings::requestKeybindingsReload() {
-    keybindingsReloadRequested = true;
+    bindingsModel.keybindingsReloadRequested = true;
 }
 
 void RmlUiPanelBindings::captureKey(int keyIdentifier) {
-    if (selectedIndex < 0 || selectedIndex >= static_cast<int>(keyboardBindings.size())) {
+    if (bindingsModel.selectedIndex < 0 || bindingsModel.selectedIndex >= static_cast<int>(rows.size())) {
         return;
     }
     if (keyIdentifier == Rml::Input::KI_UNKNOWN) {
         return;
     }
-    if (selectedColumn == BindingColumn::Mouse && keyIdentifier == Rml::Input::KI_ESCAPE) {
+    if (bindingsModel.selectedColumn == ui::BindingsModel::Column::Mouse && keyIdentifier == Rml::Input::KI_ESCAPE) {
         saveBindings();
         clearSelection();
         return;
     }
-    if (selectedColumn == BindingColumn::Mouse) {
+    if (bindingsModel.selectedColumn == ui::BindingsModel::Column::Mouse) {
         return;
     }
     const std::string name = keyIdentifierToName(keyIdentifier);
     if (name.empty()) {
         return;
     }
-    if (selectedColumn == BindingColumn::Keyboard) {
-        auto entries = ui::bindings::SplitBindings(keyboardBindings[selectedIndex]);
+    if (bindingsModel.selectedColumn == ui::BindingsModel::Column::Keyboard) {
+        auto entries = ui::bindings::SplitBindings(bindingsModel.keyboard[bindingsModel.selectedIndex].data());
         if (std::find(entries.begin(), entries.end(), name) == entries.end()) {
             entries.push_back(name);
-            keyboardBindings[selectedIndex] = ui::bindings::JoinBindings(entries);
+            WriteBuffer(bindingsModel.keyboard[bindingsModel.selectedIndex], ui::bindings::JoinBindings(entries));
             rebuildBindings();
         }
     } else {
-        auto entries = ui::bindings::SplitBindings(controllerBindings[selectedIndex]);
+        auto entries = ui::bindings::SplitBindings(bindingsModel.controller[bindingsModel.selectedIndex].data());
         if (std::find(entries.begin(), entries.end(), name) == entries.end()) {
             entries.push_back(name);
-            controllerBindings[selectedIndex] = ui::bindings::JoinBindings(entries);
+            WriteBuffer(bindingsModel.controller[bindingsModel.selectedIndex], ui::bindings::JoinBindings(entries));
             rebuildBindings();
         }
     }
+}
+
+void RmlUiPanelBindings::onShow() {
+    bindingsModel.loaded = false;
+}
+
+void RmlUiPanelBindings::onHide() {
+    clearSelection();
+}
+
+void RmlUiPanelBindings::onConfigChanged() {
+    bindingsModel.loaded = false;
 }
 
 void RmlUiPanelBindings::handleMouseClick(Rml::Element *target, int button) {
     if (button != 0) {
         return;
     }
-    if (selectedIndex < 0 || selectedIndex >= static_cast<int>(rows.size())) {
+    if (bindingsModel.selectedIndex < 0 || bindingsModel.selectedIndex >= static_cast<int>(rows.size())) {
         return;
     }
-    if (selectedColumn != BindingColumn::Keyboard) {
+    if (bindingsModel.selectedColumn != ui::BindingsModel::Column::Keyboard) {
         return;
     }
     if (target == clearButton || target == saveButton || target == resetButton) {
@@ -570,28 +450,28 @@ void RmlUiPanelBindings::handleMouseClick(Rml::Element *target, int button) {
     }
     bool targetIsBindingCell = false;
     int targetIndex = -1;
-    BindingColumn targetColumn = BindingColumn::Keyboard;
+    ui::BindingsModel::Column targetColumn = ui::BindingsModel::Column::Keyboard;
     for (std::size_t i = 0; i < rows.size(); ++i) {
         if (target == rows[i].keyboard) {
             targetIsBindingCell = true;
             targetIndex = static_cast<int>(i);
-            targetColumn = BindingColumn::Keyboard;
+            targetColumn = ui::BindingsModel::Column::Keyboard;
             break;
         }
         if (target == rows[i].mouse) {
             targetIsBindingCell = true;
             targetIndex = static_cast<int>(i);
-            targetColumn = BindingColumn::Mouse;
+            targetColumn = ui::BindingsModel::Column::Mouse;
             break;
         }
         if (target == rows[i].controller) {
             targetIsBindingCell = true;
             targetIndex = static_cast<int>(i);
-            targetColumn = BindingColumn::Controller;
+            targetColumn = ui::BindingsModel::Column::Controller;
             break;
         }
     }
-    if (targetIsBindingCell && targetIndex == selectedIndex && targetColumn == selectedColumn) {
+    if (targetIsBindingCell && targetIndex == bindingsModel.selectedIndex && targetColumn == bindingsModel.selectedColumn) {
         return;
     }
     saveBindings();
@@ -604,10 +484,10 @@ void RmlUiPanelBindings::captureMouse(int button) {
     if (selectionJustChanged) {
         return;
     }
-    if (selectedIndex < 0 || selectedIndex >= static_cast<int>(mouseBindings.size())) {
+    if (bindingsModel.selectedIndex < 0 || bindingsModel.selectedIndex >= static_cast<int>(rows.size())) {
         return;
     }
-    if (selectedColumn != BindingColumn::Mouse) {
+    if (bindingsModel.selectedColumn != ui::BindingsModel::Column::Mouse) {
         return;
     }
     std::string name;
@@ -625,10 +505,10 @@ void RmlUiPanelBindings::captureMouse(int button) {
     if (name.empty()) {
         return;
     }
-    auto entries = ui::bindings::SplitBindings(mouseBindings[selectedIndex]);
+    auto entries = ui::bindings::SplitBindings(bindingsModel.mouse[bindingsModel.selectedIndex].data());
     if (std::find(entries.begin(), entries.end(), name) == entries.end()) {
         entries.push_back(name);
-        mouseBindings[selectedIndex] = ui::bindings::JoinBindings(entries);
+        WriteBuffer(bindingsModel.mouse[bindingsModel.selectedIndex], ui::bindings::JoinBindings(entries));
         rebuildBindings();
     }
 }

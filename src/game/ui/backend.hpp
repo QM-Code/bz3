@@ -5,17 +5,13 @@
 #include <vector>
 
 #include "platform/events.hpp"
-#include "ui/hud_model.hpp"
+#include "ui/models/hud_model.hpp"
 #include "ui/types.hpp"
 #include "ui/bridges/render_bridge.hpp"
 #include "ui/console/console_interface.hpp"
 
 namespace platform {
 class Window;
-}
-
-namespace ui {
-class ImGuiRenderBridge;
 }
 
 namespace ui_backend {
@@ -38,8 +34,6 @@ public:
     virtual bool getChatInputFocus() const = 0;
     virtual bool consumeKeybindingsReloadRequest() = 0;
     virtual void setRenderBridge(const ui::RenderBridge *bridge) = 0;
-    virtual void setImGuiRenderBridge(const ui::ImGuiRenderBridge *bridge) { (void)bridge; }
-
     virtual ui::RenderOutput getRenderOutput() const { return {}; }
     virtual float getRenderBrightness() const { return 1.0f; }
     virtual bool isRenderBrightnessDragActive() const { return false; }

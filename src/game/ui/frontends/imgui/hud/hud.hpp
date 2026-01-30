@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "ui/types.hpp"
 #include "ui/frontends/imgui/hud/chat.hpp"
@@ -25,6 +26,8 @@ public:
     void setChatVisible(bool show);
     void setRadarVisible(bool show);
     void setCrosshairVisible(bool show);
+    void setFpsValue(float value);
+    void setChatLines(const std::vector<std::string> &lines);
 
     void addConsoleLine(const std::string &playerName, const std::string &line);
     std::string getChatInputBuffer() const;

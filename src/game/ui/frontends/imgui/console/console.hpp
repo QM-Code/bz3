@@ -17,9 +17,13 @@ struct ImFont;
 
 #include <imgui.h>
 #include "ui/console/console_interface.hpp"
+#include "ui/controllers/bindings_controller.hpp"
+#include "ui/controllers/settings_controller.hpp"
 #include "ui/frontends/imgui/console/thumbnail_cache.hpp"
-#include "ui/hud_settings.hpp"
-#include "ui/render_settings.hpp"
+#include "ui/controllers/console_controller.hpp"
+#include "ui/models/bindings_model.hpp"
+#include "ui/models/console_model.hpp"
+#include "ui/models/settings_model.hpp"
 
 namespace ui {
 
@@ -84,12 +88,17 @@ private:
 
     ThumbnailTexture *getOrLoadThumbnail(const std::string &url);
     MessageColors getMessageColors() const;
+    void drawTabContent(const std::string &key, const MessageColors &colors);
     void drawSettingsPanel(const MessageColors &colors);
     void drawBindingsPanel(const MessageColors &colors);
     void drawDocumentationPanel(const MessageColors &colors) const;
     void drawStartServerPanel(const MessageColors &colors);
     void drawPlaceholderPanel(const char *heading, const char *body, const MessageColors &colors) const;
     void drawCommunityPanel(const MessageColors &colors);
+    void handleConfigChanged();
+    void handleTabShow(const std::string &key);
+    void handleTabHide(const std::string &key);
+    void handleTabTick(const std::string &key);
     std::string communityKeyForIndex(int index) const;
     void refreshCommunityCredentials();
     void persistCommunityCredentials(bool passwordChanged);
@@ -124,69 +133,30 @@ private:
     bool fontReloadRequested = false;
     bool keybindingsReloadRequested = false;
 
-    std::vector<CommunityBrowserEntry> entries;
-    int selectedIndex = -1;
     std::array<char, 64> usernameBuffer{};
     std::array<char, 128> passwordBuffer{};
-    std::string statusText;
-    bool statusIsError = false;
-    std::optional<CommunityBrowserSelection> pendingSelection;
-
-    std::vector<ServerListOption> listOptions;
-    int listSelectedIndex = -1;
-    std::optional<int> pendingListSelection;
-    std::optional<ServerListOption> pendingNewList;
-    std::optional<std::string> pendingDeleteListHost;
-    bool refreshRequested = false;
-    bool scanning = false;
     bool showNewCommunityInput = false;
     std::array<char, 512> listUrlBuffer{};
-    std::string listStatusText;
-    bool listStatusIsError = false;
-    std::string communityStatusText;
-    std::string communityDetailsText;
-    std::string communityLinkStatusText;
-    bool communityLinkStatusIsError = false;
-    std::string serverLinkStatusText;
-    bool serverLinkStatusIsError = false;
-    std::string serverDescriptionLoadingKey;
-    bool serverDescriptionLoading = false;
-    std::string serverDescriptionErrorKey;
-    std::string serverDescriptionErrorText;
-    MessageTone communityStatusTone = MessageTone::Notice;
     int lastCredentialsListIndex = -1;
     std::string storedPasswordHash;
-    ConnectionState connectionState{};
     bool pendingQuitRequest = false;
     std::string errorDialogMessage;
 
     ThumbnailCache thumbnails;
 
     std::string userConfigPath;
-    HudSettings hudSettings;
-    enum class BindingColumn {
-        Keyboard,
-        Mouse,
-        Controller
-    };
-    static constexpr std::size_t kKeybindingCount = 11;
-    std::array<std::array<char, 128>, kKeybindingCount> keybindingKeyboardBuffers{};
-    std::array<std::array<char, 128>, kKeybindingCount> keybindingMouseBuffers{};
-    std::array<std::array<char, 128>, kKeybindingCount> keybindingControllerBuffers{};
-    int selectedBindingIndex = -1;
-    BindingColumn selectedBindingColumn = BindingColumn::Keyboard;
-    bool settingsLoaded = false;
-    bool bindingsLoaded = false;
-    uint64_t settingsLastConfigRevision = 0;
+    ui::BindingsModel bindingsModel;
+    ui::BindingsController bindingsController{bindingsModel};
+    ui::ConsoleModel consoleModel;
+    ui::ConsoleController consoleController{consoleModel};
+    ui::SettingsModel settingsModel;
+    ui::SettingsController settingsController{settingsModel};
     int selectedLanguageIndex = 0;
-    std::string settingsStatusText;
-    bool settingsStatusIsError = false;
-    std::string bindingsStatusText;
-    bool bindingsStatusIsError = false;
     bool renderBrightnessDragging = false;
-    RenderSettings renderSettings;
     std::function<void(const std::string &)> languageCallback;
     bool bindingsResetConfirmOpen = false;
+    std::string activeTabKey;
+    uint64_t lastConfigRevision = 0;
 
     struct LocalServerProcess {
         int id = 0;

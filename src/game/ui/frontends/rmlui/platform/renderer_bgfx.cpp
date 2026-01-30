@@ -137,6 +137,18 @@ RenderInterface_BGFX::~RenderInterface_BGFX() {
     }
     textures.clear();
 
+    if (bgfx::isValid(uiTargetFrameBuffer)) {
+        bgfx::destroy(uiTargetFrameBuffer);
+        uiTargetFrameBuffer = BGFX_INVALID_HANDLE;
+    }
+    if (bgfx::isValid(uiTargetTexture)) {
+        bgfx::destroy(uiTargetTexture);
+        uiTargetTexture = BGFX_INVALID_HANDLE;
+    }
+    uiWidth = 0;
+    uiHeight = 0;
+    outputTextureId = 0;
+
     destroyPrograms();
 }
 
@@ -176,24 +188,78 @@ void RenderInterface_BGFX::SetViewport(int width, int height, int offset_x, int 
                                              -10000, 10000);
     transform = projection;
     transform_dirty = true;
+    ensureRenderTarget(viewport_width, viewport_height);
 }
 
 void RenderInterface_BGFX::BeginFrame() {
     if (!ready || viewport_width <= 0 || viewport_height <= 0) {
         return;
     }
+    ensureRenderTarget(viewport_width, viewport_height);
 
     bgfx::setViewMode(kRmlUiView, bgfx::ViewMode::Sequential);
     bgfx::setViewTransform(kRmlUiView, nullptr, nullptr);
+    if (bgfx::isValid(uiTargetFrameBuffer)) {
+        bgfx::setViewFrameBuffer(kRmlUiView, uiTargetFrameBuffer);
+    }
     bgfx::setViewRect(kRmlUiView,
                       static_cast<uint16_t>(viewport_offset_x),
                       static_cast<uint16_t>(viewport_offset_y),
                       static_cast<uint16_t>(viewport_width),
                       static_cast<uint16_t>(viewport_height));
+    bgfx::setViewClear(kRmlUiView, BGFX_CLEAR_COLOR, 0x00000000, 1.0f, 0);
     bgfx::touch(kRmlUiView);
 }
 
 void RenderInterface_BGFX::EndFrame() {
+}
+
+void RenderInterface_BGFX::ensureRenderTarget(int width, int height) {
+    if (!bgfx::getCaps()) {
+        return;
+    }
+    if (width <= 0 || height <= 0) {
+        if (bgfx::isValid(uiTargetFrameBuffer)) {
+            bgfx::destroy(uiTargetFrameBuffer);
+            uiTargetFrameBuffer = BGFX_INVALID_HANDLE;
+        }
+        if (bgfx::isValid(uiTargetTexture)) {
+            bgfx::destroy(uiTargetTexture);
+            uiTargetTexture = BGFX_INVALID_HANDLE;
+        }
+        uiWidth = 0;
+        uiHeight = 0;
+        outputTextureId = 0;
+        return;
+    }
+    if (width == uiWidth && height == uiHeight && bgfx::isValid(uiTargetTexture) && bgfx::isValid(uiTargetFrameBuffer)) {
+        return;
+    }
+    if (bgfx::isValid(uiTargetFrameBuffer)) {
+        bgfx::destroy(uiTargetFrameBuffer);
+        uiTargetFrameBuffer = BGFX_INVALID_HANDLE;
+    }
+    if (bgfx::isValid(uiTargetTexture)) {
+        bgfx::destroy(uiTargetTexture);
+        uiTargetTexture = BGFX_INVALID_HANDLE;
+    }
+
+    const uint64_t colorFlags = BGFX_TEXTURE_RT | BGFX_SAMPLER_U_CLAMP | BGFX_SAMPLER_V_CLAMP;
+    uiTargetTexture = bgfx::createTexture2D(
+        static_cast<uint16_t>(width),
+        static_cast<uint16_t>(height),
+        false,
+        1,
+        bgfx::TextureFormat::RGBA8,
+        colorFlags);
+    if (bgfx::isValid(uiTargetTexture)) {
+        bgfx::Attachment attachment;
+        attachment.init(uiTargetTexture);
+        uiTargetFrameBuffer = bgfx::createFrameBuffer(1, &attachment, false);
+    }
+    uiWidth = width;
+    uiHeight = height;
+    outputTextureId = bgfx::isValid(uiTargetTexture) ? static_cast<unsigned int>(uiTargetTexture.idx + 1) : 0;
 }
 
 Rml::CompiledGeometryHandle RenderInterface_BGFX::CompileGeometry(Rml::Span<const Rml::Vertex> vertices,

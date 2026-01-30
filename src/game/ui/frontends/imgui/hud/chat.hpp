@@ -12,6 +12,7 @@ namespace ui {
 class ImGuiHudChat {
 public:
     void addLine(const std::string &playerName, const std::string &line);
+    void setLines(const std::vector<std::string> &lines);
     std::string getSubmittedInput() const;
     void clearSubmittedInput();
     void focusInput();

@@ -27,6 +27,8 @@
 #include <cstring>
 #include <cmath>
 #include <cstdlib>
+#include <limits>
+#include <unordered_set>
 
 namespace graphics_backend {
 
@@ -151,11 +153,12 @@ struct MeshConstants {
     float color[4];
 };
 
+constexpr uint32_t kDescriptorSetRingSize = 3;
+
 } // namespace
 
 ForgeBackend::ForgeBackend(platform::Window& windowRef) : window(&windowRef) {
     spdlog::warn("Graphics(Forge): init begin");
-    debugTriangleEnabled_ = std::getenv("BZ3_FORGE_DEBUG_TRIANGLE") != nullptr;
     int fbWidth = 0;
     int fbHeight = 0;
     window->getFramebufferSize(fbWidth, fbHeight);
@@ -179,6 +182,18 @@ ForgeBackend::ForgeBackend(platform::Window& windowRef) : window(&windowRef) {
     RendererDesc rendererDesc{};
     rendererDesc.mGpuMode = GPU_MODE_SINGLE;
     rendererDesc.mShaderTarget = SHADER_TARGET_6_0;
+#if defined(VULKAN)
+    static const char* kValidationLayer = "VK_LAYER_KHRONOS_validation";
+    const bool enableValidation = []() {
+        const char* flag = std::getenv("BZ3_FORGE_ENABLE_VALIDATION");
+        return flag && flag[0] == '1';
+    }();
+    if (enableValidation) {
+        rendererDesc.mVk.ppInstanceLayers = &kValidationLayer;
+        rendererDesc.mVk.mInstanceLayerCount = 1;
+        spdlog::warn("Graphics(Forge): Vulkan validation enabled (layer {})", kValidationLayer);
+    }
+#endif
     initRenderer("bz3", &rendererDesc, &renderer_);
     if (!renderer_) {
         spdlog::error("Graphics(Forge): failed to initialize renderer.");
@@ -315,28 +330,11 @@ void ForgeBackend::beginFrame() {
     if (cmdPool_) {
         resetCmdPool(renderer_, cmdPool_);
     }
-    acquireNextImage(renderer_, swapChain_, imageAcquiredSemaphore_, renderFence_, &frameIndex_);
+    acquireNextImage(renderer_, swapChain_, imageAcquiredSemaphore_, nullptr, &frameIndex_);
     if (!cmd_) {
         return;
     }
     beginCmd(cmd_);
-    RenderTarget* backBuffer = swapChain_->ppRenderTargets[frameIndex_];
-    BindRenderTargetsDesc bindDesc{};
-    bindDesc.mRenderTargetCount = 1;
-    bindDesc.mRenderTargets[0].pRenderTarget = backBuffer;
-    bindDesc.mRenderTargets[0].mLoadAction = LOAD_ACTION_CLEAR;
-    bindDesc.mRenderTargets[0].mStoreAction = STORE_ACTION_STORE;
-    bindDesc.mRenderTargets[0].mClearValue = {0.05f, 0.08f, 0.12f, 1.0f};
-    bindDesc.mRenderTargets[0].mOverrideClearValue = 1;
-    bindDesc.mDepthStencil.pDepthStencil = nullptr;
-    bindDesc.mDepthStencil.mLoadAction = LOAD_ACTION_DONTCARE;
-    bindDesc.mDepthStencil.mStoreAction = STORE_ACTION_DONTCARE;
-    cmdBindRenderTargets(cmd_, &bindDesc);
-    cmdSetViewport(cmd_, 0.0f, 0.0f, static_cast<float>(framebufferWidth),
-                   static_cast<float>(framebufferHeight), 0.0f, 1.0f);
-    cmdSetScissor(cmd_, 0, 0, static_cast<uint32_t>(framebufferWidth),
-                  static_cast<uint32_t>(framebufferHeight));
-
 }
 
 void ForgeBackend::endFrame() {
@@ -344,9 +342,6 @@ void ForgeBackend::endFrame() {
         return;
     }
     if (cmd_) {
-        if (debugTriangleEnabled_) {
-            renderDebugTriangle();
-        }
         endCmd(cmd_);
         QueueSubmitDesc submitDesc{};
         submitDesc.ppCmds = &cmd_;
@@ -404,6 +399,11 @@ void ForgeBackend::resize(int width, int height) {
 graphics::EntityId ForgeBackend::createEntity(graphics::LayerId layer) {
     const auto id = nextEntityId++;
     entities[id] = EntityRecord{layer};
+    static bool loggedMain = false;
+    if (!loggedMain && layer == 0) {
+        spdlog::warn("Graphics(Forge): createEntity main layer id={}", static_cast<unsigned int>(id));
+        loggedMain = true;
+    }
     return id;
 }
 
@@ -411,6 +411,12 @@ graphics::EntityId ForgeBackend::createModelEntity(const std::filesystem::path& 
                                                    graphics::LayerId layer,
                                                    graphics::MaterialId materialOverride) {
     const auto id = createEntity(layer);
+    static bool loggedMainModel = false;
+    if (!loggedMainModel && layer == 0) {
+        spdlog::warn("Graphics(Forge): createModelEntity main layer id={} model='{}'",
+                     static_cast<unsigned int>(id), modelPath.string());
+        loggedMainModel = true;
+    }
     setEntityModel(id, modelPath, materialOverride);
     return id;
 }
@@ -419,6 +425,12 @@ graphics::EntityId ForgeBackend::createMeshEntity(graphics::MeshId mesh,
                                                   graphics::LayerId layer,
                                                   graphics::MaterialId materialOverride) {
     const auto id = createEntity(layer);
+    static bool loggedMainMesh = false;
+    if (!loggedMainMesh && layer == 0) {
+        spdlog::warn("Graphics(Forge): createMeshEntity main layer id={} mesh={}",
+                     static_cast<unsigned int>(id), static_cast<unsigned int>(mesh));
+        loggedMainMesh = true;
+    }
     setEntityMesh(id, mesh, materialOverride);
     return id;
 }
@@ -429,6 +441,12 @@ void ForgeBackend::setEntityModel(graphics::EntityId entity,
     auto it = entities.find(entity);
     if (it == entities.end()) {
         return;
+    }
+    static bool loggedMainSet = false;
+    if (!loggedMainSet && it->second.layer == 0) {
+        spdlog::warn("Graphics(Forge): setEntityModel main layer id={} model='{}'",
+                     static_cast<unsigned int>(entity), modelPath.string());
+        loggedMainSet = true;
     }
     it->second.modelPath = modelPath;
     it->second.material = materialOverride;
@@ -446,7 +464,19 @@ void ForgeBackend::setEntityModel(graphics::EntityId entity,
     options.loadTextures = false;
     auto loaded = MeshLoader::loadGLB(resolved.string(), options);
     if (loaded.empty()) {
+        static bool loggedEmpty = false;
+        if (!loggedEmpty && it->second.layer == 0) {
+            spdlog::warn("Graphics(Forge): setEntityModel main layer loadGLB empty path='{}'",
+                         resolved.string());
+            loggedEmpty = true;
+        }
         return;
+    }
+    static bool loggedLoaded = false;
+    if (!loggedLoaded && it->second.layer == 0) {
+        spdlog::warn("Graphics(Forge): setEntityModel main layer loaded meshes={} path='{}'",
+                     loaded.size(), resolved.string());
+        loggedLoaded = true;
     }
 
     std::vector<graphics::MeshId> modelMeshes;
@@ -468,6 +498,13 @@ void ForgeBackend::setEntityModel(graphics::EntityId entity,
     it->second.meshes = modelMeshes;
     it->second.mesh = modelMeshes.empty() ? graphics::kInvalidMesh : modelMeshes.front();
     modelMeshCache.emplace(pathKey, std::move(modelMeshes));
+    static bool loggedMeshes = false;
+    if (!loggedMeshes && it->second.layer == 0) {
+        spdlog::warn("Graphics(Forge): setEntityModel main layer meshes={} firstMesh={}",
+                     it->second.meshes.size(),
+                     static_cast<unsigned int>(it->second.mesh));
+        loggedMeshes = true;
+    }
 }
 
 void ForgeBackend::setEntityMesh(graphics::EntityId entity,
@@ -540,6 +577,17 @@ graphics::MeshId ForgeBackend::createMesh(const graphics::MeshData& mesh) {
         const auto& n = normals[i];
         const glm::vec2 uv = (i < mesh.texcoords.size()) ? mesh.texcoords[i] : glm::vec2(0.0f);
         packed[i] = {v.x, v.y, v.z, n.x, n.y, n.z, uv.x, uv.y};
+    }
+    if (const char* dbg = std::getenv("BZ3_FORGE_DEBUG_MESH_BOUNDS"); dbg && dbg[0] == '1') {
+        glm::vec3 minv{std::numeric_limits<float>::max()};
+        glm::vec3 maxv{std::numeric_limits<float>::lowest()};
+        for (const auto& v : mesh.vertices) {
+            minv = glm::min(minv, v);
+            maxv = glm::max(maxv, v);
+        }
+        spdlog::warn("Graphics(Forge): mesh bounds min=({}, {}, {}) max=({}, {}, {}) verts={} indices={}",
+                     minv.x, minv.y, minv.z, maxv.x, maxv.y, maxv.z,
+                     mesh.vertices.size(), mesh.indices.size());
     }
 
     BufferLoadDesc vbDesc{};
@@ -655,12 +703,36 @@ void ForgeBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId
         return;
     }
     ensureMeshResources();
+    static bool loggedRenderLayerDefault = false;
+    static bool loggedRenderLayerOther = false;
+    if (target == graphics::kDefaultRenderTarget) {
+        if (!loggedRenderLayerDefault) {
+            spdlog::warn("Graphics(Forge): renderLayer begin layer={} target=default fb={}x{}",
+                         static_cast<int>(layer), framebufferWidth, framebufferHeight);
+            loggedRenderLayerDefault = true;
+        }
+    } else if (!loggedRenderLayerOther) {
+        spdlog::warn("Graphics(Forge): renderLayer begin layer={} target={} fb={}x{}",
+                     static_cast<int>(layer), static_cast<unsigned int>(target),
+                     framebufferWidth, framebufferHeight);
+        loggedRenderLayerOther = true;
+    }
 
     RenderTarget* renderTarget = nullptr;
     int targetWidth = framebufferWidth;
     int targetHeight = framebufferHeight;
     bool wantsBrightness = (target == graphics::kDefaultRenderTarget && std::abs(brightness_ - 1.0f) > 0.0001f);
     bool useSwapchain = (target == graphics::kDefaultRenderTarget && !wantsBrightness);
+    static bool whiteTextureTransitioned = false;
+    if (whiteTexture_ && !whiteTextureTransitioned) {
+        TextureBarrier texBarrier{};
+        texBarrier.pTexture = whiteTexture_;
+        texBarrier.mCurrentState = RESOURCE_STATE_COPY_DEST;
+        texBarrier.mNewState = RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+        cmdResourceBarrier(cmd_, 0, nullptr, 1, &texBarrier, 0, nullptr);
+        whiteTextureTransitioned = true;
+        spdlog::warn("Graphics(Forge): transitioned white texture to shader resource");
+    }
     if (useSwapchain) {
         if (!swapChain_) {
             return;
@@ -698,7 +770,18 @@ void ForgeBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId
     bindDesc.mRenderTargets[0].pRenderTarget = renderTarget;
     bindDesc.mRenderTargets[0].mLoadAction = LOAD_ACTION_CLEAR;
     bindDesc.mRenderTargets[0].mStoreAction = STORE_ACTION_STORE;
-    if (useSwapchain || wantsBrightness) {
+    const bool debugSwapchainClear = []() {
+        const char* flag = std::getenv("BZ3_FORGE_DEBUG_CLEAR_SWAPCHAIN");
+        return flag && flag[0] == '1';
+    }();
+    if ((useSwapchain || wantsBrightness) && debugSwapchainClear) {
+        bindDesc.mRenderTargets[0].mClearValue = {1.0f, 0.0f, 1.0f, 1.0f};
+        static bool loggedOnce = false;
+        if (!loggedOnce) {
+            spdlog::warn("Graphics(Forge): debug swapchain clear magenta");
+            loggedOnce = true;
+        }
+    } else if (useSwapchain || wantsBrightness) {
         bindDesc.mRenderTargets[0].mClearValue = {0.05f, 0.08f, 0.12f, 1.0f};
     } else {
         bindDesc.mRenderTargets[0].mClearValue = {0.0f, 0.0f, 0.0f, 0.0f};
@@ -712,15 +795,201 @@ void ForgeBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId
                    static_cast<float>(targetHeight), 0.0f, 1.0f);
     cmdSetScissor(cmd_, 0, 0, static_cast<uint32_t>(targetWidth), static_cast<uint32_t>(targetHeight));
 
+    const bool singleDescriptor = []() {
+        const char* flag = std::getenv("BZ3_FORGE_DEBUG_SINGLE_DESCRIPTOR");
+        return flag && flag[0] == '1';
+    }();
+
+    const bool debugUiQuad = []() {
+        const char* flag = std::getenv("BZ3_FORGE_DEBUG_UI_QUAD");
+        return flag && flag[0] == '1';
+    }();
+    if (debugUiQuad && target == graphics::kDefaultRenderTarget) {
+        ensureUiOverlayResources();
+        if (uiOverlayPipeline_ && uiOverlayDescriptorSet_ && uiOverlayVertexBuffer_ &&
+            uiOverlayIndexBuffer_ && uiOverlayUniformBuffer_ && whiteTexture_) {
+            struct UiOverlayConstants {
+                float scaleBias[4];
+            } constants{};
+            constants.scaleBias[0] = 2.0f / static_cast<float>(targetWidth);
+            constants.scaleBias[1] = -2.0f / static_cast<float>(targetHeight);
+            constants.scaleBias[2] = -1.0f;
+            constants.scaleBias[3] = 1.0f;
+            BufferUpdateDesc cbUpdate = { uiOverlayUniformBuffer_ };
+            beginUpdateResource(&cbUpdate);
+            std::memcpy(cbUpdate.pMappedData, &constants, sizeof(constants));
+            endUpdateResource(&cbUpdate);
+
+            struct UiVertex {
+                float x;
+                float y;
+                float u;
+                float v;
+                uint32_t color;
+            };
+            const uint32_t color = 0xffff00ffu; // magenta
+            UiVertex vertices[4] = {
+                {0.0f, 0.0f, 0.0f, 0.0f, color},
+                {static_cast<float>(targetWidth), 0.0f, 1.0f, 0.0f, color},
+                {static_cast<float>(targetWidth), static_cast<float>(targetHeight), 1.0f, 1.0f, color},
+                {0.0f, static_cast<float>(targetHeight), 0.0f, 1.0f, color},
+            };
+            const uint16_t indices[6] = {0, 1, 2, 0, 2, 3};
+
+            BufferUpdateDesc vbUpdate = { uiOverlayVertexBuffer_ };
+            beginUpdateResource(&vbUpdate);
+            std::memcpy(vbUpdate.pMappedData, vertices, sizeof(vertices));
+            endUpdateResource(&vbUpdate);
+
+            BufferUpdateDesc ibUpdate = { uiOverlayIndexBuffer_ };
+            beginUpdateResource(&ibUpdate);
+            std::memcpy(ibUpdate.pMappedData, indices, sizeof(indices));
+            endUpdateResource(&ibUpdate);
+
+            Texture* texture = whiteTexture_;
+            DescriptorData params[3] = {};
+            params[0].mIndex = 0;
+            params[0].ppBuffers = &uiOverlayUniformBuffer_;
+            params[1].mIndex = 1;
+            params[1].ppTextures = &texture;
+            params[2].mIndex = 2;
+            params[2].ppSamplers = &uiOverlaySampler_;
+            updateDescriptorSet(renderer_, setIndex, uiOverlayDescriptorSet_, 3, params);
+
+            cmdBindPipeline(cmd_, uiOverlayPipeline_);
+            cmdBindDescriptorSet(cmd_, setIndex, uiOverlayDescriptorSet_);
+            uint32_t stride = sizeof(UiVertex);
+            uint64_t offset = 0;
+            cmdBindVertexBuffer(cmd_, 1, &uiOverlayVertexBuffer_, &stride, &offset);
+            cmdBindIndexBuffer(cmd_, uiOverlayIndexBuffer_, INDEX_TYPE_UINT16, 0);
+            cmdDrawIndexed(cmd_, 6, 0, 0);
+
+            static bool loggedOnce = false;
+            if (!loggedOnce) {
+                spdlog::warn("Graphics(Forge): debug UI quad draw issued");
+                loggedOnce = true;
+            }
+        }
+    }
+
     Pipeline* pipeline = useSwapchain ? meshPipeline_ : meshPipelineOffscreen_;
     if (!pipeline || !meshDescriptorSet_ || !meshUniformBuffer_) {
+        static bool loggedMissing = false;
+        if (!loggedMissing) {
+            spdlog::warn("Graphics(Forge): renderLayer skipped (pipeline={} set={} ub={})",
+                         pipeline ? "yes" : "no",
+                         meshDescriptorSet_ ? "yes" : "no",
+                         meshUniformBuffer_ ? "yes" : "no");
+            loggedMissing = true;
+        }
         return;
     }
     const glm::mat4 viewProj = getViewProjectionMatrix();
+    int visibleEntities = 0;
+    int meshesDrawn = 0;
+    const bool debugCamera = []() {
+        const char* flag = std::getenv("BZ3_FORGE_DEBUG_CAMERA");
+        return flag && flag[0] == '1';
+    }();
+    static std::unordered_set<int> loggedLayerCamera;
+    if (debugCamera && loggedLayerCamera.insert(static_cast<int>(layer)).second) {
+        spdlog::warn("Graphics(Forge): camera pos=({}, {}, {}) rot=({}, {}, {}, {}) fov={} aspect={} near={} far={} persp={}",
+                     cameraPosition.x, cameraPosition.y, cameraPosition.z,
+                     cameraRotation.w, cameraRotation.x, cameraRotation.y, cameraRotation.z,
+                     fovDegrees, aspectRatio, nearPlane, farPlane,
+                     usePerspective ? "yes" : "no");
+        const float* vp = glm::value_ptr(viewProj);
+        spdlog::warn("Graphics(Forge): viewProj [{:.4f} {:.4f} {:.4f} {:.4f}] [{:.4f} {:.4f} {:.4f} {:.4f}] [{:.4f} {:.4f} {:.4f} {:.4f}] [{:.4f} {:.4f} {:.4f} {:.4f}]",
+                     vp[0], vp[1], vp[2], vp[3],
+                     vp[4], vp[5], vp[6], vp[7],
+                     vp[8], vp[9], vp[10], vp[11],
+                     vp[12], vp[13], vp[14], vp[15]);
+    }
+    const bool debugMeshTri = []() {
+        const char* flag = std::getenv("BZ3_FORGE_DEBUG_MESH_TRI");
+        return flag && flag[0] == '1';
+    }();
+    const bool debugOnlyTri = []() {
+        const char* flag = std::getenv("BZ3_FORGE_DEBUG_ONLY_TRI");
+        return flag && flag[0] == '1';
+    }();
+    if (debugMeshTri && target == graphics::kDefaultRenderTarget) {
+        static Buffer* debugVB = nullptr;
+        if (!debugVB) {
+            MeshVertex triVerts[3] = {
+                {-0.5f, -0.5f, 0.0f, 0, 0, 1, 0, 0},
+                {0.5f, -0.5f, 0.0f, 0, 0, 1, 1, 0},
+                {0.0f, 0.5f, 0.0f, 0, 0, 1, 0.5f, 1},
+            };
+            BufferLoadDesc vbDesc{};
+            vbDesc.mDesc.mDescriptors = DESCRIPTOR_TYPE_VERTEX_BUFFER;
+            vbDesc.mDesc.mMemoryUsage = RESOURCE_MEMORY_USAGE_GPU_ONLY;
+            vbDesc.mDesc.mSize = sizeof(triVerts);
+            vbDesc.mDesc.pName = "Forge Debug Mesh Tri VB";
+            vbDesc.pData = triVerts;
+            vbDesc.ppBuffer = &debugVB;
+            addResource(&vbDesc, nullptr);
+        }
+
+        MeshConstants constants{};
+        glm::mat4 identity(1.0f);
+        std::memcpy(constants.mvp, glm::value_ptr(identity), sizeof(constants.mvp));
+        constants.color[0] = 1.0f;
+        constants.color[1] = 0.0f;
+        constants.color[2] = 1.0f;
+        constants.color[3] = 1.0f;
+        BufferUpdateDesc ubUpdate = { meshUniformBuffer_ };
+        beginUpdateResource(&ubUpdate);
+        std::memcpy(ubUpdate.pMappedData, &constants, sizeof(constants));
+        endUpdateResource(&ubUpdate);
+
+        Texture* texture = whiteTexture_;
+        if (!singleDescriptor) {
+            DescriptorData params[3] = {};
+            params[0].mIndex = 0;
+            params[0].ppBuffers = &meshUniformBuffer_;
+            params[1].mIndex = 1;
+            params[1].ppTextures = &texture;
+            params[2].mIndex = 2;
+            params[2].ppSamplers = &meshSampler_;
+            updateDescriptorSet(renderer_, setIndex, meshDescriptorSet_, 3, params);
+        }
+
+        cmdBindPipeline(cmd_, pipeline);
+        cmdBindDescriptorSet(cmd_, setIndex, meshDescriptorSet_);
+        uint32_t stride = sizeof(MeshVertex);
+        uint64_t offset = 0;
+        cmdBindVertexBuffer(cmd_, 1, &debugVB, &stride, &offset);
+        cmdDraw(cmd_, 3, 0);
+
+        static bool loggedTri = false;
+        if (!loggedTri) {
+            spdlog::warn("Graphics(Forge): debug mesh triangle draw issued");
+            loggedTri = true;
+        }
+    }
+
+    if (debugOnlyTri) {
+        return;
+    }
+
+    if (singleDescriptor) {
+        Texture* texture = whiteTexture_;
+        DescriptorData params[3] = {};
+        params[0].mIndex = 0;
+        params[0].ppBuffers = &meshUniformBuffer_;
+        params[1].mIndex = 1;
+        params[1].ppTextures = &texture;
+        params[2].mIndex = 2;
+        params[2].ppSamplers = &meshSampler_;
+        updateDescriptorSet(renderer_, setIndex, meshDescriptorSet_, 3, params);
+    }
+
     for (const auto& [id, entity] : entities) {
         if (entity.layer != layer || !entity.visible) {
             continue;
         }
+        visibleEntities++;
 
         const glm::mat4 translate = glm::translate(glm::mat4(1.0f), entity.position);
         const glm::mat4 rotate = glm::mat4_cast(entity.rotation);
@@ -759,23 +1028,56 @@ void ForgeBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId
             }
 
             Texture* texture = mesh.texture ? mesh.texture : whiteTexture_;
-            DescriptorData params[3] = {};
-            params[0].mIndex = 0;
-            params[0].ppBuffers = &meshUniformBuffer_;
-            params[1].mIndex = 1;
-            params[1].ppTextures = &texture;
-            params[2].mIndex = 2;
-            params[2].ppSamplers = &meshSampler_;
-            updateDescriptorSet(renderer_, 0, meshDescriptorSet_, 3, params);
+            static bool loggedDraw = false;
+            if (!loggedDraw) {
+                spdlog::warn("Graphics(Forge): draw mesh id={} indices={} texture={} swapchain={} target={}x{}",
+                             static_cast<unsigned int>(meshId), mesh.indexCount,
+                             texture ? "yes" : "no",
+                             useSwapchain ? "yes" : "no",
+                             targetWidth, targetHeight);
+                if (debugCamera && loggedLayerCamera.insert(static_cast<int>(layer)).second) {
+                    spdlog::warn("Graphics(Forge): camera pos=({}, {}, {}) rot=({}, {}, {}, {}) fov={} aspect={} near={} far={} persp={}",
+                                 cameraPosition.x, cameraPosition.y, cameraPosition.z,
+                                 cameraRotation.w, cameraRotation.x, cameraRotation.y, cameraRotation.z,
+                                 fovDegrees, aspectRatio, nearPlane, farPlane,
+                                 usePerspective ? "yes" : "no");
+                    const float* vp = glm::value_ptr(viewProj);
+                    spdlog::warn("Graphics(Forge): viewProj [{:.4f} {:.4f} {:.4f} {:.4f}] [{:.4f} {:.4f} {:.4f} {:.4f}] [{:.4f} {:.4f} {:.4f} {:.4f}] [{:.4f} {:.4f} {:.4f} {:.4f}]",
+                                 vp[0], vp[1], vp[2], vp[3],
+                                 vp[4], vp[5], vp[6], vp[7],
+                                 vp[8], vp[9], vp[10], vp[11],
+                                 vp[12], vp[13], vp[14], vp[15]);
+                    const float* wm = glm::value_ptr(world);
+                    spdlog::warn("Graphics(Forge): world [{:.4f} {:.4f} {:.4f} {:.4f}] [{:.4f} {:.4f} {:.4f} {:.4f}] [{:.4f} {:.4f} {:.4f} {:.4f}] [{:.4f} {:.4f} {:.4f} {:.4f}]",
+                                 wm[0], wm[1], wm[2], wm[3],
+                                 wm[4], wm[5], wm[6], wm[7],
+                                 wm[8], wm[9], wm[10], wm[11],
+                                 wm[12], wm[13], wm[14], wm[15]);
+                    spdlog::warn("Graphics(Forge): material color=({}, {}, {}, {})",
+                                 constants.color[0], constants.color[1], constants.color[2], constants.color[3]);
+                }
+                loggedDraw = true;
+            }
+            if (!singleDescriptor) {
+                DescriptorData params[3] = {};
+                params[0].mIndex = 0;
+                params[0].ppBuffers = &meshUniformBuffer_;
+                params[1].mIndex = 1;
+                params[1].ppTextures = &texture;
+                params[2].mIndex = 2;
+                params[2].ppSamplers = &meshSampler_;
+                updateDescriptorSet(renderer_, setIndex, meshDescriptorSet_, 3, params);
+            }
 
             cmdBindPipeline(cmd_, pipeline);
-            cmdBindDescriptorSet(cmd_, 0, meshDescriptorSet_);
+            cmdBindDescriptorSet(cmd_, setIndex, meshDescriptorSet_);
             uint32_t stride = sizeof(MeshVertex);
             uint64_t offset = 0;
             Buffer* vb = mesh.vertexBuffer;
             cmdBindVertexBuffer(cmd_, 1, &vb, &stride, &offset);
             cmdBindIndexBuffer(cmd_, mesh.indexBuffer, INDEX_TYPE_UINT32, 0);
             cmdDrawIndexed(cmd_, mesh.indexCount, 0, 0);
+            meshesDrawn++;
         };
 
         if (!entity.meshes.empty()) {
@@ -788,6 +1090,7 @@ void ForgeBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId
     }
 
     if (!useSwapchain && renderTarget) {
+        cmdBindRenderTargets(cmd_, nullptr);
         RenderTargetBarrier rtEnd{};
         rtEnd.pRenderTarget = renderTarget;
         rtEnd.mCurrentState = RESOURCE_STATE_RENDER_TARGET;
@@ -797,6 +1100,32 @@ void ForgeBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId
 
     if (wantsBrightness && sceneTarget_) {
         renderBrightnessPass();
+    }
+    cmdBindRenderTargets(cmd_, nullptr);
+    static bool loggedSummaryDefaultEmpty = false;
+    static bool loggedSummaryOther = false;
+    if (target == graphics::kDefaultRenderTarget) {
+        if ((visibleEntities > 0 || meshesDrawn > 0)) {
+            spdlog::warn("Graphics(Forge): renderLayer summary layer={} target=default useSwapchain={} brightness={} entities={} meshes={} size={}x{}",
+                         static_cast<int>(layer),
+                         useSwapchain ? "yes" : "no",
+                         wantsBrightness ? "yes" : "no",
+                         visibleEntities, meshesDrawn, targetWidth, targetHeight);
+        } else if (!loggedSummaryDefaultEmpty) {
+            spdlog::warn("Graphics(Forge): renderLayer summary layer={} target=default useSwapchain={} brightness={} entities={} meshes={} size={}x{}",
+                         static_cast<int>(layer),
+                         useSwapchain ? "yes" : "no",
+                         wantsBrightness ? "yes" : "no",
+                         visibleEntities, meshesDrawn, targetWidth, targetHeight);
+            loggedSummaryDefaultEmpty = true;
+        }
+    } else if (!loggedSummaryOther) {
+        spdlog::warn("Graphics(Forge): renderLayer summary layer={} target={} useSwapchain={} brightness={} entities={} meshes={} size={}x{}",
+                     static_cast<int>(layer), static_cast<unsigned int>(target),
+                     useSwapchain ? "yes" : "no",
+                     wantsBrightness ? "yes" : "no",
+                     visibleEntities, meshesDrawn, targetWidth, targetHeight);
+        loggedSummaryOther = true;
     }
 }
 
@@ -838,6 +1167,7 @@ void ForgeBackend::renderUiOverlay() {
     if (!texture) {
         return;
     }
+    const uint32_t setIndex = frameIndex_ % kDescriptorSetRingSize;
 
     RenderTarget* backBuffer = swapChain_->ppRenderTargets[frameIndex_];
     BindRenderTargetsDesc bindDesc{};
@@ -852,6 +1182,7 @@ void ForgeBackend::renderUiOverlay() {
 
     const uint32_t width = framebufferWidth > 0 ? static_cast<uint32_t>(framebufferWidth) : 1u;
     const uint32_t height = framebufferHeight > 0 ? static_cast<uint32_t>(framebufferHeight) : 1u;
+    const uint32_t setIndex = frameIndex_ % kDescriptorSetRingSize;
 
     struct UiOverlayConstants {
         float scaleBias[4];
@@ -898,12 +1229,12 @@ void ForgeBackend::renderUiOverlay() {
     params[1].ppTextures = &texture;
     params[2].mIndex = 2;
     params[2].ppSamplers = &uiOverlaySampler_;
-    updateDescriptorSet(renderer_, 0, uiOverlayDescriptorSet_, 3, params);
+    updateDescriptorSet(renderer_, setIndex, uiOverlayDescriptorSet_, 3, params);
 
     cmdSetViewport(cmd_, 0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f);
     cmdSetScissor(cmd_, 0, 0, width, height);
     cmdBindPipeline(cmd_, uiOverlayPipeline_);
-    cmdBindDescriptorSet(cmd_, 0, uiOverlayDescriptorSet_);
+    cmdBindDescriptorSet(cmd_, setIndex, uiOverlayDescriptorSet_);
 
     uint32_t stride = sizeof(UiVertex);
     uint64_t offset = 0;
@@ -1006,9 +1337,18 @@ glm::mat4 ForgeBackend::computeViewMatrix() const {
 
 glm::mat4 ForgeBackend::computeProjectionMatrix() const {
     if (usePerspective) {
-        return glm::perspective(glm::radians(fovDegrees), aspectRatio, nearPlane, farPlane);
+        // Vulkan clip space depth is [0, 1]. Allow forcing LH for debugging camera handedness.
+        const char* forceLh = std::getenv("BZ3_FORGE_USE_LH");
+        if (forceLh && forceLh[0] == '1') {
+            return glm::perspectiveLH_ZO(glm::radians(fovDegrees), aspectRatio, nearPlane, farPlane);
+        }
+        return glm::perspectiveRH_ZO(glm::radians(fovDegrees), aspectRatio, nearPlane, farPlane);
     }
-    return glm::ortho(orthoLeft, orthoRight, orthoBottom, orthoTop, nearPlane, farPlane);
+    const char* forceLh = std::getenv("BZ3_FORGE_USE_LH");
+    if (forceLh && forceLh[0] == '1') {
+        return glm::orthoLH_ZO(orthoLeft, orthoRight, orthoBottom, orthoTop, nearPlane, farPlane);
+    }
+    return glm::orthoRH_ZO(orthoLeft, orthoRight, orthoBottom, orthoTop, nearPlane, farPlane);
 }
 
 void ForgeBackend::ensureUiOverlayResources() {
@@ -1061,7 +1401,7 @@ void ForgeBackend::ensureUiOverlayResources() {
 
     DescriptorSetDesc setDesc{};
     setDesc.mIndex = 0;
-    setDesc.mMaxSets = 1;
+    setDesc.mMaxSets = kDescriptorSetRingSize;
     setDesc.mDescriptorCount = 3;
     setDesc.pDescriptors = uiOverlayDescriptors_;
     addDescriptorSet(renderer_, &setDesc, &uiOverlayDescriptorSet_);
@@ -1113,13 +1453,19 @@ void ForgeBackend::ensureUiOverlayResources() {
     layout.mAttribs[2].mOffset = sizeof(float) * 4;
 
     BlendStateDesc blend{};
-    blend.mSrcFactors[0] = BC_SRC_ALPHA;
-    blend.mDstFactors[0] = BC_ONE_MINUS_SRC_ALPHA;
-    blend.mSrcAlphaFactors[0] = BC_SRC_ALPHA;
-    blend.mDstAlphaFactors[0] = BC_ONE_MINUS_SRC_ALPHA;
+    const bool forceOpaque = []() {
+        const char* flag = std::getenv("BZ3_FORGE_DEBUG_OPAQUE");
+        return flag && flag[0] == '1';
+    }();
     blend.mColorWriteMasks[0] = COLOR_MASK_ALL;
     blend.mRenderTargetMask = BLEND_STATE_TARGET_ALL;
     blend.mIndependentBlend = false;
+    if (!forceOpaque) {
+        blend.mSrcFactors[0] = BC_SRC_ALPHA;
+        blend.mDstFactors[0] = BC_ONE_MINUS_SRC_ALPHA;
+        blend.mSrcAlphaFactors[0] = BC_SRC_ALPHA;
+        blend.mDstAlphaFactors[0] = BC_ONE_MINUS_SRC_ALPHA;
+    }
 
     DepthStateDesc depth{};
     depth.mDepthTest = false;
@@ -1188,155 +1534,6 @@ void ForgeBackend::destroyUiOverlayResources() {
         removeResource(uiOverlayUniformBuffer_);
         uiOverlayUniformBuffer_ = nullptr;
     }
-    if (debugTriangleTexture_) {
-        removeResource(debugTriangleTexture_);
-        debugTriangleTexture_ = nullptr;
-    }
-}
-
-void ForgeBackend::ensureDebugTriangleTexture() {
-    if (!renderer_ || debugTriangleTexture_) {
-        return;
-    }
-    const uint32_t white = 0xffffffffu;
-    TextureDesc textureDesc{};
-    textureDesc.mArraySize = 1;
-    textureDesc.mDepth = 1;
-    textureDesc.mDescriptors = DESCRIPTOR_TYPE_TEXTURE;
-    textureDesc.mFormat = TinyImageFormat_R8G8B8A8_UNORM;
-    textureDesc.mHeight = 1;
-    textureDesc.mMipLevels = 1;
-    textureDesc.mSampleCount = SAMPLE_COUNT_1;
-    textureDesc.mStartState = RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-    textureDesc.mWidth = 1;
-    textureDesc.pName = "Forge Debug Triangle White";
-
-    TextureLoadDesc loadDesc{};
-    loadDesc.pDesc = &textureDesc;
-    loadDesc.ppTexture = &debugTriangleTexture_;
-    SyncToken token{};
-    addResource(&loadDesc, &token);
-    waitForToken(&token);
-
-    if (!debugTriangleTexture_) {
-        return;
-    }
-
-    TextureUpdateDesc updateDesc = { debugTriangleTexture_, 0, 1, 0, 1, RESOURCE_STATE_PIXEL_SHADER_RESOURCE };
-    beginUpdateResource(&updateDesc);
-    TextureSubresourceUpdate subresource = updateDesc.getSubresourceUpdateDesc(0, 0);
-    std::memcpy(subresource.pMappedData, &white, sizeof(white));
-    endUpdateResource(&updateDesc);
-    if (renderFence_) {
-        FlushResourceUpdateDesc flush{};
-        flush.pOutFence = renderFence_;
-        flushResourceUpdates(&flush);
-        waitForFences(renderer_, 1, &renderFence_);
-    }
-}
-
-void ForgeBackend::renderDebugTriangle() {
-    ensureUiOverlayResources();
-    ensureDebugTriangleTexture();
-    if (!cmd_ || !uiOverlayPipeline_ || !uiOverlayDescriptorSet_ || !uiOverlayVertexBuffer_ || !uiOverlayIndexBuffer_
-        || !uiOverlayUniformBuffer_ || !uiOverlaySampler_ || !debugTriangleTexture_) {
-        static bool logged = false;
-        if (!logged) {
-            spdlog::warn("Graphics(Forge): debug triangle skipped cmd={} pipeline={} set={} vb={} ib={} ub={} sampler={} tex={}",
-                         cmd_ ? "yes" : "no",
-                         uiOverlayPipeline_ ? "yes" : "no",
-                         uiOverlayDescriptorSet_ ? "yes" : "no",
-                         uiOverlayVertexBuffer_ ? "yes" : "no",
-                         uiOverlayIndexBuffer_ ? "yes" : "no",
-                         uiOverlayUniformBuffer_ ? "yes" : "no",
-                         uiOverlaySampler_ ? "yes" : "no",
-                         debugTriangleTexture_ ? "yes" : "no");
-            logged = true;
-        }
-        return;
-    }
-
-    RenderTarget* backBuffer = swapChain_->ppRenderTargets[frameIndex_];
-    BindRenderTargetsDesc bindDesc{};
-    bindDesc.mRenderTargetCount = 1;
-    bindDesc.mRenderTargets[0].pRenderTarget = backBuffer;
-    bindDesc.mRenderTargets[0].mLoadAction = LOAD_ACTION_LOAD;
-    bindDesc.mRenderTargets[0].mStoreAction = STORE_ACTION_STORE;
-    bindDesc.mDepthStencil.pDepthStencil = nullptr;
-    bindDesc.mDepthStencil.mLoadAction = LOAD_ACTION_DONTCARE;
-    bindDesc.mDepthStencil.mStoreAction = STORE_ACTION_DONTCARE;
-    cmdBindRenderTargets(cmd_, &bindDesc);
-
-    struct UiOverlayConstants {
-        float scaleBias[4];
-    } constants{};
-    const float width = framebufferWidth > 0 ? static_cast<float>(framebufferWidth) : 1.0f;
-    const float height = framebufferHeight > 0 ? static_cast<float>(framebufferHeight) : 1.0f;
-    constants.scaleBias[0] = 2.0f / width;
-    constants.scaleBias[1] = -2.0f / height;
-    constants.scaleBias[2] = -1.0f;
-    constants.scaleBias[3] = 1.0f;
-    BufferUpdateDesc cbUpdate = { uiOverlayUniformBuffer_ };
-    beginUpdateResource(&cbUpdate);
-    std::memcpy(cbUpdate.pMappedData, &constants, sizeof(constants));
-    endUpdateResource(&cbUpdate);
-
-    struct UiVertex {
-        float x;
-        float y;
-        float u;
-        float v;
-        uint32_t color;
-    };
-    const uint32_t color = 0xffffffffu;
-    UiVertex vertices[3] = {
-        {width * 0.5f, height * 0.25f, 0.0f, 0.0f, color},
-        {width * 0.25f, height * 0.75f, 0.0f, 0.0f, color},
-        {width * 0.75f, height * 0.75f, 0.0f, 0.0f, color},
-    };
-    const uint16_t indices[3] = {0, 1, 2};
-
-    BufferUpdateDesc vbUpdate = { uiOverlayVertexBuffer_ };
-    beginUpdateResource(&vbUpdate);
-    std::memcpy(vbUpdate.pMappedData, vertices, sizeof(vertices));
-    endUpdateResource(&vbUpdate);
-
-    BufferUpdateDesc ibUpdate = { uiOverlayIndexBuffer_ };
-    beginUpdateResource(&ibUpdate);
-    std::memcpy(ibUpdate.pMappedData, indices, sizeof(indices));
-    endUpdateResource(&ibUpdate);
-
-    DescriptorData params[3] = {};
-    params[0].mIndex = 0;
-    params[0].ppBuffers = &uiOverlayUniformBuffer_;
-    params[1].mIndex = 1;
-    params[1].ppTextures = &debugTriangleTexture_;
-    params[2].mIndex = 2;
-    params[2].ppSamplers = &uiOverlaySampler_;
-    updateDescriptorSet(renderer_, 0, uiOverlayDescriptorSet_, 3, params);
-
-    cmdSetViewport(cmd_, 0.0f, 0.0f, width, height, 0.0f, 1.0f);
-    cmdSetScissor(cmd_, 0, 0, static_cast<uint32_t>(width), static_cast<uint32_t>(height));
-    cmdBindPipeline(cmd_, uiOverlayPipeline_);
-    cmdBindDescriptorSet(cmd_, 0, uiOverlayDescriptorSet_);
-    uint32_t stride = sizeof(UiVertex);
-    uint64_t offset = 0;
-    cmdBindVertexBuffer(cmd_, 1, &uiOverlayVertexBuffer_, &stride, &offset);
-    cmdBindIndexBuffer(cmd_, uiOverlayIndexBuffer_, INDEX_TYPE_UINT16, 0);
-    cmdDrawIndexed(cmd_, 3, 0, 0);
-    static bool drewLogged = false;
-    if (!drewLogged) {
-        spdlog::warn("Graphics(Forge): debug triangle draw issued");
-        if (swapChain_ && swapChain_->ppRenderTargets[frameIndex_]) {
-            const RenderTarget* rt = swapChain_->ppRenderTargets[frameIndex_];
-            spdlog::warn("Graphics(Forge): debug triangle dims fb={}x{} rt={}x{} frame={}",
-                         framebufferWidth, framebufferHeight, rt->mWidth, rt->mHeight, frameIndex_);
-        } else {
-            spdlog::warn("Graphics(Forge): debug triangle dims fb={}x{} rt=<null> frame={}",
-                         framebufferWidth, framebufferHeight, frameIndex_);
-        }
-        drewLogged = true;
-    }
 }
 
 void ForgeBackend::ensureBrightnessResources() {
@@ -1390,7 +1587,7 @@ void ForgeBackend::ensureBrightnessResources() {
 
     DescriptorSetDesc setDesc{};
     setDesc.mIndex = 0;
-    setDesc.mMaxSets = 1;
+    setDesc.mMaxSets = kDescriptorSetRingSize;
     setDesc.mDescriptorCount = 3;
     setDesc.pDescriptors = brightnessDescriptors_;
     addDescriptorSet(renderer_, &setDesc, &brightnessDescriptorSet_);
@@ -1621,18 +1818,19 @@ void ForgeBackend::renderBrightnessPass() {
     params[1].ppTextures = &sceneTarget_->pTexture;
     params[2].mIndex = 2;
     params[2].ppSamplers = &brightnessSampler_;
-    updateDescriptorSet(renderer_, 0, brightnessDescriptorSet_, 3, params);
+    updateDescriptorSet(renderer_, setIndex, brightnessDescriptorSet_, 3, params);
 
     cmdSetViewport(cmd_, 0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f);
     cmdSetScissor(cmd_, 0, 0, width, height);
     cmdBindPipeline(cmd_, brightnessPipeline_);
-    cmdBindDescriptorSet(cmd_, 0, brightnessDescriptorSet_);
+    cmdBindDescriptorSet(cmd_, setIndex, brightnessDescriptorSet_);
 
     uint32_t stride = sizeof(BrightnessVertex);
     uint64_t offset = 0;
     cmdBindVertexBuffer(cmd_, 1, &brightnessVertexBuffer_, &stride, &offset);
     cmdBindIndexBuffer(cmd_, brightnessIndexBuffer_, INDEX_TYPE_UINT16, 0);
     cmdDrawIndexed(cmd_, 6, 0, 0);
+    cmdBindRenderTargets(cmd_, nullptr);
 }
 
 void ForgeBackend::ensureMeshResources() {
@@ -1644,14 +1842,20 @@ void ForgeBackend::ensureMeshResources() {
     }
 
     const std::filesystem::path shaderDir = bz::data::Resolve("forge/shaders");
-    const auto vsPath = shaderDir / "mesh.vert.spv";
-    const auto fsPath = shaderDir / "mesh.frag.spv";
+    const bool debugSolid = []() {
+        const char* flag = std::getenv("BZ3_FORGE_DEBUG_SOLID_SHADER");
+        return flag && flag[0] == '1';
+    }();
+    const auto vsPath = shaderDir / (debugSolid ? "mesh_debug.vert.spv" : "mesh.vert.spv");
+    const auto fsPath = shaderDir / (debugSolid ? "mesh_debug.frag.spv" : "mesh.frag.spv");
     auto vsBytes = readFileBytes(vsPath);
     auto fsBytes = readFileBytes(fsPath);
     if (vsBytes.empty() || fsBytes.empty()) {
         spdlog::error("Graphics(Forge): missing mesh shaders '{}', '{}'", vsPath.string(), fsPath.string());
         return;
     }
+    spdlog::warn("Graphics(Forge): mesh shader selection vs='{}' fs='{}' bytes=({}, {})",
+                 vsPath.string(), fsPath.string(), vsBytes.size(), fsBytes.size());
 
     if (!meshShader_) {
         BinaryShaderDesc shaderDesc{};
@@ -1690,7 +1894,7 @@ void ForgeBackend::ensureMeshResources() {
     if (!meshDescriptorSet_) {
         DescriptorSetDesc setDesc{};
         setDesc.mIndex = 0;
-        setDesc.mMaxSets = 1;
+        setDesc.mMaxSets = kDescriptorSetRingSize;
         setDesc.mDescriptorCount = 3;
         setDesc.pDescriptors = meshDescriptors_;
         addDescriptorSet(renderer_, &setDesc, &meshDescriptorSet_);

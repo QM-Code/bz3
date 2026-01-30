@@ -7,7 +7,8 @@
 #include <vector>
 
 #include "platform/events.hpp"
-#include "ui/hud_model.hpp"
+#include "ui/controllers/hud_controller.hpp"
+#include "ui/models/hud_model.hpp"
 #include "ui/types.hpp"
 #include "ui/console/console_interface.hpp"
 #include "ui/bridges/render_bridge.hpp"
@@ -20,10 +21,6 @@ namespace ui_backend {
 class Backend;
 }
 
-namespace ui {
-class ImGuiRenderBridge;
-}
-
 class UiSystem {
     friend class ClientEngine;
 
@@ -34,6 +31,7 @@ public:
 private:
     std::unique_ptr<ui_backend::Backend> backend;
     ui::HudModel hudModel;
+    ui::HudController hudController;
     uint64_t lastConfigRevision = 0;
 
     void update();
@@ -55,7 +53,6 @@ public:
     void setDialogVisible(bool show);
     bool consumeKeybindingsReloadRequest();
     void setRenderBridge(const ui::RenderBridge *bridge);
-    void setImGuiRenderBridge(const ui::ImGuiRenderBridge *bridge);
     ui::RenderOutput getRenderOutput() const;
     float getRenderBrightness() const;
 };
