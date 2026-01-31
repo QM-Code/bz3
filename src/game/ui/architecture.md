@@ -1,5 +1,7 @@
 # UI Architecture (current)
 
+Read `src/AGENTS.md` and `src/game/AGENTS.md` before this file.
+
 This document reflects the UI subsystem as it exists today, plus the near-term refactor direction. It is intended for future coding agents.
 
 ## 1) Big picture
