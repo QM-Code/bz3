@@ -1,14 +1,14 @@
-#include "engine/graphics/backends/bgfx/backend.hpp"
+#include "karma/graphics/backends/bgfx/backend.hpp"
 #if defined(KARMA_UI_BACKEND_IMGUI)
-#include "engine/ui/platform/imgui/renderer_bgfx.hpp"
+#include "karma/ui/platform/imgui/renderer_bgfx.hpp"
 #endif
 
-#include "engine/common/data_path_resolver.hpp"
-#include "engine/common/config_helpers.hpp"
-#include "engine/common/config_store.hpp"
-#include "engine/common/file_utils.hpp"
-#include "engine/graphics/backends/bgfx/texture_utils.hpp"
-#include "engine/geometry/mesh_loader.hpp"
+#include "karma/common/data_path_resolver.hpp"
+#include "karma/common/config_helpers.hpp"
+#include "karma/common/config_store.hpp"
+#include "karma/common/file_utils.hpp"
+#include "karma/graphics/backends/bgfx/texture_utils.hpp"
+#include "karma/geometry/mesh_loader.hpp"
 #include "platform/window.hpp"
 
 #include <bgfx/bgfx.h>
@@ -18,6 +18,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/ext/matrix_clip_space.hpp>
+#include <stdexcept>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <spdlog/spdlog.h>
@@ -150,7 +151,7 @@ bool isShotModelPath(const std::filesystem::path& path) {
 std::string getThemeName() {
     const char* env = std::getenv("KARMA_BGFX_THEME");
     if (!env || !*env) {
-        return karma::config::ReadStringConfig("graphics.theme", "classic");
+        return karma::config::ReadRequiredStringConfig("graphics.theme");
     }
     return std::string(env);
 }
@@ -209,12 +210,12 @@ std::filesystem::path skyboxPathFor(const std::string& name, const std::string& 
     return karma::data::Resolve("common/textures/skybox/" + name + "_" + face + ".png");
 }
 
-glm::vec3 readVec3Config(const char* path, const glm::vec3& fallback) {
+glm::vec3 readVec3ConfigRequired(const char* path) {
     const auto* value = karma::config::ConfigStore::Get(path);
     if (!value || !value->is_array() || value->size() < 3) {
-        return fallback;
+        throw std::runtime_error(std::string("Missing required vec3 config: ") + path);
     }
-    glm::vec3 out = fallback;
+    glm::vec3 out(0.0f);
     for (size_t i = 0; i < 3; ++i) {
         const auto& v = (*value)[i];
         if (v.is_number_float()) {
@@ -223,6 +224,8 @@ glm::vec3 readVec3Config(const char* path, const glm::vec3& fallback) {
             out[static_cast<int>(i)] = static_cast<float>(v.get<int64_t>());
         } else if (v.is_number_unsigned()) {
             out[static_cast<int>(i)] = static_cast<float>(v.get<uint64_t>());
+        } else {
+            throw std::runtime_error(std::string("Invalid vec3 config type at: ") + path);
         }
     }
     return out;
@@ -850,9 +853,9 @@ void BgfxBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId 
     if (revision != configRevision) {
         configRevision = revision;
         const glm::vec3 defaultSunDir = glm::normalize(glm::vec3(-0.4f, -1.0f, -0.2f));
-        cachedSunDirection = glm::normalize(readVec3Config("graphics.lighting.SunDirection", defaultSunDir));
-        cachedAmbientColor = readVec3Config("graphics.lighting.AmbientColor", glm::vec3(0.2f));
-        cachedSunColor = readVec3Config("graphics.lighting.SunColor", glm::vec3(1.0f));
+        cachedSunDirection = glm::normalize(readVec3ConfigRequired("graphics.lighting.SunDirection"));
+        cachedAmbientColor = readVec3ConfigRequired("graphics.lighting.AmbientColor");
+        cachedSunColor = readVec3ConfigRequired("graphics.lighting.SunColor");
     }
 
     // Treat only the radar layer as "radar pass" even when rendering to offscreen targets.
@@ -1358,13 +1361,13 @@ void BgfxBackend::buildSkyboxResources() {
         return;
     }
 
-    const std::string mode = karma::config::ReadStringConfig("graphics.skybox.Mode", "none");
+    const std::string mode = karma::config::ReadRequiredStringConfig("graphics.skybox.Mode");
     spdlog::trace("Graphics(Bgfx): skybox mode='{}'", mode);
     if (mode != "cubemap") {
         return;
     }
 
-    const std::string name = karma::config::ReadStringConfig("graphics.skybox.Cubemap.Name", "classic");
+    const std::string name = karma::config::ReadRequiredStringConfig("graphics.skybox.Cubemap.Name");
     spdlog::trace("Graphics(Bgfx): skybox cubemap='{}'", name);
     const std::array<std::string, 6> faces = {"right", "left", "up", "down", "front", "back"};
     std::array<std::vector<uint8_t>, 6> facePixels{};

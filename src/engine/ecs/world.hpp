@@ -1,7 +1,7 @@
 #pragma once
 
-#include "engine/ecs/registry.hpp"
-#include "engine/ecs/types.hpp"
+#include "karma/ecs/registry.hpp"
+#include "karma/ecs/types.hpp"
 #include <vector>
 #include <vector>
 

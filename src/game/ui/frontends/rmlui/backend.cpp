@@ -17,18 +17,18 @@
 #include <cmath>
 
 #if defined(KARMA_RENDER_BACKEND_BGFX)
-#include "engine/ui/platform/rmlui/renderer_bgfx.hpp"
+#include "karma/ui/platform/rmlui/renderer_bgfx.hpp"
 #elif defined(KARMA_RENDER_BACKEND_DILIGENT)
-#include "engine/ui/platform/rmlui/renderer_diligent.hpp"
+#include "karma/ui/platform/rmlui/renderer_diligent.hpp"
 #elif defined(KARMA_RENDER_BACKEND_FORGE)
-#include "engine/ui/platform/rmlui/renderer_forge.hpp"
+#include "karma/ui/platform/rmlui/renderer_forge.hpp"
 #else
 #error "RmlUi backend requires BGFX, Diligent, or Forge renderer."
 #endif
 #include "ui/frontends/rmlui/console/emoji_utils.hpp"
 #include "ui/frontends/rmlui/translate.hpp"
-#include "platform/window.hpp"
-#include "common/i18n.hpp"
+#include "karma/platform/window.hpp"
+#include "karma/common/i18n.hpp"
 #include "ui/frontends/rmlui/hud/hud.hpp"
 #include "ui/frontends/rmlui/console/console.hpp"
 #include "ui/frontends/rmlui/console/panels/panel_community.hpp"
@@ -37,10 +37,10 @@
 #include "ui/frontends/rmlui/console/panels/panel_settings.hpp"
 #include "ui/frontends/rmlui/console/panels/panel_start_server.hpp"
 #include "ui/console/tab_spec.hpp"
-#include "common/data_path_resolver.hpp"
-#include "common/config_store.hpp"
+#include "karma/common/data_path_resolver.hpp"
+#include "karma/common/config_store.hpp"
 #include "spdlog/spdlog.h"
-#include "engine/ui/bridges/ui_render_bridge.hpp"
+#include "karma/ui/bridges/ui_render_bridge.hpp"
 #include "ui/fonts/console_fonts.hpp"
 #include "ui/config/input_mapping.hpp"
 #include "ui/config/render_scale.hpp"
@@ -319,6 +319,11 @@ RmlUiBackend::RmlUiBackend(platform::Window &windowRefIn) : windowRef(&windowRef
                 consoleView->onJoinRequested(index);
             }
         },
+        [this](int index) {
+            if (consoleView) {
+                consoleView->onRoamRequested(index);
+            }
+        },
         [this]() {
             if (consoleView) {
                 consoleView->hide();
@@ -488,8 +493,8 @@ void RmlUiBackend::update() {
         }
     }
 
-    if (renderBridge && state->hud) {
-        state->hud->setRadarTexture(renderBridge->getRadarTexture());
+    if (rendererBridge && state->hud) {
+        state->hud->setRadarTexture(rendererBridge->getRadarTexture());
     }
     if (state->hud) {
         const bool consoleVisible = consoleView && consoleView->isVisible();
@@ -650,8 +655,8 @@ bool RmlUiBackend::consumeKeybindingsReloadRequest() {
     return consoleView && consoleView->consumeKeybindingsReloadRequest();
 }
 
-void RmlUiBackend::setRenderBridge(const ui::RenderBridge *bridge) {
-    renderBridge = bridge;
+void RmlUiBackend::setRendererBridge(const ui::RendererBridge *bridge) {
+    rendererBridge = bridge;
 }
 
 ui::RenderOutput RmlUiBackend::getRenderOutput() const {

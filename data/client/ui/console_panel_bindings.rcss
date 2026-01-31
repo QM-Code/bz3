@@ -50,6 +50,14 @@
     border-color: #243543;
 }
 
+.bindings-row.section {
+    font-size: 13px;
+    color: #c1d3e2;
+    background-color: #111c27;
+    border-color: #2a3b4a;
+    font-weight: bold;
+}
+
 .bindings-cell {
     flex: 1 1 0;
     min-width: 0;

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/ecs/types.hpp"
+#include "karma/ecs/types.hpp"
 #include <optional>
 #include <unordered_map>
 

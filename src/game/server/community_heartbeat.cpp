@@ -2,7 +2,7 @@
 
 #include "server/heartbeat_client.hpp"
 #include "server/game.hpp"
-#include "common/config_helpers.hpp"
+#include "karma/common/config_helpers.hpp"
 #include <spdlog/spdlog.h>
 
 CommunityHeartbeat::CommunityHeartbeat() : client(std::make_unique<HeartbeatClient>()) {}

@@ -5,14 +5,16 @@
 #include <string_view>
 #include <vector>
 
+#include "common/config_helpers.hpp"
 #include "platform/events.hpp"
 
 namespace platform {
 
 struct WindowConfig {
-    int width = 1280;
-    int height = 720;
-    std::string title = "KARMA";
+    int width = static_cast<int>(karma::config::ReadRequiredUInt16Config("platform.WindowWidth"));
+    int height = static_cast<int>(karma::config::ReadRequiredUInt16Config("platform.WindowHeight"));
+    // Engine default comes from config; game config should override this.
+    std::string title = karma::config::ReadRequiredStringConfig("platform.WindowTitle");
     std::string preferredVideoDriver;
 };
 

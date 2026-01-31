@@ -1,6 +1,6 @@
 #include "spdlog/spdlog.h"
-#include "engine/app/engine_app.hpp"
-#include "engine/server_engine.hpp"
+#include "karma/app/engine_app.hpp"
+#include "game/engine/server_engine.hpp"
 #include "server/game.hpp"
 #include "plugin.hpp"
 #include "server/server_discovery.hpp"
@@ -8,11 +8,11 @@
 #include "server/server_cli_options.hpp"
 #include "server/community_heartbeat.hpp"
 #include "game/common/data_path_spec.hpp"
-#include "common/data_dir_override.hpp"
-#include "common/data_path_resolver.hpp"
-#include "common/config_helpers.hpp"
-#include "common/config_store.hpp"
-#include "common/json.hpp"
+#include "karma/common/data_dir_override.hpp"
+#include "karma/common/data_path_resolver.hpp"
+#include "karma/common/config_helpers.hpp"
+#include "karma/common/config_store.hpp"
+#include "karma/common/json.hpp"
 #include <pybind11/embed.h>
 #include <csignal>
 #include <atomic>

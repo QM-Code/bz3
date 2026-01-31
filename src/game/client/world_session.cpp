@@ -2,9 +2,9 @@
 
 #include "client/game.hpp"
 #include "spdlog/spdlog.h"
-#include "common/data_path_resolver.hpp"
-#include "common/config_helpers.hpp"
-#include "common/config_store.hpp"
+#include "karma/common/data_path_resolver.hpp"
+#include "karma/common/config_helpers.hpp"
+#include "karma/common/config_store.hpp"
 
 ClientWorldSession::ClientWorldSession(Game &game, std::string worldDir)
         : game(game), backend_(world_backend::CreateWorldBackend()) {

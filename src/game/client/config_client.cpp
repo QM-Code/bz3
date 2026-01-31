@@ -1,10 +1,10 @@
 #include "client/config_client.hpp"
 #include <filesystem>
 #include <fstream>
-#include "common/json.hpp"
+#include "karma/common/json.hpp"
 #include "spdlog/spdlog.h"
-#include "common/data_path_resolver.hpp"
-#include "common/config_store.hpp"
+#include "karma/common/data_path_resolver.hpp"
+#include "karma/common/config_store.hpp"
 
 namespace {
 

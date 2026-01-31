@@ -1,11 +1,11 @@
 #pragma once
 
-#include "engine/app/game_interface.hpp"
-#include "engine/ecs/system_graph.hpp"
-#include "engine/ecs/world.hpp"
-#include "engine/ecs/systems/render_system.hpp"
-#include "engine/graphics/resources.hpp"
-#include "engine/renderer/render_context.hpp"
+#include "karma/app/game_interface.hpp"
+#include "karma/ecs/system_graph.hpp"
+#include "karma/ecs/world.hpp"
+#include "karma/ecs/systems/renderer_system.hpp"
+#include "karma/graphics/resources.hpp"
+#include "karma/renderer/renderer_context.hpp"
 #include <memory>
 
 namespace graphics {
@@ -15,8 +15,8 @@ class Input;
 class Audio;
 class PhysicsWorld;
 namespace engine::renderer {
-class RenderCore;
-struct RenderContext;
+class RendererCore;
+struct RendererContext;
 }
 namespace ui {
 class Overlay;
@@ -39,8 +39,8 @@ struct EngineContext {
     ecs::World *ecsWorld = nullptr;
     graphics::ResourceRegistry *resources = nullptr;
     graphics::MaterialId defaultMaterial = graphics::kInvalidMaterial;
-    engine::renderer::RenderContext renderContext{};
-    engine::renderer::RenderCore *renderCore = nullptr;
+    engine::renderer::RendererContext rendererContext{};
+    engine::renderer::RendererCore *rendererCore = nullptr;
 };
 
 class EngineApp {
@@ -58,7 +58,7 @@ private:
     EngineContext context_{};
     ecs::World ecsWorld_{};
     ecs::SystemGraph systemGraph_{};
-    ecs::RenderSystem renderSystem_{};
+    ecs::RendererSystem rendererSystem_{};
     std::unique_ptr<graphics::ResourceRegistry> resources_{};
 };
 } // namespace karma::app

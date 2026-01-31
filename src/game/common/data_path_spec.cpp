@@ -1,6 +1,6 @@
 #include "game/common/data_path_spec.hpp"
 
-#include "common/data_path_resolver.hpp"
+#include "karma/common/data_path_resolver.hpp"
 #include <spdlog/spdlog.h>
 
 namespace game_common {

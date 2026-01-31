@@ -36,7 +36,7 @@ public:
     void focusChatInput() override;
     bool getChatInputFocus() const override;
     bool consumeKeybindingsReloadRequest() override;
-    void setRenderBridge(const ui::RenderBridge *bridge) override;
+    void setRendererBridge(const ui::RendererBridge *bridge) override;
     ui::RenderOutput getRenderOutput() const override;
     float getRenderBrightness() const override { return consoleView.getRenderBrightness(); }
     bool isRenderBrightnessDragActive() const override;
@@ -48,7 +48,7 @@ private:
     ui::ConsoleView consoleView;
     ui::ImGuiHud hud;
     ui::HudModel hudModel;
-    const ui::RenderBridge *renderBridge = nullptr;
+    const ui::RendererBridge *rendererBridge = nullptr;
     graphics_backend::UiRenderTargetBridge* uiBridge = nullptr;
     bool languageReloadArmed = false;
     std::optional<std::string> pendingLanguage;

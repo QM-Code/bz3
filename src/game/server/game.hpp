@@ -1,7 +1,7 @@
 #pragma once
-#include "core/types.hpp"
+#include "karma/core/types.hpp"
 #include "game/net/messages.hpp"
-#include "engine/server_engine.hpp"
+#include "game/engine/server_engine.hpp"
 #include "client.hpp"
 #include "shot.hpp"
 #include "world_session.hpp"

@@ -1,9 +1,9 @@
 #pragma once
 
-#include "engine/graphics/device.hpp"
-#include "engine/graphics/types.hpp"
-#include "engine/renderer/scene_renderer.hpp"
-#include "core/types.hpp"
+#include "karma/graphics/device.hpp"
+#include "karma/graphics/types.hpp"
+#include "karma/renderer/scene_renderer.hpp"
+#include "karma/core/types.hpp"
 #include <filesystem>
 #include <unordered_map>
 

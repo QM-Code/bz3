@@ -1,6 +1,6 @@
 #include "physics/backends/bullet/static_body_bullet.hpp"
 #include "physics/backends/bullet/physics_world_bullet.hpp"
-#include "engine/geometry/mesh_loader.hpp"
+#include "karma/geometry/mesh_loader.hpp"
 #include <btBulletDynamicsCommon.h>
 #include <spdlog/spdlog.h>
 

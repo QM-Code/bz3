@@ -1,6 +1,6 @@
 #include "player.hpp"
-#include "engine/client_engine.hpp"
-#include "core/types.hpp"
+#include "game/engine/client_engine.hpp"
+#include "karma/core/types.hpp"
 #include "game/net/messages.hpp"
 #include "client/game.hpp"
 #include <cmath>

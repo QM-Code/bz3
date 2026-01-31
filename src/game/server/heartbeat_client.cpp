@@ -1,10 +1,10 @@
 #include "server/heartbeat_client.hpp"
 
 #include <curl/curl.h>
-#include "common/json.hpp"
+#include "karma/common/json.hpp"
 #include <spdlog/spdlog.h>
 
-#include "common/curl_global.hpp"
+#include "karma/common/curl_global.hpp"
 
 namespace {
 size_t AppendResponse(char *ptr, size_t size, size_t nmemb, void *userdata) {

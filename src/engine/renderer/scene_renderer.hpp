@@ -1,8 +1,8 @@
 #pragma once
 
-#include "engine/graphics/device.hpp"
-#include "engine/graphics/texture_handle.hpp"
-#include "engine/renderer/render_context.hpp"
+#include "karma/graphics/device.hpp"
+#include "karma/graphics/texture_handle.hpp"
+#include "karma/renderer/renderer_context.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 
@@ -32,7 +32,7 @@ public:
         device_->renderLayer(layer, target);
     }
 
-    void renderMain(const RenderContext &context) {
+    void renderMain(const RendererContext &context) {
         setPerspective(context.fov, context.aspect, context.nearPlane, context.farPlane);
         setCameraPosition(context.cameraPosition);
         setCameraRotation(context.cameraRotation);

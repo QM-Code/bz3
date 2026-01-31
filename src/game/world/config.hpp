@@ -1,7 +1,7 @@
 #pragma once
 
-#include "core/types.hpp"
-#include "common/json.hpp"
+#include "karma/core/types.hpp"
+#include "karma/common/json.hpp"
 
 namespace game_world {
 

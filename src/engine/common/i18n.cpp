@@ -64,7 +64,7 @@ std::unordered_map<std::string, std::string> loadLanguageStrings(const std::stri
 } // namespace
 
 void I18n::loadFromConfig() {
-    std::string language = karma::config::ReadStringConfig("language", "en");
+    std::string language = karma::config::ReadRequiredStringConfig("language");
     language = normalizeLanguage(language);
     if (language.empty()) {
         language = "en";

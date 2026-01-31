@@ -4,10 +4,10 @@
 #include <string>
 #include <vector>
 
-#include "platform/events.hpp"
+#include "karma/platform/events.hpp"
 #include "ui/models/hud_model.hpp"
 #include "ui/core/types.hpp"
-#include "engine/ui/bridges/render_bridge.hpp"
+#include "karma/ui/bridges/renderer_bridge.hpp"
 #include "ui/console/console_interface.hpp"
 
 namespace platform {
@@ -33,7 +33,7 @@ public:
     virtual void focusChatInput() = 0;
     virtual bool getChatInputFocus() const = 0;
     virtual bool consumeKeybindingsReloadRequest() = 0;
-    virtual void setRenderBridge(const ui::RenderBridge *bridge) = 0;
+    virtual void setRendererBridge(const ui::RendererBridge *bridge) = 0;
     virtual ui::RenderOutput getRenderOutput() const { return {}; }
     virtual float getRenderBrightness() const { return 1.0f; }
     virtual bool isRenderBrightnessDragActive() const { return false; }

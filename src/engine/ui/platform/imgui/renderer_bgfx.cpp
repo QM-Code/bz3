@@ -1,12 +1,12 @@
-#include "engine/ui/platform/imgui/renderer_bgfx.hpp"
+#include "karma/ui/platform/imgui/renderer_bgfx.hpp"
 
 #include <imgui.h>
 
 #include "common/data_path_resolver.hpp"
 #include "common/file_utils.hpp"
-#include "engine/graphics/backends/bgfx/texture_utils.hpp"
+#include "karma/graphics/backends/bgfx/texture_utils.hpp"
 #include "spdlog/spdlog.h"
-#include "engine/ui/imgui/texture_utils.hpp"
+#include "karma/ui/imgui/texture_utils.hpp"
 
 #include <algorithm>
 #include <cstring>

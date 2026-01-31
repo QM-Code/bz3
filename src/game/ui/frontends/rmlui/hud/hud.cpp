@@ -4,7 +4,7 @@
 #include <RmlUi/Core/ElementDocument.h>
 #include <utility>
 
-#include "common/i18n.hpp"
+#include "karma/common/i18n.hpp"
 #include "ui/frontends/rmlui/translate.hpp"
 
 namespace ui {

@@ -2,7 +2,7 @@
 
 #include "server/game.hpp"
 #include "spdlog/spdlog.h"
-#include "common/data_path_resolver.hpp"
+#include "karma/common/data_path_resolver.hpp"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>

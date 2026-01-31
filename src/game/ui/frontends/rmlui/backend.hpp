@@ -40,7 +40,7 @@ public:
     void focusChatInput() override;
     bool getChatInputFocus() const override;
     bool consumeKeybindingsReloadRequest() override;
-    void setRenderBridge(const ui::RenderBridge *bridge) override;
+    void setRendererBridge(const ui::RendererBridge *bridge) override;
     ui::RenderOutput getRenderOutput() const override;
     float getRenderBrightness() const override;
     bool isRenderBrightnessDragActive() const override;
@@ -53,7 +53,7 @@ private:
     std::unique_ptr<RmlUiState> state;
     std::unique_ptr<ui::RmlUiConsole> consoleView;
     ui::HudModel hudModel;
-    const ui::RenderBridge *renderBridge = nullptr;
+    const ui::RendererBridge *rendererBridge = nullptr;
     ui::RmlUiPanelSettings *settingsPanel = nullptr;
     void loadConfiguredFonts(const std::string &language);
     void loadConsoleDocument();

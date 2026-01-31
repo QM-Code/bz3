@@ -247,6 +247,14 @@ void RmlUiPanelBindings::rebuildBindings() {
         actionCell->SetClass("action", true);
         actionCell->SetInnerRML(escapeRmlText(defs[i].label));
 
+        if (defs[i].isHeader) {
+            row->SetClass("section", true);
+            BindingRow bindingRow;
+            bindingRow.action = actionCell;
+            rows.push_back(bindingRow);
+            continue;
+        }
+
         auto makeBindingCell = [&](ui::BindingsModel::Column column, const std::string &value, const char *columnClass) -> Rml::Element* {
             auto *cell = appendElement(row, "div");
             cell->SetClass("bindings-cell", true);
@@ -282,6 +290,10 @@ void RmlUiPanelBindings::updateSelectedLabel() {
     auto defs = ui::bindings::Definitions();
     const std::size_t count = std::min(defs.size(), ui::BindingsModel::kKeybindingCount);
     if (bindingsModel.selectedIndex >= 0 && bindingsModel.selectedIndex < static_cast<int>(count)) {
+        if (defs[static_cast<std::size_t>(bindingsModel.selectedIndex)].isHeader) {
+            selectedLabel->SetInnerRML(escapeRmlText(label));
+            return;
+        }
         const char *colName = bindingsModel.selectedColumn == ui::BindingsModel::Column::Keyboard
             ? "Keyboard"
             : (bindingsModel.selectedColumn == ui::BindingsModel::Column::Mouse ? "Mouse" : "Controller");
@@ -346,6 +358,12 @@ void RmlUiPanelBindings::clearSelected() {
     if (bindingsModel.selectedIndex < 0 || bindingsModel.selectedIndex >= static_cast<int>(rows.size())) {
         return;
     }
+    auto defs = ui::bindings::Definitions();
+    if (bindingsModel.selectedIndex >= 0 && bindingsModel.selectedIndex < static_cast<int>(defs.size())) {
+        if (defs[static_cast<std::size_t>(bindingsModel.selectedIndex)].isHeader) {
+            return;
+        }
+    }
     if (bindingsModel.selectedColumn == ui::BindingsModel::Column::Keyboard) {
         bindingsModel.keyboard[bindingsModel.selectedIndex][0] = '\0';
     } else if (bindingsModel.selectedColumn == ui::BindingsModel::Column::Mouse) {
@@ -390,6 +408,12 @@ void RmlUiPanelBindings::requestKeybindingsReload() {
 void RmlUiPanelBindings::captureKey(int keyIdentifier) {
     if (bindingsModel.selectedIndex < 0 || bindingsModel.selectedIndex >= static_cast<int>(rows.size())) {
         return;
+    }
+    auto defs = ui::bindings::Definitions();
+    if (bindingsModel.selectedIndex >= 0 && bindingsModel.selectedIndex < static_cast<int>(defs.size())) {
+        if (defs[static_cast<std::size_t>(bindingsModel.selectedIndex)].isHeader) {
+            return;
+        }
     }
     if (keyIdentifier == Rml::Input::KI_UNKNOWN) {
         return;
@@ -486,6 +510,12 @@ void RmlUiPanelBindings::captureMouse(int button) {
     }
     if (bindingsModel.selectedIndex < 0 || bindingsModel.selectedIndex >= static_cast<int>(rows.size())) {
         return;
+    }
+    auto defs = ui::bindings::Definitions();
+    if (bindingsModel.selectedIndex >= 0 && bindingsModel.selectedIndex < static_cast<int>(defs.size())) {
+        if (defs[static_cast<std::size_t>(bindingsModel.selectedIndex)].isHeader) {
+            return;
+        }
     }
     if (bindingsModel.selectedColumn != ui::BindingsModel::Column::Mouse) {
         return;

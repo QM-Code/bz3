@@ -2,7 +2,7 @@
  * RmlUi Forge renderer implementation for KARMA.
  */
 
-#include "engine/ui/platform/rmlui/renderer_forge.hpp"
+#include "karma/ui/platform/rmlui/renderer_forge.hpp"
 
 #include <RmlUi/Core/Core.h>
 #include <RmlUi/Core/FileInterface.h>
@@ -12,7 +12,7 @@
 
 #include "common/data_path_resolver.hpp"
 #include "common/file_utils.hpp"
-#include "engine/graphics/backends/forge/ui_bridge.hpp"
+#include "karma/graphics/backends/forge/ui_bridge.hpp"
 #include "spdlog/spdlog.h"
 
 #include "Common_3/Graphics/Interfaces/IGraphics.h"

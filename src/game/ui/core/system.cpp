@@ -1,10 +1,10 @@
 #include "ui/core/system.hpp"
 
 #include "ui/core/backend.hpp"
-#include "platform/window.hpp"
-#include "common/i18n.hpp"
+#include "karma/platform/window.hpp"
+#include "karma/common/i18n.hpp"
 #include "ui/config/ui_config.hpp"
-#include "common/config_store.hpp"
+#include "karma/common/config_store.hpp"
 #include "spdlog/spdlog.h"
 
 UiSystem::UiSystem(platform::Window &window)
@@ -89,8 +89,8 @@ bool UiSystem::consumeKeybindingsReloadRequest() {
     return backend->consumeKeybindingsReloadRequest();
 }
 
-void UiSystem::setRenderBridge(const ui::RenderBridge *bridge) {
-    backend->setRenderBridge(bridge);
+void UiSystem::setRendererBridge(const ui::RendererBridge *bridge) {
+    backend->setRendererBridge(bridge);
 }
 
 ui::RenderOutput UiSystem::getRenderOutput() const {

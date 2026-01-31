@@ -4,7 +4,7 @@
 #include <sstream>
 #include <vector>
 
-#include "common/data_path_resolver.hpp"
+#include "karma/common/data_path_resolver.hpp"
 
 namespace ui {
 namespace {

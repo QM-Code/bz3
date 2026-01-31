@@ -4,6 +4,7 @@ namespace ui::bindings {
 namespace {
 
 constexpr BindingDefinition kDefinitions[] = {
+    {nullptr, "Gameplay", true},
     {"moveForward", "Move Forward"},
     {"moveBackward", "Move Backward"},
     {"moveLeft", "Move Left"},
@@ -14,7 +15,16 @@ constexpr BindingDefinition kDefinitions[] = {
     {"chat", "Chat"},
     {"toggleFullscreen", "Toggle Fullscreen"},
     {"escape", "Escape Menu"},
-    {"quickQuit", "Quick Quit"}
+    {"quickQuit", "Quick Quit"},
+    {nullptr, "Roaming", true},
+    {"roamMoveForward", "Roam Camera Forward"},
+    {"roamMoveBackward", "Roam Camera Backward"},
+    {"roamMoveLeft", "Roam Camera Left"},
+    {"roamMoveRight", "Roam Camera Right"},
+    {"roamMoveUp", "Roam Camera Up"},
+    {"roamMoveDown", "Roam Camera Down"},
+    {"roamLook", "Roam Camera Look (Hold)"},
+    {"roamMoveFast", "Roam Camera Fast"}
 };
 
 } // namespace

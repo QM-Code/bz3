@@ -8,8 +8,8 @@
 #include <RmlUi/Core/ElementDocument.h>
 #include <spdlog/spdlog.h>
 
-#include "common/data_path_resolver.hpp"
-#include "common/i18n.hpp"
+#include "karma/common/data_path_resolver.hpp"
+#include "karma/common/i18n.hpp"
 #include "ui/frontends/rmlui/translate.hpp"
 
 namespace ui {

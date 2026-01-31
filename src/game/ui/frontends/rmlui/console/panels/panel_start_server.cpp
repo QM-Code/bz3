@@ -15,10 +15,10 @@
 #include <fstream>
 #include <sstream>
 
-#include "common/json.hpp"
+#include "karma/common/json.hpp"
 #include <spdlog/spdlog.h>
 
-#include "common/data_path_resolver.hpp"
+#include "karma/common/data_path_resolver.hpp"
 #include "ui/config/config.hpp"
 
 #if !defined(_WIN32)

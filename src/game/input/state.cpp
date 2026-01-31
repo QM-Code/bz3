@@ -1,8 +1,8 @@
 #include "game/input/state.hpp"
 
 #include "game/input/actions.hpp"
-#include "input/input.hpp"
-#include "common/i18n.hpp"
+#include "karma/input/input.hpp"
+#include "karma/common/i18n.hpp"
 
 namespace game_input {
 

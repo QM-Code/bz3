@@ -32,7 +32,7 @@ public:
     void focusChatInput() override {}
     bool getChatInputFocus() const override { return false; }
     bool consumeKeybindingsReloadRequest() override { return false; }
-    void setRenderBridge(const ui::RenderBridge *bridge) override { (void)bridge; }
+    void setRendererBridge(const ui::RendererBridge *bridge) override { (void)bridge; }
     ui::RenderOutput getRenderOutput() const override { return {}; }
     float getRenderBrightness() const override { return 1.0f; }
 

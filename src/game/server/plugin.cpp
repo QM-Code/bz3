@@ -1,7 +1,7 @@
 #include "plugin.hpp"
 #include "server/game.hpp"
-#include "engine/server_engine.hpp"
-#include "common/data_path_resolver.hpp"
+#include "game/engine/server_engine.hpp"
+#include "karma/common/data_path_resolver.hpp"
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/embed.h>

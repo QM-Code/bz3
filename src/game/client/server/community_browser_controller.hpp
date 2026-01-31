@@ -15,7 +15,7 @@
 #include "client/server/community_auth_client.hpp"
 #include "client/server/server_discovery.hpp"
 #include "client/server/server_list_fetcher.hpp"
-#include "engine/client_engine.hpp"
+#include "game/engine/client_engine.hpp"
 #include "ui/console/console_interface.hpp"
 
 class ServerConnector;

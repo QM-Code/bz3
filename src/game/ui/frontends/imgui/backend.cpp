@@ -1,11 +1,11 @@
 #include "ui/frontends/imgui/backend.hpp"
 
-#include "common/data_path_resolver.hpp"
-#include "common/i18n.hpp"
-#include "engine/graphics/ui_render_target_bridge.hpp"
-#include "platform/window.hpp"
+#include "karma/common/data_path_resolver.hpp"
+#include "karma/common/i18n.hpp"
+#include "karma/graphics/ui_render_target_bridge.hpp"
+#include "karma/platform/window.hpp"
 #include "spdlog/spdlog.h"
-#include "engine/ui/bridges/ui_render_bridge.hpp"
+#include "karma/ui/bridges/ui_render_bridge.hpp"
 #include "ui/config/input_mapping.hpp"
 #include "ui/fonts/console_fonts.hpp"
 #include "ui/config/render_scale.hpp"
@@ -145,8 +145,8 @@ void ImGuiBackend::update() {
     if (consoleView.consumeFontReloadRequest()) {
         reloadFonts();
     }
-    if (renderBridge) {
-        hud.setRadarTexture(renderBridge->getRadarTexture());
+    if (rendererBridge) {
+        hud.setRadarTexture(rendererBridge->getRadarTexture());
     }
 
     ImGuiIO &io = ImGui::GetIO();
@@ -270,9 +270,9 @@ bool ImGuiBackend::consumeKeybindingsReloadRequest() {
     return consoleView.consumeKeybindingsReloadRequest();
 }
 
-void ImGuiBackend::setRenderBridge(const ui::RenderBridge *bridge) {
-    renderBridge = bridge;
-    uiBridge = renderBridge ? renderBridge->getUiRenderTargetBridge() : nullptr;
+void ImGuiBackend::setRendererBridge(const ui::RendererBridge *bridge) {
+    rendererBridge = bridge;
+    uiBridge = rendererBridge ? rendererBridge->getUiRenderTargetBridge() : nullptr;
     if (uiBridge) {
         ImGuiIO &io = ImGui::GetIO();
         io.BackendRendererName = "bz3-imgui-bridge";

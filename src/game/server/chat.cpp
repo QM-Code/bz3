@@ -3,7 +3,7 @@
 #include <string>
 #include <sstream>
 #include "spdlog/spdlog.h"
-#include "engine/server_engine.hpp"
+#include "game/engine/server_engine.hpp"
 #include "plugin.hpp"
 
 Chat::Chat(Game &game) : game(game) {

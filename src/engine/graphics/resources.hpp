@@ -1,7 +1,7 @@
 #pragma once
 
-#include "engine/geometry/mesh_loader.hpp"
-#include "engine/graphics/device.hpp"
+#include "karma/geometry/mesh_loader.hpp"
+#include "karma/graphics/device.hpp"
 #include <filesystem>
 #include <unordered_map>
 #include <vector>

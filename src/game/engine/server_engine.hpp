@@ -1,8 +1,8 @@
 #pragma once
-#include "core/types.hpp"
+#include "karma/core/types.hpp"
 #include "game/net/messages.hpp"
 #include "game/net/server_network.hpp"
-#include "physics/physics_world.hpp"
+#include "karma/physics/physics_world.hpp"
 
 class ServerEngine {
 public:

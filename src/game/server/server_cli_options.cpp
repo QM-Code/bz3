@@ -1,9 +1,9 @@
 #include "server/server_cli_options.hpp"
 
-#include "common/data_path_resolver.hpp"
-#include "common/config_store.hpp"
+#include "karma/common/data_path_resolver.hpp"
+#include "karma/common/config_store.hpp"
 #include "cxxopts.hpp"
-#include "common/json.hpp"
+#include "karma/common/json.hpp"
 #include <spdlog/spdlog.h>
 #include <stdexcept>
 #include <cstdlib>

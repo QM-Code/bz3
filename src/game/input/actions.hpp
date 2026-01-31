@@ -16,8 +16,16 @@ inline constexpr std::string_view kActionMoveLeft = "moveLeft";
 inline constexpr std::string_view kActionMoveRight = "moveRight";
 inline constexpr std::string_view kActionMoveForward = "moveForward";
 inline constexpr std::string_view kActionMoveBackward = "moveBackward";
+inline constexpr std::string_view kActionRoamMoveLeft = "roamMoveLeft";
+inline constexpr std::string_view kActionRoamMoveRight = "roamMoveRight";
+inline constexpr std::string_view kActionRoamMoveForward = "roamMoveForward";
+inline constexpr std::string_view kActionRoamMoveBackward = "roamMoveBackward";
+inline constexpr std::string_view kActionRoamMoveUp = "roamMoveUp";
+inline constexpr std::string_view kActionRoamMoveDown = "roamMoveDown";
+inline constexpr std::string_view kActionRoamLook = "roamLook";
+inline constexpr std::string_view kActionRoamMoveFast = "roamMoveFast";
 
-constexpr std::array<std::string_view, 11> kActionIds = {
+constexpr std::array<std::string_view, 19> kActionIds = {
     kActionFire,
     kActionSpawn,
     kActionJump,
@@ -28,7 +36,15 @@ constexpr std::array<std::string_view, 11> kActionIds = {
     kActionMoveLeft,
     kActionMoveRight,
     kActionMoveForward,
-    kActionMoveBackward
+    kActionMoveBackward,
+    kActionRoamMoveLeft,
+    kActionRoamMoveRight,
+    kActionRoamMoveForward,
+    kActionRoamMoveBackward,
+    kActionRoamMoveUp,
+    kActionRoamMoveDown,
+    kActionRoamLook,
+    kActionRoamMoveFast
 };
 
 } // namespace game_input

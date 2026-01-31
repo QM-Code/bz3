@@ -26,6 +26,25 @@
       "crosshair": true
     }
   },
+  "game": {
+    "roamingCamera": {
+      "MoveSpeed": 8.0,
+      "FastMultiplier": 3.0,
+      "LookSensitivity": 0.002,
+      "InvertY": false,
+      "StartYawOffsetDeg": -75.0,
+      "StartPosition": [
+        -75.0,
+        35.0,
+        75.0
+      ],
+      "StartTarget": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  },
   "keybindings": {
     "fire": [
       "ENTER",
@@ -74,6 +93,30 @@
     ],
     "moveBackward": [
       "DOWN"
+    ],
+    "roamMoveForward": [
+      "W"
+    ],
+    "roamMoveBackward": [
+      "S"
+    ],
+    "roamMoveLeft": [
+      "A"
+    ],
+    "roamMoveRight": [
+      "D"
+    ],
+    "roamMoveUp": [
+      "E"
+    ],
+    "roamMoveDown": [
+      "Q"
+    ],
+    "roamLook": [
+      "RIGHT_MOUSE"
+    ],
+    "roamMoveFast": [
+      "LEFT_SHIFT"
     ]
   },
   "assets": {
@@ -180,7 +223,8 @@
     "MaxRetries": 3
   },
   "platform": {
-    "SdlVideoDriver": "wayland"
+    "SdlVideoDriver": "wayland",
+    "WindowTitle": "BZFlag v3"
   },
   "graphics": {
     "resolution": {

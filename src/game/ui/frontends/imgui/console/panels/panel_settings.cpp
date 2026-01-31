@@ -3,8 +3,9 @@
 #include <string>
 #include <vector>
 
-#include "common/config_store.hpp"
-#include "common/i18n.hpp"
+#include "karma/common/config_store.hpp"
+#include "karma/common/i18n.hpp"
+#include "ui/config/config.hpp"
 #include "spdlog/spdlog.h"
 #include "ui/console/status_banner.hpp"
 

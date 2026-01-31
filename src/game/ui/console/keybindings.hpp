@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/input/bindings_text.hpp"
+#include "karma/input/bindings_text.hpp"
 
 #include <string>
 #include <span>
@@ -11,6 +11,7 @@ namespace ui::bindings {
 struct BindingDefinition {
     const char *action;
     const char *label;
+    bool isHeader = false;
 };
 
 std::span<const BindingDefinition> Definitions();

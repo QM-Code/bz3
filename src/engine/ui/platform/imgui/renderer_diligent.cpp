@@ -1,10 +1,10 @@
-#include "engine/ui/platform/imgui/renderer_diligent.hpp"
+#include "karma/ui/platform/imgui/renderer_diligent.hpp"
 
 #include <imgui.h>
 
-#include "engine/graphics/backends/diligent/ui_bridge.hpp"
+#include "karma/graphics/backends/diligent/ui_bridge.hpp"
 #include "spdlog/spdlog.h"
-#include "engine/ui/imgui/texture_utils.hpp"
+#include "karma/ui/imgui/texture_utils.hpp"
 
 #include <DiligentCore/Graphics/GraphicsEngine/interface/Buffer.h>
 #include <DiligentCore/Graphics/GraphicsEngine/interface/DeviceContext.h>

@@ -7,7 +7,7 @@
 
 #include <filesystem>
 
-#include "common/data_path_resolver.hpp"
+#include "karma/common/data_path_resolver.hpp"
 #include "spdlog/spdlog.h"
 
 namespace ui {
@@ -358,9 +358,28 @@ void RmlUiConsole::onJoinRequested(int index) {
         entry.port,
         true,
         entry.sourceHost,
-        entry.worldName
+        entry.worldName,
+        false
     });
     spdlog::info("RmlUi Console: Join queued host={} port={} sourceHost={} worldName={}",
+                 entry.host, entry.port, entry.sourceHost, entry.worldName);
+}
+
+void RmlUiConsole::onRoamRequested(int index) {
+    if (index < 0 || index >= static_cast<int>(consoleModel.community.entries.size())) {
+        spdlog::warn("RmlUi Console: Roam requested with invalid index {}", index);
+        return;
+    }
+    const auto &entry = consoleModel.community.entries[static_cast<std::size_t>(index)];
+    consoleController.queueSelection(CommunityBrowserSelection{
+        entry.host,
+        entry.port,
+        true,
+        entry.sourceHost,
+        entry.worldName,
+        true
+    });
+    spdlog::info("RmlUi Console: Roam queued host={} port={} sourceHost={} worldName={}",
                  entry.host, entry.port, entry.sourceHost, entry.worldName);
 }
 

@@ -1,9 +1,9 @@
 #include "client/server/community_auth_client.hpp"
 
 #include <curl/curl.h>
-#include "common/json.hpp"
+#include "karma/common/json.hpp"
 
-#include "common/curl_global.hpp"
+#include "karma/common/curl_global.hpp"
 
 namespace {
 size_t CurlWriteToString(char *ptr, size_t size, size_t nmemb, void *userdata) {

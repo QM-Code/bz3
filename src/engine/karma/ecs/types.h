@@ -1,3 +1,3 @@
 #pragma once
 
-#include "engine/ecs/types.hpp"
+#include "engine/ecs/types.h"

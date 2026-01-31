@@ -8,10 +8,10 @@
 #include <string>
 #include <vector>
 
-#include "common/json.hpp"
-#include "common/config_store.hpp"
-#include "common/data_path_resolver.hpp"
-#include "common/i18n.hpp"
+#include "karma/common/json.hpp"
+#include "karma/common/config_store.hpp"
+#include "karma/common/data_path_resolver.hpp"
+#include "karma/common/i18n.hpp"
 #include "spdlog/spdlog.h"
 #include "ui/config/config.hpp"
 #include "ui/console/tab_spec.hpp"

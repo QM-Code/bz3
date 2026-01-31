@@ -1,9 +1,9 @@
 #include "client/server/server_list_fetcher.hpp"
 
 #include <curl/curl.h>
-#include "common/json.hpp"
-#include "common/curl_global.hpp"
-#include "common/config_helpers.hpp"
+#include "karma/common/json.hpp"
+#include "karma/common/curl_global.hpp"
+#include "karma/common/config_helpers.hpp"
 #include "spdlog/spdlog.h"
 
 #include <sstream>

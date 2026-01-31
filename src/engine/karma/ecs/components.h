@@ -1,3 +1,3 @@
 #pragma once
 
-#include "engine/ecs/components.hpp"
+#include "engine/ecs/components.h"

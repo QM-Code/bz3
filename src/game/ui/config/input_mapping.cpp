@@ -1,6 +1,6 @@
 #include "ui/config/input_mapping.hpp"
 
-#include "platform/window.hpp"
+#include "karma/platform/window.hpp"
 
 namespace ui::input_mapping {
 

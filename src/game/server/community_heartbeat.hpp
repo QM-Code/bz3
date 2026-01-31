@@ -5,7 +5,7 @@
 #include <string>
 
 #include <cstdint>
-#include "common/json.hpp"
+#include "karma/common/json.hpp"
 
 class Game;
 class HeartbeatClient;

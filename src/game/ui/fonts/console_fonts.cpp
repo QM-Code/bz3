@@ -1,7 +1,7 @@
 #include "ui/fonts/console_fonts.hpp"
 
-#include "common/config_store.hpp"
-#include "common/data_path_resolver.hpp"
+#include "karma/common/config_store.hpp"
+#include "karma/common/data_path_resolver.hpp"
 
 namespace ui::fonts {
 

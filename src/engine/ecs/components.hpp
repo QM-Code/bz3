@@ -1,7 +1,7 @@
 #pragma once
 
-#include "engine/ecs/types.hpp"
-#include "engine/graphics/types.hpp"
+#include "karma/ecs/types.hpp"
+#include "karma/graphics/types.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 

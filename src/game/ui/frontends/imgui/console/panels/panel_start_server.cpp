@@ -10,12 +10,12 @@
 #include <vector>
 
 #include <imgui.h>
-#include "common/json.hpp"
+#include "karma/common/json.hpp"
 #include <spdlog/spdlog.h>
 #include <optional>
 
-#include "common/data_path_resolver.hpp"
-#include "common/i18n.hpp"
+#include "karma/common/data_path_resolver.hpp"
+#include "karma/common/i18n.hpp"
 #include "ui/config/config.hpp"
 
 #if !defined(_WIN32)

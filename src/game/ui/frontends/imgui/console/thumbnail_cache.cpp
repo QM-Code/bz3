@@ -7,7 +7,7 @@
 #include <bgfx/bgfx.h>
 #endif
 
-#include "common/curl_global.hpp"
+#include "karma/common/curl_global.hpp"
 
 #include <stb_image.h>
 

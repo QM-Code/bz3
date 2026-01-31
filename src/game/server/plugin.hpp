@@ -1,8 +1,8 @@
 #pragma once
-#include "core/types.hpp"
+#include "karma/core/types.hpp"
 #include "game/net/messages.hpp"
 #include "spdlog/spdlog.h"
-#include "common/json.hpp"
+#include "karma/common/json.hpp"
 #include <vector>
 #include <memory>
 #include <map>

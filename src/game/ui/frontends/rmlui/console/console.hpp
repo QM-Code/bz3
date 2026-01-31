@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "common/json.hpp"
+#include "karma/common/json.hpp"
 
 #include "ui/console/console_interface.hpp"
 #include "ui/controllers/console_controller.hpp"
@@ -69,6 +69,7 @@ public:
     void onRefreshRequested();
     void onServerSelection(int index);
     void onJoinRequested(int index);
+    void onRoamRequested(int index);
     void onQuitRequested();
 
 private:

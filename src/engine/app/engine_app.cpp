@@ -1,12 +1,16 @@
-#include "engine/app/engine_app.hpp"
-#include "engine/core/types.hpp"
-#include "engine/renderer/render_core.hpp"
-#include "engine/ui/overlay.hpp"
-#include "engine/ui/types.hpp"
+#include "karma/app/engine_app.hpp"
+#include "karma/core/types.hpp"
+#include "karma/renderer/renderer_core.hpp"
+#include "karma/ui/overlay.hpp"
+#include "karma/ui/types.hpp"
+#include "karma/common/config_helpers.hpp"
 
 namespace karma::app {
 EngineApp::EngineApp() {
     context_.ecsWorld = &ecsWorld_;
+    context_.rendererContext.fov = karma::config::ReadRequiredFloatConfig("graphics.Camera.FovDegrees");
+    context_.rendererContext.nearPlane = karma::config::ReadRequiredFloatConfig("graphics.Camera.NearPlane");
+    context_.rendererContext.farPlane = karma::config::ReadRequiredFloatConfig("graphics.Camera.FarPlane");
 }
 
 EngineApp::~EngineApp() = default;
@@ -32,10 +36,10 @@ int EngineApp::run() {
         resources_ = std::make_unique<graphics::ResourceRegistry>(*context_.graphics);
         context_.resources = resources_.get();
         context_.defaultMaterial = context_.resources->getDefaultMaterial();
-        renderSystem_.setDefaultMaterial(context_.defaultMaterial);
+        rendererSystem_.setDefaultMaterial(context_.defaultMaterial);
     }
-    if (context_.renderCore) {
-        context_.renderContext = context_.renderCore->context();
+    if (context_.rendererCore) {
+        context_.rendererContext = context_.rendererCore->context();
     }
 #endif
     if (!game_->onInit(context_)) {
@@ -47,19 +51,19 @@ int EngineApp::run() {
         const float dt = TimeUtils::GetElapsedTime(lastFrame, now);
         lastFrame = now;
 #ifndef KARMA_SERVER
-        if (context_.renderCore) {
-            context_.renderContext = context_.renderCore->context();
+        if (context_.rendererCore) {
+            context_.rendererContext = context_.rendererCore->context();
         }
 #endif
         game_->onUpdate(context_, dt);
  #ifndef KARMA_SERVER
-        if (context_.renderCore) {
-            context_.renderCore->context() = context_.renderContext;
+        if (context_.rendererCore) {
+            context_.rendererCore->context() = context_.rendererContext;
         }
  #endif
         systemGraph_.update(dt);
 #ifndef KARMA_SERVER
-        renderSystem_.update(ecsWorld_, context_.graphics, dt);
+        rendererSystem_.update(ecsWorld_, context_.graphics, dt);
 #endif
         game_->onRender(context_);
     }

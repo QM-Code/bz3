@@ -2,9 +2,9 @@
  * RmlUi Diligent renderer stub for KARMA.
  * TODO: Implement actual Diligent rendering.
  */
-#include "engine/ui/platform/rmlui/renderer_diligent.hpp"
+#include "karma/ui/platform/rmlui/renderer_diligent.hpp"
 
-#include "engine/graphics/backends/diligent/ui_bridge.hpp"
+#include "karma/graphics/backends/diligent/ui_bridge.hpp"
 
 #include <DiligentCore/Common/interface/BasicMath.hpp>
 #include <DiligentCore/Graphics/GraphicsEngine/interface/Buffer.h>

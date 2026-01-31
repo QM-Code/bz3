@@ -1,9 +1,9 @@
 #pragma once
 #include <cstdint>
-#include "core/types.hpp"
+#include "karma/core/types.hpp"
 #include "game/net/messages.hpp"
 #include <glm/vec3.hpp>
-#include "audio/audio.hpp"
+#include "karma/audio/audio.hpp"
 #include "actor.hpp"
 
 #include <string>

@@ -155,6 +155,16 @@ void ConsoleView::drawBindingsPanel(const MessageColors &colors) {
         for (std::size_t i = 0; i < count; ++i) {
             ImGui::TableNextRow();
             ImGui::TableSetColumnIndex(0);
+            if (defs[i].isHeader) {
+                ImGui::TextDisabled("%s", defs[i].label);
+                ImGui::TableSetColumnIndex(1);
+                ImGui::TextUnformatted("");
+                ImGui::TableSetColumnIndex(2);
+                ImGui::TextUnformatted("");
+                ImGui::TableSetColumnIndex(3);
+                ImGui::TextUnformatted("");
+                continue;
+            }
             ImGui::TextUnformatted(defs[i].label);
 
             auto drawBindingCell = [&](ui::BindingsModel::Column column,
@@ -207,12 +217,22 @@ void ConsoleView::drawBindingsPanel(const MessageColors &colors) {
     const char *selectedLabel = "None";
     const char *selectedColumn = "None";
     if (bindingsModel.selectedIndex >= 0 && bindingsModel.selectedIndex < static_cast<int>(defs.size())) {
-        selectedLabel = defs[static_cast<std::size_t>(bindingsModel.selectedIndex)].label;
-        selectedColumn = (bindingsModel.selectedColumn == ui::BindingsModel::Column::Keyboard)
-            ? "Keyboard"
-            : (bindingsModel.selectedColumn == ui::BindingsModel::Column::Mouse ? "Mouse" : "Controller");
+        const auto &def = defs[static_cast<std::size_t>(bindingsModel.selectedIndex)];
+        if (!def.isHeader) {
+            selectedLabel = def.label;
+            selectedColumn = (bindingsModel.selectedColumn == ui::BindingsModel::Column::Keyboard)
+                ? "Keyboard"
+                : (bindingsModel.selectedColumn == ui::BindingsModel::Column::Mouse ? "Mouse" : "Controller");
+        }
     }
     ImGui::TextDisabled("Selected cell: %s / %s", selectedLabel, selectedColumn);
+
+    if (bindingsModel.selectedIndex >= 0) {
+        if (bindingsModel.selectedIndex >= static_cast<int>(defs.size()) ||
+            defs[static_cast<std::size_t>(bindingsModel.selectedIndex)].isHeader) {
+            bindingsModel.selectedIndex = -1;
+        }
+    }
 
     if (bindingsModel.selectedIndex >= 0) {
         const bool skipMouseCapture = selectionChanged || ImGui::IsAnyItemActive();

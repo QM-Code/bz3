@@ -10,8 +10,8 @@
 #include <sstream>
 #include <string>
 
-#include "common/config_store.hpp"
-#include "common/i18n.hpp"
+#include "karma/common/config_store.hpp"
+#include "karma/common/i18n.hpp"
 #include "ui/console/status_banner.hpp"
 #include "spdlog/spdlog.h"
 
@@ -199,7 +199,6 @@ void RmlUiPanelSettings::onLoaded(Rml::ElementDocument *doc) {
         }
         listeners.emplace_back(std::move(listener));
     }
-
     syncSettingsFromConfig();
     syncRenderBrightnessControls(true);
     syncHudControls();

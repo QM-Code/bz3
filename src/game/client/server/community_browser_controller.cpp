@@ -10,11 +10,11 @@
 
 #include "client/server/password_hash.hpp"
 #include "client/server/server_connector.hpp"
-#include "common/curl_global.hpp"
-#include "common/config_helpers.hpp"
+#include "karma/common/curl_global.hpp"
+#include "karma/common/config_helpers.hpp"
 #include "spdlog/spdlog.h"
 #include <curl/curl.h>
-#include "common/json.hpp"
+#include "karma/common/json.hpp"
 
 namespace {
 std::string trimCopy(const std::string &value) {
@@ -817,6 +817,7 @@ void CommunityBrowserController::handleJoinSelection(const ui::CommunityBrowserS
     pendingJoin.reset();
 
     if (communityHost.empty()) {
+        engine.setRoamingModeSession(selection.roamingMode);
         connector.connect(selection.host, selection.port, username, false, false, false);
         return;
     }
@@ -912,6 +913,7 @@ void CommunityBrowserController::handleAuthResponse(const CommunityAuthClient::R
                              pending.username,
                              pending.selection.host,
                              pending.selection.port);
+                engine.setRoamingModeSession(pending.selection.roamingMode);
                 connector.connect(pending.selection.host, pending.selection.port, pending.username, false, false, false);
             }
             return;
@@ -923,6 +925,7 @@ void CommunityBrowserController::handleAuthResponse(const CommunityAuthClient::R
                          pending.username,
                          pending.selection.host,
                          pending.selection.port);
+            engine.setRoamingModeSession(pending.selection.roamingMode);
             connector.connect(pending.selection.host, pending.selection.port, pending.username, false, false, false);
             return;
         }
@@ -964,6 +967,7 @@ void CommunityBrowserController::handleAuthResponse(const CommunityAuthClient::R
                  pending.selection.host,
                  pending.selection.port);
     browser.clearPassword();
+    engine.setRoamingModeSession(pending.selection.roamingMode);
     connector.connect(
         pending.selection.host,
         pending.selection.port,

@@ -1,6 +1,6 @@
 #include "ui/config/config.hpp"
 
-#include "common/config_store.hpp"
+#include "karma/common/config_store.hpp"
 #include "spdlog/spdlog.h"
 
 #include <algorithm>

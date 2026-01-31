@@ -1,13 +1,13 @@
-#include "engine/graphics/backend.hpp"
+#include "karma/graphics/backend.hpp"
 
 #include <spdlog/spdlog.h>
 
 #if defined(KARMA_RENDER_BACKEND_DILIGENT)
-#include "engine/graphics/backends/diligent/backend.hpp"
+#include "karma/graphics/backends/diligent/backend.hpp"
 #elif defined(KARMA_RENDER_BACKEND_BGFX)
-#include "engine/graphics/backends/bgfx/backend.hpp"
+#include "karma/graphics/backends/bgfx/backend.hpp"
 #elif defined(KARMA_RENDER_BACKEND_FORGE)
-#include "engine/graphics/backends/forge/backend.hpp"
+#include "karma/graphics/backends/forge/backend.hpp"
 #else
 #error "KARMA render backend not set. Define KARMA_RENDER_BACKEND_DILIGENT, KARMA_RENDER_BACKEND_BGFX, or KARMA_RENDER_BACKEND_FORGE."
 #endif

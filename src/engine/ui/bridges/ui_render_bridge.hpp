@@ -2,8 +2,8 @@
 
 #include <cstdint>
 
-#include "engine/graphics/texture_handle.hpp"
-#include "engine/ui/types.hpp"
+#include "karma/graphics/texture_handle.hpp"
+#include "karma/ui/types.hpp"
 
 namespace ui {
 

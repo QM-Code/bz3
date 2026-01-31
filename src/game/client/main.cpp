@@ -6,10 +6,10 @@
 #include <cstring>
 #include <utility>
 #include "spdlog/spdlog.h"
-#include "engine/app/engine_app.hpp"
-#include "engine/client_engine.hpp"
+#include "karma/app/engine_app.hpp"
+#include "game/engine/client_engine.hpp"
 #if defined(KARMA_RENDER_BACKEND_BGFX)
-#include "engine/graphics/backends/bgfx/backend.hpp"
+#include "karma/graphics/backends/bgfx/backend.hpp"
 #endif
 #include "client/game.hpp"
 #include "client/client_cli_options.hpp"
@@ -17,12 +17,12 @@
 #include "client/server/community_browser_controller.hpp"
 #include "client/server/server_connector.hpp"
 #include "game/common/data_path_spec.hpp"
-#include "common/data_dir_override.hpp"
-#include "common/data_path_resolver.hpp"
-#include "common/config_helpers.hpp"
-#include "common/config_store.hpp"
-#include "common/i18n.hpp"
-#include "platform/window.hpp"
+#include "karma/common/data_dir_override.hpp"
+#include "karma/common/data_path_resolver.hpp"
+#include "karma/common/config_helpers.hpp"
+#include "karma/common/config_store.hpp"
+#include "karma/common/i18n.hpp"
+#include "karma/platform/window.hpp"
 
 #if !defined(_WIN32)
 #include <csignal>
@@ -183,6 +183,7 @@ public:
                 quickStartLastAttempt_ = TimeUtils::GetCurrentTime();
             }
         } else if (cliOptions_.addrExplicit) {
+            engine_.setRoamingModeSession(false);
             serverConnector_.connect(cliOptions_.connectAddr,
                                      cliOptions_.connectPort,
                                      cliOptions_.playerName,
@@ -209,6 +210,7 @@ public:
             if (TimeUtils::GetElapsedTime(quickStartLastAttempt_, now) >= quickStartRetryDelay_) {
                 quickStartLastAttempt_ = now;
                 ++quickStartAttempts_;
+                engine_.setRoamingModeSession(false);
                 if (serverConnector_.connect("localhost",
                                              cliOptions_.connectPort,
                                              cliOptions_.playerName,
@@ -368,6 +370,7 @@ int main(int argc, char *argv[]) {
     const uint16_t configHeight = karma::config::ReadUInt16Config({"graphics.resolution.Height"}, 720);
     const bool fullscreenEnabled = karma::config::ReadBoolConfig({"graphics.Fullscreen"}, false);
     const bool vsyncEnabled = karma::config::ReadBoolConfig({"graphics.VSync"}, true);
+    const std::string windowTitle = karma::config::ReadStringConfig({"platform.WindowTitle"}, "BZFlag v3");
 
     const ClientCLIOptions cliOptions = ParseClientCLIOptions(argc, argv);
     if (cliOptions.languageExplicit && !cliOptions.language.empty()) {
@@ -393,7 +396,7 @@ int main(int argc, char *argv[]) {
     platform::WindowConfig windowConfig;
     windowConfig.width = configWidth;
     windowConfig.height = configHeight;
-    windowConfig.title = "BZFlag v3";
+    windowConfig.title = windowTitle;
     windowConfig.preferredVideoDriver = karma::config::ReadStringConfig({"platform.SdlVideoDriver"}, "");
     auto window = platform::CreateWindow(windowConfig);
     if (!window || !window->nativeHandle()) {
@@ -429,7 +432,7 @@ int main(int argc, char *argv[]) {
     engine.ecsWorld = app.context().ecsWorld;
     engine.render->setEcsWorld(app.context().ecsWorld);
     app.context().graphics = engine.render->getGraphicsDevice();
-    app.context().renderCore = engine.render->getRenderCore();
+    app.context().rendererCore = engine.render->getRendererCore();
     app.setGame(&adapter);
     return app.run();
 }

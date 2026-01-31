@@ -2,9 +2,9 @@
 
 #include <utility>
 
-#include "engine/client_engine.hpp"
+#include "game/engine/client_engine.hpp"
 #include "client/game.hpp"
-#include "common/config_helpers.hpp"
+#include "karma/common/config_helpers.hpp"
 #include "spdlog/spdlog.h"
 
 ServerConnector::ServerConnector(ClientEngine &engine,

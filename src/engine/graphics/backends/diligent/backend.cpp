@@ -1,12 +1,12 @@
-#include "engine/graphics/backends/diligent/backend.hpp"
-#include "engine/graphics/backends/diligent/ui_bridge.hpp"
+#include "karma/graphics/backends/diligent/backend.hpp"
+#include "karma/graphics/backends/diligent/ui_bridge.hpp"
 #if defined(KARMA_UI_BACKEND_IMGUI)
-#include "engine/ui/platform/imgui/renderer_diligent.hpp"
+#include "karma/ui/platform/imgui/renderer_diligent.hpp"
 #endif
 
-#include "engine/common/data_path_resolver.hpp"
-#include "engine/common/config_helpers.hpp"
-#include "engine/geometry/mesh_loader.hpp"
+#include "karma/common/data_path_resolver.hpp"
+#include "karma/common/config_helpers.hpp"
+#include "karma/geometry/mesh_loader.hpp"
 #include "platform/window.hpp"
 
 #include <DiligentCore/Common/interface/BasicMath.hpp>
@@ -100,7 +100,7 @@ bool isShotModelPath(const std::filesystem::path& path) {
 }
 
 std::string getThemeName() {
-    return karma::config::ReadStringConfig("graphics.theme", "classic");
+    return karma::config::ReadRequiredStringConfig("graphics.theme");
 }
 
 bool isLikelyGrass(const MeshLoader::TextureData& texture) {
@@ -1104,13 +1104,13 @@ void DiligentBackend::buildSkyboxResources() {
         return;
     }
 
-    const std::string mode = karma::config::ReadStringConfig("graphics.skybox.Mode", "none");
+    const std::string mode = karma::config::ReadRequiredStringConfig("graphics.skybox.Mode");
     spdlog::info("Graphics(Diligent): skybox mode='{}'", mode);
     if (mode != "cubemap") {
         return;
     }
 
-    const std::string name = karma::config::ReadStringConfig("graphics.skybox.Cubemap.Name", "classic");
+    const std::string name = karma::config::ReadRequiredStringConfig("graphics.skybox.Cubemap.Name");
     spdlog::info("Graphics(Diligent): skybox cubemap='{}'", name);
     const std::array<std::string, 6> faces = {"right", "left", "up", "down", "front", "back"};
     std::array<std::vector<uint8_t>, 6> facePixels{};
