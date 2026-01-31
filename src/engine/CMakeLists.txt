@@ -2,6 +2,7 @@ set(ENGINE_COMMON_SOURCES
     ${PROJECT_SOURCE_DIR}/src/engine/common/curl_global.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/common/config_helpers.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/common/config_store.cpp
+    ${PROJECT_SOURCE_DIR}/src/engine/common/config_validation.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/common/i18n.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/common/data_path_resolver.cpp
     ${PROJECT_SOURCE_DIR}/src/engine/common/data_dir_override.cpp

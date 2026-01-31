@@ -21,6 +21,7 @@
 #include "karma/common/data_path_resolver.hpp"
 #include "karma/common/config_helpers.hpp"
 #include "karma/common/config_store.hpp"
+#include "karma/common/config_validation.hpp"
 #include "karma/common/i18n.hpp"
 #include "karma/platform/window.hpp"
 
@@ -364,6 +365,25 @@ int main(int argc, char *argv[]) {
         {"client/config.json", "data/client/config.json", spdlog::level::err, true, true}
     };
     karma::config::ConfigStore::Initialize(clientConfigSpecs, clientUserConfigPathFs);
+    const ClientCLIOptions cliOptions = ParseClientCLIOptions(argc, argv);
+    const auto configIssues = karma::config::ValidateRequiredKeys(karma::config::ClientRequiredKeys());
+    if (!configIssues.empty()) {
+        if (cliOptions.strictConfig) {
+            spdlog::error("Config validation failed:");
+        } else {
+            spdlog::warn("Config validation reported issues:");
+        }
+        for (const auto &issue : configIssues) {
+            if (cliOptions.strictConfig) {
+                spdlog::error("  {}: {}", issue.path, issue.message);
+            } else {
+                spdlog::warn("  {}: {}", issue.path, issue.message);
+            }
+        }
+        if (cliOptions.strictConfig) {
+            return 1;
+        }
+    }
     karma::i18n::Get().loadFromConfig();
 
     const uint16_t configWidth = karma::config::ReadUInt16Config({"graphics.resolution.Width"}, 1280);
@@ -372,7 +392,6 @@ int main(int argc, char *argv[]) {
     const bool vsyncEnabled = karma::config::ReadBoolConfig({"graphics.VSync"}, true);
     const std::string windowTitle = karma::config::ReadStringConfig({"platform.WindowTitle"}, "BZFlag v3");
 
-    const ClientCLIOptions cliOptions = ParseClientCLIOptions(argc, argv);
     if (cliOptions.languageExplicit && !cliOptions.language.empty()) {
         karma::i18n::Get().loadLanguage(cliOptions.language);
     }

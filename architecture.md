@@ -99,6 +99,7 @@ data/
 ### Data root and configuration layering
 
 The runtime **data root** is discovered via a game-provided spec (`src/game/common/data_path_spec.*`). For BZ3 this uses the `KARMA_DATA_DIR` environment variable. All config and assets are loaded relative to this directory.
+See `CONFIG-SCHEMA.md` for a concise reference on layer order, asset lookup, and user config paths.
 
 Configuration is **layered JSON** merged into a single “config cache”:
 
@@ -373,6 +374,7 @@ Plugin callbacks are keyed by `ClientMsg_Type` and currently invoked from gamepl
 - **UI/HUD**: `src/game/ui/` (backend entry + frontends/*/hud)
 - **Community browser**: `src/game/client/server/*` (control) + `src/game/ui/frontends/*/console/console.*` (view)
 - **Plugins / moderation / commands**: `src/game/server/plugin.*` and `data/plugins/*`
+- **Adding new subsystems**: `HOW-TO-ADD-SUBSYSTEM.md`
 
 ## Common gotchas
 

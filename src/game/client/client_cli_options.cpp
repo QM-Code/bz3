@@ -72,6 +72,8 @@ ClientCLIOptions ParseClientCLIOptions(int argc, char *argv[]) {
     options.add_options()
         ("dev-quick-start", "Dev helper: show console, start local server, auto-connect");
     options.add_options()
+        ("strict-config", "Fail startup if required config keys are missing", cxxopts::value<bool>()->default_value("true"));
+    options.add_options()
         ("v,verbose", "Enable verbose logging (-v=debug, -vv=trace)")
         ("L,log-level", "Logging level (trace, debug, info, warn, err, critical, off)", cxxopts::value<std::string>());
     options.add_options()
@@ -109,6 +111,7 @@ ClientCLIOptions ParseClientCLIOptions(int argc, char *argv[]) {
     parsed.languageExplicit = result.count("language") > 0;
     parsed.themeExplicit = result.count("theme") > 0;
     parsed.devQuickStart = result.count("dev-quick-start") > 0;
+    parsed.strictConfig = result["strict-config"].as<bool>();
     parsed.verbose = static_cast<int>(result.count("verbose"));
     parsed.logLevel = result.count("log-level") ? result["log-level"].as<std::string>() : std::string();
     parsed.logLevelExplicit = result.count("log-level") > 0;

@@ -59,8 +59,8 @@ Focus is on long-term clarity, engine/game separation, and developer velocity.
 - Add CI builds for bgfx+imgui and bgfx+rmlui at minimum.
 
 ## 11) Documentation
-- Keep cascading docs up-to-date as code moves.
-- Add a “How to add a new subsystem” guide.
+- Keep cascading docs up-to-date as code moves. (done: noted in `AGENTS.md`)
+- Add a “How to add a new subsystem” guide. (done: `HOW-TO-ADD-SUBSYSTEM.md`)
 
 ---
 

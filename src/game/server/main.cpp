@@ -12,6 +12,7 @@
 #include "karma/common/data_path_resolver.hpp"
 #include "karma/common/config_helpers.hpp"
 #include "karma/common/config_store.hpp"
+#include "karma/common/config_validation.hpp"
 #include "karma/common/json.hpp"
 #include <pybind11/embed.h>
 #include <csignal>
@@ -147,6 +148,24 @@ int main(int argc, char *argv[]) {
     } catch (const std::exception &ex) {
         spdlog::error("Failed to parse server command line options: {}", ex.what());
         return 1;
+    }
+    const auto configIssues = karma::config::ValidateRequiredKeys(karma::config::ServerRequiredKeys());
+    if (!configIssues.empty()) {
+        if (cliOptions.strictConfig) {
+            spdlog::error("Config validation failed:");
+        } else {
+            spdlog::warn("Config validation reported issues:");
+        }
+        for (const auto &issue : configIssues) {
+            if (cliOptions.strictConfig) {
+                spdlog::error("  {}: {}", issue.path, issue.message);
+            } else {
+                spdlog::warn("  {}: {}", issue.path, issue.message);
+            }
+        }
+        if (cliOptions.strictConfig) {
+            return 1;
+        }
     }
 
     const spdlog::level::level_enum logLevel = cliOptions.logLevelExplicit

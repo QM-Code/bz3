@@ -103,6 +103,14 @@ add_executable(bz3-server
     $<TARGET_OBJECTS:karma_server>
 )
 
+add_custom_target(check_required_config
+    COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/scripts/check_required_config.py
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+    COMMENT "Checking required config key list"
+)
+add_dependencies(bz3 check_required_config)
+add_dependencies(bz3-server check_required_config)
+
 set_target_properties(bz3 bz3-server PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 )

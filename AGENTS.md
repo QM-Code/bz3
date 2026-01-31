@@ -51,6 +51,10 @@ Windows:
 ## Notes / gotchas
 - Config is layered via `src/common/data_path_resolver.*`; prefer asset keys over hard paths.
 - Network messages are "peeked" and must be freed on `flushPeekedMessages()`. Do not store pointers.
+- Keep `architecture.md` and `README.md` in sync when behavior or layout changes.
+- When moving or renaming code/modules, update any related docs in `README.md`, `architecture.md`, and `CONFIG-SCHEMA.md`.
+- If you add a `ReadRequired*Config` or `ui::config::GetRequired*` call, update `ClientRequiredKeys()` / `ServerRequiredKeys()` in `src/engine/common/config_validation.*`.
+- Use `scripts/check_required_config.py` to verify the required-key list stays in sync.
 
 ## Prompt index
 Prompt files live in `docs/agent-prompts/`. Ask to use one by name (title) or file.

@@ -17,6 +17,7 @@ This project uses vcpkg to provide most native dependencies and the setup script
 ## Runtime Data
 
 The programs load assets/config from a data root resolved via the `KARMA_DATA_DIR` environment variable (configured by `src/game/common/data_path_spec.*`).
+See `CONFIG-SCHEMA.md` for config layering and asset lookup details.
 
 - Linux/macOS:
 
@@ -66,6 +67,17 @@ After building:
 
 - Linux/macOS: `./build/bz3` and `./build/bz3-server`
 - Windows: `build\Release\bz3.exe` and `build\Release\bz3-server.exe`
+
+### Config validation
+
+Startup validates required config keys. To allow startup with warnings only, pass:
+
+- Client: `./build/bz3 --strict-config=false`
+- Server: `./build/bz3-server --strict-config=false`
+
+You can verify the required-key list stays in sync with code using:
+
+- `scripts/check_required_config.py`
 
 ## Overview (Libraries in Use)
 
@@ -191,6 +203,10 @@ Actions:
 ## Agent prompts
 
 Repo-level guidance lives in `AGENTS.md`. Task-specific prompts live under `docs/agent-prompts/` (e.g., Webserver, UiSystem/HUD). In a new session, ask to use a prompt by its title.
+
+## Guides
+
+- `HOW-TO-ADD-SUBSYSTEM.md`
 
 ## TODO
 * Teams
