@@ -5,13 +5,17 @@
 #include <cstdio>
 #include <vector>
 
-#include "common/config_store.hpp"
+#include "karma/common/config_store.hpp"
 #include "game/input/bindings.hpp"
 #include "ui/console/keybindings.hpp"
 #include "ui/config/ui_config.hpp"
 
 namespace ui {
 namespace {
+
+bool IsBindingDefinition(const ui::bindings::BindingDefinition &def) {
+    return !def.isHeader && def.action && def.action[0] != '\0';
+}
 
 const std::vector<std::string> &defaultBindingsForAction(std::string_view action) {
     static const game_input::DefaultBindingsMap kDefaults = game_input::DefaultKeybindings();
@@ -45,18 +49,18 @@ BindingsController::Result BindingsController::loadFromConfig() {
         buffer[0] = '\0';
     }
 
-    if (!bz::config::ConfigStore::Initialized()) {
+    if (!karma::config::ConfigStore::Initialized()) {
         result.ok = false;
         result.status = "Failed to load config; showing defaults.";
         result.statusIsError = true;
     }
 
-    const bz::json::Value *bindingsNode = nullptr;
+    const karma::json::Value *bindingsNode = nullptr;
     auto keybindingsNode = ui::UiConfig::GetKeybindings();
     if (keybindingsNode && keybindingsNode->is_object()) {
         bindingsNode = &(*keybindingsNode);
     }
-    const bz::json::Value *controllerNode = nullptr;
+    const karma::json::Value *controllerNode = nullptr;
     auto controllerBindingsNode = ui::UiConfig::GetControllerKeybindings();
     if (controllerBindingsNode && controllerBindingsNode->is_object()) {
         controllerNode = &(*controllerBindingsNode);
@@ -65,6 +69,12 @@ BindingsController::Result BindingsController::loadFromConfig() {
     const auto defs = ui::bindings::Definitions();
     const std::size_t count = std::min(defs.size(), ui::BindingsModel::kKeybindingCount);
     for (std::size_t i = 0; i < count; ++i) {
+        if (!IsBindingDefinition(defs[i])) {
+            model.keyboard[i][0] = '\0';
+            model.mouse[i][0] = '\0';
+            model.controller[i][0] = '\0';
+            continue;
+        }
         std::vector<std::string> keyboardEntries;
         std::vector<std::string> mouseEntries;
         std::vector<std::string> controllerEntries;
@@ -118,14 +128,17 @@ BindingsController::Result BindingsController::loadFromConfig() {
 
 BindingsController::Result BindingsController::saveToConfig() {
     Result result;
-    bz::json::Value keybindings = bz::json::Object();
-    bz::json::Value controllerBindings = bz::json::Object();
+    karma::json::Value keybindings = karma::json::Object();
+    karma::json::Value controllerBindings = karma::json::Object();
     bool hasBindings = false;
     bool hasControllerBindings = false;
 
     const auto defs = ui::bindings::Definitions();
     const std::size_t count = std::min(defs.size(), ui::BindingsModel::kKeybindingCount);
     for (std::size_t i = 0; i < count; ++i) {
+        if (!IsBindingDefinition(defs[i])) {
+            continue;
+        }
         std::vector<std::string> keyboardValues = ui::bindings::SplitBindings(model.keyboard[i].data());
         std::vector<std::string> mouseValues = ui::bindings::SplitBindings(model.mouse[i].data());
         std::vector<std::string> controllerValues = ui::bindings::SplitBindings(model.controller[i].data());
@@ -154,7 +167,7 @@ BindingsController::Result BindingsController::saveToConfig() {
         }
     }
 
-    if (!bz::config::ConfigStore::Initialized()) {
+    if (!karma::config::ConfigStore::Initialized()) {
         result.ok = false;
         result.status = "Failed to save bindings.";
         result.statusIsError = true;
@@ -194,6 +207,12 @@ BindingsController::Result BindingsController::resetToDefaults() {
     const auto defs = ui::bindings::Definitions();
     const std::size_t count = std::min(defs.size(), ui::BindingsModel::kKeybindingCount);
     for (std::size_t i = 0; i < count; ++i) {
+        if (!IsBindingDefinition(defs[i])) {
+            model.keyboard[i][0] = '\0';
+            model.mouse[i][0] = '\0';
+            model.controller[i][0] = '\0';
+            continue;
+        }
         std::vector<std::string> keyboardEntries;
         std::vector<std::string> mouseEntries;
         const auto &defaults = defaultBindingsForAction(defs[i].action);

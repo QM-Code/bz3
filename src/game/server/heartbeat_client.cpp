@@ -1,10 +1,10 @@
 #include "server/heartbeat_client.hpp"
 
 #include <curl/curl.h>
-#include "common/json.hpp"
+#include "karma/common/json.hpp"
 #include <spdlog/spdlog.h>
 
-#include "common/curl_global.hpp"
+#include "karma/common/curl_global.hpp"
 
 namespace {
 size_t AppendResponse(char *ptr, size_t size, size_t nmemb, void *userdata) {
@@ -32,7 +32,7 @@ std::string urlEncode(CURL *curlHandle, const std::string &value) {
 }
 
 bool performGet(const std::string &url, long &statusOut, std::string &errorOut, std::string &bodyOut) {
-    if (!bz::net::EnsureCurlGlobalInit()) {
+    if (!karma::net::EnsureCurlGlobalInit()) {
         return false;
     }
     CURL *curlHandle = curl_easy_init();
@@ -66,7 +66,7 @@ bool performGet(const std::string &url, long &statusOut, std::string &errorOut, 
     if (status < 200 || status >= 300) {
         if (!bodyOut.empty()) {
             try {
-                auto jsonData = bz::json::Parse(bodyOut);
+                auto jsonData = karma::json::Parse(bodyOut);
                 if (jsonData.contains("message") && jsonData["message"].is_string()) {
                     errorOut = jsonData["message"].get<std::string>();
                 }
@@ -141,7 +141,7 @@ void HeartbeatClient::workerProc() {
             requests.pop_front();
         }
 
-        if (!bz::net::EnsureCurlGlobalInit()) {
+        if (!karma::net::EnsureCurlGlobalInit()) {
             spdlog::warn("HeartbeatClient: Failed to initialize cURL");
             continue;
         }

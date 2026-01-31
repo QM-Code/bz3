@@ -14,7 +14,15 @@ DefaultBindingsMap DefaultKeybindings() {
         {std::string(kActionMoveLeft), {"LEFT", "J"}},
         {std::string(kActionMoveRight), {"RIGHT", "L"}},
         {std::string(kActionMoveForward), {"UP", "I"}},
-        {std::string(kActionMoveBackward), {"DOWN", "K"}}
+        {std::string(kActionMoveBackward), {"DOWN", "K"}},
+        {std::string(kActionRoamMoveLeft), {}},
+        {std::string(kActionRoamMoveRight), {}},
+        {std::string(kActionRoamMoveForward), {}},
+        {std::string(kActionRoamMoveBackward), {}},
+        {std::string(kActionRoamMoveUp), {}},
+        {std::string(kActionRoamMoveDown), {}},
+        {std::string(kActionRoamLook), {}},
+        {std::string(kActionRoamMoveFast), {}}
     };
 }
 

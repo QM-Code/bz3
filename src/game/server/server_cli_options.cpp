@@ -1,9 +1,9 @@
 #include "server/server_cli_options.hpp"
 
-#include "common/data_path_resolver.hpp"
-#include "common/config_store.hpp"
+#include "karma/common/data_path_resolver.hpp"
+#include "karma/common/config_store.hpp"
 #include "cxxopts.hpp"
-#include "common/json.hpp"
+#include "karma/common/json.hpp"
 #include <spdlog/spdlog.h>
 #include <stdexcept>
 #include <cstdlib>
@@ -13,7 +13,7 @@
 namespace {
 
 std::string ConfiguredPortDefault() {
-    if (const auto *portNode = bz::config::ConfigStore::Get("network.ServerPort")) {
+    if (const auto *portNode = karma::config::ConfigStore::Get("network.ServerPort")) {
         if (portNode->is_string()) {
             return portNode->get<std::string>();
         }
@@ -54,10 +54,10 @@ ServerCLIOptions ParseServerCLIOptions(int argc, char *argv[]) {
         ("w,world", "World directory", cxxopts::value<std::string>())
         ("D,default-world", "Use bundled default world")
         ("p,port", "Server listen port", cxxopts::value<uint16_t>()->default_value(ConfiguredPortDefault()))
-        ("d,data-dir", "Data directory (overrides BZ3_DATA_DIR)", cxxopts::value<std::string>())
+        ("d,data-dir", "Data directory (overrides KARMA_DATA_DIR)", cxxopts::value<std::string>())
         ("c,config", "User config file path", cxxopts::value<std::string>())
         ("C,community", "Community server (http://host:port or host:port)", cxxopts::value<std::string>())
-        ("v,verbose", "Enable verbose logging (alias for --log-level trace)")
+        ("v,verbose", "Enable verbose logging (-v=debug, -vv=trace)")
         ("L,log-level", "Logging level (trace, debug, info, warn, err, critical, off)", cxxopts::value<std::string>())
         ("T,timestamp-logging", "Enable timestamped logging output")
         ("h,help", "Show help");
@@ -84,8 +84,8 @@ ServerCLIOptions ParseServerCLIOptions(int argc, char *argv[]) {
     if (result.count("default-world")) {
         parsed.worldSpecified = true;
 
-        const auto serverConfigPath = bz::data::Resolve("server/config.json");
-        auto serverConfigOpt = bz::data::LoadJsonFile(serverConfigPath, "data/server/config.json", spdlog::level::err);
+        const auto serverConfigPath = karma::data::Resolve("server/config.json");
+        auto serverConfigOpt = karma::data::LoadJsonFile(serverConfigPath, "data/server/config.json", spdlog::level::err);
         if (!serverConfigOpt || !serverConfigOpt->is_object()) {
             throw std::runtime_error("default world flag requires data/server/config.json to be a JSON object");
         }
@@ -111,7 +111,7 @@ ServerCLIOptions ParseServerCLIOptions(int argc, char *argv[]) {
     parsed.hostPortExplicit = result.count("port") > 0;
     parsed.dataDirExplicit = result.count("data-dir") > 0;
     parsed.userConfigExplicit = result.count("config") > 0;
-    parsed.verbose = result.count("verbose") > 0;
+    parsed.verbose = static_cast<int>(result.count("verbose"));
     parsed.logLevel = result.count("log-level") ? result["log-level"].as<std::string>() : std::string();
     parsed.logLevelExplicit = result.count("log-level") > 0;
     parsed.timestampLogging = result.count("timestamp-logging") > 0;

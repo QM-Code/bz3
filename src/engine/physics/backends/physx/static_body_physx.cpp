@@ -1,6 +1,6 @@
 #include "physics/backends/physx/static_body_physx.hpp"
 #include "physics/backends/physx/physics_world_physx.hpp"
-#include "engine/geometry/mesh_loader.hpp"
+#include "karma/geometry/mesh_loader.hpp"
 #include <PxPhysicsAPI.h>
 #include <spdlog/spdlog.h>
 #include <vector>

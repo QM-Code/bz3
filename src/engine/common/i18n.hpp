@@ -5,7 +5,7 @@
 #include <string_view>
 #include <unordered_map>
 
-namespace bz::i18n {
+namespace karma::i18n {
 
 class I18n {
 public:
@@ -29,4 +29,4 @@ private:
 
 I18n &Get();
 
-} // namespace bz::i18n
+} // namespace karma::i18n

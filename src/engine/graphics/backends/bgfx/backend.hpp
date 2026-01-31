@@ -1,8 +1,8 @@
 #pragma once
 
-#include "engine/graphics/backend.hpp"
-#if defined(BZ3_UI_BACKEND_IMGUI)
-#include "ui/frontends/imgui/platform/renderer_bgfx.hpp"
+#include "karma/graphics/backend.hpp"
+#if defined(KARMA_UI_BACKEND_IMGUI)
+#include "karma/ui/platform/imgui/renderer_bgfx.hpp"
 #endif
 
 #include <bgfx/bgfx.h>

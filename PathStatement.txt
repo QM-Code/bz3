@@ -1,3 +1,0 @@
-RD_GPU_CONFIG = /home/karmak/dev/bz3/forge_data
-RD_OTHER_FILES = /home/karmak/dev/bz3/forge_data
-RD_LOG = /home/karmak/dev/bz3/forge_data

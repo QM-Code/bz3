@@ -4,8 +4,8 @@
 #include <filesystem>
 #include <vector>
 
-namespace bz::file {
+namespace karma::file {
 
 std::vector<uint8_t> ReadFileBytes(const std::filesystem::path &path);
 
-} // namespace bz::file
+} // namespace karma::file

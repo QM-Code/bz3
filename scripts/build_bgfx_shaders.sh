@@ -24,8 +24,8 @@ find_shaderc() {
     fi
   fi
   local vcpkg_candidate
-  if [[ -n "${BZ3_BUILD_DIR:-}" ]]; then
-    vcpkg_candidate="$BZ3_BUILD_DIR/vcpkg_installed/x64-linux/tools/bgfx/shaderc"
+  if [[ -n "${KARMA_BUILD_DIR:-}" ]]; then
+    vcpkg_candidate="$KARMA_BUILD_DIR/vcpkg_installed/x64-linux/tools/bgfx/shaderc"
     if [[ -x "$vcpkg_candidate" ]]; then
       echo "$vcpkg_candidate"
       return 0

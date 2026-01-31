@@ -77,8 +77,8 @@ world::ArchiveBytes ReadArchiveFile(const fs::path& zipPath) {
 
 namespace world_backend {
 
-world::WorldContent FsWorldBackend::loadContent(const std::vector<bz::data::ConfigLayerSpec>& baseSpecs,
-                                                const std::optional<bz::json::Value>& worldConfig,
+world::WorldContent FsWorldBackend::loadContent(const std::vector<karma::data::ConfigLayerSpec>& baseSpecs,
+                                                const std::optional<karma::json::Value>& worldConfig,
                                                 const fs::path& worldDir,
                                                 const std::string& fallbackName,
                                                 const std::string& logContext) {
@@ -86,7 +86,7 @@ world::WorldContent FsWorldBackend::loadContent(const std::vector<bz::data::Conf
     content.rootDir = worldDir;
     content.name = fallbackName;
 
-    std::vector<bz::data::ConfigLayer> layers = bz::data::LoadConfigLayers(baseSpecs);
+    std::vector<karma::data::ConfigLayer> layers = karma::data::LoadConfigLayers(baseSpecs);
     if (worldConfig.has_value()) {
         if (worldConfig->is_object()) {
             layers.push_back({*worldConfig, worldDir});
@@ -95,9 +95,9 @@ world::WorldContent FsWorldBackend::loadContent(const std::vector<bz::data::Conf
         }
     }
 
-    bz::json::Value mergedConfig = bz::json::Object();
+    karma::json::Value mergedConfig = karma::json::Object();
     for (const auto& layer : layers) {
-        bz::data::MergeJsonObjects(mergedConfig, layer.json);
+        karma::data::MergeJsonObjects(mergedConfig, layer.json);
         content.mergeLayer(layer.json, layer.baseDir);
     }
 
@@ -156,7 +156,7 @@ bool FsWorldBackend::extractArchive(const world::ArchiveBytes& data, const fs::p
     return true;
 }
 
-std::optional<bz::json::Value> FsWorldBackend::readJsonFile(const fs::path& path) {
+std::optional<karma::json::Value> FsWorldBackend::readJsonFile(const fs::path& path) {
     if (!fs::exists(path)) {
         return std::nullopt;
     }
@@ -167,7 +167,7 @@ std::optional<bz::json::Value> FsWorldBackend::readJsonFile(const fs::path& path
     }
 
     try {
-        bz::json::Value data;
+        karma::json::Value data;
         file >> data;
         return data;
     } catch (const std::exception& e) {

@@ -14,6 +14,7 @@ Game::Game(ClientEngine &engine,
       communityAdmin(communityAdmin),
       localAdmin(localAdmin),
       engine(engine) {
+    roamingMode = engine.isRoamingModeSession();
     world = std::make_unique<ClientWorldSession>(*this, worldDir);
     spdlog::trace("Game: World session created successfully");
     console = std::make_unique<Console>(*this);
@@ -44,7 +45,7 @@ void Game::earlyUpdate(TimeUtils::duration deltaTime) {
         return;
     }
 
-    if (!player) {
+    if (!player && !roamingMode) {
         spdlog::trace("Game: Creating player with name '{}'", playerName);
         auto playerActor = std::make_unique<Player>(
             *this,
@@ -73,6 +74,9 @@ void Game::earlyUpdate(TimeUtils::duration deltaTime) {
     }
 
     for (const auto &msg : engine.network->consumeMessages<ServerMsg_PlayerJoin>()) {
+        if (roamingMode && msg.clientId == world->playerId) {
+            continue;
+        }
         if (getActorById(msg.clientId)) {
             continue;
         }
@@ -93,36 +97,54 @@ void Game::earlyUpdate(TimeUtils::duration deltaTime) {
     }
 
     for (const auto &msg : engine.network->consumeMessages<ServerMsg_PlayerParameters>()) {
+        if (roamingMode && msg.clientId == world->playerId) {
+            continue;
+        }
         if (auto *actor = getActorById(msg.clientId)) {
             actor->setParameters(msg.params);
         }
     }
 
     for (const auto &msg : engine.network->consumeMessages<ServerMsg_PlayerState>()) {
+        if (roamingMode && msg.clientId == world->playerId) {
+            continue;
+        }
         if (auto *actor = getActorById(msg.clientId)) {
             actor->setState(msg.state);
         }
     }
 
     for (const auto &msg : engine.network->consumeMessages<ServerMsg_PlayerLocation>()) {
+        if (roamingMode && msg.clientId == world->playerId) {
+            continue;
+        }
         if (auto *actor = getActorById(msg.clientId)) {
             actor->setLocation(msg.position, msg.rotation, msg.velocity);
         }
     }
 
     for (const auto &msg : engine.network->consumeMessages<ServerMsg_PlayerDeath>()) {
+        if (roamingMode && msg.clientId == world->playerId) {
+            continue;
+        }
         if (auto *actor = getActorById(msg.clientId)) {
             actor->die();
         }
     }
 
     for (const auto &msg : engine.network->consumeMessages<ServerMsg_SetScore>()) {
+        if (roamingMode && msg.clientId == world->playerId) {
+            continue;
+        }
         if (auto *actor = getActorById(msg.clientId)) {
             actor->setScore(msg.score);
         }
     }
 
     for (const auto &msg : engine.network->consumeMessages<ServerMsg_PlayerSpawn>()) {
+        if (roamingMode && msg.clientId == world->playerId) {
+            continue;
+        }
         if (auto *actor = getActorById(msg.clientId)) {
             actor->spawn(msg.position, msg.rotation, msg.velocity);
         }
@@ -162,6 +184,8 @@ void Game::lateUpdate(TimeUtils::duration deltaTime) {
     for (const auto &shot : shots) {
         shot->update(deltaTime);
     }
+
+    engine.updateRoamingCamera(deltaTime, focusState == FOCUS_STATE_GAME);
 
     std::vector<ScoreboardEntry> scoreboard;
     scoreboard.reserve(actors.size());

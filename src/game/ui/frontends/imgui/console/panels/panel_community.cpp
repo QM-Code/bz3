@@ -1,5 +1,5 @@
 #include "ui/frontends/imgui/console/console.hpp"
-#include "ui/frontends/imgui/texture_utils.hpp"
+#include "karma/ui/imgui/texture_utils.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -311,7 +311,9 @@ namespace ui {
 void ConsoleView::drawCommunityPanel(const MessageColors &messageColors) {
     const bool hasHeadingFont = (headingFont != nullptr);
     const bool hasButtonFont = (buttonFont != nullptr);
-    bool joinFromIdentity = false;
+    bool joinRequested = false;
+    bool roamRequested = false;
+    const bool connected = consoleModel.connectionState.connected;
     auto &community = consoleModel.community;
     auto &entries = community.entries;
     auto &selectedIndex = community.selectedIndex;
@@ -495,9 +497,13 @@ void ConsoleView::drawCommunityPanel(const MessageColors &messageColors) {
         listOptions[listSelectedIndex].name == "Local Area Network";
 
     const float joinInlineWidth = ImGui::CalcTextSize("Join").x + style.FramePadding.x * 2.0f;
+    const float roamInlineWidth = ImGui::CalcTextSize("Roam").x + style.FramePadding.x * 2.0f;
+    const float quitInlineWidth = ImGui::CalcTextSize("Quit").x + style.FramePadding.x * 2.0f;
+    const float joinButtonsWidth = joinInlineWidth + roamInlineWidth + style.ItemSpacing.x;
     const float labelSpacing = style.ItemSpacing.x * 2.0f;
     const float inputWidth = 150.0f;
-    float rowWidth = ImGui::GetContentRegionAvail().x - joinInlineWidth - style.ItemSpacing.x;
+    const float buttonWidth = connected ? quitInlineWidth : joinButtonsWidth;
+    float rowWidth = ImGui::GetContentRegionAvail().x - buttonWidth - style.ItemSpacing.x;
     float contentWidth = inputWidth + ImGui::CalcTextSize("Username").x + style.ItemInnerSpacing.x;
     if (!isLanCommunity) {
         contentWidth += labelSpacing;
@@ -513,7 +519,9 @@ void ConsoleView::drawCommunityPanel(const MessageColors &messageColors) {
         usernameBuffer.data(),
         usernameBuffer.size(),
         ImGuiInputTextFlags_EnterReturnsTrue);
-    joinFromIdentity |= usernameEdited;
+    if (!connected) {
+        joinRequested |= usernameEdited;
+    }
     usernameChanged |= usernameEdited;
     if (usernameEdited) {
         storedPasswordHash.clear();
@@ -533,7 +541,9 @@ void ConsoleView::drawCommunityPanel(const MessageColors &messageColors) {
             passwordBuffer.data(),
             passwordBuffer.size(),
             ImGuiInputTextFlags_Password | ImGuiInputTextFlags_EnterReturnsTrue);
-        joinFromIdentity |= passwordEdited;
+        if (!connected) {
+            joinRequested |= passwordEdited;
+        }
         if (passwordEdited) {
             storedPasswordHash.clear();
             passwordChanged = true;
@@ -549,18 +559,35 @@ void ConsoleView::drawCommunityPanel(const MessageColors &messageColors) {
         ImGui::PushFont(buttonFont);
     }
     ImGui::PushStyleColor(ImGuiCol_Text, buttonColor);
-    ImGui::BeginDisabled(!hasActiveServers);
-    if (ImGui::Button("Join")) {
-        joinFromIdentity = true;
+    if (connected) {
+        if (ImGui::Button("Quit")) {
+            pendingQuitRequest = true;
+        }
+    } else {
+        ImGui::BeginDisabled(!hasActiveServers);
+        if (ImGui::Button("Join")) {
+            joinRequested = true;
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        ImGui::BeginDisabled(!hasActiveServers);
+        if (ImGui::Button("Roam")) {
+            roamRequested = true;
+        }
+        ImGui::EndDisabled();
     }
-    ImGui::EndDisabled();
     ImGui::PopStyleColor();
     if (hasButtonFont) {
         ImGui::PopFont();
     }
 
     if (!hasActiveServers) {
-        joinFromIdentity = false;
+        joinRequested = false;
+        roamRequested = false;
+    }
+    if (connected) {
+        joinRequested = false;
+        roamRequested = false;
     }
 
     if (usernameChanged || passwordChanged) {
@@ -686,13 +713,14 @@ void ConsoleView::drawCommunityPanel(const MessageColors &messageColors) {
                 if (ImGui::Selectable(label.c_str(), selected,
                                       ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowDoubleClick)) {
                     selectedIndex = i;
-                    if (ImGui::IsMouseDoubleClicked(0)) {
+                    if (!connected && ImGui::IsMouseDoubleClicked(0)) {
                         consoleController.queueSelection(CommunityBrowserSelection{
                             entry.host,
                             entry.port,
                             false,
                             entry.sourceHost,
-                            entry.worldName
+                            entry.worldName,
+                            false
                         });
                     }
                 }
@@ -823,7 +851,7 @@ void ConsoleView::drawCommunityPanel(const MessageColors &messageColors) {
         ImGui::EndPopup();
     }
 
-    if (joinFromIdentity) {
+    if (joinRequested || roamRequested) {
         if (selectedIndex >= 0 && selectedIndex < static_cast<int>(entries.size())) {
             const auto &entry = entries[selectedIndex];
             consoleController.queueSelection(CommunityBrowserSelection{
@@ -831,7 +859,8 @@ void ConsoleView::drawCommunityPanel(const MessageColors &messageColors) {
                 entry.port,
                 true,
                 entry.sourceHost,
-                entry.worldName
+                entry.worldName,
+                roamRequested
             });
             statusText.clear();
             statusIsError = false;

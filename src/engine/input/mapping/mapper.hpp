@@ -14,7 +14,7 @@ namespace input {
 
 class InputMapper {
 public:
-    void loadBindings(const bz::json::Value* keybindings, const InputMap::DefaultBindingsMap& defaults);
+    void loadBindings(const karma::json::Value* keybindings, const InputMap::DefaultBindingsMap& defaults);
 
     bool actionTriggered(std::string_view actionId, const std::vector<platform::Event>& events) const;
     bool actionDown(std::string_view actionId, const platform::Window* window) const;

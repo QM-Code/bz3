@@ -1,4 +1,4 @@
-#include "engine/graphics/backends/diligent/ui_bridge.hpp"
+#include "karma/graphics/backends/diligent/ui_bridge.hpp"
 
 #include <DiligentCore/Graphics/GraphicsEngine/interface/Texture.h>
 

@@ -1,6 +1,6 @@
 #include "ui/config/ui_config.hpp"
 
-#include "common/config_store.hpp"
+#include "karma/common/config_store.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -15,7 +15,7 @@ std::string toLower(std::string text) {
     return text;
 }
 
-float readFloatValue(const bz::json::Value &value, float fallback) {
+float readFloatValue(const karma::json::Value &value, float fallback) {
     if (value.is_number_float()) {
         return static_cast<float>(value.get<double>());
     }
@@ -33,7 +33,7 @@ float readFloatValue(const bz::json::Value &value, float fallback) {
 }
 
 float readFloat(std::string_view path, float fallback) {
-    const auto *value = bz::config::ConfigStore::Get(path);
+    const auto *value = karma::config::ConfigStore::Get(path);
     if (!value) {
         return fallback;
     }
@@ -41,7 +41,7 @@ float readFloat(std::string_view path, float fallback) {
 }
 
 bool readBool(std::string_view path, bool fallback) {
-    const auto *value = bz::config::ConfigStore::Get(path);
+    const auto *value = karma::config::ConfigStore::Get(path);
     if (!value) {
         return fallback;
     }
@@ -73,15 +73,15 @@ float UiConfig::GetRenderBrightness() {
 }
 
 bool UiConfig::SetRenderBrightness(float value) {
-    return bz::config::ConfigStore::Set("render.brightness", value);
+    return karma::config::ConfigStore::Set("render.brightness", value);
 }
 
 bool UiConfig::EraseRenderBrightness() {
-    return bz::config::ConfigStore::Erase("render.brightness");
+    return karma::config::ConfigStore::Erase("render.brightness");
 }
 
 std::optional<float> UiConfig::TryGetRenderScale() {
-    const auto *value = bz::config::ConfigStore::Get("ui.RenderScale");
+    const auto *value = karma::config::ConfigStore::Get("ui.RenderScale");
     if (!value) {
         return std::nullopt;
     }
@@ -89,15 +89,15 @@ std::optional<float> UiConfig::TryGetRenderScale() {
 }
 
 bool UiConfig::SetRenderScale(float value) {
-    return bz::config::ConfigStore::Set("ui.RenderScale", value);
+    return karma::config::ConfigStore::Set("ui.RenderScale", value);
 }
 
 bool UiConfig::EraseRenderScale() {
-    return bz::config::ConfigStore::Erase("ui.RenderScale");
+    return karma::config::ConfigStore::Erase("ui.RenderScale");
 }
 
 std::string UiConfig::GetLanguage() {
-    if (const auto *value = bz::config::ConfigStore::Get("language")) {
+    if (const auto *value = karma::config::ConfigStore::Get("language")) {
         if (value->is_string()) {
             return value->get<std::string>();
         }
@@ -106,43 +106,43 @@ std::string UiConfig::GetLanguage() {
 }
 
 bool UiConfig::SetLanguage(const std::string &value) {
-    return bz::config::ConfigStore::Set("language", value);
+    return karma::config::ConfigStore::Set("language", value);
 }
 
-const bz::json::Value *UiConfig::GetCommunityCredentials() {
-    return bz::config::ConfigStore::Get("gui.communityCredentials");
+const karma::json::Value *UiConfig::GetCommunityCredentials() {
+    return karma::config::ConfigStore::Get("gui.communityCredentials");
 }
 
-bool UiConfig::SetCommunityCredentials(const bz::json::Value &value) {
-    return bz::config::ConfigStore::Set("gui.communityCredentials", value);
+bool UiConfig::SetCommunityCredentials(const karma::json::Value &value) {
+    return karma::config::ConfigStore::Set("gui.communityCredentials", value);
 }
 
 bool UiConfig::EraseCommunityCredentials() {
-    return bz::config::ConfigStore::Erase("gui.communityCredentials");
+    return karma::config::ConfigStore::Erase("gui.communityCredentials");
 }
 
-std::optional<bz::json::Value> UiConfig::GetKeybindings() {
-    return bz::config::ConfigStore::GetCopy("keybindings");
+std::optional<karma::json::Value> UiConfig::GetKeybindings() {
+    return karma::config::ConfigStore::GetCopy("keybindings");
 }
 
-bool UiConfig::SetKeybindings(const bz::json::Value &value) {
-    return bz::config::ConfigStore::Set("keybindings", value);
+bool UiConfig::SetKeybindings(const karma::json::Value &value) {
+    return karma::config::ConfigStore::Set("keybindings", value);
 }
 
 bool UiConfig::EraseKeybindings() {
-    return bz::config::ConfigStore::Erase("keybindings");
+    return karma::config::ConfigStore::Erase("keybindings");
 }
 
-std::optional<bz::json::Value> UiConfig::GetControllerKeybindings() {
-    return bz::config::ConfigStore::GetCopy("gui.keybindings.controller");
+std::optional<karma::json::Value> UiConfig::GetControllerKeybindings() {
+    return karma::config::ConfigStore::GetCopy("gui.keybindings.controller");
 }
 
-bool UiConfig::SetControllerKeybindings(const bz::json::Value &value) {
-    return bz::config::ConfigStore::Set("gui.keybindings.controller", value);
+bool UiConfig::SetControllerKeybindings(const karma::json::Value &value) {
+    return karma::config::ConfigStore::Set("gui.keybindings.controller", value);
 }
 
 bool UiConfig::EraseControllerKeybindings() {
-    return bz::config::ConfigStore::Erase("gui.keybindings.controller");
+    return karma::config::ConfigStore::Erase("gui.keybindings.controller");
 }
 
 bool UiConfig::GetHudScoreboard() {
@@ -166,23 +166,23 @@ bool UiConfig::GetHudCrosshair() {
 }
 
 bool UiConfig::SetHudScoreboard(bool value) {
-    return bz::config::ConfigStore::Set("ui.hud.scoreboard", value);
+    return karma::config::ConfigStore::Set("ui.hud.scoreboard", value);
 }
 
 bool UiConfig::SetHudChat(bool value) {
-    return bz::config::ConfigStore::Set("ui.hud.chat", value);
+    return karma::config::ConfigStore::Set("ui.hud.chat", value);
 }
 
 bool UiConfig::SetHudRadar(bool value) {
-    return bz::config::ConfigStore::Set("ui.hud.radar", value);
+    return karma::config::ConfigStore::Set("ui.hud.radar", value);
 }
 
 bool UiConfig::SetHudFps(bool value) {
-    return bz::config::ConfigStore::Set("ui.hud.fps", value);
+    return karma::config::ConfigStore::Set("ui.hud.fps", value);
 }
 
 bool UiConfig::SetHudCrosshair(bool value) {
-    return bz::config::ConfigStore::Set("ui.hud.crosshair", value);
+    return karma::config::ConfigStore::Set("ui.hud.crosshair", value);
 }
 
 } // namespace ui

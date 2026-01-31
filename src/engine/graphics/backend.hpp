@@ -1,8 +1,8 @@
 #pragma once
 
-#include "engine/graphics/texture_handle.hpp"
-#include "engine/graphics/types.hpp"
-#include "engine/graphics/ui_render_target_bridge.hpp"
+#include "karma/graphics/texture_handle.hpp"
+#include "karma/graphics/types.hpp"
+#include "karma/graphics/ui_render_target_bridge.hpp"
 
 #include <filesystem>
 #include <glm/glm.hpp>

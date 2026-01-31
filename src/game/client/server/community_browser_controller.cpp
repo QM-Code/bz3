@@ -10,11 +10,11 @@
 
 #include "client/server/password_hash.hpp"
 #include "client/server/server_connector.hpp"
-#include "common/curl_global.hpp"
-#include "common/config_helpers.hpp"
+#include "karma/common/curl_global.hpp"
+#include "karma/common/config_helpers.hpp"
 #include "spdlog/spdlog.h"
 #include <curl/curl.h>
-#include "common/json.hpp"
+#include "karma/common/json.hpp"
 
 namespace {
 std::string trimCopy(const std::string &value) {
@@ -56,7 +56,7 @@ bool isLanToken(const std::string &value) {
 }
 
 uint16_t configuredServerPort() {
-    return bz::config::ReadUInt16Config({"network.ServerPort"}, 0);
+    return karma::config::ReadUInt16Config({"network.ServerPort"}, 0);
 }
 
 uint16_t applyPortFallback(uint16_t candidate) {
@@ -199,7 +199,7 @@ bool fetchCommunityInfoOk(const std::string &baseUrl) {
         return false;
     }
     try {
-        auto json = bz::json::Parse(body);
+        auto json = karma::json::Parse(body);
         return json.is_object();
     } catch (...) {
         return false;
@@ -216,7 +216,7 @@ CommunityBrowserController::CommunityBrowserController(ClientEngine &engine,
       clientConfig(clientConfig),
       clientConfigPath(configPath),
       connector(connector) {
-    curlReady = bz::net::EnsureCurlGlobalInit();
+    curlReady = karma::net::EnsureCurlGlobalInit();
     if (!curlReady) {
         spdlog::warn("CommunityBrowserController: Failed to initialize cURL");
     }
@@ -817,6 +817,7 @@ void CommunityBrowserController::handleJoinSelection(const ui::CommunityBrowserS
     pendingJoin.reset();
 
     if (communityHost.empty()) {
+        engine.setRoamingModeSession(selection.roamingMode);
         connector.connect(selection.host, selection.port, username, false, false, false);
         return;
     }
@@ -912,6 +913,7 @@ void CommunityBrowserController::handleAuthResponse(const CommunityAuthClient::R
                              pending.username,
                              pending.selection.host,
                              pending.selection.port);
+                engine.setRoamingModeSession(pending.selection.roamingMode);
                 connector.connect(pending.selection.host, pending.selection.port, pending.username, false, false, false);
             }
             return;
@@ -923,6 +925,7 @@ void CommunityBrowserController::handleAuthResponse(const CommunityAuthClient::R
                          pending.username,
                          pending.selection.host,
                          pending.selection.port);
+            engine.setRoamingModeSession(pending.selection.roamingMode);
             connector.connect(pending.selection.host, pending.selection.port, pending.username, false, false, false);
             return;
         }
@@ -964,6 +967,7 @@ void CommunityBrowserController::handleAuthResponse(const CommunityAuthClient::R
                  pending.selection.host,
                  pending.selection.port);
     browser.clearPassword();
+    engine.setRoamingModeSession(pending.selection.roamingMode);
     connector.connect(
         pending.selection.host,
         pending.selection.port,
@@ -1142,7 +1146,7 @@ void CommunityBrowserController::startServerDetailsRequest(const ui::CommunityBr
         }
 
         try {
-            bz::json::Value jsonData = bz::json::Parse(body);
+            karma::json::Value jsonData = karma::json::Parse(body);
             const auto *serverNode = jsonData.contains("server") ? &jsonData["server"] : nullptr;
             if (serverNode && serverNode->is_object()) {
                 if (auto nameIt = serverNode->find("name");

@@ -8,10 +8,10 @@
 #include <string>
 #include <vector>
 
-#include "common/json.hpp"
-#include "common/config_store.hpp"
-#include "common/data_path_resolver.hpp"
-#include "common/i18n.hpp"
+#include "karma/common/json.hpp"
+#include "karma/common/config_store.hpp"
+#include "karma/common/data_path_resolver.hpp"
+#include "karma/common/i18n.hpp"
 #include "spdlog/spdlog.h"
 #include "ui/config/config.hpp"
 #include "ui/console/tab_spec.hpp"
@@ -35,7 +35,7 @@ std::string trimCopy(const std::string &value) {
 }
 
 ImVec4 readColorConfig(const char *path, const ImVec4 &fallback) {
-    const auto *value = bz::config::ConfigStore::Get(path);
+    const auto *value = karma::config::ConfigStore::Get(path);
     if (!value || !value->is_array()) {
         return fallback;
     }
@@ -66,7 +66,7 @@ namespace ui {
 void ConsoleView::initializeFonts(ImGuiIO &io) {
     const ImVec4 defaultTextColor = ImGui::GetStyle().Colors[ImGuiCol_Text];
     auto addFallbackFont = [&](const char *assetKey, float size, const ImWchar *ranges, const char *label) {
-        const auto fontPath = bz::data::ResolveConfiguredAsset(assetKey);
+        const auto fontPath = karma::data::ResolveConfiguredAsset(assetKey);
         if (fontPath.empty()) {
             return;
         }
@@ -99,11 +99,11 @@ void ConsoleView::initializeFonts(ImGuiIO &io) {
             addFallbackFont("hud.fonts.console.FallbackCJK_SC.Font", size, io.Fonts->GetGlyphRangesChineseSimplifiedCommon(), "FallbackCJK_SC");
         }
     };
-    const std::string language = bz::i18n::Get().language();
+    const std::string language = karma::i18n::Get().language();
     const ui::fonts::ConsoleFontAssets assets = ui::fonts::GetConsoleFontAssets(language, true);
     const ui::fonts::ConsoleFontSelection &selection = assets.selection;
     const char *regularFontKey = selection.regularFontKey.c_str();
-    const auto regularFontPath = bz::data::ResolveConfiguredAsset(regularFontKey);
+    const auto regularFontPath = karma::data::ResolveConfiguredAsset(regularFontKey);
     const std::string regularFontPathStr = regularFontPath.string();
     const ImWchar *regularRanges = nullptr;
     if (selection.script == ui::fonts::Script::Cyrillic) {
@@ -142,7 +142,7 @@ void ConsoleView::initializeFonts(ImGuiIO &io) {
 
 
 
-    const auto titleFontPath = bz::data::ResolveConfiguredAsset(assets.titleKey);
+    const auto titleFontPath = karma::data::ResolveConfiguredAsset(assets.titleKey);
     const std::string titleFontPathStr = titleFontPath.string();
     const float titleFontSize = ui::config::GetRequiredFloat("assets.hud.fonts.console.Title.Size");
     this->titleFontSize = titleFontSize;
@@ -156,7 +156,7 @@ void ConsoleView::initializeFonts(ImGuiIO &io) {
         spdlog::warn("Failed to load console title font for community browser ({}).", titleFontPathStr);
     }
 
-    const auto headingFontPath = bz::data::ResolveConfiguredAsset(assets.headingKey);
+    const auto headingFontPath = karma::data::ResolveConfiguredAsset(assets.headingKey);
     const std::string headingFontPathStr = headingFontPath.string();
     const float headingFontSize = ui::config::GetRequiredFloat("assets.hud.fonts.console.Heading.Size");
     this->headingFontSize = headingFontSize;
@@ -170,7 +170,7 @@ void ConsoleView::initializeFonts(ImGuiIO &io) {
         spdlog::warn("Failed to load console heading font for community browser ({}).", headingFontPathStr);
     }
 
-    const auto buttonFontPath = bz::data::ResolveConfiguredAsset(assets.buttonKey);
+    const auto buttonFontPath = karma::data::ResolveConfiguredAsset(assets.buttonKey);
     const std::string buttonFontPathStr = buttonFontPath.string();
     const float buttonFontSize = ui::config::GetRequiredFloat("assets.hud.fonts.console.Button.Size");
     buttonFont = io.Fonts->AddFontFromFileTTF(
@@ -235,7 +235,7 @@ void ConsoleView::draw(ImGuiIO &io) {
     ImGui::PushStyleColor(ImGuiCol_Text, titleColor);
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
                         ImVec2(style.FramePadding.x + 6.0f, style.FramePadding.y + 4.0f));
-    auto &i18n = bz::i18n::Get();
+    auto &i18n = karma::i18n::Get();
     const std::string windowTitle = i18n.get("ui.console.title");
     ImGui::Begin((windowTitle + "###MainConsole").c_str(), nullptr, flags);
     ImGui::PopStyleVar();
@@ -245,7 +245,7 @@ void ConsoleView::draw(ImGuiIO &io) {
     }
 
     const MessageColors messageColors = getMessageColors();
-    const uint64_t revision = bz::config::ConfigStore::Revision();
+    const uint64_t revision = karma::config::ConfigStore::Revision();
     if (revision != lastConfigRevision) {
         lastConfigRevision = revision;
         handleConfigChanged();
@@ -527,14 +527,14 @@ void ConsoleView::storeCommunityAuth(const std::string &communityHost,
         key.pop_back();
     }
 
-    bz::json::Value creds = bz::json::Object();
+    karma::json::Value creds = karma::json::Object();
     if (const auto *existing = ui::UiConfig::GetCommunityCredentials()) {
         if (existing->is_object()) {
             creds = *existing;
         }
     }
     if (!creds.contains(key) || !creds[key].is_object()) {
-        creds[key] = bz::json::Object();
+        creds[key] = karma::json::Object();
     }
     creds[key]["username"] = username;
     if (!passhash.empty()) {

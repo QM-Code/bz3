@@ -1,15 +1,15 @@
 #include "game/net/backends/enet/server_backend.hpp"
 
 #include "game/net/proto_codec.hpp"
-#include "engine/network/transport_factory.hpp"
+#include "karma/network/transport_factory.hpp"
 #include "spdlog/spdlog.h"
 
 #include <algorithm>
 
-namespace network_backend {
+namespace game::net {
 
 EnetServerBackend::EnetServerBackend(uint16_t port, int maxClients, int numChannels) {
-    transport_ = net::createDefaultServerTransport(port, maxClients, numChannels);
+    transport_ = ::net::createDefaultServerTransport(port, maxClients, numChannels);
     if (!transport_) {
         spdlog::error("ServerNetwork::ServerNetwork: Failed to initialize server transport.");
         return;
@@ -44,7 +44,7 @@ void EnetServerBackend::flushPeekedMessages() {
     );
 }
 
-client_id EnetServerBackend::getClient(net::ConnectionHandle connection) {
+client_id EnetServerBackend::getClient(::net::ConnectionHandle connection) {
     auto it = clientByConnection_.find(connection);
     if (it != clientByConnection_.end()) {
         return it->second;
@@ -67,17 +67,17 @@ void EnetServerBackend::update() {
         return;
     }
 
-    std::vector<net::Event> events;
+    std::vector<::net::Event> events;
     transport_->poll(events);
 
     for (const auto &evt : events) {
         switch (evt.type) {
-        case net::Event::Type::Receive: {
+        case ::net::Event::Type::Receive: {
             if (evt.payload.empty()) {
                 break;
             }
 
-            auto decoded = net::decodeClientMsg(evt.payload.data(), evt.payload.size());
+            auto decoded = ::net::decodeClientMsg(evt.payload.data(), evt.payload.size());
             if (!decoded) {
                 spdlog::warn("Received unknown/invalid ClientMsg payload");
                 break;
@@ -101,19 +101,19 @@ void EnetServerBackend::update() {
                 }
             }
 
-            receivedMessages_.push_back({ decoded.release() });
+            receivedMessages_.push_back(ServerMsgData{ decoded.release(), false });
 
             break;
         }
-        case net::Event::Type::Connect: {
+        case ::net::Event::Type::Connect: {
             client_id newClientId = getNextClientId();
             clients_[newClientId] = evt.connection;
             clientByConnection_[evt.connection] = newClientId;
             ipByConnection_[evt.connection] = evt.peerIp;
             break;
         }
-        case net::Event::Type::Disconnect:
-        case net::Event::Type::DisconnectTimeout: {
+        case ::net::Event::Type::Disconnect:
+        case ::net::Event::Type::DisconnectTimeout: {
             auto it = clientByConnection_.find(evt.connection);
             if (it == clientByConnection_.end()) {
                 break;
@@ -124,7 +124,7 @@ void EnetServerBackend::update() {
             ipByConnection_.erase(evt.connection);
             ClientMsg_PlayerLeave* discMsg = new ClientMsg_PlayerLeave();
             discMsg->clientId = discClientId;
-            receivedMessages_.push_back({ discMsg });
+            receivedMessages_.push_back(ServerMsgData{ discMsg, false });
             break;
         }
         default:
@@ -176,12 +176,12 @@ void EnetServerBackend::sendImpl(client_id clientId, const ServerMsg &input, boo
         return;
     }
 
-    net::Delivery delivery = net::Delivery::Reliable;
+    ::net::Delivery delivery = ::net::Delivery::Reliable;
     if (input.type == ServerMsg_Type_PLAYER_LOCATION) {
-        delivery = net::Delivery::Unreliable;
+        delivery = ::net::Delivery::Unreliable;
     }
 
-    auto encoded = net::encodeServerMsg(input);
+    auto encoded = ::net::encodeServerMsg(input);
     if (!encoded.has_value()) {
         logUnsupportedMessageType();
         return;
@@ -191,4 +191,4 @@ void EnetServerBackend::sendImpl(client_id clientId, const ServerMsg &input, boo
     transport_->send(it->second, encoded->data(), encoded->size(), delivery, shouldFlush);
 }
 
-} // namespace network_backend
+} // namespace game::net

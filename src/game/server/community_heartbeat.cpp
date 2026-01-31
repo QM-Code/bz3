@@ -2,18 +2,18 @@
 
 #include "server/heartbeat_client.hpp"
 #include "server/game.hpp"
-#include "common/config_helpers.hpp"
+#include "karma/common/config_helpers.hpp"
 #include <spdlog/spdlog.h>
 
 CommunityHeartbeat::CommunityHeartbeat() : client(std::make_unique<HeartbeatClient>()) {}
 
 CommunityHeartbeat::~CommunityHeartbeat() = default;
 
-void CommunityHeartbeat::configureFromConfig(const bz::json::Value &mergedConfig,
+void CommunityHeartbeat::configureFromConfig(const karma::json::Value &mergedConfig,
                                              uint16_t listenPort,
                                              const std::string &communityOverride) {
-    std::string advertiseHost = bz::config::ReadStringConfig("network.ServerAdvertiseHost", "");
-    std::string serverHost = bz::config::ReadStringConfig("network.ServerHost", "");
+    std::string advertiseHost = karma::config::ReadStringConfig("network.ServerAdvertiseHost", "");
+    std::string serverHost = karma::config::ReadStringConfig("network.ServerHost", "");
     if (advertiseHost.empty() || advertiseHost == "0.0.0.0") {
         advertiseHost = serverHost;
     }

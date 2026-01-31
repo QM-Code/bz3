@@ -1,5 +1,6 @@
 #include "ui/controllers/settings_controller.hpp"
 
+#include "karma/common/config_store.hpp"
 #include "ui/config/ui_config.hpp"
 #include "spdlog/spdlog.h"
 

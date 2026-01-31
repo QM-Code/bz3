@@ -1,5 +1,5 @@
 #pragma once
-#include "core/types.hpp"
+#include "karma/core/types.hpp"
 #include "game/net/messages.hpp"
 
 class Game;

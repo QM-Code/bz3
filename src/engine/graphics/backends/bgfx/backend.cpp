@@ -1,14 +1,14 @@
-#include "engine/graphics/backends/bgfx/backend.hpp"
-#if defined(BZ3_UI_BACKEND_IMGUI)
-#include "ui/frontends/imgui/platform/renderer_bgfx.hpp"
+#include "karma/graphics/backends/bgfx/backend.hpp"
+#if defined(KARMA_UI_BACKEND_IMGUI)
+#include "karma/ui/platform/imgui/renderer_bgfx.hpp"
 #endif
 
-#include "engine/common/data_path_resolver.hpp"
-#include "engine/common/config_helpers.hpp"
-#include "engine/common/config_store.hpp"
-#include "engine/common/file_utils.hpp"
-#include "engine/graphics/backends/bgfx/texture_utils.hpp"
-#include "engine/geometry/mesh_loader.hpp"
+#include "karma/common/data_path_resolver.hpp"
+#include "karma/common/config_helpers.hpp"
+#include "karma/common/config_store.hpp"
+#include "karma/common/file_utils.hpp"
+#include "karma/graphics/backends/bgfx/texture_utils.hpp"
+#include "karma/geometry/mesh_loader.hpp"
 #include "platform/window.hpp"
 
 #include <bgfx/bgfx.h>
@@ -18,6 +18,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/ext/matrix_clip_space.hpp>
+#include <stdexcept>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <spdlog/spdlog.h>
@@ -26,7 +27,7 @@
 #include <array>
 #include <vector>
 
-#if defined(BZ3_WINDOW_BACKEND_SDL3)
+#if defined(KARMA_WINDOW_BACKEND_SDL3)
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_properties.h>
 #include <SDL3/SDL_video.h>
@@ -48,7 +49,7 @@ NativeWindowInfo getNativeWindowInfo(platform::Window* window) {
         return {};
     }
     void* handle = window->nativeHandle();
-#if defined(BZ3_WINDOW_BACKEND_SDL3)
+#if defined(KARMA_WINDOW_BACKEND_SDL3)
     auto* sdlWindow = static_cast<SDL_Window*>(handle);
     if (!sdlWindow) {
         return {};
@@ -62,14 +63,14 @@ NativeWindowInfo getNativeWindowInfo(platform::Window* window) {
         if (void* wlDisplay = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WAYLAND_DISPLAY_POINTER, nullptr)) {
             info.ndt = wlDisplay;
             void* wlSurface = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WAYLAND_SURFACE_POINTER, nullptr);
-            spdlog::info("Graphics(Bgfx): Wayland handles display={} surface={}", info.ndt, wlSurface);
+            spdlog::trace("Graphics(Bgfx): Wayland handles display={} surface={}", info.ndt, wlSurface);
             if (wlSurface) {
                 info.nwh = wlSurface;
                 info.handleType = bgfx::NativeWindowHandleType::Wayland;
-                spdlog::info("Graphics(Bgfx): using Wayland surface handle");
+                spdlog::trace("Graphics(Bgfx): using Wayland surface handle");
                 return info;
             }
-            spdlog::info("Graphics(Bgfx): Wayland display found but no surface");
+            spdlog::trace("Graphics(Bgfx): Wayland display found but no surface");
             return {};
         }
     }
@@ -81,7 +82,7 @@ NativeWindowInfo getNativeWindowInfo(platform::Window* window) {
 
 
 bgfx::ShaderHandle loadShader(const std::filesystem::path& path) {
-    auto bytes = bz::file::ReadFileBytes(path);
+    auto bytes = karma::file::ReadFileBytes(path);
     if (bytes.empty()) {
         spdlog::error("Graphics(Bgfx): failed to read shader '{}'", path.string());
         return BGFX_INVALID_HANDLE;
@@ -91,7 +92,7 @@ bgfx::ShaderHandle loadShader(const std::filesystem::path& path) {
 }
 
 std::filesystem::path getBgfxShaderDir(std::string_view subdir = {}) {
-    std::filesystem::path base = bz::data::Resolve("bgfx/shaders/bin");
+    std::filesystem::path base = karma::data::Resolve("bgfx/shaders/bin");
     base /= "vk";
     if (!subdir.empty()) {
         base /= subdir;
@@ -148,9 +149,9 @@ bool isShotModelPath(const std::filesystem::path& path) {
 }
 
 std::string getThemeName() {
-    const char* env = std::getenv("BZ3_BGFX_THEME");
+    const char* env = std::getenv("KARMA_BGFX_THEME");
     if (!env || !*env) {
-        return bz::config::ReadStringConfig("graphics.theme", "classic");
+        return karma::config::ReadRequiredStringConfig("graphics.theme");
     }
     return std::string(env);
 }
@@ -206,15 +207,15 @@ std::string themePathFor(const std::string& theme, const std::string& slot) {
 }
 
 std::filesystem::path skyboxPathFor(const std::string& name, const std::string& face) {
-    return bz::data::Resolve("common/textures/skybox/" + name + "_" + face + ".png");
+    return karma::data::Resolve("common/textures/skybox/" + name + "_" + face + ".png");
 }
 
-glm::vec3 readVec3Config(const char* path, const glm::vec3& fallback) {
-    const auto* value = bz::config::ConfigStore::Get(path);
+glm::vec3 readVec3ConfigRequired(const char* path) {
+    const auto* value = karma::config::ConfigStore::Get(path);
     if (!value || !value->is_array() || value->size() < 3) {
-        return fallback;
+        throw std::runtime_error(std::string("Missing required vec3 config: ") + path);
     }
-    glm::vec3 out = fallback;
+    glm::vec3 out(0.0f);
     for (size_t i = 0; i < 3; ++i) {
         const auto& v = (*value)[i];
         if (v.is_number_float()) {
@@ -223,6 +224,8 @@ glm::vec3 readVec3Config(const char* path, const glm::vec3& fallback) {
             out[static_cast<int>(i)] = static_cast<float>(v.get<int64_t>());
         } else if (v.is_number_unsigned()) {
             out[static_cast<int>(i)] = static_cast<float>(v.get<uint64_t>());
+        } else {
+            throw std::runtime_error(std::string("Invalid vec3 config type at: ") + path);
         }
     }
     return out;
@@ -247,7 +250,7 @@ void SetBgfxRendererPreference(BgfxRendererPreference preference) {
 
 BgfxBackend::BgfxBackend(platform::Window& windowIn)
     : window(&windowIn) {
-    spdlog::info("Graphics(Bgfx): ctor begin");
+    spdlog::trace("Graphics(Bgfx): ctor begin");
     if (window) {
         window->getFramebufferSize(framebufferWidth, framebufferHeight);
         if (framebufferWidth <= 0) {
@@ -259,17 +262,17 @@ BgfxBackend::BgfxBackend(platform::Window& windowIn)
     }
 
     themeName = getThemeName();
-    spdlog::info("Graphics(Bgfx): theme = '{}'", themeName);
+    spdlog::trace("Graphics(Bgfx): theme = '{}'", themeName);
 
     const auto nativeInfo = getNativeWindowInfo(window);
     bgfx::PlatformData pd{};
     pd.ndt = nativeInfo.ndt;
     pd.nwh = nativeInfo.nwh;
     pd.context = nativeInfo.context;
-#if defined(BZ3_WINDOW_BACKEND_SDL3)
+#if defined(KARMA_WINDOW_BACKEND_SDL3)
     pd.type = nativeInfo.handleType;
 #endif
-    spdlog::info("Graphics(Bgfx): platform nwh={} ndt={} ctx={}", pd.nwh, pd.ndt, pd.context);
+    spdlog::trace("Graphics(Bgfx): platform nwh={} ndt={} ctx={}", pd.nwh, pd.ndt, pd.context);
 
     if (!pd.ndt || !pd.nwh) {
         spdlog::error("Graphics(Bgfx): missing native display/window handle (ndt={}, nwh={})", pd.ndt, pd.nwh);
@@ -286,7 +289,7 @@ BgfxBackend::BgfxBackend(platform::Window& windowIn)
             init.type = bgfx::RendererType::Vulkan;
             break;
     }
-    spdlog::info("Graphics(Bgfx): requested renderer {}", static_cast<int>(init.type));
+    spdlog::trace("Graphics(Bgfx): requested renderer {}", static_cast<int>(init.type));
     init.vendorId = BGFX_PCI_ID_NONE;
     init.platformData = pd;
     init.resolution.width = static_cast<uint32_t>(framebufferWidth);
@@ -294,17 +297,17 @@ BgfxBackend::BgfxBackend(platform::Window& windowIn)
     init.resolution.reset = BGFX_RESET_VSYNC;
     initialized = bgfx::init(init);
 
-    spdlog::info("Graphics(Bgfx): init result={} size={}x{}", initialized, framebufferWidth, framebufferHeight);
+    spdlog::trace("Graphics(Bgfx): init result={} size={}x{}", initialized, framebufferWidth, framebufferHeight);
     if (initialized) {
         bgfx::setViewClear(0, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, 0x0d1620ff, 1.0f, 0);
         bgfx::setViewRect(0, 0, 0, static_cast<uint16_t>(framebufferWidth), static_cast<uint16_t>(framebufferHeight));
         bgfx::setViewTransform(0, nullptr, nullptr);
         buildTestResources();
         buildSkyboxResources();
-#if defined(BZ3_UI_BACKEND_IMGUI)
+#if defined(KARMA_UI_BACKEND_IMGUI)
         uiBridge_ = std::make_unique<BgfxRenderer>();
 #endif
-        spdlog::info("Graphics(Bgfx): init ok renderer={} testReady={}",
+        spdlog::trace("Graphics(Bgfx): init ok renderer={} testReady={}",
                      static_cast<int>(bgfx::getRendererType()),
                      testReady);
     }
@@ -475,7 +478,7 @@ void BgfxBackend::setEntityModel(graphics::EntityId entity,
         return;
     }
 
-    const auto resolved = bz::data::Resolve(modelPath);
+    const auto resolved = karma::data::Resolve(modelPath);
     MeshLoader::LoadOptions options;
     options.loadTextures = true;
     auto loaded = MeshLoader::loadGLB(resolved.string(), options);
@@ -495,12 +498,12 @@ void BgfxBackend::setEntityModel(graphics::EntityId entity,
         if (themeIt != textureCache.end()) {
             return themeIt->second;
         }
-        const std::filesystem::path themePath = bz::data::Resolve(themePathFor(themeName, slot));
+        const std::filesystem::path themePath = karma::data::Resolve(themePathFor(themeName, slot));
         if (std::filesystem::exists(themePath)) {
             bgfx::TextureHandle handle = loadTextureFromFile(themePath);
             if (bgfx::isValid(handle)) {
                 textureCache.emplace(themeKey, handle);
-                spdlog::info("Graphics(Bgfx): loaded theme texture '{}' -> {}", themeKey, themePath.string());
+                spdlog::trace("Graphics(Bgfx): loaded theme texture '{}' -> {}", themeKey, themePath.string());
                 return handle;
             }
             spdlog::warn("Graphics(Bgfx): failed to load theme texture '{}'", themePath.string());
@@ -544,7 +547,7 @@ void BgfxBackend::setEntityModel(graphics::EntityId entity,
                     const bool isEmbeddedBuildingTop = submesh.albedo->key.find("embedded:2") != std::string::npos;
                     const bool isGrass = isEmbeddedGrass || isLikelyGrass(*submesh.albedo);
                     slot = isGrass ? "grass" : (isEmbeddedBuildingTop ? "building-top" : "building");
-                    spdlog::info("Graphics(Bgfx): submesh tex='{}' grass={} theme='{}' slot='{}'",
+                    spdlog::trace("Graphics(Bgfx): submesh tex='{}' grass={} theme='{}' slot='{}'",
                                  submesh.albedo->key, isGrass, themeName, slot);
                 }
                 if (!slot.empty()) {
@@ -846,15 +849,16 @@ void BgfxBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId 
         bgfx::setViewTransform(viewId, glm::value_ptr(view), glm::value_ptr(proj));
     }
 
-    const uint64_t revision = bz::config::ConfigStore::Revision();
+    const uint64_t revision = karma::config::ConfigStore::Revision();
     if (revision != configRevision) {
         configRevision = revision;
         const glm::vec3 defaultSunDir = glm::normalize(glm::vec3(-0.4f, -1.0f, -0.2f));
-        cachedSunDirection = glm::normalize(readVec3Config("graphics.lighting.SunDirection", defaultSunDir));
-        cachedAmbientColor = readVec3Config("graphics.lighting.AmbientColor", glm::vec3(0.2f));
-        cachedSunColor = readVec3Config("graphics.lighting.SunColor", glm::vec3(1.0f));
+        cachedSunDirection = glm::normalize(readVec3ConfigRequired("graphics.lighting.SunDirection"));
+        cachedAmbientColor = readVec3ConfigRequired("graphics.lighting.AmbientColor");
+        cachedSunColor = readVec3ConfigRequired("graphics.lighting.SunColor");
     }
 
+    // Treat only the radar layer as "radar pass" even when rendering to offscreen targets.
     const bool radarPass = (target != graphics::kDefaultRenderTarget && layer != 0);
     auto renderEntity = [&](const EntityRecord& entity) {
         if (entity.layer != layer || !entity.visible) {
@@ -1357,14 +1361,14 @@ void BgfxBackend::buildSkyboxResources() {
         return;
     }
 
-    const std::string mode = bz::config::ReadStringConfig("graphics.skybox.Mode", "none");
-    spdlog::info("Graphics(Bgfx): skybox mode='{}'", mode);
+    const std::string mode = karma::config::ReadRequiredStringConfig("graphics.skybox.Mode");
+    spdlog::trace("Graphics(Bgfx): skybox mode='{}'", mode);
     if (mode != "cubemap") {
         return;
     }
 
-    const std::string name = bz::config::ReadStringConfig("graphics.skybox.Cubemap.Name", "classic");
-    spdlog::info("Graphics(Bgfx): skybox cubemap='{}'", name);
+    const std::string name = karma::config::ReadRequiredStringConfig("graphics.skybox.Cubemap.Name");
+    spdlog::trace("Graphics(Bgfx): skybox cubemap='{}'", name);
     const std::array<std::string, 6> faces = {"right", "left", "up", "down", "front", "back"};
     std::array<std::vector<uint8_t>, 6> facePixels{};
     int faceWidth = 0;
@@ -1372,7 +1376,7 @@ void BgfxBackend::buildSkyboxResources() {
 
     for (size_t i = 0; i < faces.size(); ++i) {
         const std::filesystem::path facePath = skyboxPathFor(name, faces[i]);
-        spdlog::info("Graphics(Bgfx): loading skybox face '{}'", facePath.string());
+        spdlog::trace("Graphics(Bgfx): loading skybox face '{}'", facePath.string());
         int width = 0;
         int height = 0;
         int channels = 0;
@@ -1402,7 +1406,7 @@ void BgfxBackend::buildSkyboxResources() {
         spdlog::warn("Graphics(Bgfx): failed to create skybox cubemap");
         return;
     }
-    spdlog::info("Graphics(Bgfx): skybox cubemap created {}x{}", faceWidth, faceHeight);
+    spdlog::trace("Graphics(Bgfx): skybox cubemap created {}x{}", faceWidth, faceHeight);
 
     const std::filesystem::path shaderDir = getBgfxShaderDir("skybox");
     const std::filesystem::path vsPath = shaderDir / "vs_skybox.bin";
@@ -1457,18 +1461,18 @@ void BgfxBackend::buildSkyboxResources() {
 
     skyboxVertexBuffer = bgfx::createVertexBuffer(bgfx::copy(cubeVerts, sizeof(cubeVerts)), skyboxLayout);
     skyboxReady = bgfx::isValid(skyboxVertexBuffer) && bgfx::isValid(skyboxProgram);
-    spdlog::info("Graphics(Bgfx): skybox ready={}", skyboxReady);
+    spdlog::trace("Graphics(Bgfx): skybox ready={}", skyboxReady);
 }
 
 void BgfxBackend::ensureUiOverlayResources() {
     if (!initialized || bgfx::isValid(uiOverlayProgram)) {
         return;
     }
-    const std::filesystem::path shaderDir = bz::data::Resolve("bgfx/shaders/bin/vk/imgui");
+    const std::filesystem::path shaderDir = karma::data::Resolve("bgfx/shaders/bin/vk/imgui");
     const auto vsPath = shaderDir / "vs_imgui.bin";
     const auto fsPath = shaderDir / "fs_imgui.bin";
-    auto vsBytes = bz::file::ReadFileBytes(vsPath);
-    auto fsBytes = bz::file::ReadFileBytes(fsPath);
+    auto vsBytes = karma::file::ReadFileBytes(vsPath);
+    auto fsBytes = karma::file::ReadFileBytes(fsPath);
     if (vsBytes.empty() || fsBytes.empty()) {
         spdlog::error("Graphics(Bgfx): missing UI overlay shaders '{}', '{}'", vsPath.string(), fsPath.string());
         return;
@@ -1499,8 +1503,8 @@ void BgfxBackend::ensureBrightnessResources() {
     const std::filesystem::path shaderDir = getBgfxShaderDir("brightness");
     const auto vsPath = shaderDir / "vs_brightness.bin";
     const auto fsPath = shaderDir / "fs_brightness.bin";
-    auto vsBytes = bz::file::ReadFileBytes(vsPath);
-    auto fsBytes = bz::file::ReadFileBytes(fsPath);
+    auto vsBytes = karma::file::ReadFileBytes(vsPath);
+    auto fsBytes = karma::file::ReadFileBytes(fsPath);
     if (vsBytes.empty() || fsBytes.empty()) {
         spdlog::error("Graphics(Bgfx): missing brightness shaders '{}', '{}'", vsPath.string(), fsPath.string());
         return;

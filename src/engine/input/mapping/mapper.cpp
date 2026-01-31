@@ -21,7 +21,7 @@ bool MatchesMouse(const std::vector<Binding>& bindings, platform::MouseButton bu
 
 } // namespace
 
-void InputMapper::loadBindings(const bz::json::Value* keybindings, const InputMap::DefaultBindingsMap& defaults) {
+void InputMapper::loadBindings(const karma::json::Value* keybindings, const InputMap::DefaultBindingsMap& defaults) {
     map_.load(keybindings, defaults);
 }
 

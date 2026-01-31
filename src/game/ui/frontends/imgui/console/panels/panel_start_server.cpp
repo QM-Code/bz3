@@ -10,12 +10,12 @@
 #include <vector>
 
 #include <imgui.h>
-#include "common/json.hpp"
+#include "karma/common/json.hpp"
 #include <spdlog/spdlog.h>
 #include <optional>
 
-#include "common/data_path_resolver.hpp"
-#include "common/i18n.hpp"
+#include "karma/common/data_path_resolver.hpp"
+#include "karma/common/i18n.hpp"
 #include "ui/config/config.hpp"
 
 #if !defined(_WIN32)
@@ -149,7 +149,7 @@ std::string ConsoleView::findServerBinary() {
     serverBinaryChecked = true;
 
     std::error_code ec;
-    const auto dataRoot = bz::data::DataRoot();
+    const auto dataRoot = karma::data::DataRoot();
     const auto root = dataRoot.parent_path();
 
     auto isExecutable = [](const std::filesystem::path &path) {
@@ -243,7 +243,7 @@ bool ConsoleView::startLocalServer(uint16_t port,
         server->communityUrl = communityUrl;
         server->communityLabel = communityLabel;
     }
-    server->dataDir = bz::data::DataRoot().string();
+    server->dataDir = karma::data::DataRoot().string();
 
     if (!launchLocalServer(*server, error)) {
         return false;
@@ -309,7 +309,7 @@ bool ConsoleView::launchLocalServer(LocalServerProcess &server, std::string &err
 
     server.configPath.clear();
     if (!server.advertiseHost.empty()) {
-        const auto configDir = bz::data::UserConfigDirectory() / "server" / "instances";
+        const auto configDir = karma::data::UserConfigDirectory() / "server" / "instances";
         std::error_code dirEc;
         std::filesystem::create_directories(configDir, dirEc);
         if (dirEc) {
@@ -321,7 +321,7 @@ bool ConsoleView::launchLocalServer(LocalServerProcess &server, std::string &err
         name << "local_server_" << server.port << "_" << server.id << ".json";
         const auto configFile = configDir / name.str();
 
-        bz::json::Value configJson;
+        karma::json::Value configJson;
         configJson["network"]["ServerAdvertiseHost"] = server.advertiseHost;
         std::ofstream out(configFile);
         if (!out) {
@@ -440,7 +440,7 @@ bool ConsoleView::launchLocalServer(LocalServerProcess &server, std::string &err
 }
 
 void ConsoleView::drawStartServerPanel(const MessageColors &colors) {
-    auto &i18n = bz::i18n::Get();
+    auto &i18n = karma::i18n::Get();
     const bool hasHeadingFont = (headingFont != nullptr);
     if (hasHeadingFont) {
         ImGui::PushFont(headingFont);
@@ -593,8 +593,8 @@ void ConsoleView::drawStartServerPanel(const MessageColors &colors) {
                 }
             };
 
-            addDirectoryEntries(bz::data::EnsureUserWorldsDirectory());
-            addDirectoryEntries(bz::data::Resolve("server/worlds"));
+            addDirectoryEntries(karma::data::EnsureUserWorldsDirectory());
+            addDirectoryEntries(karma::data::Resolve("server/worlds"));
 
             ImGui::EndPopup();
         }

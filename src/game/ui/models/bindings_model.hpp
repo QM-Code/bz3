@@ -13,7 +13,7 @@ struct BindingsModel {
         Controller
     };
 
-    static constexpr std::size_t kKeybindingCount = 11;
+    static constexpr std::size_t kKeybindingCount = 21;
 
     std::array<std::array<char, 128>, kKeybindingCount> keyboard{};
     std::array<std::array<char, 128>, kKeybindingCount> mouse{};

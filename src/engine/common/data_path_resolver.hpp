@@ -10,7 +10,7 @@
 #include "common/json.hpp"
 #include <spdlog/spdlog.h>
 
-namespace bz::data {
+namespace karma::data {
 
 // Resolve paths located under the runtime data directory.
 std::filesystem::path Resolve(const std::filesystem::path &relativePath);
@@ -18,7 +18,7 @@ std::filesystem::path Resolve(const std::filesystem::path &relativePath);
 // Overrides the detected data directory. Must be called before the first Resolve/DataRoot invocation.
 void SetDataRootOverride(const std::filesystem::path &path);
 
-std::optional<bz::json::Value> LoadJsonFile(const std::filesystem::path &path,
+std::optional<karma::json::Value> LoadJsonFile(const std::filesystem::path &path,
 										   const std::string &label,
 										   spdlog::level::level_enum missingLevel);
 
@@ -35,16 +35,16 @@ struct ConfigLayerSpec {
 };
 
 struct ConfigLayer {
-	bz::json::Value json;
+	karma::json::Value json;
 	std::filesystem::path baseDir;
 	std::string label;
 };
 
 std::vector<ConfigLayer> LoadConfigLayers(const std::vector<ConfigLayerSpec> &specs);
 
-void MergeJsonObjects(bz::json::Value &destination, const bz::json::Value &source);
+void MergeJsonObjects(karma::json::Value &destination, const karma::json::Value &source);
 
-void CollectAssetEntries(const bz::json::Value &node,
+void CollectAssetEntries(const karma::json::Value &node,
 						 const std::filesystem::path &baseDir,
 						 std::map<std::string, std::filesystem::path> &assetMap,
 						 const std::string &prefix = "");
@@ -69,4 +69,4 @@ std::filesystem::path ResolveConfiguredAsset(const std::string &assetKey,
 // Returns the detected runtime data directory.
 const std::filesystem::path &DataRoot();
 
-} // namespace bz::data
+} // namespace karma::data

@@ -3,7 +3,7 @@
 #include "platform/window.hpp"
 #include "common/config_store.hpp"
 
-#include <optional>
+#include <stdexcept>
 #include <spdlog/spdlog.h>
 
 Input::Input(platform::Window &window, input::InputMap::DefaultBindingsMap defaultBindings) {
@@ -13,18 +13,11 @@ Input::Input(platform::Window &window, input::InputMap::DefaultBindingsMap defau
 }
 
 void Input::loadKeyBindings() {
-    std::optional<bz::json::Value> keybindingsConfig;
-
-    if (auto keybindingsOpt = bz::config::ConfigStore::GetCopy("keybindings")) {
-        if (keybindingsOpt->is_object()) {
-            keybindingsConfig = std::move(keybindingsOpt);
-        } else {
-            spdlog::warn("Input: 'keybindings' exists but is not a JSON object; falling back to defaults");
-        }
+    auto keybindingsOpt = karma::config::ConfigStore::GetCopy("keybindings");
+    if (!keybindingsOpt || !keybindingsOpt->is_object()) {
+        throw std::runtime_error("Input: required config 'keybindings' is missing or not a JSON object");
     }
-
-    const bz::json::Value *keybindingsJson = keybindingsConfig ? &(*keybindingsConfig) : nullptr;
-    mapper_.loadBindings(keybindingsJson, defaultBindings_);
+    mapper_.loadBindings(&(*keybindingsOpt), defaultBindings_);
 }
 
 void Input::update(const std::vector<platform::Event> &events) {

@@ -1,12 +1,12 @@
 #pragma once
 
 #include "game/net/backend.hpp"
-#include "engine/network/transport.hpp"
+#include "karma/network/transport.hpp"
 
 #include <optional>
 #include <vector>
 
-namespace network_backend {
+namespace game::net {
 
 class EnetClientBackend final : public ClientBackend {
 public:
@@ -28,10 +28,10 @@ public:
 private:
     void logUnsupportedMessageType();
 
-    std::unique_ptr<net::IClientTransport> transport_;
+    std::unique_ptr<::net::IClientTransport> transport_;
     std::optional<DisconnectEvent> pendingDisconnect_;
     std::optional<ServerEndpointInfo> serverEndpoint_;
     std::vector<ClientMsgData> receivedMessages_;
 };
 
-} // namespace network_backend
+} // namespace game::net

@@ -1,5 +1,6 @@
 #include "spdlog/spdlog.h"
-#include "engine/server_engine.hpp"
+#include "karma/app/engine_app.hpp"
+#include "game/engine/server_engine.hpp"
 #include "server/game.hpp"
 #include "plugin.hpp"
 #include "server/server_discovery.hpp"
@@ -7,11 +8,11 @@
 #include "server/server_cli_options.hpp"
 #include "server/community_heartbeat.hpp"
 #include "game/common/data_path_spec.hpp"
-#include "common/data_dir_override.hpp"
-#include "common/data_path_resolver.hpp"
-#include "common/config_helpers.hpp"
-#include "common/config_store.hpp"
-#include "common/json.hpp"
+#include "karma/common/data_dir_override.hpp"
+#include "karma/common/data_path_resolver.hpp"
+#include "karma/common/config_helpers.hpp"
+#include "karma/common/config_store.hpp"
+#include "karma/common/json.hpp"
 #include <pybind11/embed.h>
 #include <csignal>
 #include <atomic>
@@ -58,10 +59,10 @@ void ConfigureLogging(spdlog::level::level_enum level, bool includeTimestamp) {
     spdlog::set_level(level);
 }
 
-Game *g_game = nullptr;
-ServerEngine *g_engine = nullptr;
 std::atomic<bool> g_running{true};
 namespace py = pybind11;
+Game* g_game = nullptr;
+ServerEngine* g_engine = nullptr;
 
 /**
  * Signal handler for graceful shutdown.
@@ -74,6 +75,55 @@ void signalHandler(int signum) {
     g_running = false;
 }
 
+class ServerLoopAdapter final : public karma::app::GameInterface {
+public:
+    ServerLoopAdapter(ServerEngine &engine,
+                      Game &game,
+                      CommunityHeartbeat &heartbeat)
+        : engine_(engine),
+          game_(game),
+          heartbeat_(heartbeat) {}
+
+    bool onInit(karma::app::EngineContext &) override { return true; }
+
+    void onShutdown(karma::app::EngineContext &) override {}
+
+    void onUpdate(karma::app::EngineContext &, float dt) override {
+        if (dt < MIN_FRAME_HZ) {
+            TimeUtils::sleep(MIN_FRAME_HZ - dt);
+            return;
+        }
+
+        if (poll(&pfd_, 1, 0) > 0 && (pfd_.revents & POLLIN)) {
+            std::string line;
+            if (std::getline(std::cin, line)) {
+                if (!line.empty()) {
+                    std::string response = processTerminalInput(line);
+                    if (!response.empty()) {
+                        std::cout << response << std::endl;
+                    }
+                }
+                std::cout << "> " << std::flush;
+            }
+        }
+
+        engine_.earlyUpdate(dt);
+        game_.update(dt);
+        engine_.lateUpdate(dt);
+        heartbeat_.update(game_);
+    }
+
+    void onRender(karma::app::EngineContext &) override {}
+
+    bool shouldQuit() const override { return !g_running.load(); }
+
+private:
+    ServerEngine &engine_;
+    Game &game_;
+    CommunityHeartbeat &heartbeat_;
+    struct pollfd pfd_ = { STDIN_FILENO, POLLIN, 0 };
+};
+
 int main(int argc, char *argv[]) {
     ConfigureLogging(spdlog::level::info, false);
 
@@ -83,13 +133,13 @@ int main(int argc, char *argv[]) {
     signal(SIGINT, signalHandler);
     signal(SIGTERM, signalHandler);
 
-    const auto dataDirResult = bz::data::ApplyDataDirOverrideFromArgs(argc, argv, std::filesystem::path("server/config.json"));
+    const auto dataDirResult = karma::data::ApplyDataDirOverrideFromArgs(argc, argv, std::filesystem::path("server/config.json"));
 
-    const std::vector<bz::config::ConfigFileSpec> baseConfigSpecs = {
+    const std::vector<karma::config::ConfigFileSpec> baseConfigSpecs = {
         {"common/config.json", "data/common/config.json", spdlog::level::err, true, true},
         {"server/config.json", "data/server/config.json", spdlog::level::err, true, true}
     };
-    bz::config::ConfigStore::Initialize(baseConfigSpecs, dataDirResult.userConfigPath);
+    karma::config::ConfigStore::Initialize(baseConfigSpecs, dataDirResult.userConfigPath);
 
     ServerCLIOptions cliOptions;
     try {
@@ -101,7 +151,9 @@ int main(int argc, char *argv[]) {
 
     const spdlog::level::level_enum logLevel = cliOptions.logLevelExplicit
         ? ParseLogLevel(cliOptions.logLevel)
-        : (cliOptions.verbose ? spdlog::level::trace : spdlog::level::info);
+        : (cliOptions.verbose >= 2 ? spdlog::level::trace
+           : cliOptions.verbose == 1 ? spdlog::level::debug
+           : spdlog::level::info);
     ConfigureLogging(logLevel, cliOptions.timestampLogging);
 
     if (!cliOptions.worldSpecified) {
@@ -109,7 +161,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    std::filesystem::path worldDirPath = bz::data::Resolve(cliOptions.worldDir);
+    std::filesystem::path worldDirPath = karma::data::Resolve(cliOptions.worldDir);
 
     if (!std::filesystem::is_directory(worldDirPath)) {
         spdlog::error("World directory not found: {}", worldDirPath.string());
@@ -117,19 +169,19 @@ int main(int argc, char *argv[]) {
     }
     const std::filesystem::path configPath = worldDirPath / "config.json";
 
-    if (auto worldConfigOpt = bz::data::LoadJsonFile(configPath, "world config", spdlog::level::err)) {
+    if (auto worldConfigOpt = karma::data::LoadJsonFile(configPath, "world config", spdlog::level::err)) {
         if (worldConfigOpt->is_object()) {
-            bz::config::ConfigStore::AddRuntimeLayer("world config", *worldConfigOpt, configPath.parent_path());
+            karma::config::ConfigStore::AddRuntimeLayer("world config", *worldConfigOpt, configPath.parent_path());
         }
     }
 
-    const auto *worldConfigPtr = bz::config::ConfigStore::LayerByLabel("world config");
+    const auto *worldConfigPtr = karma::config::ConfigStore::LayerByLabel("world config");
     if (!worldConfigPtr || !worldConfigPtr->is_object()) {
         spdlog::error("main: Failed to load world config object from {}", configPath.string());
         return 1;
     }
 
-    const auto &mergedConfig = bz::config::ConfigStore::Merged();
+    const auto &mergedConfig = karma::config::ConfigStore::Merged();
     if (!mergedConfig.is_object()) {
         spdlog::error("main: Merged configuration is not a JSON object");
         return 1;
@@ -137,22 +189,22 @@ int main(int argc, char *argv[]) {
 
     uint16_t port = cliOptions.hostPort;
     if (!cliOptions.hostPortExplicit) {
-        port = bz::config::ReadUInt16Config({"network.ServerPort"}, port);
+        port = karma::config::ReadUInt16Config({"network.ServerPort"}, port);
     } else {
         port = cliOptions.hostPort;
     }
 
-    std::string serverName = bz::config::ReadStringConfig("serverName", "BZ Server");
-    std::string worldName = bz::config::ReadStringConfig("worldName", worldDirPath.filename().string());
+    std::string serverName = karma::config::ReadStringConfig("serverName", "BZ Server");
+    std::string worldName = karma::config::ReadStringConfig("worldName", worldDirPath.filename().string());
     ServerEngine engine(port);
-    g_engine = &engine;
     spdlog::trace("ServerEngine initialized successfully");
 
     const bool shouldZipWorld = cliOptions.customWorldProvided;
 
     Game game(engine, serverName, worldName, *worldConfigPtr, worldDirPath.string(), shouldZipWorld);
-    g_game = &game;
     spdlog::trace("Game initialized successfully");
+    g_engine = &engine;
+    g_game = &game;
 
     ServerDiscoveryBeacon discoveryBeacon(port, serverName, worldName);
 
@@ -169,7 +221,7 @@ int main(int argc, char *argv[]) {
         py::module_ sys = py::module_::import("sys");
 
         fs::path pycachePrefix;
-        if (const char *envPrefix = std::getenv("BZ3_PY_CACHE_DIR")) {
+        if (const char *envPrefix = std::getenv("KARMA_PY_CACHE_DIR")) {
             pycachePrefix = fs::path(envPrefix);
         } else {
             pycachePrefix = fs::temp_directory_path() / "bz3-pycache";
@@ -188,46 +240,14 @@ int main(int argc, char *argv[]) {
     PluginAPI::loadPythonPlugins(mergedConfig);
     spdlog::trace("Plugins loaded successfully");
 
-    TimeUtils::time lastFrameTime = TimeUtils::GetCurrentTime();
     spdlog::trace("Starting main loop");
-
-    std::string inputBuffer;
-    struct pollfd pfd = { STDIN_FILENO, POLLIN, 0 };
     std::cout << "> " << std::flush;
 
-    while (g_running) {
-        TimeUtils::time currTime = TimeUtils::GetCurrentTime();  
-        TimeUtils::duration deltaTime = TimeUtils::GetElapsedTime(lastFrameTime, currTime);
-        
-        if (deltaTime < MIN_FRAME_HZ) {
-            TimeUtils::sleep(MIN_FRAME_HZ - deltaTime);
-            continue;
-        }
-
-        lastFrameTime = currTime;
-
-        // Non-blocking check for stdin input
-        if (poll(&pfd, 1, 0) > 0 && (pfd.revents & POLLIN)) {
-            std::string line;
-            if (std::getline(std::cin, line)) {
-                if (!line.empty()) {
-                    std::string response = processTerminalInput(line);
-
-                    if (!response.empty()) {
-                        std::cout << response << std::endl;
-                    }
-                }
-                std::cout << "> " << std::flush;
-            }
-        }
-
-        engine.earlyUpdate(deltaTime);
-        game.update(deltaTime);
-        engine.lateUpdate(deltaTime);
-
-        communityHeartbeat.update(game);
-    }
-
+    ServerLoopAdapter adapter(engine, game, communityHeartbeat);
+    karma::app::EngineApp app;
+    app.context().physics = engine.physics;
+    app.setGame(&adapter);
+    const int result = app.run();
     spdlog::info("Server shutdown complete");
-    return 0;
+    return result;
 }

@@ -51,5 +51,8 @@
     "network": {
         "ConnectTimeoutMs": 2000,
         "ServerPort": 11899
+    },
+    "platform": {
+        "WindowTitle": "BZ3 - BZflag Revisited"
     }
 }

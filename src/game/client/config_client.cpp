@@ -1,17 +1,17 @@
 #include "client/config_client.hpp"
 #include <filesystem>
 #include <fstream>
-#include "common/json.hpp"
+#include "karma/common/json.hpp"
 #include "spdlog/spdlog.h"
-#include "common/data_path_resolver.hpp"
-#include "common/config_store.hpp"
+#include "karma/common/data_path_resolver.hpp"
+#include "karma/common/config_store.hpp"
 
 namespace {
 
-ClientConfig ParseClientConfig(const bz::json::Value &root) {
+ClientConfig ParseClientConfig(const karma::json::Value &root) {
     ClientConfig config;
 
-    auto parsePositiveInt = [](const bz::json::Value &object, const char *key) {
+    auto parsePositiveInt = [](const karma::json::Value &object, const char *key) {
         int value = 0;
         auto it = object.find(key);
         if (it == object.end()) {
@@ -57,7 +57,7 @@ ClientConfig ParseClientConfig(const bz::json::Value &root) {
                 config.defaultServerList = defaultIt->get<std::string>();
             }
 
-            auto parseCommunities = [&](const bz::json::Value &array) {
+            auto parseCommunities = [&](const karma::json::Value &array) {
                 for (const auto &entry : array) {
                     if (!entry.is_object()) {
                         continue;
@@ -121,21 +121,21 @@ ClientConfig ParseClientConfig(const bz::json::Value &root) {
 
 ClientConfig LoadClientConfigFromFiles(const std::filesystem::path &defaultConfigPath,
                                        const std::filesystem::path &userConfigPath) {
-    bz::json::Value merged = bz::json::Object();
+    karma::json::Value merged = karma::json::Object();
 
-    if (auto defaults = bz::data::LoadJsonFile(defaultConfigPath, "client defaults", spdlog::level::warn)) {
+    if (auto defaults = karma::data::LoadJsonFile(defaultConfigPath, "client defaults", spdlog::level::warn)) {
         if (!defaults->is_object()) {
             spdlog::warn("ClientConfig::Load: {} is not a JSON object", defaultConfigPath.string());
         } else {
-            bz::data::MergeJsonObjects(merged, *defaults);
+            karma::data::MergeJsonObjects(merged, *defaults);
         }
     }
 
-    if (auto user = bz::data::LoadJsonFile(userConfigPath, "user config", spdlog::level::debug)) {
+    if (auto user = karma::data::LoadJsonFile(userConfigPath, "user config", spdlog::level::debug)) {
         if (!user->is_object()) {
             spdlog::warn("ClientConfig::Load: User config at {} is not a JSON object", userConfigPath.string());
         } else {
-            bz::data::MergeJsonObjects(merged, *user);
+            karma::data::MergeJsonObjects(merged, *user);
         }
     }
 
@@ -145,22 +145,22 @@ ClientConfig LoadClientConfigFromFiles(const std::filesystem::path &defaultConfi
 } // namespace
 
 ClientConfig ClientConfig::Load(const std::string &path) {
-    const auto userConfigPath = bz::config::ConfigStore::Initialized()
-        ? bz::config::ConfigStore::UserConfigPath()
-        : bz::data::EnsureUserConfigFile("config.json");
+    const auto userConfigPath = karma::config::ConfigStore::Initialized()
+        ? karma::config::ConfigStore::UserConfigPath()
+        : karma::data::EnsureUserConfigFile("config.json");
 
     if (!path.empty()) {
         const std::filesystem::path defaultConfigPath(path);
         return LoadClientConfigFromFiles(defaultConfigPath, userConfigPath);
     }
 
-    if (!bz::config::ConfigStore::Initialized()) {
+    if (!karma::config::ConfigStore::Initialized()) {
         spdlog::debug("ClientConfig::Load: Config cache uninitialized; falling back to direct file load");
-        const auto defaultConfigPath = bz::data::Resolve("client/config.json");
+        const auto defaultConfigPath = karma::data::Resolve("client/config.json");
         return LoadClientConfigFromFiles(defaultConfigPath, userConfigPath);
     }
 
-    const auto &root = bz::config::ConfigStore::Merged();
+    const auto &root = karma::config::ConfigStore::Merged();
     if (!root.is_object()) {
         spdlog::warn("ClientConfig::Load: Configuration cache root is not a JSON object");
         return ClientConfig{};
@@ -172,7 +172,7 @@ ClientConfig ClientConfig::Load(const std::string &path) {
 bool ClientConfig::Save(const std::string &path) const {
     const std::filesystem::path filePath(path);
 
-    bz::json::Value userConfig = bz::json::Object();
+    karma::json::Value userConfig = karma::json::Object();
 
     {
         std::ifstream file(filePath);
@@ -181,11 +181,11 @@ bool ClientConfig::Save(const std::string &path) const {
                 file >> userConfig;
                 if (!userConfig.is_object()) {
                     spdlog::warn("ClientConfig::Save: Existing {} is not a JSON object; overwriting", path);
-                    userConfig = bz::json::Object();
+                    userConfig = karma::json::Object();
                 }
             } catch (const std::exception &ex) {
                 spdlog::warn("ClientConfig::Save: Failed to parse existing {}: {}", path, ex.what());
-                userConfig = bz::json::Object();
+                userConfig = karma::json::Object();
             }
         }
     }
@@ -196,7 +196,7 @@ bool ClientConfig::Save(const std::string &path) const {
         userConfig.erase("tankPath");
     }
 
-    bz::json::Value serverListsObject = bz::json::Object();
+    karma::json::Value serverListsObject = karma::json::Object();
     serverListsObject["showLAN"] = showLanServers;
     if (!defaultServerList.empty()) {
         serverListsObject["default"] = defaultServerList;
@@ -204,13 +204,13 @@ bool ClientConfig::Save(const std::string &path) const {
         serverListsObject.erase("default");
     }
 
-    bz::json::Value communitiesArray = bz::json::Array();
+    karma::json::Value communitiesArray = karma::json::Array();
     for (const auto &source : serverLists) {
         if (source.host.empty()) {
             continue;
         }
 
-        bz::json::Value entry;
+        karma::json::Value entry;
         entry["host"] = source.host;
         if (!source.name.empty()) {
             entry["name"] = source.name;

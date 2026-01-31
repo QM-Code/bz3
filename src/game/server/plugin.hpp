@@ -1,8 +1,8 @@
 #pragma once
-#include "core/types.hpp"
+#include "karma/core/types.hpp"
 #include "game/net/messages.hpp"
 #include "spdlog/spdlog.h"
-#include "common/json.hpp"
+#include "karma/common/json.hpp"
 #include <vector>
 #include <memory>
 #include <map>
@@ -108,7 +108,7 @@ namespace py = pybind11;
 
 namespace PluginAPI {
     void registerCallback(EventType type, pybind11::function func);
-    void loadPythonPlugins(const bz::json::Value &configJson);
+    void loadPythonPlugins(const karma::json::Value &configJson);
     const std::vector<std::string>& getLoadedPluginScripts();
     
     void sendChatMessage(client_id fromId, client_id toId, const std::string &text);

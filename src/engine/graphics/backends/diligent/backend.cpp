@@ -1,12 +1,12 @@
-#include "engine/graphics/backends/diligent/backend.hpp"
-#include "engine/graphics/backends/diligent/ui_bridge.hpp"
-#if defined(BZ3_UI_BACKEND_IMGUI)
-#include "ui/frontends/imgui/platform/renderer_diligent.hpp"
+#include "karma/graphics/backends/diligent/backend.hpp"
+#include "karma/graphics/backends/diligent/ui_bridge.hpp"
+#if defined(KARMA_UI_BACKEND_IMGUI)
+#include "karma/ui/platform/imgui/renderer_diligent.hpp"
 #endif
 
-#include "engine/common/data_path_resolver.hpp"
-#include "engine/common/config_helpers.hpp"
-#include "engine/geometry/mesh_loader.hpp"
+#include "karma/common/data_path_resolver.hpp"
+#include "karma/common/config_helpers.hpp"
+#include "karma/geometry/mesh_loader.hpp"
 #include "platform/window.hpp"
 
 #include <DiligentCore/Common/interface/BasicMath.hpp>
@@ -22,6 +22,7 @@
 #include <DiligentCore/Graphics/GraphicsEngineVulkan/interface/EngineFactoryVk.h>
 #include <DiligentCore/Graphics/GraphicsTools/interface/MapHelper.hpp>
 #include <DiligentCore/Platforms/interface/NativeWindow.h>
+#include <DiligentCore/Primitives/interface/DebugOutput.h>
 #include <spdlog/spdlog.h>
 #include <stb_image.h>
 
@@ -33,7 +34,7 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#if defined(BZ3_WINDOW_BACKEND_SDL3)
+#if defined(KARMA_WINDOW_BACKEND_SDL3)
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_properties.h>
 #include <SDL3/SDL_video.h>
@@ -63,6 +64,33 @@ struct Vertex {
     float v;
 };
 
+void DILIGENT_CALL_TYPE DiligentMessageCallback(Diligent::DEBUG_MESSAGE_SEVERITY severity,
+                                                const Diligent::Char* message,
+                                                const Diligent::Char* /*function*/,
+                                                const Diligent::Char* /*file*/,
+                                                int /*line*/) {
+    if (!message) {
+        return;
+    }
+    switch (severity) {
+        case Diligent::DEBUG_MESSAGE_SEVERITY_INFO:
+            spdlog::trace("Diligent: {}", message);
+            break;
+        case Diligent::DEBUG_MESSAGE_SEVERITY_WARNING:
+            spdlog::warn("Diligent: {}", message);
+            break;
+        case Diligent::DEBUG_MESSAGE_SEVERITY_ERROR:
+            spdlog::error("Diligent: {}", message);
+            break;
+        case Diligent::DEBUG_MESSAGE_SEVERITY_FATAL_ERROR:
+            spdlog::critical("Diligent: {}", message);
+            break;
+        default:
+            spdlog::debug("Diligent: {}", message);
+            break;
+    }
+}
+
 bool isWorldModelPath(const std::filesystem::path& path) {
     return path.filename() == "world.glb";
 }
@@ -72,7 +100,7 @@ bool isShotModelPath(const std::filesystem::path& path) {
 }
 
 std::string getThemeName() {
-    return bz::config::ReadStringConfig("graphics.theme", "classic");
+    return karma::config::ReadRequiredStringConfig("graphics.theme");
 }
 
 bool isLikelyGrass(const MeshLoader::TextureData& texture) {
@@ -106,11 +134,11 @@ bool isLikelyGrass(const MeshLoader::TextureData& texture) {
 }
 
 std::filesystem::path themePathFor(const std::string& theme, const std::string& slot) {
-    return bz::data::Resolve("common/textures/themes/" + theme + "_" + slot + ".png");
+    return karma::data::Resolve("common/textures/themes/" + theme + "_" + slot + ".png");
 }
 
 std::filesystem::path skyboxPathFor(const std::string& name, const std::string& face) {
-    return bz::data::Resolve("common/textures/skybox/" + name + "_" + face + ".png");
+    return karma::data::Resolve("common/textures/skybox/" + name + "_" + face + ".png");
 }
 
 std::string themeSlotForWorldSubmesh(const MeshLoader::MeshData& submesh) {
@@ -183,7 +211,7 @@ bool createCubemapRGBA8(Diligent::IRenderDevice* device,
     desc.Format = Diligent::TEX_FORMAT_RGBA8_UNORM;
     desc.BindFlags = Diligent::BIND_SHADER_RESOURCE;
     desc.Usage = Diligent::USAGE_IMMUTABLE;
-    desc.Name = "BZ3 Diligent Skybox";
+    desc.Name = "KARMA Diligent Skybox";
 
     std::array<Diligent::TextureSubResData, 6> subresources{};
     for (size_t i = 0; i < faces.size(); ++i) {
@@ -323,7 +351,7 @@ void DiligentBackend::setEntityModel(graphics::EntityId entity,
         return;
     }
 
-    const auto resolved = bz::data::Resolve(modelPath);
+    const auto resolved = karma::data::Resolve(modelPath);
     MeshLoader::LoadOptions options;
     options.loadTextures = true;
     auto loaded = MeshLoader::loadGLB(resolved.string(), options);
@@ -363,7 +391,7 @@ void DiligentBackend::setEntityModel(graphics::EntityId entity,
                     int c = 0;
                     stbi_uc* pixels = stbi_load(themePath.string().c_str(), &w, &h, &c, 4);
                     if (pixels && w > 0 && h > 0) {
-                        auto texture = createTextureRGBA8(device_, w, h, pixels, "BZ3 Diligent Theme");
+                        auto texture = createTextureRGBA8(device_, w, h, pixels, "KARMA Diligent Theme");
                         stbi_image_free(pixels);
                         if (texture) {
                             textureCache.emplace(key, texture);
@@ -387,7 +415,7 @@ void DiligentBackend::setEntityModel(graphics::EntityId entity,
                                                      submesh.albedo->width,
                                                      submesh.albedo->height,
                                                      submesh.albedo->pixels.data(),
-                                                     "BZ3 Diligent Albedo");
+                                                     "KARMA Diligent Albedo");
                     if (texture) {
                         textureCache.emplace(key, texture);
                         texIt = textureCache.find(key);
@@ -481,7 +509,7 @@ graphics::MeshId DiligentBackend::createMesh(const graphics::MeshData& mesh) {
     }
 
     Diligent::BufferDesc vbDesc;
-    vbDesc.Name = "BZ3 Diligent VB";
+    vbDesc.Name = "KARMA Diligent VB";
     vbDesc.Usage = Diligent::USAGE_IMMUTABLE;
     vbDesc.BindFlags = Diligent::BIND_VERTEX_BUFFER;
     vbDesc.Size = static_cast<Diligent::Uint32>(packed.size() * sizeof(Vertex));
@@ -491,7 +519,7 @@ graphics::MeshId DiligentBackend::createMesh(const graphics::MeshData& mesh) {
     device_->CreateBuffer(vbDesc, &vbData, &record.vertexBuffer);
 
     Diligent::BufferDesc ibDesc;
-    ibDesc.Name = "BZ3 Diligent IB";
+    ibDesc.Name = "KARMA Diligent IB";
     ibDesc.Usage = Diligent::USAGE_IMMUTABLE;
     ibDesc.BindFlags = Diligent::BIND_INDEX_BUFFER;
     ibDesc.Size = static_cast<Diligent::Uint32>(mesh.indices.size() * sizeof(uint32_t));
@@ -511,7 +539,7 @@ graphics::MeshId DiligentBackend::createMesh(const graphics::MeshData& mesh) {
         desc.Format = Diligent::TEX_FORMAT_RGBA8_UNORM;
         desc.BindFlags = Diligent::BIND_SHADER_RESOURCE;
         desc.Usage = Diligent::USAGE_IMMUTABLE;
-        desc.Name = "BZ3 Diligent White Texture";
+        desc.Name = "KARMA Diligent White Texture";
 
         Diligent::TextureData initData;
         Diligent::TextureSubResData sub{};
@@ -568,7 +596,7 @@ graphics::RenderTargetId DiligentBackend::createRenderTarget(const graphics::Ren
         colorDesc.MipLevels = 1;
         colorDesc.Format = Diligent::TEX_FORMAT_RGBA8_UNORM;
         colorDesc.BindFlags = Diligent::BIND_RENDER_TARGET | Diligent::BIND_SHADER_RESOURCE;
-        colorDesc.Name = "BZ3 Diligent RT Color";
+        colorDesc.Name = "KARMA Diligent RT Color";
         device_->CreateTexture(colorDesc, nullptr, &record.colorTexture);
         if (record.colorTexture) {
             record.rtv = record.colorTexture->GetDefaultView(Diligent::TEXTURE_VIEW_RENDER_TARGET);
@@ -584,7 +612,7 @@ graphics::RenderTargetId DiligentBackend::createRenderTarget(const graphics::Ren
             depthDesc.MipLevels = 1;
             depthDesc.Format = Diligent::TEX_FORMAT_D32_FLOAT;
             depthDesc.BindFlags = Diligent::BIND_DEPTH_STENCIL;
-            depthDesc.Name = "BZ3 Diligent RT Depth";
+            depthDesc.Name = "KARMA Diligent RT Depth";
             device_->CreateTexture(depthDesc, nullptr, &record.depthTexture);
             if (record.depthTexture) {
                 record.dsv = record.depthTexture->GetDefaultView(Diligent::TEXTURE_VIEW_DEPTH_STENCIL);
@@ -665,7 +693,9 @@ void DiligentBackend::renderLayer(graphics::LayerId layer, graphics::RenderTarge
         targetHeight = it->second.desc.height;
     }
 
-    renderToTargets(rtv, dsv, layer, targetWidth, targetHeight);
+
+    const bool drawSkybox = (target == graphics::kDefaultRenderTarget);
+    renderToTargets(rtv, dsv, layer, targetWidth, targetHeight, drawSkybox);
 
     if (target == graphics::kDefaultRenderTarget && std::abs(brightness_ - 1.0f) > 0.0001f
         && sceneTargetValid_ && sceneTarget_.srv) {
@@ -783,11 +813,12 @@ void DiligentBackend::initDiligent() {
         spdlog::error("Graphics(Diligent): Vulkan factory not available");
         return;
     }
+    factory->SetMessageCallback(DiligentMessageCallback);
 
     Diligent::NativeWindow nativeWindow;
     bool nativeWindowReady = false;
 
-#if defined(BZ3_WINDOW_BACKEND_SDL3)
+#if defined(KARMA_WINDOW_BACKEND_SDL3)
     auto* sdlWindow = static_cast<SDL_Window*>(window->nativeHandle());
     if (sdlWindow) {
         const SDL_PropertiesID props = SDL_GetWindowProperties(sdlWindow);
@@ -848,7 +879,7 @@ void DiligentBackend::initDiligent() {
 
     initialized = true;
     graphics_backend::diligent_ui::SetContext(device_, context_, swapChain_, framebufferWidth, framebufferHeight);
-#if defined(BZ3_UI_BACKEND_IMGUI)
+#if defined(KARMA_UI_BACKEND_IMGUI)
     if (!uiBridge_) {
         uiBridge_ = std::make_unique<DiligentRenderer>();
     }
@@ -915,14 +946,14 @@ float4 main(PSInput In) : SV_Target
 
     Diligent::RefCntAutoPtr<Diligent::IShader> vs;
     shaderCI.Desc.ShaderType = Diligent::SHADER_TYPE_VERTEX;
-    shaderCI.Desc.Name = "BZ3 Diligent VS";
+    shaderCI.Desc.Name = "KARMA Diligent VS";
     shaderCI.EntryPoint = "main";
     shaderCI.Source = vsSource;
     device_->CreateShader(shaderCI, &vs);
 
     Diligent::RefCntAutoPtr<Diligent::IShader> ps;
     shaderCI.Desc.ShaderType = Diligent::SHADER_TYPE_PIXEL;
-    shaderCI.Desc.Name = "BZ3 Diligent PS";
+    shaderCI.Desc.Name = "KARMA Diligent PS";
     shaderCI.EntryPoint = "main";
     shaderCI.Source = psSource;
     device_->CreateShader(shaderCI, &ps);
@@ -934,7 +965,7 @@ float4 main(PSInput In) : SV_Target
 
     if (!constantBuffer_) {
         Diligent::BufferDesc cbDesc;
-        cbDesc.Name = "BZ3 Diligent CB";
+        cbDesc.Name = "KARMA Diligent CB";
         cbDesc.Size = sizeof(Constants);
         cbDesc.Usage = Diligent::USAGE_DYNAMIC;
         cbDesc.BindFlags = Diligent::BIND_UNIFORM_BUFFER;
@@ -1039,7 +1070,8 @@ float4 main(PSInput In) : SV_Target
                   false,
                   pipeline_,
                   shaderBinding_,
-                  "BZ3 Diligent PSO");
+                  "KARMA Diligent PSO");
+    // Offscreen main scene still needs depth for correct world rendering.
     buildPipeline(Diligent::TEX_FORMAT_RGBA8_UNORM,
                   Diligent::TEX_FORMAT_D32_FLOAT,
                   true,
@@ -1047,7 +1079,24 @@ float4 main(PSInput In) : SV_Target
                   false,
                   pipelineOffscreen_,
                   shaderBindingOffscreen_,
-                  "BZ3 Diligent PSO Offscreen");
+                  "KARMA Diligent PSO Offscreen");
+    // Overlay entities (radar markers, lines) render without depth.
+    buildPipeline(swapRtv,
+                  swapDsv,
+                  false,
+                  false,
+                  true,
+                  pipelineOverlay_,
+                  shaderBindingOverlay_,
+                  "KARMA Diligent PSO Overlay");
+    buildPipeline(Diligent::TEX_FORMAT_RGBA8_UNORM,
+                  Diligent::TEX_FORMAT_D32_FLOAT,
+                  false,
+                  false,
+                  true,
+                  pipelineOverlayOffscreen_,
+                  shaderBindingOverlayOffscreen_,
+                  "KARMA Diligent PSO Overlay Offscreen");
 }
 
 void DiligentBackend::buildSkyboxResources() {
@@ -1055,13 +1104,13 @@ void DiligentBackend::buildSkyboxResources() {
         return;
     }
 
-    const std::string mode = bz::config::ReadStringConfig("graphics.skybox.Mode", "none");
+    const std::string mode = karma::config::ReadRequiredStringConfig("graphics.skybox.Mode");
     spdlog::info("Graphics(Diligent): skybox mode='{}'", mode);
     if (mode != "cubemap") {
         return;
     }
 
-    const std::string name = bz::config::ReadStringConfig("graphics.skybox.Cubemap.Name", "classic");
+    const std::string name = karma::config::ReadRequiredStringConfig("graphics.skybox.Cubemap.Name");
     spdlog::info("Graphics(Diligent): skybox cubemap='{}'", name);
     const std::array<std::string, 6> faces = {"right", "left", "up", "down", "front", "back"};
     std::array<std::vector<uint8_t>, 6> facePixels{};
@@ -1136,14 +1185,14 @@ float4 main(float3 dir : TEXCOORD0) : SV_Target
 
     Diligent::RefCntAutoPtr<Diligent::IShader> vs;
     shaderCI.Desc.ShaderType = Diligent::SHADER_TYPE_VERTEX;
-    shaderCI.Desc.Name = "BZ3 Diligent Skybox VS";
+    shaderCI.Desc.Name = "KARMA Diligent Skybox VS";
     shaderCI.EntryPoint = "main";
     shaderCI.Source = vsSource;
     device_->CreateShader(shaderCI, &vs);
 
     Diligent::RefCntAutoPtr<Diligent::IShader> ps;
     shaderCI.Desc.ShaderType = Diligent::SHADER_TYPE_PIXEL;
-    shaderCI.Desc.Name = "BZ3 Diligent Skybox PS";
+    shaderCI.Desc.Name = "KARMA Diligent Skybox PS";
     shaderCI.EntryPoint = "main";
     shaderCI.Source = psSource;
     device_->CreateShader(shaderCI, &ps);
@@ -1154,12 +1203,12 @@ float4 main(float3 dir : TEXCOORD0) : SV_Target
     }
 
     Diligent::GraphicsPipelineStateCreateInfo psoCI;
-    psoCI.PSODesc.Name = "BZ3 Diligent Skybox PSO";
+    psoCI.PSODesc.Name = "KARMA Diligent Skybox PSO";
     psoCI.PSODesc.PipelineType = Diligent::PIPELINE_TYPE_GRAPHICS;
     psoCI.pVS = vs;
     psoCI.pPS = ps;
     psoCI.GraphicsPipeline.PrimitiveTopology = Diligent::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-    psoCI.GraphicsPipeline.RasterizerDesc.CullMode = Diligent::CULL_MODE_FRONT;
+    psoCI.GraphicsPipeline.RasterizerDesc.CullMode = Diligent::CULL_MODE_NONE;
     psoCI.GraphicsPipeline.DepthStencilDesc.DepthEnable = true;
     psoCI.GraphicsPipeline.DepthStencilDesc.DepthWriteEnable = false;
     psoCI.GraphicsPipeline.DepthStencilDesc.DepthFunc = Diligent::COMPARISON_FUNC_LESS_EQUAL;
@@ -1203,7 +1252,7 @@ float4 main(float3 dir : TEXCOORD0) : SV_Target
     }
 
     Diligent::BufferDesc cbDesc;
-    cbDesc.Name = "BZ3 Diligent Skybox CB";
+    cbDesc.Name = "KARMA Diligent Skybox CB";
     cbDesc.Size = sizeof(SkyboxConstants);
     cbDesc.Usage = Diligent::USAGE_DYNAMIC;
     cbDesc.BindFlags = Diligent::BIND_UNIFORM_BUFFER;
@@ -1238,7 +1287,7 @@ float4 main(float3 dir : TEXCOORD0) : SV_Target
     };
 
     Diligent::BufferDesc vbDesc;
-    vbDesc.Name = "BZ3 Diligent Skybox VB";
+    vbDesc.Name = "KARMA Diligent Skybox VB";
     vbDesc.Usage = Diligent::USAGE_IMMUTABLE;
     vbDesc.BindFlags = Diligent::BIND_VERTEX_BUFFER;
     vbDesc.Size = sizeof(cubeVerts);
@@ -1303,13 +1352,13 @@ float4 main(float2 uv : TEXCOORD0) : SV_Target
 
     Diligent::RefCntAutoPtr<Diligent::IShader> vs;
     shaderCI.Desc.ShaderType = Diligent::SHADER_TYPE_VERTEX;
-    shaderCI.Desc.Name = "BZ3 Diligent UI Overlay VS";
+    shaderCI.Desc.Name = "KARMA Diligent UI Overlay VS";
     shaderCI.Source = vsSource;
     device_->CreateShader(shaderCI, &vs);
 
     Diligent::RefCntAutoPtr<Diligent::IShader> ps;
     shaderCI.Desc.ShaderType = Diligent::SHADER_TYPE_PIXEL;
-    shaderCI.Desc.Name = "BZ3 Diligent UI Overlay PS";
+    shaderCI.Desc.Name = "KARMA Diligent UI Overlay PS";
     shaderCI.Source = psSource;
     device_->CreateShader(shaderCI, &ps);
 
@@ -1319,7 +1368,7 @@ float4 main(float2 uv : TEXCOORD0) : SV_Target
     }
 
     Diligent::GraphicsPipelineStateCreateInfo psoCI;
-    psoCI.PSODesc.Name = "BZ3 Diligent UI Overlay PSO";
+    psoCI.PSODesc.Name = "KARMA Diligent UI Overlay PSO";
     psoCI.PSODesc.PipelineType = Diligent::PIPELINE_TYPE_GRAPHICS;
     psoCI.pVS = vs;
     psoCI.pPS = ps;
@@ -1392,7 +1441,7 @@ float4 main(float2 uv : TEXCOORD0) : SV_Target
     };
 
     Diligent::BufferDesc vbDesc;
-    vbDesc.Name = "BZ3 Diligent UI Overlay VB";
+    vbDesc.Name = "KARMA Diligent UI Overlay VB";
     vbDesc.Usage = Diligent::USAGE_IMMUTABLE;
     vbDesc.BindFlags = Diligent::BIND_VERTEX_BUFFER;
     vbDesc.Size = sizeof(verts);
@@ -1450,13 +1499,13 @@ float4 main(float2 uv : TEXCOORD0) : SV_Target
 
     Diligent::RefCntAutoPtr<Diligent::IShader> vs;
     shaderCI.Desc.ShaderType = Diligent::SHADER_TYPE_VERTEX;
-    shaderCI.Desc.Name = "BZ3 Diligent Brightness VS";
+    shaderCI.Desc.Name = "KARMA Diligent Brightness VS";
     shaderCI.Source = vsSource;
     device_->CreateShader(shaderCI, &vs);
 
     Diligent::RefCntAutoPtr<Diligent::IShader> ps;
     shaderCI.Desc.ShaderType = Diligent::SHADER_TYPE_PIXEL;
-    shaderCI.Desc.Name = "BZ3 Diligent Brightness PS";
+    shaderCI.Desc.Name = "KARMA Diligent Brightness PS";
     shaderCI.Source = psSource;
     device_->CreateShader(shaderCI, &ps);
 
@@ -1467,7 +1516,7 @@ float4 main(float2 uv : TEXCOORD0) : SV_Target
 
     if (!brightnessConstantBuffer_) {
         Diligent::BufferDesc cbDesc;
-        cbDesc.Name = "BZ3 Diligent Brightness CB";
+        cbDesc.Name = "KARMA Diligent Brightness CB";
         cbDesc.Size = sizeof(float) * 4;
         cbDesc.Usage = Diligent::USAGE_DYNAMIC;
         cbDesc.BindFlags = Diligent::BIND_UNIFORM_BUFFER;
@@ -1476,7 +1525,7 @@ float4 main(float2 uv : TEXCOORD0) : SV_Target
     }
 
     Diligent::GraphicsPipelineStateCreateInfo psoCI;
-    psoCI.PSODesc.Name = "BZ3 Diligent Brightness PSO";
+    psoCI.PSODesc.Name = "KARMA Diligent Brightness PSO";
     psoCI.PSODesc.PipelineType = Diligent::PIPELINE_TYPE_GRAPHICS;
     psoCI.pVS = vs;
     psoCI.pPS = ps;
@@ -1541,7 +1590,7 @@ float4 main(float2 uv : TEXCOORD0) : SV_Target
     };
 
     Diligent::BufferDesc vbDesc;
-    vbDesc.Name = "BZ3 Diligent Brightness VB";
+    vbDesc.Name = "KARMA Diligent Brightness VB";
     vbDesc.Usage = Diligent::USAGE_IMMUTABLE;
     vbDesc.BindFlags = Diligent::BIND_VERTEX_BUFFER;
     vbDesc.Size = sizeof(verts);
@@ -1578,7 +1627,7 @@ void DiligentBackend::ensureSceneTarget(int width, int height) {
         colorDesc.Format = Diligent::TEX_FORMAT_RGBA8_UNORM;
     }
     colorDesc.BindFlags = Diligent::BIND_RENDER_TARGET | Diligent::BIND_SHADER_RESOURCE;
-    colorDesc.Name = "BZ3 Diligent Scene Color";
+    colorDesc.Name = "KARMA Diligent Scene Color";
     device_->CreateTexture(colorDesc, nullptr, &sceneTarget_.colorTexture);
     if (sceneTarget_.colorTexture) {
         sceneTarget_.rtv = sceneTarget_.colorTexture->GetDefaultView(Diligent::TEXTURE_VIEW_RENDER_TARGET);
@@ -1596,7 +1645,7 @@ void DiligentBackend::ensureSceneTarget(int width, int height) {
         depthDesc.Format = Diligent::TEX_FORMAT_D32_FLOAT;
     }
     depthDesc.BindFlags = Diligent::BIND_DEPTH_STENCIL;
-    depthDesc.Name = "BZ3 Diligent Scene Depth";
+    depthDesc.Name = "KARMA Diligent Scene Depth";
     device_->CreateTexture(depthDesc, nullptr, &sceneTarget_.depthTexture);
     if (sceneTarget_.depthTexture) {
         sceneTarget_.dsv = sceneTarget_.depthTexture->GetDefaultView(Diligent::TEXTURE_VIEW_DEPTH_STENCIL);
@@ -1679,7 +1728,8 @@ void DiligentBackend::renderToTargets(Diligent::ITextureView* rtv,
                                       Diligent::ITextureView* dsv,
                                       graphics::LayerId layer,
                                       int targetWidth,
-                                      int targetHeight) {
+                                      int targetHeight,
+                                      bool drawSkybox) {
     if (!context_ || !pipeline_ || !pipelineOffscreen_) {
         return;
     }
@@ -1711,7 +1761,7 @@ void DiligentBackend::renderToTargets(Diligent::ITextureView* rtv,
         context_->ClearDepthStencil(dsv, Diligent::CLEAR_DEPTH_FLAG, 1.0f, 0, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
     }
 
-    if (rtv == swapChain_->GetCurrentBackBufferRTV() && skyboxReady && skyboxPipeline_ && skyboxVertexBuffer_) {
+    if (drawSkybox && skyboxReady && skyboxPipeline_ && skyboxVertexBuffer_) {
         const glm::mat4 rotation = glm::mat4_cast(glm::conjugate(cameraRotation));
         const glm::mat4 viewProj = computeProjectionMatrix() * rotation;
         Diligent::MapHelper<SkyboxConstants> cb(context_, skyboxConstantBuffer_, Diligent::MAP_WRITE, Diligent::MAP_FLAG_DISCARD);
@@ -1735,18 +1785,22 @@ void DiligentBackend::renderToTargets(Diligent::ITextureView* rtv,
         context_->Draw(drawAttrs);
     }
 
-    auto* pipeline = useSwapchain ? pipeline_.RawPtr() : pipelineOffscreen_.RawPtr();
-    auto* binding = useSwapchain ? shaderBinding_.RawPtr() : shaderBindingOffscreen_.RawPtr();
-    if (!pipeline || !binding) {
-        return;
-    }
-    context_->SetPipelineState(pipeline);
-
     const glm::mat4 viewProj = getViewProjectionMatrix();
     auto renderEntity = [&](const EntityRecord& entity) {
         if (entity.layer != layer || !entity.visible) {
             return;
         }
+
+        auto* pipeline = useSwapchain
+            ? (entity.overlay ? pipelineOverlay_.RawPtr() : pipeline_.RawPtr())
+            : (entity.overlay ? pipelineOverlayOffscreen_.RawPtr() : pipelineOffscreen_.RawPtr());
+        auto* binding = useSwapchain
+            ? (entity.overlay ? shaderBindingOverlay_.RawPtr() : shaderBinding_.RawPtr())
+            : (entity.overlay ? shaderBindingOverlayOffscreen_.RawPtr() : shaderBindingOffscreen_.RawPtr());
+        if (!pipeline || !binding) {
+            return;
+        }
+        context_->SetPipelineState(pipeline);
 
         const glm::mat4 translate = glm::translate(glm::mat4(1.0f), entity.position);
         const glm::mat4 rotate = glm::mat4_cast(entity.rotation);

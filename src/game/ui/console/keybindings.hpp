@@ -1,20 +1,31 @@
 #pragma once
 
+#include "karma/input/bindings_text.hpp"
+
 #include <string>
-#include <string_view>
-#include <vector>
 #include <span>
+#include <vector>
 
 namespace ui::bindings {
 
 struct BindingDefinition {
     const char *action;
     const char *label;
+    bool isHeader = false;
 };
 
 std::span<const BindingDefinition> Definitions();
-bool IsMouseBindingName(std::string_view name);
-std::string JoinBindings(const std::vector<std::string> &entries);
-std::vector<std::string> SplitBindings(const std::string &text);
+
+inline bool IsMouseBindingName(std::string_view name) {
+    return input::bindings::IsMouseBindingName(name);
+}
+
+inline std::string JoinBindings(const std::vector<std::string> &entries) {
+    return input::bindings::JoinBindings(entries);
+}
+
+inline std::vector<std::string> SplitBindings(const std::string &text) {
+    return input::bindings::SplitBindings(text);
+}
 
 } // namespace ui::bindings

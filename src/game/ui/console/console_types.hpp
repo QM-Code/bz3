@@ -29,6 +29,7 @@ struct CommunityBrowserSelection {
     bool fromPreset;
     std::string sourceHost;
     std::string worldName;
+    bool roamingMode = false;
 };
 
 struct ServerListOption {

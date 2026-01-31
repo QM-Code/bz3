@@ -3,8 +3,9 @@
 #include <string>
 #include <vector>
 
-#include "common/config_store.hpp"
-#include "common/i18n.hpp"
+#include "karma/common/config_store.hpp"
+#include "karma/common/i18n.hpp"
+#include "ui/config/config.hpp"
 #include "spdlog/spdlog.h"
 #include "ui/console/status_banner.hpp"
 
@@ -46,7 +47,7 @@ bool DrawOnOffToggle(const char *label, bool &value) {
 namespace ui {
 
 void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
-    const uint64_t revision = bz::config::ConfigStore::Revision();
+    const uint64_t revision = karma::config::ConfigStore::Revision();
     if (settingsModel.lastConfigRevision != 0 && settingsModel.lastConfigRevision != revision) {
         spdlog::info("ImGuiSettings: config revision changed while open: {} -> {} (connected={})",
                      settingsModel.lastConfigRevision,
@@ -60,7 +61,7 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
         settingsModel.statusText.clear();
         settingsModel.statusIsError = false;
 
-        if (!bz::config::ConfigStore::Initialized()) {
+        if (!karma::config::ConfigStore::Initialized()) {
             settingsModel.statusText = "Failed to load config; showing defaults.";
             settingsModel.statusIsError = true;
         }
@@ -68,7 +69,7 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
         settingsModel.hud.loadFromConfig();
         std::string configuredLanguage = settingsController.getConfiguredLanguage();
         if (configuredLanguage.empty()) {
-            configuredLanguage = bz::i18n::Get().language();
+            configuredLanguage = karma::i18n::Get().language();
         }
         settingsModel.language = configuredLanguage;
         for (std::size_t i = 0; i < kLanguageCodes.size(); ++i) {
@@ -79,7 +80,7 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
         }
     }
 
-    auto &i18n = bz::i18n::Get();
+    auto &i18n = karma::i18n::Get();
     ImGui::TextUnformatted(i18n.get("ui.settings.language_label").c_str());
     ImGui::SameLine();
     std::string selectedLangCode = (selectedLanguageIndex >= 0 &&

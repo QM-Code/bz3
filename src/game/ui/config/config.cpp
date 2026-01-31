@@ -1,6 +1,6 @@
 #include "ui/config/config.hpp"
 
-#include "common/config_store.hpp"
+#include "karma/common/config_store.hpp"
 #include "spdlog/spdlog.h"
 
 #include <algorithm>
@@ -10,8 +10,8 @@
 namespace ui::config {
 namespace {
 
-const bz::json::Value* getValue(const char* path) {
-    const auto* value = bz::config::ConfigStore::Get(path);
+const karma::json::Value* getValue(const char* path) {
+    const auto* value = karma::config::ConfigStore::Get(path);
     if (!value) {
         spdlog::error("Config '{}' is missing", path);
     }

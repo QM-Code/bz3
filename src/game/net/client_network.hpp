@@ -14,11 +14,11 @@ class ClientNetwork {
     friend class ClientEngine;
 
 public:
-    using DisconnectEvent = network_backend::DisconnectEvent;
-    using ServerEndpointInfo = network_backend::ServerEndpointInfo;
+    using DisconnectEvent = game::net::DisconnectEvent;
+    using ServerEndpointInfo = game::net::ServerEndpointInfo;
 
 private:
-    std::unique_ptr<network_backend::ClientBackend> backend_;
+    std::unique_ptr<game::net::ClientBackend> backend_;
 
     ClientNetwork();
     ~ClientNetwork();

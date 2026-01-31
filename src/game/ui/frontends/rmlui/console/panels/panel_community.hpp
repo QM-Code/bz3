@@ -48,6 +48,7 @@ public:
                        std::function<void()> onRefresh,
                        std::function<void(int)> onServerSelection,
                        std::function<void(int)> onJoinRequested,
+                       std::function<void(int)> onRoamRequested,
                        std::function<void()> onResumeRequested,
                        std::function<void()> onQuitRequested);
 
@@ -67,6 +68,7 @@ private:
     void handleAdd();
     void handleRefresh();
     void handleJoin();
+    void handleRoam();
     void handleResume();
     void handleQuit();
     void handleConfirmJoin(bool accepted);
@@ -99,6 +101,7 @@ private:
     Rml::Element *communityDeleteButton = nullptr;
     Rml::Element *detailTitle = nullptr;
     Rml::Element *joinButton = nullptr;
+    Rml::Element *roamButton = nullptr;
     Rml::Element *detailName = nullptr;
     Rml::Element *detailWebsite = nullptr;
     Rml::Element *detailOverview = nullptr;
@@ -127,6 +130,7 @@ private:
     std::function<void()> onRefreshRequested;
     std::function<void(int)> onServerSelectionChanged;
     std::function<void(int)> onJoinRequested;
+    std::function<void(int)> onRoamRequested;
     std::function<void()> onResumeRequested;
     std::function<void()> onQuitRequested;
     std::vector<std::unique_ptr<Rml::EventListener>> listeners;

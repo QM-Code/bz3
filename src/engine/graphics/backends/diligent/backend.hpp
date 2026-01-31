@@ -1,8 +1,8 @@
 #pragma once
 
-#include "engine/graphics/backend.hpp"
-#if defined(BZ3_UI_BACKEND_IMGUI)
-#include "ui/frontends/imgui/platform/renderer_diligent.hpp"
+#include "karma/graphics/backend.hpp"
+#if defined(KARMA_UI_BACKEND_IMGUI)
+#include "karma/ui/platform/imgui/renderer_diligent.hpp"
 #endif
 
 #include <DiligentCore/Common/interface/RefCntAutoPtr.hpp>
@@ -144,6 +144,10 @@ private:
     Diligent::RefCntAutoPtr<Diligent::IShaderResourceBinding> shaderBinding_;
     Diligent::RefCntAutoPtr<Diligent::IPipelineState> pipelineOffscreen_;
     Diligent::RefCntAutoPtr<Diligent::IShaderResourceBinding> shaderBindingOffscreen_;
+    Diligent::RefCntAutoPtr<Diligent::IPipelineState> pipelineOverlay_;
+    Diligent::RefCntAutoPtr<Diligent::IShaderResourceBinding> shaderBindingOverlay_;
+    Diligent::RefCntAutoPtr<Diligent::IPipelineState> pipelineOverlayOffscreen_;
+    Diligent::RefCntAutoPtr<Diligent::IShaderResourceBinding> shaderBindingOverlayOffscreen_;
     Diligent::RefCntAutoPtr<Diligent::IBuffer> constantBuffer_;
     Diligent::RefCntAutoPtr<Diligent::IPipelineState> skyboxPipeline_;
     Diligent::RefCntAutoPtr<Diligent::IShaderResourceBinding> skyboxBinding_;
@@ -195,7 +199,8 @@ private:
                          Diligent::ITextureView* dsv,
                          graphics::LayerId layer,
                          int targetWidth,
-                         int targetHeight);
+                         int targetHeight,
+                         bool drawSkybox);
 
     glm::mat4 computeViewMatrix() const;
     glm::mat4 computeProjectionMatrix() const;

@@ -40,11 +40,11 @@ and what to tackle next.
   - `console/`: panels are class-based (`panel_*`), RML/RCSS templates live in `data/client/ui`.
   - `hud/`: RmlUi HUD document and components.
 
-### Rendering bridges (BGFX/Diligent/Forge)
+### Rendering bridges (BGFX/Diligent)
 - ImGui uses `engine/graphics/ui_bridge.hpp` and backend-specific bridges under
   `src/engine/graphics/backends/*`.
-- RmlUi uses render interfaces in `src/game/ui/frontends/rmlui/platform/renderer_{bgfx,diligent,forge}.*`.
-- RmlUi renderers expose output textures for the shared render bridge; see `ui/bridges/` + RmlUi platform renderers.
+- RmlUi uses render interfaces in `src/engine/ui/platform/rmlui/renderer_{bgfx,diligent}.*`.
+- RmlUi renderers expose output textures for the shared render bridge; see `engine/ui/bridges/` + RmlUi platform renderers.
 
 ## Console vs HUD
 
@@ -58,8 +58,8 @@ and what to tackle next.
 
 - All UI config reads/writes must go through `ConfigStore` (no direct JSON file I/O).
 - The UI should only use:
-  - `bz::config::ConfigStore::Get/Set/Erase` for config values.
-  - `bz::config::ConfigStore::Revision()` to detect changes.
+  - `karma::config::ConfigStore::Get/Set/Erase` for config values.
+  - `karma::config::ConfigStore::Revision()` to detect changes.
 - Example usage is in:
   - RmlUi Settings panel (`panel_settings.cpp`)
   - ImGui Settings panel (`panel_settings.cpp`)

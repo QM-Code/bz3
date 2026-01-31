@@ -12,13 +12,13 @@ std::string LeafKey(const std::string& key) {
 
 namespace world {
 
-void AssetCatalog::mergeFromJson(const bz::json::Value& assetsJson, const std::filesystem::path& baseDir) {
+void AssetCatalog::mergeFromJson(const karma::json::Value& assetsJson, const std::filesystem::path& baseDir) {
     if (!assetsJson.is_object()) {
         return;
     }
 
     std::map<std::string, std::filesystem::path> collected;
-    bz::data::CollectAssetEntries(assetsJson, baseDir, collected);
+    karma::data::CollectAssetEntries(assetsJson, baseDir, collected);
 
     for (const auto& [key, path] : collected) {
         entries[key] = path;
@@ -43,7 +43,7 @@ std::filesystem::path AssetCatalog::resolvePath(const std::string& key, const ch
     return {};
 }
 
-void WorldContent::mergeLayer(const bz::json::Value& layerJson, const std::filesystem::path& baseDir) {
+void WorldContent::mergeLayer(const karma::json::Value& layerJson, const std::filesystem::path& baseDir) {
     if (!layerJson.is_object()) {
         return;
     }

@@ -16,13 +16,13 @@
 
 #include <md4c.h>
 
-#include "common/json.hpp"
+#include "karma/common/json.hpp"
 #if defined(_WIN32)
 #include <shellapi.h>
 #include <windows.h>
 #endif
 
-#include "common/data_path_resolver.hpp"
+#include "karma/common/data_path_resolver.hpp"
 #include "ui/frontends/rmlui/console/emoji_utils.hpp"
 #include "spdlog/spdlog.h"
 
@@ -325,6 +325,7 @@ public:
         SelectionBlur,
         Refresh,
         Join,
+        Roam,
         Quit,
         AddOnEnter
     };
@@ -351,6 +352,9 @@ public:
                 break;
             case Action::Join:
                 panel->handleJoin();
+                break;
+            case Action::Roam:
+                panel->handleRoam();
                 break;
             case Action::Quit:
                 panel->handleQuit();
@@ -386,6 +390,9 @@ public:
         }
         if (action == Action::Join) {
             panel->handleServerClick(index);
+            if (panel->hasActiveConnection()) {
+                return;
+            }
             auto *community = panel->consoleModel ? &panel->consoleModel->community : nullptr;
             if (community &&
                 community->selectedIndex == index &&
@@ -508,6 +515,7 @@ void RmlUiPanelCommunity::bindCallbacks(std::function<void(int)> onSelection,
                                         std::function<void()> onRefresh,
                                         std::function<void(int)> onServerSelection,
                                         std::function<void(int)> onJoin,
+                                        std::function<void(int)> onRoam,
                                         std::function<void()> onResume,
                                         std::function<void()> onQuit) {
     onSelectionChanged = std::move(onSelection);
@@ -515,6 +523,7 @@ void RmlUiPanelCommunity::bindCallbacks(std::function<void(int)> onSelection,
     onRefreshRequested = std::move(onRefresh);
     onServerSelectionChanged = std::move(onServerSelection);
     onJoinRequested = std::move(onJoin);
+    onRoamRequested = std::move(onRoam);
     onResumeRequested = std::move(onResume);
     onQuitRequested = std::move(onQuit);
 }
@@ -535,6 +544,7 @@ void RmlUiPanelCommunity::onLoaded(Rml::ElementDocument *doc) {
     communityInfoButton = document->GetElementById("community-info-button");
     detailTitle = document->GetElementById("server-detail-title");
     joinButton = document->GetElementById("server-join-button");
+    roamButton = document->GetElementById("server-roam-button");
     quitButton = document->GetElementById("server-quit-button");
     detailName = document->GetElementById("server-detail-name");
     detailWebsite = document->GetElementById("server-detail-website");
@@ -575,6 +585,11 @@ void RmlUiPanelCommunity::onLoaded(Rml::ElementDocument *doc) {
     if (joinButton) {
         auto listener = std::make_unique<RmlUiPanelCommunityListener>(this, RmlUiPanelCommunityListener::Action::Join);
         joinButton->AddEventListener("click", listener.get());
+        listeners.emplace_back(std::move(listener));
+    }
+    if (roamButton) {
+        auto listener = std::make_unique<RmlUiPanelCommunityListener>(this, RmlUiPanelCommunityListener::Action::Roam);
+        roamButton->AddEventListener("click", listener.get());
         listeners.emplace_back(std::move(listener));
     }
     if (quitButton) {
@@ -964,6 +979,9 @@ void RmlUiPanelCommunity::handleJoin() {
     if (!consoleModel) {
         return;
     }
+    if (hasActiveConnection()) {
+        return;
+    }
     auto &community = consoleModel->community;
     spdlog::info("RmlUi Community: Join clicked (selectedServerIndex={}, entries={})",
                  community.selectedIndex, community.entries.size());
@@ -979,25 +997,29 @@ void RmlUiPanelCommunity::handleJoin() {
     if (detailOverviewSection) detailOverviewSection->SetClass("hidden", false);
     if (detailDescriptionSection) detailDescriptionSection->SetClass("hidden", false);
     if (detailScreenshotSection) detailScreenshotSection->SetClass("hidden", false);
-    if (hasActiveConnection() && !isConnectedToEntry(entry)) {
-        pendingJoinIndex = community.selectedIndex;
-        const std::string serverName = !entry.worldName.empty()
-            ? entry.worldName
-            : (!entry.label.empty() ? entry.label : entry.host);
-        confirmDialog.show(
-            "You are already connected to another server. Quit that game to join \"" +
-            escapeRmlText(serverName) + "\"?");
-        return;
-    }
-    if (hasActiveConnection() && isConnectedToEntry(entry)) {
-        handleResume();
-        return;
-    }
     if (!onJoinRequested) {
         spdlog::warn("RmlUi Community: Join ignored (no callback bound)");
         return;
     }
     onJoinRequested(community.selectedIndex);
+}
+
+void RmlUiPanelCommunity::handleRoam() {
+    if (!consoleModel) {
+        return;
+    }
+    if (hasActiveConnection()) {
+        return;
+    }
+    auto &community = consoleModel->community;
+    if (community.selectedIndex < 0 ||
+        community.selectedIndex >= static_cast<int>(community.entries.size())) {
+        return;
+    }
+    if (!onRoamRequested) {
+        return;
+    }
+    onRoamRequested(community.selectedIndex);
 }
 
 void RmlUiPanelCommunity::handleResume() {
@@ -1158,11 +1180,15 @@ void RmlUiPanelCommunity::updateServerDetails() {
     if (detailTitle) {
         detailTitle->SetInnerRML(showingCommunityInfo ? "Community Info" : "Server Details");
     }
+    const bool connected = hasActiveConnection();
     if (joinButton) {
-        joinButton->SetClass("hidden", showingCommunityInfo || community.selectedIndex < 0);
+        joinButton->SetClass("hidden", connected || showingCommunityInfo || community.selectedIndex < 0);
+    }
+    if (roamButton) {
+        roamButton->SetClass("hidden", connected || showingCommunityInfo || community.selectedIndex < 0);
     }
     if (quitButton) {
-        quitButton->SetClass("hidden", true);
+        quitButton->SetClass("hidden", !connected);
     }
     if (communityDeleteButton) {
         communityDeleteButton->SetClass("hidden", !showingCommunityInfo || isLanSelected());
@@ -1239,13 +1265,15 @@ void RmlUiPanelCommunity::updateServerDetails() {
     }
 
     const auto &entry = community.entries[static_cast<std::size_t>(community.selectedIndex)];
-    const bool connectedEntry = isConnectedToEntry(entry);
     if (joinButton) {
-        joinButton->SetInnerRML(connectedEntry ? "Resume" : "Join");
-        joinButton->SetClass("hidden", false);
+        joinButton->SetInnerRML("Join");
+        joinButton->SetClass("hidden", connected);
+    }
+    if (roamButton) {
+        roamButton->SetClass("hidden", connected);
     }
     if (quitButton) {
-        quitButton->SetClass("hidden", !connectedEntry);
+        quitButton->SetClass("hidden", !connected);
     }
     const std::string name = !entry.worldName.empty()
         ? entry.worldName

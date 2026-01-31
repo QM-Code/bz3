@@ -1,9 +1,9 @@
 #pragma once
 #include <memory>
 #include <vector>
-#include "core/types.hpp"
+#include "karma/core/types.hpp"
 #include "game/net/messages.hpp"
-#include "engine/client_engine.hpp"
+#include "game/engine/client_engine.hpp"
 #include "world_session.hpp"
 #include "shot.hpp"
 #include "console.hpp"
@@ -24,6 +24,7 @@ private:
     bool registeredUser = false;
     bool communityAdmin = false;
     bool localAdmin = false;
+    bool roamingMode = false;
 
     std::vector<std::unique_ptr<Actor>> actors;
 
@@ -36,6 +37,7 @@ public:
     std::vector<std::unique_ptr<Shot>> shots;
 
     FOCUS_STATE getFocusState() const { return focusState; }
+    bool isRoamingMode() const { return roamingMode; }
 
     Game(ClientEngine &engine,
          std::string playerName,

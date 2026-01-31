@@ -1,8 +1,9 @@
 #include "player.hpp"
-#include "engine/client_engine.hpp"
-#include "core/types.hpp"
+#include "game/engine/client_engine.hpp"
+#include "karma/core/types.hpp"
 #include "game/net/messages.hpp"
 #include "client/game.hpp"
+#include <cmath>
 #include <string>
 #include <utility>
 #include <memory>
@@ -162,11 +163,14 @@ void Player::earlyUpdate() {
     }
 }
 
-    void Player::lateUpdate() {
+void Player::lateUpdate() {
     setLocation(physics->getPosition(), physics->getRotation(), physics->getVelocity());
     game.engine.render->setCameraPosition(state.position + glm::vec3(0.0f, muzzleOffset.y, 0.0f));
     game.engine.render->setCameraRotation(state.rotation);
-    game.engine.render->setRadarFOVLinesAngle(CAMERA_FOV);
+    const auto &ctx = game.engine.render->mainContext();
+    const float halfVertRad = glm::radians(ctx.fov * 0.5f);
+    const float halfHorizRad = std::atan(std::tan(halfVertRad) * ctx.aspect);
+    game.engine.render->setRadarFOVLinesAngle(glm::degrees(halfHorizRad * 2.0f));
 
     if (state.alive) {
         if (glm::distance(lastPosition, state.position) > POSITION_UPDATE_THRESHOLD ||

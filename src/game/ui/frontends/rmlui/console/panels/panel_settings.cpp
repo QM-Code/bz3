@@ -10,8 +10,8 @@
 #include <sstream>
 #include <string>
 
-#include "common/config_store.hpp"
-#include "common/i18n.hpp"
+#include "karma/common/config_store.hpp"
+#include "karma/common/i18n.hpp"
 #include "ui/console/status_banner.hpp"
 #include "spdlog/spdlog.h"
 
@@ -199,7 +199,6 @@ void RmlUiPanelSettings::onLoaded(Rml::ElementDocument *doc) {
         }
         listeners.emplace_back(std::move(listener));
     }
-
     syncSettingsFromConfig();
     syncRenderBrightnessControls(true);
     syncHudControls();
@@ -245,7 +244,7 @@ void RmlUiPanelSettings::rebuildLanguageOptions() {
     select->RemoveAll();
     for (const auto &code : kLanguageCodes) {
         const std::string labelKey = "languages." + code;
-        const std::string &label = bz::i18n::Get().get(labelKey);
+        const std::string &label = karma::i18n::Get().get(labelKey);
         select->Add(label.empty() ? code : label, code);
     }
     const std::string selected = selectedLanguageFromConfig();
@@ -262,7 +261,7 @@ void RmlUiPanelSettings::applyLanguageSelection(const std::string &code) {
     if (code.empty()) {
         return;
     }
-    if (code == selectedLanguageFromConfig() && code == bz::i18n::Get().language()) {
+    if (code == selectedLanguageFromConfig() && code == karma::i18n::Get().language()) {
         return;
     }
     std::string error;
@@ -280,7 +279,7 @@ std::string RmlUiPanelSettings::selectedLanguageFromConfig() const {
     if (!configured.empty()) {
         return configured;
     }
-    return bz::i18n::Get().language();
+    return karma::i18n::Get().language();
 }
 
 float RmlUiPanelSettings::getRenderBrightness() const {
@@ -411,7 +410,7 @@ void RmlUiPanelSettings::updateStatus() {
 }
 
 void RmlUiPanelSettings::syncSettingsFromConfig() {
-    if (!bz::config::ConfigStore::Initialized()) {
+    if (!karma::config::ConfigStore::Initialized()) {
         return;
     }
 

@@ -6,12 +6,13 @@
 #include <string>
 #include <vector>
 
-#include "platform/events.hpp"
+#include "karma/platform/events.hpp"
 #include "ui/controllers/hud_controller.hpp"
 #include "ui/models/hud_model.hpp"
 #include "ui/core/types.hpp"
 #include "ui/console/console_interface.hpp"
-#include "ui/bridges/render_bridge.hpp"
+#include "karma/ui/overlay.hpp"
+#include "karma/ui/bridges/renderer_bridge.hpp"
 
 namespace platform {
 class Window;
@@ -21,7 +22,7 @@ namespace ui_backend {
 class Backend;
 }
 
-class UiSystem {
+class UiSystem : public ui::Overlay {
     friend class ClientEngine;
 
 public:
@@ -52,7 +53,7 @@ public:
     bool getChatInputFocus() const;
     void setDialogVisible(bool show);
     bool consumeKeybindingsReloadRequest();
-    void setRenderBridge(const ui::RenderBridge *bridge);
-    ui::RenderOutput getRenderOutput() const;
-    float getRenderBrightness() const;
+    void setRendererBridge(const ui::RendererBridge *bridge);
+    ui::RenderOutput getRenderOutput() const override;
+    float getRenderBrightness() const override;
 };

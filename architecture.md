@@ -98,7 +98,7 @@ data/
 
 ### Data root and configuration layering
 
-The runtime **data root** is discovered via a game-provided spec (`src/game/common/data_path_spec.*`). For BZ3 this uses the `BZ3_DATA_DIR` environment variable. All config and assets are loaded relative to this directory.
+The runtime **data root** is discovered via a game-provided spec (`src/game/common/data_path_spec.*`). For BZ3 this uses the `KARMA_DATA_DIR` environment variable. All config and assets are loaded relative to this directory.
 
 Configuration is **layered JSON** merged into a single “config cache”:
 
@@ -376,7 +376,7 @@ Plugin callbacks are keyed by `ClientMsg_Type` and currently invoked from gamepl
 
 ## Common gotchas
 
-- `BZ3_DATA_DIR` must point at the repo’s `data/` directory (or an installed equivalent).
+- `KARMA_DATA_DIR` must point at the repo’s `data/` directory (or an installed equivalent).
 - Config and assets are *layered*; if something “mysteriously” changes between worlds, check the world’s `config.json` and `manifest.json` merging.
 - Network messages are freed on `flushPeekedMessages()`; don’t hold pointers returned by `peekMessage<T>()` beyond the current frame.
 

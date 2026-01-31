@@ -3,7 +3,7 @@
 #include <filesystem>
 #include <optional>
 
-namespace bz::data {
+namespace karma::data {
 
 struct DataDirOverrideResult {
     std::filesystem::path userConfigPath;
@@ -12,4 +12,4 @@ struct DataDirOverrideResult {
 
 DataDirOverrideResult ApplyDataDirOverrideFromArgs(int argc, char *argv[], const std::filesystem::path &defaultConfigRelative = std::filesystem::path("config.json"));
 
-} // namespace bz::data
+} // namespace karma::data

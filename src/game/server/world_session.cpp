@@ -2,7 +2,7 @@
 
 #include "server/game.hpp"
 #include "spdlog/spdlog.h"
-#include "common/data_path_resolver.hpp"
+#include "karma/common/data_path_resolver.hpp"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
@@ -13,19 +13,19 @@
 ServerWorldSession::ServerWorldSession(Game &game,
                                        std::string serverNameIn,
                                        std::string worldName,
-                                       bz::json::Value worldConfig,
+                                       karma::json::Value worldConfig,
                                        std::string worldDir,
                                        bool enableWorldZipping)
         : game(game),
           backend_(world_backend::CreateWorldBackend()),
           serverName(std::move(serverNameIn)),
           archiveOnStartup(enableWorldZipping) {
-    const std::vector<bz::data::ConfigLayerSpec> baseSpecs = {
+    const std::vector<karma::data::ConfigLayerSpec> baseSpecs = {
         {"common/config.json", "data/common/config.json", spdlog::level::err, true},
         {"server/config.json", "data/server/config.json", spdlog::level::err, true}
     };
 
-    const std::optional<bz::json::Value> configOpt = worldConfig.is_null() ? std::nullopt : std::optional<bz::json::Value>(std::move(worldConfig));
+    const std::optional<karma::json::Value> configOpt = worldConfig.is_null() ? std::nullopt : std::optional<karma::json::Value>(std::move(worldConfig));
     content_ = backend_->loadContent(baseSpecs,
                                      configOpt,
                                      std::filesystem::path(worldDir),

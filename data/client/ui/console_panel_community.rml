@@ -32,6 +32,7 @@
                 <span id="server-detail-title" class="panel-header-title panel-header-title-details">Server Details</span>
                 <div class="panel-header-actions">
                     <button id="server-join-button">Join</button>
+                    <button id="server-roam-button">Roam</button>
                     <button id="server-quit-button" class="danger">Quit</button>
                     <button id="community-delete-button" class="danger">Delete</button>
                 </div>

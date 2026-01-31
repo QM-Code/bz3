@@ -6,8 +6,9 @@
 #include <algorithm>
 #include <cctype>
 #include <limits>
+#include <stdexcept>
 
-namespace bz::config {
+namespace karma::config {
 
 bool ReadBoolConfig(std::initializer_list<const char*> paths, bool defaultValue) {
     for (const char* path : paths) {
@@ -114,4 +115,69 @@ std::string ReadStringConfig(const char *path, const std::string &defaultValue) 
     return defaultValue;
 }
 
-} // namespace bz::config
+bool ReadRequiredBoolConfig(const char *path) {
+    if (const auto* value = ConfigStore::Get(path)) {
+        if (value->is_boolean()) {
+            return value->get<bool>();
+        }
+        if (value->is_number_integer()) {
+            return value->get<long long>() != 0;
+        }
+        if (value->is_number_float()) {
+            return value->get<double>() != 0.0;
+        }
+        if (value->is_string()) {
+            std::string text = value->get<std::string>();
+            std::transform(text.begin(), text.end(), text.begin(),
+                           [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+            if (text == "true" || text == "1" || text == "yes" || text == "on") {
+                return true;
+            }
+            if (text == "false" || text == "0" || text == "no" || text == "off") {
+                return false;
+            }
+        }
+    }
+    throw std::runtime_error(std::string("Missing required boolean config: ") + path);
+}
+
+uint16_t ReadRequiredUInt16Config(const char *path) {
+    if (const auto* value = ConfigStore::Get(path)) {
+        if (value->is_number_integer()) {
+            const auto raw = value->get<long long>();
+            if (raw >= 0 && raw <= std::numeric_limits<uint16_t>::max()) {
+                return static_cast<uint16_t>(raw);
+            }
+        }
+        if (value->is_number_float()) {
+            const auto raw = value->get<double>();
+            if (raw >= 0.0 && raw <= static_cast<double>(std::numeric_limits<uint16_t>::max())) {
+                return static_cast<uint16_t>(raw);
+            }
+        }
+    }
+    throw std::runtime_error(std::string("Missing required uint16 config: ") + path);
+}
+
+float ReadRequiredFloatConfig(const char *path) {
+    if (const auto* value = ConfigStore::Get(path)) {
+        if (value->is_number_float()) {
+            return static_cast<float>(value->get<double>());
+        }
+        if (value->is_number_integer()) {
+            return static_cast<float>(value->get<long long>());
+        }
+    }
+    throw std::runtime_error(std::string("Missing required float config: ") + path);
+}
+
+std::string ReadRequiredStringConfig(const char *path) {
+    if (const auto* value = ConfigStore::Get(path)) {
+        if (value->is_string()) {
+            return value->get<std::string>();
+        }
+    }
+    throw std::runtime_error(std::string("Missing required string config: ") + path);
+}
+
+} // namespace karma::config

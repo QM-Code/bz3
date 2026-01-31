@@ -1,10 +1,10 @@
 #pragma once
 #include <glm/glm.hpp>
 #include <string>
-#include "core/types.hpp"
+#include "karma/core/types.hpp"
 #include "game/net/messages.hpp"
-#include "physics/player_controller.hpp"
-#include "audio/audio.hpp"
+#include "karma/physics/player_controller.hpp"
+#include "karma/audio/audio.hpp"
 #include <spdlog/spdlog.h>
 
 #include "actor.hpp"

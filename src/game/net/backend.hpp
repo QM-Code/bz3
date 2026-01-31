@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-namespace network_backend {
+namespace game::net {
 
 struct DisconnectEvent {
     std::string reason;
@@ -62,4 +62,4 @@ public:
 std::unique_ptr<ClientBackend> CreateClientBackend();
 std::unique_ptr<ServerBackend> CreateServerBackend(uint16_t port, int maxClients, int numChannels);
 
-} // namespace network_backend
+} // namespace game::net

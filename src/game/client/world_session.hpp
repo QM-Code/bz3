@@ -1,15 +1,15 @@
 #pragma once
 
-#include "core/types.hpp"
+#include "karma/core/types.hpp"
 #include "game/net/messages.hpp"
-#include "physics/static_body.hpp"
+#include "karma/physics/static_body.hpp"
 #include "game/world/config.hpp"
 #include "world/backend.hpp"
 #include "world/content.hpp"
 
 #include <filesystem>
 #include <memory>
-#include "common/json.hpp"
+#include "karma/common/json.hpp"
 #include <string>
 #include <vector>
 

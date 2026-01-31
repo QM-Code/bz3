@@ -1,10 +1,10 @@
 #include "ui/core/system.hpp"
 
 #include "ui/core/backend.hpp"
-#include "platform/window.hpp"
-#include "common/i18n.hpp"
+#include "karma/platform/window.hpp"
+#include "karma/common/i18n.hpp"
 #include "ui/config/ui_config.hpp"
-#include "common/config_store.hpp"
+#include "karma/common/config_store.hpp"
 #include "spdlog/spdlog.h"
 
 UiSystem::UiSystem(platform::Window &window)
@@ -19,7 +19,7 @@ void UiSystem::handleEvents(const std::vector<platform::Event> &events) {
 }
 
 void UiSystem::update() {
-    const uint64_t revision = bz::config::ConfigStore::Revision();
+    const uint64_t revision = karma::config::ConfigStore::Revision();
     if (revision != lastConfigRevision) {
         lastConfigRevision = revision;
         hudModel.visibility.scoreboard = ui::UiConfig::GetHudScoreboard();
@@ -41,7 +41,7 @@ void UiSystem::reloadFonts() {
 }
 
 void UiSystem::setLanguage(const std::string &language) {
-    bz::i18n::Get().loadLanguage(language);
+    karma::i18n::Get().loadLanguage(language);
     backend->reloadFonts();
 }
 
@@ -89,8 +89,8 @@ bool UiSystem::consumeKeybindingsReloadRequest() {
     return backend->consumeKeybindingsReloadRequest();
 }
 
-void UiSystem::setRenderBridge(const ui::RenderBridge *bridge) {
-    backend->setRenderBridge(bridge);
+void UiSystem::setRendererBridge(const ui::RendererBridge *bridge) {
+    backend->setRendererBridge(bridge);
 }
 
 ui::RenderOutput UiSystem::getRenderOutput() const {

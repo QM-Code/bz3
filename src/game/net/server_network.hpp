@@ -15,7 +15,7 @@ class ServerNetwork {
     friend class ServerEngine;
 
 private:
-    std::unique_ptr<network_backend::ServerBackend> backend_;
+    std::unique_ptr<game::net::ServerBackend> backend_;
 
     ServerNetwork(
         uint16_t port,
