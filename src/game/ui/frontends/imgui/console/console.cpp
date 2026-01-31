@@ -6,6 +6,7 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "karma/common/json.hpp"
@@ -57,6 +58,25 @@ ImVec4 readColorConfig(const char *path, const ImVec4 &fallback) {
         color.w = readComponent(3, color.w);
     }
     return color;
+}
+
+std::string tabLabelForSpec(const ui::ConsoleTabSpec &spec) {
+    if (spec.labelKey) {
+        return karma::i18n::Get().get(spec.labelKey);
+    }
+    if (spec.fallbackLabel) {
+        return spec.fallbackLabel;
+    }
+    return spec.key ? spec.key : "";
+}
+
+const ui::ConsoleTabSpec *findTabSpec(std::string_view key) {
+    for (const auto &spec : ui::GetConsoleTabSpecs()) {
+        if (spec.key && key == spec.key) {
+            return &spec;
+        }
+    }
+    return nullptr;
 }
 
 }
@@ -301,22 +321,27 @@ void ConsoleView::draw(ImGuiIO &io) {
 
 void ConsoleView::drawTabContent(const std::string &key, const MessageColors &colors) {
     if (key == "community") {
+        drawPanelHeader(key);
         drawCommunityPanel(colors);
         return;
     }
     if (key == "start-server") {
+        drawPanelHeader(key);
         drawStartServerPanel(colors);
         return;
     }
     if (key == "settings") {
+        drawPanelHeader(key);
         drawSettingsPanel(colors);
         return;
     }
     if (key == "bindings") {
+        drawPanelHeader(key);
         drawBindingsPanel(colors);
         return;
     }
     if (key == "documentation") {
+        drawPanelHeader(key);
         drawDocumentationPanel(colors);
         return;
     }
@@ -415,6 +440,28 @@ void ConsoleView::drawPlaceholderPanel(const char *heading,
     ImGui::PushStyleColor(ImGuiCol_Text, colors.notice);
     ImGui::TextWrapped("%s", body);
     ImGui::PopStyleColor();
+}
+
+void ConsoleView::drawPanelHeader(std::string_view tabKey) const {
+    const ui::ConsoleTabSpec *spec = findTabSpec(tabKey);
+    std::string label = spec ? tabLabelForSpec(*spec) : std::string(tabKey);
+    if (label.empty()) {
+        label = std::string(tabKey);
+    }
+
+    if (headingFont) {
+        ImGui::PushFont(headingFont);
+    }
+    ImGui::PushStyleColor(ImGuiCol_Text, headingColor);
+    ImGui::TextUnformatted(label.c_str());
+    ImGui::PopStyleColor();
+    if (headingFont) {
+        ImGui::PopFont();
+    }
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
 }
 
 void ConsoleView::show(const std::vector<CommunityBrowserEntry> &newEntries) {

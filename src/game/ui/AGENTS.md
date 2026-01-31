@@ -51,7 +51,7 @@ and what to tackle next.
 ## Console vs HUD
 
 - The **Console** is the in-game UI with tabs (Community, Start Server, Settings, Bindings, ?).
-- The **HUD** is gameplay overlay (chat, radar, scoreboard, crosshair, fps, dialog).
+- The **HUD** is gameplay overlay (chat, radar, scoreboard, crosshair, fps, dialog, quick menu).
 - The HUD draws beneath the console when connected; when not connected and the console is open,
   the HUD is hidden. This is enforced in `UiSystem::update` and backend draw logic.
 - Crosshair is explicitly suppressed when the console is visible to avoid the “white square” leak.

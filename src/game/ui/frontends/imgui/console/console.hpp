@@ -9,6 +9,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <vector>
 
@@ -93,6 +94,7 @@ private:
     void drawBindingsPanel(const MessageColors &colors);
     void drawDocumentationPanel(const MessageColors &colors) const;
     void drawStartServerPanel(const MessageColors &colors);
+    void drawPanelHeader(std::string_view tabKey) const;
     void drawPlaceholderPanel(const char *heading, const char *body, const MessageColors &colors) const;
     void drawCommunityPanel(const MessageColors &colors);
     void handleConfigChanged();

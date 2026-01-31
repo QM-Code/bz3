@@ -105,7 +105,14 @@ void ClientEngine::earlyUpdate(TimeUtils::duration deltaTime) {
     if (input) {
         input->update(events);
     }
+    const bool allowGameplayInput = !ui || ui->isGameplayInputEnabled();
     inputState = game_input::BuildInputState(*input);
+    if (!allowGameplayInput) {
+        inputState.fire = false;
+        inputState.spawn = false;
+        inputState.jump = false;
+        inputState.movement = {};
+    }
     if (window) {
         window->clearEvents();
     }

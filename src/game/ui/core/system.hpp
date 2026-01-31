@@ -3,6 +3,7 @@
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -10,6 +11,7 @@
 #include "ui/controllers/hud_controller.hpp"
 #include "ui/models/hud_model.hpp"
 #include "ui/core/types.hpp"
+#include "ui/core/validation.hpp"
 #include "ui/console/console_interface.hpp"
 #include "karma/ui/overlay.hpp"
 #include "karma/ui/bridges/renderer_bridge.hpp"
@@ -34,6 +36,8 @@ private:
     ui::HudModel hudModel;
     ui::HudController hudController;
     uint64_t lastConfigRevision = 0;
+    bool validateHudState = false;
+    ui::HudValidator hudValidator;
 
     void update();
     void reloadFonts();
@@ -52,8 +56,14 @@ public:
     void focusChatInput();
     bool getChatInputFocus() const;
     void setDialogVisible(bool show);
+    void setQuickMenuVisible(bool show);
+    void toggleQuickMenuVisible();
+    bool isQuickMenuVisible() const;
+    std::optional<ui::QuickMenuAction> consumeQuickMenuAction();
     bool consumeKeybindingsReloadRequest();
     void setRendererBridge(const ui::RendererBridge *bridge);
     ui::RenderOutput getRenderOutput() const override;
     float getRenderBrightness() const override;
+    bool isUiInputEnabled() const;
+    bool isGameplayInputEnabled() const;
 };

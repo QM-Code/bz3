@@ -55,6 +55,7 @@ Windows:
 - When moving or renaming code/modules, update any related docs in `README.md`, `architecture.md`, and `CONFIG-SCHEMA.md`.
 - If you add a `ReadRequired*Config` or `ui::config::GetRequired*` call, update `ClientRequiredKeys()` / `ServerRequiredKeys()` in `src/engine/common/config_validation.*`.
 - Use `scripts/check_required_config.py` to verify the required-key list stays in sync.
+- Input gating: gameplay input is suppressed when UI input is active (console visible or chat focused). See `src/game/engine/client_engine.cpp` and `src/game/ui/core/system.*` if you need to tweak which actions remain global.
 
 ## Prompt index
 Prompt files live in `docs/agent-prompts/`. Ask to use one by name (title) or file.

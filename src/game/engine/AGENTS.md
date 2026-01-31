@@ -17,3 +17,5 @@ that connect BZ3 to the Karma engine.
 ## Gotchas
 - Keep this layer game-specific; it may wrap engine APIs but should not live
   under `src/engine/`.
+- Gameplay input is gated off when UI input is active; only global actions
+  (chat/escape/quick quit/fullscreen) remain.

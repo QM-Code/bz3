@@ -11,3 +11,14 @@ struct ScoreboardEntry {
     bool communityAdmin = false;
     bool localAdmin = false;
 };
+
+namespace ui {
+
+enum class QuickMenuAction {
+    OpenConsole,
+    Resume,
+    Disconnect,
+    Quit
+};
+
+} // namespace ui

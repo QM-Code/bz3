@@ -20,6 +20,7 @@ struct ClientCLIOptions {
     bool themeExplicit = false;
     bool devQuickStart = false;
     bool strictConfig = true;
+    bool uiSmokeTest = false;
     int verbose = 0;
     std::string logLevel;
     bool logLevelExplicit = false;

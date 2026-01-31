@@ -185,7 +185,7 @@ void Game::lateUpdate(TimeUtils::duration deltaTime) {
         shot->update(deltaTime);
     }
 
-    engine.updateRoamingCamera(deltaTime, focusState == FOCUS_STATE_GAME);
+    engine.updateRoamingCamera(deltaTime, focusState == FOCUS_STATE_GAME && engine.ui->isGameplayInputEnabled());
 
     std::vector<ScoreboardEntry> scoreboard;
     scoreboard.reserve(actors.size());

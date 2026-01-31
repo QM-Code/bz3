@@ -14,6 +14,7 @@ void ImGuiHud::setDialogText(const std::string &text) {
 }
 
 void ImGuiHud::setDialogVisible(bool show) {
+    dialogVisible = show;
     dialog.setVisible(show);
 }
 
@@ -72,6 +73,7 @@ bool ImGuiHud::getChatInputFocus() const {
 }
 
 void ImGuiHud::setShowFps(bool show) {
+    fpsVisible = show;
     fps.setVisible(show);
 }
 

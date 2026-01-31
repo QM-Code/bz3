@@ -189,22 +189,76 @@ void ImGuiBackend::update() {
 
     hud.setScoreboardEntries(hudModel.scoreboardEntries);
     hud.setDialogText(hudModel.dialog.text);
-    hud.setDialogVisible(hudModel.dialog.visible);
     hud.setFpsValue(hudModel.fpsValue);
     hud.setChatLines(hudModel.chatLines);
 
     const bool consoleVisible = consoleView.isVisible();
     const bool hudVisible = hudModel.visibility.hud;
+    quickMenuVisible = hudVisible && hudModel.visibility.quickMenu;
+    const bool suppressHud = quickMenuVisible;
     if (hudVisible) {
-        hud.setScoreboardVisible(hudModel.visibility.scoreboard);
-        hud.setChatVisible(hudModel.visibility.chat);
-        hud.setRadarVisible(hudModel.visibility.radar);
-        hud.setCrosshairVisible(hudModel.visibility.crosshair && !consoleVisible);
-        hud.setShowFps(hudModel.visibility.fps);
+        hud.setScoreboardVisible(!suppressHud && hudModel.visibility.scoreboard);
+        hud.setChatVisible(!suppressHud && hudModel.visibility.chat);
+        hud.setRadarVisible(!suppressHud && hudModel.visibility.radar);
+        hud.setCrosshairVisible(!suppressHud && hudModel.visibility.crosshair && !consoleVisible);
+        hud.setShowFps(!suppressHud && hudModel.visibility.fps);
+        hud.setDialogVisible(!suppressHud && hudModel.dialog.visible);
         hud.draw(io, bigFont);
     }
     if (consoleVisible) {
         consoleView.draw(io);
+    }
+    if (quickMenuVisible) {
+        const auto &i18n = karma::i18n::Get();
+        const std::string title = i18n.get("ui.hud.quick_menu.title");
+        const std::string consoleLabel = i18n.get("ui.hud.quick_menu.console");
+        const std::string resumeLabel = i18n.get("ui.hud.quick_menu.resume");
+        const std::string disconnectLabel = i18n.get("ui.hud.quick_menu.disconnect");
+        const std::string quitLabel = i18n.get("ui.hud.quick_menu.quit");
+        const std::string windowTitle = title + "###QuickMenu";
+        ImGui::SetNextWindowPos(
+            ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f),
+            ImGuiCond_Always,
+            ImVec2(0.5f, 0.5f)
+        );
+        ImGui::SetNextWindowSize(ImVec2(320.0f, 0.0f), ImGuiCond_Always);
+        ImGuiWindowFlags flags = ImGuiWindowFlags_NoResize |
+                                 ImGuiWindowFlags_NoCollapse |
+                                 ImGuiWindowFlags_NoMove |
+                                 ImGuiWindowFlags_NoSavedSettings;
+        ImGui::Begin(windowTitle.c_str(), nullptr, flags);
+        if (ImGui::Button(consoleLabel.c_str(), ImVec2(-1.0f, 0.0f))) {
+            pendingQuickMenuAction = ui::QuickMenuAction::OpenConsole;
+        }
+        if (ImGui::Button(resumeLabel.c_str(), ImVec2(-1.0f, 0.0f))) {
+            pendingQuickMenuAction = ui::QuickMenuAction::Resume;
+        }
+        if (ImGui::Button(disconnectLabel.c_str(), ImVec2(-1.0f, 0.0f))) {
+            pendingQuickMenuAction = ui::QuickMenuAction::Disconnect;
+        }
+        if (ImGui::Button(quitLabel.c_str(), ImVec2(-1.0f, 0.0f))) {
+            pendingQuickMenuAction = ui::QuickMenuAction::Quit;
+        }
+        ImGui::End();
+    }
+
+    lastHudRenderState.hudVisible = hudVisible;
+    if (hudVisible) {
+        lastHudRenderState.scoreboardVisible = hud.isScoreboardVisible();
+        lastHudRenderState.chatVisible = hud.isChatVisible();
+        lastHudRenderState.radarVisible = hud.isRadarVisible();
+        lastHudRenderState.crosshairVisible = hud.isCrosshairVisible();
+        lastHudRenderState.fpsVisible = hud.isFpsVisible();
+        lastHudRenderState.dialogVisible = hud.isDialogVisible();
+        lastHudRenderState.quickMenuVisible = quickMenuVisible;
+    } else {
+        lastHudRenderState.scoreboardVisible = false;
+        lastHudRenderState.chatVisible = false;
+        lastHudRenderState.radarVisible = false;
+        lastHudRenderState.crosshairVisible = false;
+        lastHudRenderState.fpsVisible = false;
+        lastHudRenderState.dialogVisible = false;
+        lastHudRenderState.quickMenuVisible = false;
     }
 
     ImGui::Render();
@@ -268,6 +322,15 @@ bool ImGuiBackend::getChatInputFocus() const {
 
 bool ImGuiBackend::consumeKeybindingsReloadRequest() {
     return consoleView.consumeKeybindingsReloadRequest();
+}
+
+std::optional<ui::QuickMenuAction> ImGuiBackend::consumeQuickMenuAction() {
+    if (!pendingQuickMenuAction) {
+        return std::nullopt;
+    }
+    auto action = *pendingQuickMenuAction;
+    pendingQuickMenuAction.reset();
+    return action;
 }
 
 void ImGuiBackend::setRendererBridge(const ui::RendererBridge *bridge) {

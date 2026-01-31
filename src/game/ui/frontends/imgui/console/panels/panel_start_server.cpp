@@ -441,24 +441,12 @@ bool ConsoleView::launchLocalServer(LocalServerProcess &server, std::string &err
 
 void ConsoleView::drawStartServerPanel(const MessageColors &colors) {
     auto &i18n = karma::i18n::Get();
-    const bool hasHeadingFont = (headingFont != nullptr);
-    if (hasHeadingFont) {
-        ImGui::PushFont(headingFont);
-    }
-    ImGui::TextUnformatted(i18n.get("ui.console.start_server.title").c_str());
-    if (hasHeadingFont) {
-        ImGui::PopFont();
-    }
-    ImGui::Spacing();
 
     const std::string serverBinary = findServerBinary();
     if (serverBinary.empty()) {
         ImGui::TextColored(colors.error, "%s", i18n.get("ui.console.start_server.server_binary_missing").c_str());
+        ImGui::Spacing();
     }
-
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
 
     if (serverAdvertiseHostBuffer[0] == '\0') {
         std::string advertiseHost = ui::config::GetRequiredString("network.ServerAdvertiseHost");

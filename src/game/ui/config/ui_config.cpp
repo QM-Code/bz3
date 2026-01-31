@@ -165,6 +165,10 @@ bool UiConfig::GetHudCrosshair() {
     return readBool("ui.hud.crosshair", kDefaultHudCrosshair);
 }
 
+bool UiConfig::GetValidateUi() {
+    return readBool("ui.Validate", kDefaultValidateUi);
+}
+
 bool UiConfig::SetHudScoreboard(bool value) {
     return karma::config::ConfigStore::Set("ui.hud.scoreboard", value);
 }

@@ -37,6 +37,12 @@ public:
 
     void setShowFps(bool show);
     void draw(ImGuiIO &io, ImFont *bigFont);
+    bool isScoreboardVisible() const { return scoreboardVisible; }
+    bool isChatVisible() const { return chatVisible; }
+    bool isRadarVisible() const { return radarVisible; }
+    bool isCrosshairVisible() const { return crosshairVisible; }
+    bool isFpsVisible() const { return fpsVisible; }
+    bool isDialogVisible() const { return dialogVisible; }
 
 private:
     ImGuiHudScoreboard scoreboard;
@@ -49,6 +55,8 @@ private:
     bool chatVisible = true;
     bool radarVisible = true;
     bool crosshairVisible = true;
+    bool fpsVisible = false;
+    bool dialogVisible = false;
 };
 
 } // namespace ui

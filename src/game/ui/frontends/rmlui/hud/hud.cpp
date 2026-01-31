@@ -168,11 +168,20 @@ void RmlUiHud::setFpsValue(float fps) {
     }
 }
 
+void RmlUiHud::setQuickMenuVisible(bool visible) {
+    quickMenu.show(visible);
+}
+
+std::optional<QuickMenuAction> RmlUiHud::consumeQuickMenuAction() {
+    return quickMenu.consumeAction();
+}
+
 void RmlUiHud::bindElements() {
     if (!document) {
         return;
     }
     dialog.bind(document, emojiMarkup);
+    quickMenu.bind(document);
     chat.bind(document, emojiMarkup);
     crosshair.bind(document);
     radar.bind(document);

@@ -18,6 +18,7 @@ public:
     static constexpr bool kDefaultHudRadar = true;
     static constexpr bool kDefaultHudFps = false;
     static constexpr bool kDefaultHudCrosshair = true;
+    static constexpr bool kDefaultValidateUi = false;
 
     static float GetRenderBrightness();
     static bool SetRenderBrightness(float value);
@@ -47,6 +48,7 @@ public:
     static bool GetHudRadar();
     static bool GetHudFps();
     static bool GetHudCrosshair();
+    static bool GetValidateUi();
 
     static bool SetHudScoreboard(bool value);
     static bool SetHudChat(bool value);

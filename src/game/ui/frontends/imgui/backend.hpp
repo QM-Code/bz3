@@ -36,10 +36,16 @@ public:
     void focusChatInput() override;
     bool getChatInputFocus() const override;
     bool consumeKeybindingsReloadRequest() override;
+    std::optional<ui::QuickMenuAction> consumeQuickMenuAction() override;
     void setRendererBridge(const ui::RendererBridge *bridge) override;
     ui::RenderOutput getRenderOutput() const override;
     float getRenderBrightness() const override { return consoleView.getRenderBrightness(); }
     bool isRenderBrightnessDragActive() const override;
+    bool isUiInputEnabled() const override {
+        return consoleView.isVisible() || hud.getChatInputFocus() || quickMenuVisible;
+    }
+    const char *name() const override { return "imgui"; }
+    ui::HudRenderState getHudRenderState() const override { return lastHudRenderState; }
 
 private:
     platform::Window *window = nullptr;
@@ -54,6 +60,9 @@ private:
     std::optional<std::string> pendingLanguage;
     bool fontsDirty = false;
     bool outputVisible = false;
+    bool quickMenuVisible = false;
+    std::optional<ui::QuickMenuAction> pendingQuickMenuAction;
+    ui::HudRenderState lastHudRenderState{};
     void drawTexture(const graphics::TextureHandle& texture);
 };
 

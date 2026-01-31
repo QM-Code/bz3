@@ -24,6 +24,7 @@ set(GAME_CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/game/input/bindings.cpp
     ${PROJECT_SOURCE_DIR}/src/game/input/state.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/core/system.cpp
+    ${PROJECT_SOURCE_DIR}/src/game/ui/core/validation.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/core/backend_factory.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/config/config.cpp
     ${PROJECT_SOURCE_DIR}/src/game/ui/config/ui_config.cpp
@@ -87,6 +88,7 @@ elseif(KARMA_UI_BACKEND STREQUAL "rmlui")
         ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/console/panels/panel_bindings.cpp
         ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/console/panels/panel_documentation.cpp
         ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/console/panels/panel_start_server.cpp
+        ${PROJECT_SOURCE_DIR}/src/game/ui/frontends/rmlui/hud/quick_menu.cpp
     )
 endif()
 

@@ -149,6 +149,7 @@ required but are commonly referenced across the codebase:
 - `serverName`
 - `worldName`
 - `ui.RenderScale`
+- `ui.Validate`
 - `gui.communityCredentials`
 - `assets.hud.fonts.console.Extras`
 - `assets.hud.fonts.console.Regular.Size`

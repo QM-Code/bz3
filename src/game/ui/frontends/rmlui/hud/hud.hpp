@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -10,6 +11,7 @@
 #include "ui/frontends/rmlui/hud/chat.hpp"
 #include "ui/frontends/rmlui/hud/crosshair.hpp"
 #include "ui/frontends/rmlui/hud/dialog.hpp"
+#include "ui/frontends/rmlui/hud/quick_menu.hpp"
 #include "ui/frontends/rmlui/hud/radar.hpp"
 #include "ui/frontends/rmlui/hud/scoreboard.hpp"
 
@@ -55,6 +57,15 @@ public:
     void setCrosshairVisible(bool visible);
     void setFpsVisible(bool visible);
     void setFpsValue(float fps);
+    void setQuickMenuVisible(bool visible);
+    std::optional<QuickMenuAction> consumeQuickMenuAction();
+    bool isScoreboardVisible() const { return scoreboardVisible; }
+    bool isChatVisible() const { return chatVisible; }
+    bool isRadarVisible() const { return radarVisible; }
+    bool isCrosshairVisible() const { return crosshairVisible; }
+    bool isFpsVisible() const { return fpsVisible; }
+    bool isDialogVisible() const { return dialog.isVisible(); }
+    bool isQuickMenuVisible() const { return quickMenu.isVisible(); }
 
 private:
     Rml::Context *context = nullptr;
@@ -63,6 +74,7 @@ private:
     EmojiMarkupFn emojiMarkup;
 
     RmlUiHudDialog dialog;
+    RmlUiHudQuickMenu quickMenu;
     RmlUiHudChat chat;
     RmlUiHudCrosshair crosshair;
     RmlUiHudRadar radar;

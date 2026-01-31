@@ -19,6 +19,7 @@ struct HudVisibility {
     bool radar = true;
     bool fps = false;
     bool crosshair = true;
+    bool quickMenu = false;
 };
 
 struct HudModel {

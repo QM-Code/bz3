@@ -79,6 +79,12 @@ You can verify the required-key list stays in sync with code using:
 
 - `scripts/check_required_config.py`
 
+### UI smoke test
+
+The client has a lightweight HUD smoke test that toggles visibility flags on a timer:
+
+- `./build/bz3 --ui-smoke`
+
 ## Overview (Libraries in Use)
 
 Rendering and windowing

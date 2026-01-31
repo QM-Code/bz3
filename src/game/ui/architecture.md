@@ -12,7 +12,7 @@ The UI subsystem exposes a single backend interface (`ui::Backend`) and two fron
 
 The UI is split into two surfaces:
 - **Console**: multi-tab UI (Community, Start Server, Settings, Bindings, ?)
-- **HUD**: gameplay overlay (chat, radar, scoreboard, crosshair, FPS, dialog)
+- **HUD**: gameplay overlay (chat, radar, scoreboard, crosshair, FPS, dialog, quick menu)
 
 Both frontends render HUD first, then Console (so the console overlays the HUD). The HUD can be forced off while the console is visible, depending on connection state.
 
@@ -24,6 +24,9 @@ Both frontends render HUD first, then Console (so the console overlays the HUD).
   - Reads `ConfigStore::Revision()` and updates HUD visibility flags from config.
   - Sets `hudModel.visibility.hud` based on connection + console visibility.
   - Sends the model to the backend and calls `backend->update()`.
+- Optional parity tooling:
+  - `ui.Validate` (config) enables HUD visibility self-checks per backend.
+  - `--ui-smoke` (client CLI) toggles HUD elements on a timer for quick manual parity checks.
 
 ### `ui::Backend` (`src/game/ui/core/backend.hpp`)
 Key responsibilities:
@@ -60,6 +63,9 @@ Key responsibilities:
 
 - Each backend maps `platform::Event` into its UI system.
 - Mapping logic is duplicated between ImGui and RmlUi and should be unified (`TODO.md`).
+- Gameplay input is suppressed when UI input is active (console visible or chat focused).
+  - The UI still receives input, and “global” actions (chat/escape/quick quit/fullscreen) remain active.
+  - See `src/game/engine/client_engine.cpp` for the input gating rules.
 
 ## 6) Config and persistence
 
@@ -73,6 +79,7 @@ Important: UI code should not load or write JSON files directly (except the Star
 
 - **Console**: tabbed UI with panels implemented separately per frontend.
 - **HUD**: overlay components (chat/radar/scoreboard/crosshair/fps/dialog).
+- **Quick menu**: modal HUD overlay (resume/disconnect/quit), toggled by Escape.
 - The HUD is suppressed behind the console when **not connected**.
 - Crosshair is explicitly disabled while the console is visible to avoid a "white square" leak.
 

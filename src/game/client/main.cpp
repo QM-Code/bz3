@@ -24,6 +24,7 @@
 #include "karma/common/config_validation.hpp"
 #include "karma/common/i18n.hpp"
 #include "karma/platform/window.hpp"
+#include "ui/config/ui_config.hpp"
 
 #if !defined(_WIN32)
 #include <csignal>
@@ -51,6 +52,11 @@ struct QuickStartServer {
         }
 #endif
     }
+};
+
+struct UiSmokeTimer {
+    float elapsed = 0.0f;
+    int phase = 0;
 };
 
 std::string findServerBinary() {
@@ -247,6 +253,26 @@ public:
                 engine_.network->disconnect("Disconnected from server.");
             }
         }
+        if (auto action = engine_.ui->consumeQuickMenuAction()) {
+            switch (*action) {
+            case ui::QuickMenuAction::OpenConsole:
+                engine_.ui->setQuickMenuVisible(false);
+                engine_.ui->console().show({});
+                break;
+            case ui::QuickMenuAction::Resume:
+                engine_.ui->setQuickMenuVisible(false);
+                break;
+            case ui::QuickMenuAction::Disconnect:
+                if (game_) {
+                    engine_.network->disconnect("Disconnected from server.");
+                }
+                engine_.ui->setQuickMenuVisible(false);
+                break;
+            case ui::QuickMenuAction::Quit:
+                window_.requestClose();
+                break;
+            }
+        }
 
         if (auto disconnectEvent = engine_.network->consumeDisconnectEvent()) {
             if (game_) {
@@ -256,8 +282,18 @@ public:
         }
 
         const bool consoleVisible = engine_.ui->console().isVisible();
-        if (consoleVisible) {
-            engine_.inputState = {};
+        if (cliOptions_.uiSmokeTest) {
+            updateUiSmokeTest(dt);
+        }
+        if (game_ && consoleVisible && engine_.getInputState().escape) {
+            engine_.ui->console().hide();
+        }
+        if (game_ && engine_.getInputState().escape) {
+            if (engine_.ui->isQuickMenuVisible()) {
+                engine_.ui->setQuickMenuVisible(false);
+            } else if (!consoleVisible) {
+                engine_.ui->setQuickMenuVisible(true);
+            }
         }
         if (!consoleVisible && engine_.getInputState().toggleFullscreen) {
             const bool wasFullscreen = window_.isFullscreen();
@@ -296,6 +332,7 @@ private:
     ClientCLIOptions cliOptions_;
     std::unique_ptr<Game> &game_;
     QuickStartServer quickStartServer_;
+    UiSmokeTimer uiSmokeTimer_;
     bool quickStartPending_ = false;
     int quickStartAttempts_ = 0;
     TimeUtils::time quickStartLastAttempt_ = TimeUtils::GetCurrentTime();
@@ -303,6 +340,49 @@ private:
     const float quickStartRetryDelay_ = 0.5f;
     const int quickStartMaxAttempts_ = 20;
     float lastDt_ = 0.0f;
+
+    void updateUiSmokeTest(float dt) {
+        uiSmokeTimer_.elapsed += dt;
+        if (uiSmokeTimer_.elapsed < 2.0f) {
+            return;
+        }
+        uiSmokeTimer_.elapsed = 0.0f;
+        uiSmokeTimer_.phase = (uiSmokeTimer_.phase + 1) % 6;
+        switch (uiSmokeTimer_.phase) {
+        case 0:
+            ui::UiConfig::SetHudScoreboard(true);
+            ui::UiConfig::SetHudChat(true);
+            ui::UiConfig::SetHudRadar(true);
+            ui::UiConfig::SetHudFps(false);
+            ui::UiConfig::SetHudCrosshair(true);
+            engine_.ui->setDialogVisible(false);
+            spdlog::info("ui-smoke: baseline HUD on");
+            break;
+        case 1:
+            ui::UiConfig::SetHudScoreboard(false);
+            spdlog::info("ui-smoke: scoreboard off");
+            break;
+        case 2:
+            ui::UiConfig::SetHudChat(false);
+            spdlog::info("ui-smoke: chat off");
+            break;
+        case 3:
+            ui::UiConfig::SetHudRadar(false);
+            spdlog::info("ui-smoke: radar off");
+            break;
+        case 4:
+            ui::UiConfig::SetHudFps(true);
+            spdlog::info("ui-smoke: fps on");
+            break;
+        case 5:
+            engine_.ui->setDialogText("UI smoke test");
+            engine_.ui->setDialogVisible(true);
+            spdlog::info("ui-smoke: dialog on");
+            break;
+        default:
+            break;
+        }
+    }
 };
 }
 

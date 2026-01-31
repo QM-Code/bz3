@@ -27,13 +27,22 @@ void UiSystem::update() {
         hudModel.visibility.radar = ui::UiConfig::GetHudRadar();
         hudModel.visibility.fps = ui::UiConfig::GetHudFps();
         hudModel.visibility.crosshair = ui::UiConfig::GetHudCrosshair();
+        validateHudState = ui::UiConfig::GetValidateUi();
     }
     const bool consoleVisible = backend->console().isVisible();
     const bool connected = backend->console().getConnectionState().connected;
     hudModel.visibility.hud = connected || !consoleVisible;
+    if (!hudModel.visibility.hud || consoleVisible) {
+        hudModel.visibility.quickMenu = false;
+    }
     hudController.tick();
     backend->setHudModel(hudModel);
     backend->update();
+    if (validateHudState) {
+        const ui::HudRenderState expected = ui::BuildExpectedHudState(hudModel, consoleVisible);
+        const ui::HudRenderState actual = backend->getHudRenderState();
+        hudValidator.validate(expected, actual, backend->name());
+    }
 }
 
 void UiSystem::reloadFonts() {
@@ -85,6 +94,25 @@ void UiSystem::setDialogVisible(bool show) {
     hudController.setDialogVisible(show);
 }
 
+void UiSystem::setQuickMenuVisible(bool show) {
+    hudModel.visibility.quickMenu = show;
+}
+
+void UiSystem::toggleQuickMenuVisible() {
+    hudModel.visibility.quickMenu = !hudModel.visibility.quickMenu;
+}
+
+bool UiSystem::isQuickMenuVisible() const {
+    return hudModel.visibility.quickMenu;
+}
+
+std::optional<ui::QuickMenuAction> UiSystem::consumeQuickMenuAction() {
+    if (!backend) {
+        return std::nullopt;
+    }
+    return backend->consumeQuickMenuAction();
+}
+
 bool UiSystem::consumeKeybindingsReloadRequest() {
     return backend->consumeKeybindingsReloadRequest();
 }
@@ -105,4 +133,12 @@ float UiSystem::getRenderBrightness() const {
         return 1.0f;
     }
     return backend->getRenderBrightness();
+}
+
+bool UiSystem::isUiInputEnabled() const {
+    return backend && backend->isUiInputEnabled();
+}
+
+bool UiSystem::isGameplayInputEnabled() const {
+    return !isUiInputEnabled();
 }

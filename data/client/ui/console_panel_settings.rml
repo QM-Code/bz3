@@ -1,6 +1,6 @@
 <div class="panel settings-panel">
     <div class="panel-header settings-header">
-        <span class="panel-header-title">Settings</span>
+        <span class="panel-header-title" data-i18n="ui.console.tabs.settings"></span>
     </div>
     <div class="settings-body">
         <div class="settings-brightness">
