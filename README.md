@@ -14,22 +14,6 @@ BZ3 is a C++20 client/server 3D game inspired by BZFlag.
 
 This project uses vcpkg to provide most native dependencies and the setup scripts automatically configure CMake with the correct toolchain.
 
-## Optional: The Forge renderer backend
-
-The Forge is not bundled and must be cloned manually if you want to build with `-DKARMA_RENDER_BACKEND=forge`.
-
-- Linux/macOS:
-
-  - `git clone https://github.com/ConfettiFX/The-Forge.git third_party/the-forge`
-- Windows (PowerShell or cmd):
-
-  - `git clone https://github.com/ConfettiFX/The-Forge.git third_party\the-forge`
-
-The setup scripts can do this automatically if you set `KARMA_SETUP_FORGE=1`:
-
-- Linux/macOS: `KARMA_SETUP_FORGE=1 ./setup.sh`
-- Windows: `set KARMA_SETUP_FORGE=1` then `setup.bat`
-
 ## Runtime Data
 
 The programs load assets/config from a data root resolved via the `KARMA_DATA_DIR` environment variable (configured by `src/game/common/data_path_spec.*`).
@@ -101,7 +85,7 @@ Networking
 - Custom LAN discovery protocol (see `src/game/net/discovery_protocol.hpp`)
 
 Simulation
-- **Jolt** or **Bullet** (physics, selectable)
+- **Jolt** or **PhysX** (physics, selectable)
 - **glm** (math)
 
 Other
@@ -154,8 +138,8 @@ Backend layouts (examples)
 - `src/engine/audio/backends/miniaudio/` and `src/engine/audio/backends/sdl/`
 - `src/engine/platform/backends/` (currently `sdl3`, with an `sdl2` stub)
 - `src/game/ui/frontends/imgui/` and `src/game/ui/frontends/rmlui/`
-- `src/engine/physics/backends/jolt/` and `src/engine/physics/backends/bullet/`
-- `src/engine/graphics/backends/bgfx/`, `src/engine/graphics/backends/diligent/`, `src/engine/graphics/backends/forge/`
+- `src/engine/physics/backends/jolt/` and `src/engine/physics/backends/physx/`
+- `src/engine/graphics/backends/bgfx/` and `src/engine/graphics/backends/diligent/`
 - `src/game/net/backends/enet/` (future: steam, webrtc, etc.)
 - `src/engine/world/backends/fs/` (future: zip, remote, etc.)
 - `src/engine/input/mapping/` (action-agnostic mapping: bindings, maps, mapper)
@@ -167,24 +151,24 @@ These CMake cache variables select backends at build time:
 
 - `KARMA_UI_BACKEND=imgui|rmlui`
 - `KARMA_WINDOW_BACKEND=sdl3|sdl2`
-- `KARMA_PHYSICS_BACKEND=jolt|bullet|physx`
+- `KARMA_PHYSICS_BACKEND=jolt|physx`
 - `KARMA_AUDIO_BACKEND=miniaudio|sdlaudio`
-- `KARMA_RENDER_BACKEND=bgfx|diligent|forge`
+- `KARMA_RENDER_BACKEND=bgfx|diligent`
 - `KARMA_NETWORK_BACKEND=enet`
 - `KARMA_WORLD_BACKEND=fs`
 
 Example:
 
 ```bash
-cmake -S . -B build-sdl3-rmlui-bullet-sdlaudio-bgfx-enet-fs \
+cmake -S . -B build-sdl3-rmlui-sdlaudio-bgfx-enet-fs \
   -DKARMA_WINDOW_BACKEND=sdl3 \
   -DKARMA_UI_BACKEND=rmlui \
-  -DKARMA_PHYSICS_BACKEND=bullet \
+  -DKARMA_PHYSICS_BACKEND=jolt \
   -DKARMA_AUDIO_BACKEND=sdlaudio \
   -DKARMA_RENDER_BACKEND=bgfx \
   -DKARMA_NETWORK_BACKEND=enet \
   -DKARMA_WORLD_BACKEND=fs
-cmake --build build-sdl3-rmlui-bullet-sdlaudio-bgfx-enet-fs
+cmake --build build-sdl3-rmlui-sdlaudio-bgfx-enet-fs
 ```
 
 ## Input bindings

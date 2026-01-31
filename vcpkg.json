@@ -16,7 +16,6 @@
         "rtti"
       ]
     },
-    "bullet3",
     "physx",
     "assimp",
     "opengl",

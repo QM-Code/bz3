@@ -20,10 +20,8 @@
 #include "karma/ui/platform/rmlui/renderer_bgfx.hpp"
 #elif defined(KARMA_RENDER_BACKEND_DILIGENT)
 #include "karma/ui/platform/rmlui/renderer_diligent.hpp"
-#elif defined(KARMA_RENDER_BACKEND_FORGE)
-#include "karma/ui/platform/rmlui/renderer_forge.hpp"
 #else
-#error "RmlUi backend requires BGFX, Diligent, or Forge renderer."
+#error "RmlUi backend requires BGFX or Diligent renderer."
 #endif
 #include "ui/frontends/rmlui/console/emoji_utils.hpp"
 #include "ui/frontends/rmlui/translate.hpp"
@@ -168,8 +166,6 @@ struct RmlUiBackend::RmlUiState {
     RenderInterface_BGFX renderInterface;
 #elif defined(KARMA_RENDER_BACKEND_DILIGENT)
     RenderInterface_Diligent renderInterface;
-#elif defined(KARMA_RENDER_BACKEND_FORGE)
-    RenderInterface_Forge renderInterface;
 #endif
     Rml::Context *context = nullptr;
     Rml::ElementDocument *document = nullptr;
@@ -219,12 +215,6 @@ RmlUiBackend::RmlUiBackend(platform::Window &windowRefIn) : windowRef(&windowRef
         return;
     }
     spdlog::info("RmlUi: Diligent renderer initialized.");
-#elif defined(KARMA_RENDER_BACKEND_FORGE)
-    if (!state->renderInterface) {
-        spdlog::error("RmlUi: failed to initialize Forge renderer.");
-        return;
-    }
-    spdlog::info("RmlUi: Forge renderer initialized.");
 #endif
 
     if (!Rml::Initialise()) {
@@ -250,15 +240,7 @@ RmlUiBackend::RmlUiBackend(platform::Window &windowRefIn) : windowRef(&windowRef
 
     float dpRatio = 1.0f;
     if (windowRef) { dpRatio = windowRef->getContentScale(); }
-#if defined(KARMA_RENDER_BACKEND_FORGE)
-    const float scaledDpRatio = dpRatio;
-#else
-    #if defined(KARMA_RENDER_BACKEND_FORGE)
-    const float scaledDpRatio = dpRatio;
-    #else
     const float scaledDpRatio = dpRatio / std::max(renderScale, 0.0001f);
-    #endif
-#endif
     state->lastDpRatio = scaledDpRatio;
     state->context->SetDensityIndependentPixelRatio(scaledDpRatio);
 

@@ -56,10 +56,6 @@ if(KARMA_UI_BACKEND STREQUAL "imgui")
         list(APPEND ENGINE_CLIENT_SOURCES
         ${PROJECT_SOURCE_DIR}/src/engine/ui/platform/imgui/renderer_diligent.cpp
         )
-    elseif(KARMA_RENDER_BACKEND STREQUAL "forge")
-        list(APPEND ENGINE_CLIENT_SOURCES
-        ${PROJECT_SOURCE_DIR}/src/engine/ui/platform/imgui/renderer_forge.cpp
-        )
     endif()
 elseif(KARMA_UI_BACKEND STREQUAL "rmlui")
     if(KARMA_RENDER_BACKEND STREQUAL "bgfx")
@@ -69,10 +65,6 @@ elseif(KARMA_UI_BACKEND STREQUAL "rmlui")
     elseif(KARMA_RENDER_BACKEND STREQUAL "diligent")
         list(APPEND ENGINE_CLIENT_SOURCES
         ${PROJECT_SOURCE_DIR}/src/engine/ui/platform/rmlui/renderer_diligent.cpp
-        )
-    elseif(KARMA_RENDER_BACKEND STREQUAL "forge")
-        list(APPEND ENGINE_CLIENT_SOURCES
-        ${PROJECT_SOURCE_DIR}/src/engine/ui/platform/rmlui/renderer_forge.cpp
         )
     endif()
 endif()
@@ -90,13 +82,6 @@ if(KARMA_PHYSICS_BACKEND STREQUAL "jolt")
         ${PROJECT_SOURCE_DIR}/src/engine/physics/backends/jolt/rigid_body_jolt.cpp
         ${PROJECT_SOURCE_DIR}/src/engine/physics/backends/jolt/static_body_jolt.cpp
         ${PROJECT_SOURCE_DIR}/src/engine/physics/backends/jolt/player_controller_jolt.cpp
-    )
-elseif(KARMA_PHYSICS_BACKEND STREQUAL "bullet")
-    list(APPEND PHYSICS_SOURCES
-        ${PROJECT_SOURCE_DIR}/src/engine/physics/backends/bullet/physics_world_bullet.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/physics/backends/bullet/rigid_body_bullet.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/physics/backends/bullet/static_body_bullet.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/physics/backends/bullet/player_controller_bullet.cpp
     )
 elseif(KARMA_PHYSICS_BACKEND STREQUAL "physx")
     list(APPEND PHYSICS_SOURCES
@@ -130,12 +115,6 @@ if(KARMA_RENDER_BACKEND STREQUAL "diligent")
 elseif(KARMA_RENDER_BACKEND STREQUAL "bgfx")
     list(APPEND ENGINE_CLIENT_SOURCES
         ${PROJECT_SOURCE_DIR}/src/engine/graphics/backends/bgfx/backend.cpp
-    )
-elseif(KARMA_RENDER_BACKEND STREQUAL "forge")
-    list(APPEND ENGINE_CLIENT_SOURCES
-        ${PROJECT_SOURCE_DIR}/src/engine/graphics/backends/forge/backend.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/graphics/backends/forge/ui_bridge.cpp
-        ${PROJECT_SOURCE_DIR}/src/engine/graphics/backends/forge/reload_stubs.cpp
     )
 endif()
 
@@ -209,24 +188,10 @@ if(KARMA_RENDER_BACKEND STREQUAL "diligent")
     endif()
 elseif(KARMA_RENDER_BACKEND STREQUAL "bgfx")
     target_link_libraries(karma PRIVATE bgfx::bgfx)
-elseif(KARMA_RENDER_BACKEND STREQUAL "forge")
-    target_link_libraries(karma PRIVATE the_forge)
 endif()
 if(KARMA_PHYSICS_BACKEND STREQUAL "jolt")
     target_link_libraries(karma PRIVATE Jolt::Jolt)
     target_link_libraries(karma_server PRIVATE Jolt::Jolt)
-elseif(KARMA_PHYSICS_BACKEND STREQUAL "bullet")
-    if(TARGET Bullet::Bullet)
-        target_link_libraries(karma PRIVATE Bullet::Bullet)
-        target_link_libraries(karma_server PRIVATE Bullet::Bullet)
-    elseif(DEFINED BULLET_LIBRARIES)
-        target_link_libraries(karma PRIVATE ${BULLET_LIBRARIES})
-        target_link_libraries(karma_server PRIVATE ${BULLET_LIBRARIES})
-    endif()
-    if(DEFINED BULLET_INCLUDE_DIRS)
-        target_include_directories(karma PRIVATE ${BULLET_INCLUDE_DIRS})
-        target_include_directories(karma_server PRIVATE ${BULLET_INCLUDE_DIRS})
-    endif()
 elseif(KARMA_PHYSICS_BACKEND STREQUAL "physx")
     target_link_libraries(karma PRIVATE unofficial::omniverse-physx-sdk::sdk)
     target_link_libraries(karma PRIVATE

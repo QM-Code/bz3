@@ -40,10 +40,10 @@ and what to tackle next.
   - `console/`: panels are class-based (`panel_*`), RML/RCSS templates live in `data/client/ui`.
   - `hud/`: RmlUi HUD document and components.
 
-### Rendering bridges (BGFX/Diligent/Forge)
+### Rendering bridges (BGFX/Diligent)
 - ImGui uses `engine/graphics/ui_bridge.hpp` and backend-specific bridges under
   `src/engine/graphics/backends/*`.
-- RmlUi uses render interfaces in `src/engine/ui/platform/rmlui/renderer_{bgfx,diligent,forge}.*`.
+- RmlUi uses render interfaces in `src/engine/ui/platform/rmlui/renderer_{bgfx,diligent}.*`.
 - RmlUi renderers expose output textures for the shared render bridge; see `engine/ui/bridges/` + RmlUi platform renderers.
 
 ## Console vs HUD

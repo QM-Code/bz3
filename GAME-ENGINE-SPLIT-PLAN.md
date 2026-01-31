@@ -36,7 +36,7 @@ These modules are engine‑agnostic or are toolkit glue that should be reusable 
 - The UI frontends (ImGui/RmlUi) are game‑specific because they encode HUD/Console structure.
 - But render bridges and backend glue are engine‑agnostic:
   - Move `src/game/ui/bridges/*` into `src/engine/ui/bridges/*`.
-  - Move toolkit platform renderers (`renderer_bgfx/diligent/forge.*`) under `src/engine/ui/platform/`.
+  - Move toolkit platform renderers (`renderer_bgfx/diligent.*`) under `src/engine/ui/platform/`.
   - Keep `src/game/ui/frontends/*` for layout, panels, HUD widgets.
 
 ### 3) Networking
@@ -67,7 +67,7 @@ These modules are engine‑agnostic or are toolkit glue that should be reusable 
 - **Namespace rename**: `bz::` → `karma::` across codebase.
 - **UI overlay + render‑to‑texture**: engine owns bridge; game owns HUD/Console.
 - **ECS in engine**: `ecs::World`, components, render system in place.
-- **Render pipeline integration**: ECS render path feeding engine backends (bgfx/diligent/forge).
+- **Render pipeline integration**: ECS render path feeding engine backends (bgfx/diligent).
 - **Networking split**: transport in engine, protocol + backend adapters in game (`src/game/net/*`).
 - **Binding text helpers**: moved `IsMouseBindingName` / join/split helpers to `src/engine/input/bindings_text.*`.
 - **Build split**: engine now builds as object targets (`karma`, `karma_server`) and game links them; build output shows `karma.dir` vs `bz3.dir`.

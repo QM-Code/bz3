@@ -47,11 +47,11 @@ Key responsibilities:
 
 ### ImGui path
 - Uses `ui::RendererBridge` and `engine/graphics/ui_render_target_bridge.hpp` to render into a texture.
-- Platform renderers live under `src/engine/ui/platform/imgui/renderer_{bgfx,diligent,forge}.*`.
+- Platform renderers live under `src/engine/ui/platform/imgui/renderer_{bgfx,diligent}.*`.
 - `ImGuiBackend::getRenderOutput()` returns a valid texture + visibility when the console or HUD drew.
 
 ### RmlUi path
-- Uses RmlUi `RenderInterface` implementations in `src/engine/ui/platform/rmlui/renderer_{bgfx,diligent,forge}`.
+- Uses RmlUi `RenderInterface` implementations in `src/engine/ui/platform/rmlui/renderer_{bgfx,diligent}`.
 - `RenderOutput` is provided by both frontends and is always composited by the renderer.
 
 ## 5) Input handling
@@ -133,7 +133,7 @@ Any frontend changes that add UI elements generally require editing these asset 
 
 - **HUD visibility logic** lives in `UiSystem::update` (depends on connection + console visibility).
 - **Crosshair leak** is handled by disabling crosshair when console is visible.
-- **RmlUi output texture** is expected to be available across BGFX/Diligent/Forge.
+- **RmlUi output texture** is expected to be available across BGFX/Diligent.
 - **ConfigStore** is authoritative; do not read/write JSON files in UI code.
 - **Start Server panels** still write a JSON override file for spawned servers; this is an intentional exception for now.
 

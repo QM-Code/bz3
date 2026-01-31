@@ -13,14 +13,6 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 enable_language(ASM)
 
-set(THE_FORGE_DIR "${PROJECT_SOURCE_DIR}/third_party/the-forge" CACHE PATH "The Forge root directory")
-if(EXISTS "${THE_FORGE_DIR}/Common_3")
-    add_library(the_forge_headers INTERFACE)
-    target_include_directories(the_forge_headers INTERFACE "${THE_FORGE_DIR}")
-else()
-    message(STATUS "The Forge not found at ${THE_FORGE_DIR}; clone it to enable Forge integration.")
-endif()
-
 set(KARMA_UI_BACKEND "imgui" CACHE STRING "UI backend (imgui or rmlui)")
 set_property(CACHE KARMA_UI_BACKEND PROPERTY STRINGS imgui rmlui)
 if(KARMA_UI_BACKEND STREQUAL "imgui")
@@ -43,12 +35,10 @@ else()
     message(FATAL_ERROR "Unknown KARMA_WINDOW_BACKEND value: ${KARMA_WINDOW_BACKEND}")
 endif()
 
-set(KARMA_PHYSICS_BACKEND "jolt" CACHE STRING "Physics backend (jolt or bullet or physx)")
-set_property(CACHE KARMA_PHYSICS_BACKEND PROPERTY STRINGS jolt bullet physx)
+set(KARMA_PHYSICS_BACKEND "jolt" CACHE STRING "Physics backend (jolt or physx)")
+set_property(CACHE KARMA_PHYSICS_BACKEND PROPERTY STRINGS jolt physx)
 if(KARMA_PHYSICS_BACKEND STREQUAL "jolt")
     add_compile_definitions(KARMA_PHYSICS_BACKEND_JOLT)
-elseif(KARMA_PHYSICS_BACKEND STREQUAL "bullet")
-    add_compile_definitions(KARMA_PHYSICS_BACKEND_BULLET)
 elseif(KARMA_PHYSICS_BACKEND STREQUAL "physx")
     add_compile_definitions(KARMA_PHYSICS_BACKEND_PHYSX)
 else()
@@ -81,82 +71,14 @@ else()
     message(FATAL_ERROR "Unknown KARMA_WORLD_BACKEND value: ${KARMA_WORLD_BACKEND}")
 endif()
 
-set(KARMA_RENDER_BACKEND "bgfx" CACHE STRING "Render backend (diligent|bgfx|forge)")
-set_property(CACHE KARMA_RENDER_BACKEND PROPERTY STRINGS diligent bgfx forge)
+set(KARMA_RENDER_BACKEND "bgfx" CACHE STRING "Render backend (diligent|bgfx)")
+set_property(CACHE KARMA_RENDER_BACKEND PROPERTY STRINGS diligent bgfx)
 if(KARMA_RENDER_BACKEND STREQUAL "diligent")
     add_compile_definitions(KARMA_RENDER_BACKEND_DILIGENT)
 elseif(KARMA_RENDER_BACKEND STREQUAL "bgfx")
     add_compile_definitions(KARMA_RENDER_BACKEND_BGFX)
-elseif(KARMA_RENDER_BACKEND STREQUAL "forge")
-    add_compile_definitions(KARMA_RENDER_BACKEND_FORGE)
 else()
     message(FATAL_ERROR "Unknown KARMA_RENDER_BACKEND value: ${KARMA_RENDER_BACKEND}")
-endif()
-
-if(KARMA_RENDER_BACKEND STREQUAL "forge")
-    if(NOT EXISTS "${THE_FORGE_DIR}/Common_3")
-        message(FATAL_ERROR "The Forge not found at ${THE_FORGE_DIR}. Clone https://github.com/ConfettiFX/The-Forge.git into third_party/the-forge.")
-    endif()
-    set(THE_FORGE_GRAPHICS_SOURCES
-        ${THE_FORGE_DIR}/Common_3/Graphics/GraphicsConfig.cpp
-        ${THE_FORGE_DIR}/Common_3/Graphics/Vulkan/Vulkan.c
-        ${THE_FORGE_DIR}/Common_3/Graphics/Vulkan/Vulkan_cxx.cpp
-        ${THE_FORGE_DIR}/Common_3/Graphics/Vulkan/VulkanRaytracing.c
-        ${THE_FORGE_DIR}/Common_3/Graphics/ThirdParty/OpenSource/volk/volk.c
-    )
-    set(THE_FORGE_OS_SOURCES
-        ${THE_FORGE_DIR}/Common_3/OS/Linux/LinuxLog.c
-        ${THE_FORGE_DIR}/Common_3/OS/Linux/LinuxThread.c
-        ${THE_FORGE_DIR}/Common_3/OS/Linux/LinuxTime.c
-        ${THE_FORGE_DIR}/Common_3/OS/Linux/LinuxFileSystem.c
-        ${THE_FORGE_DIR}/Common_3/OS/Linux/LinuxToolsFileSystem.c
-    )
-    set(THE_FORGE_UTIL_SOURCES
-        ${THE_FORGE_DIR}/Common_3/Utilities/Log/Log.c
-        ${THE_FORGE_DIR}/Common_3/Utilities/FileSystem/FileSystem.c
-        ${THE_FORGE_DIR}/Common_3/Utilities/FileSystem/ToolFileSystem.c
-        ${THE_FORGE_DIR}/Common_3/Utilities/FileSystem/UnixFileSystem.c
-        ${THE_FORGE_DIR}/Common_3/Utilities/Threading/ThreadSystem.c
-        ${THE_FORGE_DIR}/Common_3/Utilities/Timer.c
-        ${THE_FORGE_DIR}/Common_3/Utilities/MemoryTracking/MemoryTracking.c
-        ${THE_FORGE_DIR}/Common_3/Utilities/Math/Algorithms.c
-        ${THE_FORGE_DIR}/Common_3/Utilities/Math/StbDs.c
-        ${THE_FORGE_DIR}/Common_3/Resources/ResourceLoader/ResourceLoader.cpp
-        ${THE_FORGE_DIR}/Common_3/Utilities/ThirdParty/OpenSource/lz4/lz4.c
-        ${THE_FORGE_DIR}/Common_3/Utilities/ThirdParty/OpenSource/lz4/lz4hc.c
-        ${THE_FORGE_DIR}/Common_3/Utilities/ThirdParty/OpenSource/bstrlib/bstrlib.c
-        ${THE_FORGE_DIR}/Common_3/Utilities/ThirdParty/OpenSource/bstrlib/buniutil.c
-        ${THE_FORGE_DIR}/Common_3/Utilities/ThirdParty/OpenSource/bstrlib/utf8util.c
-        ${THE_FORGE_DIR}/Common_3/Utilities/ThirdParty/OpenSource/FluidStudios/MemoryManager/mmgr.c
-    )
-    file(GLOB THE_FORGE_ZSTD_COMMON_SOURCES
-        ${THE_FORGE_DIR}/Common_3/Utilities/ThirdParty/OpenSource/zstd/common/*.c
-    )
-    file(GLOB THE_FORGE_ZSTD_COMPRESS_SOURCES
-        ${THE_FORGE_DIR}/Common_3/Utilities/ThirdParty/OpenSource/zstd/compress/*.c
-    )
-    file(GLOB THE_FORGE_ZSTD_DECOMPRESS_SOURCES
-        ${THE_FORGE_DIR}/Common_3/Utilities/ThirdParty/OpenSource/zstd/decompress/*.c
-    )
-    set(THE_FORGE_ZSTD_ASM_SOURCES
-        ${THE_FORGE_DIR}/Common_3/Utilities/ThirdParty/OpenSource/zstd/decompress/huf_decompress_amd64.S
-    )
-    set_source_files_properties(${THE_FORGE_ZSTD_ASM_SOURCES} PROPERTIES LANGUAGE ASM)
-    add_library(the_forge STATIC
-        ${THE_FORGE_GRAPHICS_SOURCES}
-        ${THE_FORGE_OS_SOURCES}
-        ${THE_FORGE_UTIL_SOURCES}
-        ${THE_FORGE_ZSTD_COMMON_SOURCES}
-        ${THE_FORGE_ZSTD_COMPRESS_SOURCES}
-        ${THE_FORGE_ZSTD_DECOMPRESS_SOURCES}
-        ${THE_FORGE_ZSTD_ASM_SOURCES}
-    )
-    target_include_directories(the_forge PUBLIC "${THE_FORGE_DIR}")
-    target_compile_definitions(the_forge PRIVATE
-        FORGE_EXPLICIT_RENDERER_API
-        FORGE_EXPLICIT_RENDERER_API_VULKAN
-        ENABLE_MEMORY_TRACKING
-    )
 endif()
 
 set(CMAKE_BUILD_TYPE Release)
@@ -227,8 +149,6 @@ FetchContent_MakeAvailable(enet)
 find_package(glm REQUIRED)
 if(KARMA_PHYSICS_BACKEND STREQUAL "jolt")
     find_package(Jolt REQUIRED)
-elseif(KARMA_PHYSICS_BACKEND STREQUAL "bullet")
-    find_package(Bullet CONFIG REQUIRED)
 elseif(KARMA_PHYSICS_BACKEND STREQUAL "physx")
     find_package(unofficial-omniverse-physx-sdk CONFIG REQUIRED)
 endif()

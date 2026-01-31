@@ -19,7 +19,7 @@ It’s useful for batch‑processing many similar objects and keeping data/behav
   - Game adapters feed ECS render components from gameplay objects.
 
 - ECS is **not used for physics**:
-  - Physics remains in the engine’s physics system (Jolt/Bullet/PhysX backends).
+  - Physics remains in the engine’s physics system (Jolt/PhysX backends).
   - No physics update loop is driven by ECS.
 
 ## When ECS is a good fit here
