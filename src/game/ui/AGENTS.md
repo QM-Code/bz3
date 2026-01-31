@@ -1,5 +1,7 @@
 # UI AGENTS.md
 
+Read `src/AGENTS.md` and `src/game/AGENTS.md` before this file.
+
 This file is UI-specific onboarding for future coding agents working under `src/game/ui/`.
 It complements the repo-level AGENTS.md and focuses on how the UI subsystem is organized
 and what to tackle next.

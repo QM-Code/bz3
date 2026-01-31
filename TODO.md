@@ -1,7 +1,70 @@
-# TODO
+# TODO (Owner’s Wishlist)
 
-- Consider asset/world loading abstraction for file/zipped/remote sources.
-- Consider input mapping improvements (actions/contexts, controller support) as a separate module.
-- Consider plugin system boundary to isolate plugin loading/runtime.
-- Consider runtime data/asset resolution abstraction to reduce coupling.
-- Consider UI ↔ renderer service boundary for offscreen targets/texture handles.
+This replaces the old list. We are early-stage and can break APIs freely.
+Focus is on long-term clarity, engine/game separation, and developer velocity.
+
+## 1) Engine/Game Split (Highest Priority)
+- Make `src/engine` fully standalone (no game headers, no game data dependencies).
+- Split build into two phases: build Karma as libs → build BZ3 against them.
+- Replace `src/engine/karma/` forwarders with real installed headers once split.
+- Create a Karma build script (parallel to `bzbuild.py`) once it is a separate repo.
+
+## 2) Rendering & Scene Architecture
+- Create a real render graph / pass scheduler (main scene, radar, UI overlay, post).
+- Formalize a “scene” API: camera, layers, lights, renderables, skybox.
+- Decouple game renderer from backend implementation details.
+- Add a minimal debug draw layer (lines, boxes, text) for engine/game diagnostics.
+
+## 3) Asset & World Pipeline
+- Implement a proper asset registry (IDs, refcounts, hot reload hints).
+- Add a world/content abstraction that supports FS + zipped + remote sources.
+- Add a “world package” manifest format for server-delivered content.
+
+## 4) Input System (Usability + Consistency)
+- Add input **contexts** (gameplay vs UI vs roaming vs console).
+- Make bindings fully data-driven, including context precedence.
+- Add explicit controller support (dead zones, axis bindings, mappings).
+
+## 5) UI System (Parity + Tooling)
+- Keep ImGui/RmlUi feature parity as a hard rule.
+- Add a single shared UI state validator to catch frontend divergence.
+- Create a minimal UI smoke harness for regression checks.
+
+## 6) Networking & Protocol
+- Add explicit protocol versioning and compatibility handling.
+- Introduce a client/server capability handshake for optional features.
+- Create a replay/record format for debugging net sync.
+
+## 7) Physics & Simulation
+- Define a clean physics API contract (including query/raycast utilities).
+- Add deterministic or lockstep options where feasible.
+- Standardize player controller semantics across backends.
+
+## 8) Dev/Editor Mode
+- Integrate the roaming/dev camera as a proper “spectator” mode with no body.
+- Add a minimal “world explorer” overlay for inspecting entities, materials,
+  and network state.
+
+## 9) Configuration & Data
+- Formalize config schema docs (engine defaults vs game defaults vs user).
+- Add a config validation pass on startup (strict mode).
+- Add runtime config reload hooks where safe.
+
+## 10) Tooling & Testing
+- Add a lightweight test harness for:
+  - input mapping
+  - config parsing
+  - protocol encode/decode
+  - UI model/controller logic
+- Add CI builds for bgfx+imgui and bgfx+rmlui at minimum.
+
+## 11) Documentation
+- Keep cascading docs up-to-date as code moves.
+- Add a “How to add a new subsystem” guide.
+
+---
+
+Notes:
+- We can break APIs freely during this stage—prefer clean design over compatibility.
+- When unsure about scope, prefer engine-level generalization and push game-specific
+  behavior into `src/game`.
