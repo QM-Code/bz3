@@ -5,6 +5,7 @@
 #include <vector>
 #include <cstring>
 #include <utility>
+#include <glm/gtc/matrix_transform.hpp>
 #include "spdlog/spdlog.h"
 #include "karma/app/engine_app.hpp"
 #include "game/engine/client_engine.hpp"
@@ -16,6 +17,7 @@
 #include "client/config_client.hpp"
 #include "client/server/community_browser_controller.hpp"
 #include "client/server/server_connector.hpp"
+#include "game/net/messages.hpp"
 #include "game/common/data_path_spec.hpp"
 #include "karma/common/data_dir_override.hpp"
 #include "karma/common/data_path_resolver.hpp"
@@ -181,13 +183,24 @@ public:
           cliOptions_(std::move(cliOptions)),
           game_(game) {}
 
-    bool onInit(karma::app::EngineContext &context) override {
-        engine_.render->setResourceRegistry(context.resources);
+    void onStart() override {
+        auto *ctx = context();
+        if (!ctx) {
+            initOk_ = false;
+            return;
+        }
+        lastConfigRevision_ = karma::config::ConfigStore::Revision();
+        lastVsyncEnabled_ = karma::config::ReadBoolConfig({"graphics.VSync"}, true);
+        if (cliOptions_.ecsSmokeTest) {
+            engine_.ui->console().hide();
+            engine_.ui->setQuickMenuVisible(false);
+        }
         if (cliOptions_.devQuickStart) {
             engine_.ui->console().show({});
             if (launchQuickStartServer(cliOptions_, quickStartServer_)) {
                 quickStartPending_ = true;
                 quickStartLastAttempt_ = TimeUtils::GetCurrentTime();
+                quickStartInitialDelayDone_ = false;
             }
         } else if (cliOptions_.addrExplicit) {
             engine_.setRoamingModeSession(false);
@@ -198,23 +211,46 @@ public:
                                      false,
                                      false);
         }
-        return true;
+        if (!initOk_ && ctx->window) {
+            ctx->window->requestClose();
+        }
     }
 
-    void onShutdown(karma::app::EngineContext &) override {}
-
-    void onUpdate(karma::app::EngineContext &, float dt) override {
-        lastDt_ = dt;
-        if (dt < MIN_DELTA_TIME) {
-            TimeUtils::sleep(MIN_DELTA_TIME - dt);
+    void onUpdate(float dt) override {
+        if (!initOk_) {
             return;
         }
+        const uint64_t configRevision = karma::config::ConfigStore::Revision();
+        if (configRevision != lastConfigRevision_) {
+            lastConfigRevision_ = configRevision;
+            const bool vsyncEnabled = karma::config::ReadBoolConfig({"graphics.VSync"}, true);
+            if (vsyncEnabled != lastVsyncEnabled_) {
+                window_.setVsync(vsyncEnabled);
+                lastVsyncEnabled_ = vsyncEnabled;
+            }
+        }
+        lastDt_ = dt;
+        const float effectiveDt = dt < MIN_DELTA_TIME ? MIN_DELTA_TIME : dt;
+        if (dt < MIN_DELTA_TIME) {
+            TimeUtils::sleep(MIN_DELTA_TIME - dt);
+        }
 
-        engine_.earlyUpdate(dt);
+        engine_.earlyUpdate(effectiveDt);
+
+        for (const auto &joinResp : engine_.network->consumeMessages<ServerMsg_JoinResponse>()) {
+            serverConnector_.handleJoinResponse(joinResp);
+        }
 
         if (quickStartPending_ && !engine_.network->isConnected()) {
             const TimeUtils::time now = TimeUtils::GetCurrentTime();
-            if (TimeUtils::GetElapsedTime(quickStartLastAttempt_, now) >= quickStartRetryDelay_) {
+            if (!quickStartInitialDelayDone_) {
+                if (TimeUtils::GetElapsedTime(quickStartLastAttempt_, now) >= quickStartInitialDelay_) {
+                    quickStartInitialDelayDone_ = true;
+                    quickStartLastAttempt_ = now;
+                }
+            }
+            if (quickStartInitialDelayDone_ &&
+                TimeUtils::GetElapsedTime(quickStartLastAttempt_, now) >= quickStartRetryDelay_) {
                 quickStartLastAttempt_ = now;
                 ++quickStartAttempts_;
                 engine_.setRoamingModeSession(false);
@@ -225,9 +261,6 @@ public:
                                              false,
                                              false)) {
                     quickStartPending_ = false;
-                    if (cliOptions_.devQuickStart) {
-                        engine_.ui->console().hide();
-                    }
                 } else if (quickStartAttempts_ >= quickStartMaxAttempts_) {
                     spdlog::error("dev-quick-start: failed to connect after {} attempts.", quickStartAttempts_);
                     quickStartPending_ = false;
@@ -250,6 +283,7 @@ public:
 
         if (engine_.ui->console().consumeQuitRequest()) {
             if (game_) {
+                suppressDisconnectDialog_ = true;
                 engine_.network->disconnect("Disconnected from server.");
             }
         }
@@ -264,6 +298,7 @@ public:
                 break;
             case ui::QuickMenuAction::Disconnect:
                 if (game_) {
+                    suppressDisconnectDialog_ = true;
                     engine_.network->disconnect("Disconnected from server.");
                 }
                 engine_.ui->setQuickMenuVisible(false);
@@ -279,6 +314,33 @@ public:
                 game_.reset();
             }
             communityBrowser_.handleDisconnected(disconnectEvent->reason);
+            if (!suppressDisconnectDialog_
+                && !serverConnector_.consumeSuppressDisconnectDialog()
+                && !serverConnector_.consumeJoinRejectionDialogShown()) {
+                const std::string &reason = disconnectEvent->reason;
+                std::string message;
+                if (reason.find("Name already in use") != std::string::npos) {
+                    message = "That name is already in use. Please choose a different name.";
+                } else if (reason.find("Protocol version mismatch") != std::string::npos) {
+                    message = "Client/server versions don't match. Please rebuild both.";
+                } else if (reason.find("Join request required") != std::string::npos) {
+                    message = "Join rejected by server. Please try again.";
+                } else if (reason.find("Join request mismatch") != std::string::npos) {
+                    message = "Join rejected by server. Please try again.";
+                } else if (reason.find("Connection lost") != std::string::npos) {
+                    message = "Connection lost. Please check your network and try again.";
+                } else if (reason.find("timeout") != std::string::npos) {
+                    message = "Connection timed out. Please try again.";
+                } else if (reason.find("Disconnected from server") != std::string::npos) {
+                    message = "Connection closed by server.";
+                } else if (!reason.empty()) {
+                    message = "Disconnected: " + reason;
+                } else {
+                    message = "Disconnected from server.";
+                }
+                engine_.ui->console().showErrorDialog(message);
+            }
+            suppressDisconnectDialog_ = false;
         }
 
         const bool consoleVisible = engine_.ui->console().isVisible();
@@ -305,6 +367,13 @@ public:
                 spdlog::warn("Fullscreen toggle had no effect");
             }
         }
+        if (engine_.cameraEntity != ecs::kInvalidEntity && engine_.ecsWorld) {
+            if (engine_.isRoamingModeSession()) {
+                const bool allowInput = !consoleVisible && engine_.ui->isGameplayInputEnabled();
+                engine_.updateRoamingCamera(dt, allowInput);
+                engine_.roamingCameraController().applyToEcs(*engine_.ecsWorld, engine_.cameraEntity);
+            }
+        }
         if (consoleVisible) {
             communityBrowser_.update();
         }
@@ -312,10 +381,7 @@ public:
             game_->earlyUpdate(dt);
         }
 
-        engine_.step(dt);
-    }
-
-    void onRender(karma::app::EngineContext &) override {
+        engine_.step(effectiveDt);
         if (game_) {
             game_->lateUpdate(lastDt_);
         }
@@ -338,9 +404,14 @@ private:
     TimeUtils::time quickStartLastAttempt_ = TimeUtils::GetCurrentTime();
     bool prevGraveDown_ = false;
     const float quickStartRetryDelay_ = 0.5f;
+    const float quickStartInitialDelay_ = 1.0f;
     const int quickStartMaxAttempts_ = 20;
     float lastDt_ = 0.0f;
-
+    uint64_t lastConfigRevision_ = 0;
+    bool lastVsyncEnabled_ = true;
+    bool initOk_ = true;
+    bool suppressDisconnectDialog_ = false;
+    bool quickStartInitialDelayDone_ = true;
     void updateUiSmokeTest(float dt) {
         uiSmokeTimer_.elapsed += dt;
         if (uiSmokeTimer_.elapsed < 2.0f) {
@@ -530,8 +601,67 @@ int main(int argc, char *argv[]) {
     app.context().overlay = engine.ui;
     engine.ecsWorld = app.context().ecsWorld;
     engine.render->setEcsWorld(app.context().ecsWorld);
+    engine.render->setEcsRadarSyncEnabled(true);
     app.context().graphics = engine.render->getGraphicsDevice();
     app.context().rendererCore = engine.render->getRendererCore();
-    app.setGame(&adapter);
-    return app.run();
+    if (!cliOptions.ecsSmokeTest) {
+        auto *ecsWorld = app.context().ecsWorld;
+        if (ecsWorld) {
+            engine.cameraEntity = ecsWorld->createEntity();
+            ecs::Transform camXform{};
+            camXform.position = {0.0f, 2.0f, 6.0f};
+            ecsWorld->set(engine.cameraEntity, camXform);
+            ecs::CameraComponent camera{};
+            camera.is_primary = true;
+            camera.fov_degrees = karma::config::ReadRequiredFloatConfig("graphics.Camera.FovDegrees");
+            camera.near_plane = karma::config::ReadRequiredFloatConfig("graphics.Camera.NearPlane");
+            camera.far_plane = karma::config::ReadRequiredFloatConfig("graphics.Camera.FarPlane");
+            ecsWorld->set(engine.cameraEntity, camera);
+        }
+    }
+    {
+        auto &config = app.config();
+        config.enable_ecs_render_sync = true;
+        config.enable_ecs_camera_sync = true;
+        spdlog::info("ECS render/camera sync enabled (default)");
+    }
+    if (cliOptions.ecsSmokeTest) {
+        auto &config = app.config();
+        config.enable_ecs_physics_sync = false;
+        config.enable_ecs_audio_sync = false;
+        spdlog::info("ECS smoke test enabled (render + camera sync)");
+
+        auto *ecsWorld = app.context().ecsWorld;
+        if (ecsWorld) {
+            const auto worldEntity = ecsWorld->createEntity();
+            ecs::Transform worldXform{};
+            worldXform.scale = {2.0f, 2.0f, 2.0f};
+            ecsWorld->set(worldEntity, worldXform);
+            ecs::MeshComponent worldMesh{};
+            worldMesh.mesh_key = karma::data::Resolve("common/models/tank_final.glb").string();
+            ecsWorld->set(worldEntity, worldMesh);
+
+            const auto cameraEntity = ecsWorld->createEntity();
+            ecs::Transform camXform{};
+            camXform.position = {0.0f, 8.0f, 22.0f};
+            const glm::vec3 target{0.0f, 0.0f, 0.0f};
+            const glm::mat4 view = glm::lookAt(camXform.position, target, glm::vec3(0.0f, 1.0f, 0.0f));
+            camXform.rotation = glm::quat_cast(glm::inverse(view));
+            ecsWorld->set(cameraEntity, camXform);
+            ecs::CameraComponent camera{};
+            camera.is_primary = true;
+            camera.fov_degrees = karma::config::ReadRequiredFloatConfig("graphics.Camera.FovDegrees");
+            camera.near_plane = karma::config::ReadRequiredFloatConfig("graphics.Camera.NearPlane");
+            camera.far_plane = karma::config::ReadRequiredFloatConfig("graphics.Camera.FarPlane");
+            ecsWorld->set(cameraEntity, camera);
+        }
+    }
+    spdlog::info("EngineApp loop enabled (start/tick)");
+    if (!app.start(adapter, app.config())) {
+        return 1;
+    }
+    while (app.isRunning()) {
+        app.tick();
+    }
+    return 0;
 }

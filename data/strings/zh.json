@@ -54,7 +54,9 @@
       }
     },
     "settings": {
-      "language_label": "语言"
+      "language_label": "语言",
+      "hud_background_label": "背景",
+      "hud_background_edit": "编辑"
     }
   }
 }

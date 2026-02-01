@@ -53,7 +53,9 @@ public:
         const auto &meshes = world.all<RenderMesh>();
         const auto &materials = world.all<Material>();
         const auto &renderEntities = world.all<RenderEntity>();
+        const auto &transparency = world.all<Transparency>();
         const auto &layers = world.all<RenderLayer>();
+        const auto &meshComponents = world.all<MeshComponent>();
         for (const auto &pair : world.all<Transform>()) {
             const EntityId entity = pair.first;
             const Transform &transform = pair.second;
@@ -78,22 +80,37 @@ public:
 
             if (gfxEntity == graphics::kInvalidEntity) {
                 const auto meshIt = meshes.find(entity);
-                if (meshIt == meshes.end()) {
+                const auto meshKeyIt = meshComponents.find(entity);
+                if (meshIt == meshes.end() && meshKeyIt == meshComponents.end()) {
                     continue;
                 }
                 gfxEntity = graphics->createEntity(desiredLayer);
                 entities_.insert({entity, RenderHandle{gfxEntity, desiredLayer}});
-                graphics->setEntityMesh(gfxEntity, meshIt->second.meshId, graphics::kInvalidMaterial);
+                if (meshKeyIt != meshComponents.end() && !meshKeyIt->second.mesh_key.empty()) {
+                    graphics->setEntityModel(gfxEntity, meshKeyIt->second.mesh_key, graphics::kInvalidMaterial);
+                } else if (meshIt != meshes.end()) {
+                    graphics->setEntityMesh(gfxEntity, meshIt->second.meshId, graphics::kInvalidMaterial);
+                }
                 world.set(entity, RenderEntity{gfxEntity});
             }
 
             if (gfxEntity != graphics::kInvalidEntity) {
-                if (auto meshIt = meshes.find(entity); meshIt != meshes.end()) {
+                if (auto meshKeyIt = meshComponents.find(entity);
+                    meshKeyIt != meshComponents.end() && !meshKeyIt->second.mesh_key.empty()) {
+                    graphics::MaterialId material = graphics::kInvalidMaterial;
+                    if (auto materialIt = materials.find(entity); materialIt != materials.end()) {
+                        material = materialIt->second.materialId;
+                    }
+                    graphics->setEntityModel(gfxEntity, meshKeyIt->second.mesh_key, material);
+                } else if (auto meshIt = meshes.find(entity); meshIt != meshes.end()) {
                     graphics::MaterialId material = defaultMaterial_;
                     if (auto materialIt = materials.find(entity); materialIt != materials.end()) {
                         material = materialIt->second.materialId;
                     }
                     graphics->setEntityMesh(gfxEntity, meshIt->second.meshId, material);
+                }
+                if (auto transIt = transparency.find(entity); transIt != transparency.end()) {
+                    graphics->setTransparency(gfxEntity, transIt->second.enabled);
                 }
                 graphics->setPosition(gfxEntity, transform.position);
                 graphics->setRotation(gfxEntity, transform.rotation);

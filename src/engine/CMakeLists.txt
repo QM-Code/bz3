@@ -125,11 +125,13 @@ add_library(karma_server OBJECT ${ENGINE_SERVER_SOURCES})
 target_compile_definitions(karma_server PRIVATE KARMA_SERVER)
 
 target_include_directories(karma PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/src
     ${PROJECT_SOURCE_DIR}/src/engine
     ${enet_SOURCE_DIR}/include
 )
 target_include_directories(karma_server PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/src
     ${PROJECT_SOURCE_DIR}/src/engine
     ${enet_SOURCE_DIR}/include

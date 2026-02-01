@@ -16,6 +16,10 @@ public:
         auto it = components_.find(entity);
         return it == components_.end() ? nullptr : &it->second;
     }
+    const T *get(EntityId entity) const {
+        auto it = components_.find(entity);
+        return it == components_.end() ? nullptr : &it->second;
+    }
     const std::unordered_map<EntityId, T> &all() const { return components_; }
 
 private:

@@ -77,9 +77,13 @@ void ImGuiHud::setShowFps(bool show) {
     fps.setVisible(show);
 }
 
+void ImGuiHud::setHudBackgroundColor(const ImVec4 &color) {
+    hudBackgroundColor = color;
+}
+
 void ImGuiHud::draw(ImGuiIO &io, ImFont *bigFont) {
     if (scoreboardVisible) {
-        scoreboard.draw(io);
+        scoreboard.draw(io, hudBackgroundColor);
     }
 
     const float margin = 12.0f;
@@ -106,14 +110,16 @@ void ImGuiHud::draw(ImGuiIO &io, ImFont *bigFont) {
     ImVec2 size = ImVec2(consoleWidth, panelHeight);
 
     if (chatVisible) {
-        chat.draw(pos, size, inputHeight);
+        chat.draw(pos, size, inputHeight, hudBackgroundColor);
     }
 
     dialog.draw(io, bigFont);
     if (crosshairVisible) {
         crosshair.draw(io);
     }
-    fps.draw(io);
+    if (fpsVisible) {
+        fps.draw(io, hudBackgroundColor);
+    }
 }
 
 } // namespace ui

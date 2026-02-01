@@ -54,7 +54,9 @@
       }
     },
     "settings": {
-      "language_label": "언어"
+      "language_label": "언어",
+      "hud_background_label": "배경",
+      "hud_background_edit": "편집"
     }
   }
 }

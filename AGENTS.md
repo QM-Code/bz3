@@ -13,7 +13,7 @@ This file provides quick, repo-specific instructions for coding agents.
 - `src/game/engine/`: BZ3-specific engine orchestrators.
 - `src/engine/core/`: shared types and constants.
 - `src/engine/graphics/`: engine-agnostic graphics API + backends.
-- `src/game/renderer/`: BZ3 render orchestration and particles.
+- `src/game/renderer/`: Game render orchestration and radar rendering.
 - `src/engine/geometry/`: mesh loading utilities.
 - `src/engine/audio/`: audio system.
 - `src/engine/input/`: input handling.

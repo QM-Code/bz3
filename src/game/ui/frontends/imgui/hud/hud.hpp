@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+#include <imgui.h>
+
 #include "ui/core/types.hpp"
 #include "ui/frontends/imgui/hud/chat.hpp"
 #include "ui/frontends/imgui/hud/crosshair.hpp"
@@ -36,6 +38,7 @@ public:
     bool getChatInputFocus() const;
 
     void setShowFps(bool show);
+    void setHudBackgroundColor(const ImVec4 &color);
     void draw(ImGuiIO &io, ImFont *bigFont);
     bool isScoreboardVisible() const { return scoreboardVisible; }
     bool isChatVisible() const { return chatVisible; }
@@ -57,6 +60,7 @@ private:
     bool crosshairVisible = true;
     bool fpsVisible = false;
     bool dialogVisible = false;
+    ImVec4 hudBackgroundColor{0.0f, 0.0f, 0.0f, 1.0f};
 };
 
 } // namespace ui

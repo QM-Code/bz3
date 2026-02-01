@@ -2,6 +2,8 @@
 
 #include <imgui.h>
 
+#include <algorithm>
+
 namespace ui {
 
 void ImGuiHudChat::addLine(const std::string &playerName, const std::string &line) {
@@ -37,10 +39,15 @@ bool ImGuiHudChat::isFocused() const {
     return chatFocus;
 }
 
-void ImGuiHudChat::draw(const ImVec2 &pos, const ImVec2 &size, float inputHeight) {
+void ImGuiHudChat::draw(const ImVec2 &pos, const ImVec2 &size, float inputHeight, const ImVec4 &backgroundColor) {
+    ImVec4 bg = backgroundColor;
+    bg.x = std::clamp(bg.x, 0.0f, 1.0f);
+    bg.y = std::clamp(bg.y, 0.0f, 1.0f);
+    bg.z = std::clamp(bg.z, 0.0f, 1.0f);
+    bg.w = std::clamp(bg.w, 0.0f, 1.0f);
     ImGui::SetNextWindowPos(pos, ImGuiCond_Always);
     ImGui::SetNextWindowSize(size, ImGuiCond_Always);
-    ImGui::SetNextWindowBgAlpha(0.70f);
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, bg);
 
     ImGuiWindowFlags flags =
         ImGuiWindowFlags_NoTitleBar |
@@ -88,7 +95,6 @@ void ImGuiHudChat::draw(const ImVec2 &pos, const ImVec2 &size, float inputHeight
     }
 
     ImGui::PushItemWidth(-1);
-    ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.75f);
     bool submitted = ImGui::InputTextWithHint(
         "##ChatHint",
         "press T to type",
@@ -103,10 +109,10 @@ void ImGuiHudChat::draw(const ImVec2 &pos, const ImVec2 &size, float inputHeight
         chatFocus = false;
     }
     
-    ImGui::PopStyleVar();
     ImGui::PopItemWidth();
 
     ImGui::End();
+    ImGui::PopStyleColor();
 
     if (submitted) {
         submittedInputBuffer = std::string(chatInputBuffer.data());

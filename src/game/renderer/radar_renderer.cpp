@@ -1,4 +1,4 @@
-#include "game/renderer/radar_renderer.hpp"
+#include "renderer/radar_renderer.hpp"
 
 #include "spdlog/spdlog.h"
 #include <algorithm>

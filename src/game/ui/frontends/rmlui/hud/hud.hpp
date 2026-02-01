@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <functional>
 #include <optional>
 #include <string>
@@ -55,6 +56,7 @@ public:
     void setChatVisible(bool visible);
     void setRadarVisible(bool visible);
     void setCrosshairVisible(bool visible);
+    void setHudBackgroundColor(const std::array<float, 4> &color);
     void setFpsVisible(bool visible);
     void setFpsValue(float fps);
     void setQuickMenuVisible(bool visible);
@@ -87,6 +89,7 @@ private:
     bool chatVisible = true;
     bool radarVisible = true;
     bool crosshairVisible = true;
+    std::array<float, 4> hudBackgroundColor{0.0f, 0.0f, 0.0f, 1.0f};
     std::string lastLanguage;
 
     void bindElements();

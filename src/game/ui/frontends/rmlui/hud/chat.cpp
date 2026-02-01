@@ -6,6 +6,9 @@
 #include <RmlUi/Core/Input.h>
 #include <utility>
 
+#include <algorithm>
+#include <cstdio>
+
 namespace ui {
 namespace {
 
@@ -22,6 +25,20 @@ public:
 private:
     RmlUiHudChat *chat = nullptr;
 };
+
+std::string formatRgba(const std::array<float, 4> &color) {
+    const float r = std::clamp(color[0], 0.0f, 1.0f);
+    const float g = std::clamp(color[1], 0.0f, 1.0f);
+    const float b = std::clamp(color[2], 0.0f, 1.0f);
+    const float a = std::clamp(color[3], 0.0f, 1.0f);
+    const int ri = static_cast<int>(r * 255.0f + 0.5f);
+    const int gi = static_cast<int>(g * 255.0f + 0.5f);
+    const int bi = static_cast<int>(b * 255.0f + 0.5f);
+    const int ai = static_cast<int>(a * 255.0f + 0.5f);
+    char buffer[16];
+    std::snprintf(buffer, sizeof(buffer), "#%02X%02X%02X%02X", ri, gi, bi, ai);
+    return buffer;
+}
 
 } // namespace
 
@@ -42,6 +59,7 @@ void RmlUiHudChat::bind(Rml::ElementDocument *document, EmojiMarkupFn emojiMarku
 
     if (panel) {
         panel->SetClass("hidden", !visible);
+        panel->SetProperty("background-color", formatRgba(backgroundColor));
     }
 
     if (input) {
@@ -141,6 +159,13 @@ void RmlUiHudChat::setVisible(bool visibleIn) {
 
 bool RmlUiHudChat::isVisible() const {
     return visible;
+}
+
+void RmlUiHudChat::setBackgroundColor(const std::array<float, 4> &color) {
+    backgroundColor = color;
+    if (panel) {
+        panel->SetProperty("background-color", formatRgba(backgroundColor));
+    }
 }
 
 

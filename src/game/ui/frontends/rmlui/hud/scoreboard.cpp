@@ -2,7 +2,27 @@
 
 #include <RmlUi/Core/ElementDocument.h>
 
+#include <algorithm>
+#include <cstdio>
+
 namespace ui {
+namespace {
+
+std::string formatRgba(const std::array<float, 4> &color) {
+    const float r = std::clamp(color[0], 0.0f, 1.0f);
+    const float g = std::clamp(color[1], 0.0f, 1.0f);
+    const float b = std::clamp(color[2], 0.0f, 1.0f);
+    const float a = std::clamp(color[3], 0.0f, 1.0f);
+    const int ri = static_cast<int>(r * 255.0f + 0.5f);
+    const int gi = static_cast<int>(g * 255.0f + 0.5f);
+    const int bi = static_cast<int>(b * 255.0f + 0.5f);
+    const int ai = static_cast<int>(a * 255.0f + 0.5f);
+    char buffer[16];
+    std::snprintf(buffer, sizeof(buffer), "#%02X%02X%02X%02X", ri, gi, bi, ai);
+    return buffer;
+}
+
+} // namespace
 
 void RmlUiHudScoreboard::bind(Rml::ElementDocument *document, EmojiMarkupFn emojiMarkupIn) {
     emojiMarkup = std::move(emojiMarkupIn);
@@ -13,6 +33,7 @@ void RmlUiHudScoreboard::bind(Rml::ElementDocument *document, EmojiMarkupFn emoj
     container = document->GetElementById("hud-scoreboard");
     if (container) {
         container->SetClass("hidden", !visible);
+        container->SetProperty("background-color", formatRgba(backgroundColor));
     }
     rebuild(document);
 }
@@ -33,6 +54,13 @@ void RmlUiHudScoreboard::setVisible(bool visibleIn) {
 
 bool RmlUiHudScoreboard::isVisible() const {
     return visible;
+}
+
+void RmlUiHudScoreboard::setBackgroundColor(const std::array<float, 4> &color) {
+    backgroundColor = color;
+    if (container) {
+        container->SetProperty("background-color", formatRgba(backgroundColor));
+    }
 }
 
 void RmlUiHudScoreboard::rebuild(Rml::ElementDocument *document) {

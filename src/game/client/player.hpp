@@ -5,6 +5,7 @@
 #include "game/net/messages.hpp"
 #include "karma/physics/player_controller.hpp"
 #include "karma/audio/audio.hpp"
+#include "karma/ecs/types.hpp"
 #include <spdlog/spdlog.h>
 
 #include "actor.hpp"
@@ -31,7 +32,8 @@ private:
     glm::vec3 lastPosition;
     glm::quat lastRotation;
 
-    render_id renderId;
+    render_id radarId;
+    ecs::EntityId ecsEntity = ecs::kInvalidEntity;
     glm::vec3 muzzleOffset{0.0f, 1.18f, 2.22f};
 
 public:

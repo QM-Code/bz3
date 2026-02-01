@@ -24,7 +24,6 @@ private:
     platform::Window *window;
     std::unique_ptr<ui::RendererBridge> uiRenderBridge;
     std::string lastLanguage;
-    float lastBrightness = 1.0f;
     bool roamingMode = false;
     bool roamingModeInitialized = false;
     std::vector<platform::Event> lastEvents;
@@ -39,6 +38,8 @@ public:
     UiSystem *ui;
     Audio *audio;
     ecs::World *ecsWorld = nullptr;
+    ecs::EntityId cameraEntity = ecs::kInvalidEntity;
+    game_client::RoamingCameraController &roamingCameraController() { return roamingCamera; }
 
     void setRoamingModeSession(bool enabled);
     bool isRoamingModeSession() const { return roamingMode; }

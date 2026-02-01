@@ -27,6 +27,7 @@ void UiSystem::update() {
         hudModel.visibility.radar = ui::UiConfig::GetHudRadar();
         hudModel.visibility.fps = ui::UiConfig::GetHudFps();
         hudModel.visibility.crosshair = ui::UiConfig::GetHudCrosshair();
+        hudModel.hudBackgroundColor = ui::UiConfig::GetHudBackgroundColor();
         validateHudState = ui::UiConfig::GetValidateUi();
     }
     const bool consoleVisible = backend->console().isVisible();

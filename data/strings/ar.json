@@ -54,7 +54,9 @@
       }
     },
     "settings": {
-      "language_label": "اللغة"
+      "language_label": "اللغة",
+      "hud_background_label": "الخلفية",
+      "hud_background_edit": "تعديل"
     }
   }
 }

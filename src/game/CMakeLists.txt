@@ -9,6 +9,8 @@ list(APPEND SERVER_SOURCES
     ${PROJECT_SOURCE_DIR}/src/game/server/server_cli_options.cpp
 )
 
+option(KARMA_BUILD_ENGINEAPP_SAMPLE "Build EngineApp sample executable" OFF)
+
 set(GAME_CLIENT_SOURCES
     ${PROJECT_SOURCE_DIR}/src/game/engine/client_engine.cpp
     ${PROJECT_SOURCE_DIR}/src/game/net/client_network.cpp
@@ -105,6 +107,117 @@ add_executable(bz3-server
     $<TARGET_OBJECTS:karma_server>
 )
 
+if(KARMA_BUILD_ENGINEAPP_SAMPLE)
+    add_executable(bz3-engineapp-sample
+        ${PROJECT_SOURCE_DIR}/examples/engine_app_sample.cpp
+        $<TARGET_OBJECTS:karma>
+    )
+    set_target_properties(bz3-engineapp-sample PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+    )
+    target_include_directories(bz3-engineapp-sample PRIVATE
+        ${PROJECT_SOURCE_DIR}/include
+        ${PROJECT_SOURCE_DIR}/src
+        ${PROJECT_SOURCE_DIR}/src/engine
+        ${enet_SOURCE_DIR}/include
+    )
+    target_link_libraries(bz3-engineapp-sample PRIVATE
+        ${WINDOW_TARGET}
+        glm::glm
+        enet_static
+        assimp::assimp
+        cxxopts::cxxopts
+        spdlog::spdlog
+        miniz::miniz
+        nlohmann_json::nlohmann_json
+        proto_lib
+        CURL::libcurl
+        OpenSSL::Crypto
+    )
+    if(KARMA_RENDER_BACKEND STREQUAL "diligent")
+        target_link_libraries(bz3-engineapp-sample PRIVATE Diligent-GraphicsEngineVk-static)
+        if(TARGET Diligent-Common)
+            target_link_libraries(bz3-engineapp-sample PRIVATE Diligent-Common)
+        endif()
+        if(TARGET Diligent-GraphicsEngine)
+            target_link_libraries(bz3-engineapp-sample PRIVATE Diligent-GraphicsEngine)
+        endif()
+        if(TARGET Diligent-GraphicsEngineNextGenBase)
+            target_link_libraries(bz3-engineapp-sample PRIVATE Diligent-GraphicsEngineNextGenBase)
+        endif()
+        if(TARGET Diligent-GraphicsAccessories)
+            target_link_libraries(bz3-engineapp-sample PRIVATE Diligent-GraphicsAccessories)
+        endif()
+        if(TARGET Diligent-ShaderTools)
+            target_link_libraries(bz3-engineapp-sample PRIVATE Diligent-ShaderTools)
+        endif()
+        if(TARGET Diligent-PlatformInterface)
+            target_link_libraries(bz3-engineapp-sample PRIVATE Diligent-PlatformInterface)
+        endif()
+        if(TARGET Diligent-TargetPlatform)
+            target_link_libraries(bz3-engineapp-sample PRIVATE Diligent-TargetPlatform)
+        endif()
+        if(DEFINED DiligentEngine_SOURCE_DIR)
+            target_include_directories(bz3-engineapp-sample PRIVATE ${DiligentEngine_SOURCE_DIR})
+            target_include_directories(bz3-engineapp-sample PRIVATE ${DiligentEngine_SOURCE_DIR}/DiligentCore)
+            target_include_directories(bz3-engineapp-sample PRIVATE ${DiligentEngine_SOURCE_DIR}/DiligentTools)
+        endif()
+        if(UNIX AND NOT APPLE)
+            target_compile_definitions(bz3-engineapp-sample PRIVATE PLATFORM_LINUX=1)
+        endif()
+    elseif(KARMA_RENDER_BACKEND STREQUAL "bgfx")
+        target_link_libraries(bz3-engineapp-sample PRIVATE bgfx::bgfx)
+        add_dependencies(bz3-engineapp-sample bz3_bgfx_shaders)
+    endif()
+    if(KARMA_PHYSICS_BACKEND STREQUAL "jolt")
+        target_link_libraries(bz3-engineapp-sample PRIVATE Jolt::Jolt)
+    elseif(KARMA_PHYSICS_BACKEND STREQUAL "physx")
+        target_link_libraries(bz3-engineapp-sample PRIVATE unofficial::omniverse-physx-sdk::sdk)
+        target_link_libraries(bz3-engineapp-sample PRIVATE
+            unofficial::omniverse-physx-sdk::PhysXCharacterKinematic
+            unofficial::omniverse-physx-sdk::PhysXExtensions
+        )
+    endif()
+    if(KARMA_UI_BACKEND STREQUAL "imgui")
+        target_link_libraries(bz3-engineapp-sample PRIVATE
+            imgui::imgui
+            Freetype::Freetype
+            harfbuzz::harfbuzz
+            PkgConfig::LIBRSVG
+        )
+        target_compile_definitions(bz3-engineapp-sample PRIVATE KARMA_HAS_LIBRSVG IMGUI_USE_WCHAR32)
+        if(UNIX AND NOT APPLE)
+            target_link_libraries(bz3-engineapp-sample PRIVATE Fontconfig::Fontconfig)
+        endif()
+        if(TARGET imgui::imgui)
+            target_compile_definitions(imgui::imgui INTERFACE IMGUI_USE_WCHAR32)
+        endif()
+    endif()
+
+    if(KARMA_UI_BACKEND STREQUAL "rmlui")
+        target_link_libraries(bz3-engineapp-sample PRIVATE RmlUi::RmlUi md4c::md4c)
+    endif()
+
+    if(KARMA_AUDIO_BACKEND STREQUAL "sdlaudio")
+        target_link_libraries(bz3-engineapp-sample PRIVATE SDL3::SDL3)
+    endif()
+
+    if (UNIX AND NOT APPLE)
+        target_link_libraries(bz3-engineapp-sample PRIVATE pthread dl m)
+    elseif(APPLE)
+        find_library(COCOA Cocoa)
+        find_library(IOKIT IOKit)
+        find_library(COREVIDEO CoreVideo)
+        target_link_libraries(bz3-engineapp-sample PRIVATE ${COCOA} ${IOKIT} ${COREVIDEO})
+    elseif(WIN32)
+        target_link_libraries(bz3-engineapp-sample PRIVATE ws2_32)
+    endif()
+
+    target_compile_definitions(bz3-engineapp-sample PRIVATE
+        INSTALL_DATA_DIR="${CMAKE_INSTALL_PREFIX}/share/${PROJECT_NAME}/data"
+    )
+endif()
+
 add_custom_target(check_required_config
     COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/scripts/check_required_config.py
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
@@ -118,6 +231,7 @@ set_target_properties(bz3 bz3-server PROPERTIES
 )
 
 target_include_directories(bz3 PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/src
     ${PROJECT_SOURCE_DIR}/src/engine
     ${PROJECT_SOURCE_DIR}/src/game
@@ -125,6 +239,7 @@ target_include_directories(bz3 PRIVATE
 )
 
 target_include_directories(bz3-server PRIVATE
+    ${PROJECT_SOURCE_DIR}/include
     ${PROJECT_SOURCE_DIR}/src
     ${PROJECT_SOURCE_DIR}/src/engine
     ${PROJECT_SOURCE_DIR}/src/game

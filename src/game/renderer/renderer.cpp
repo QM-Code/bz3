@@ -1,8 +1,10 @@
 #include "renderer/renderer.hpp"
+#include "renderer/radar_components.hpp"
 #include "karma/graphics/resources.hpp"
 
 #include "karma/platform/window.hpp"
 #include "spdlog/spdlog.h"
+#include <unordered_set>
 
 Renderer::Renderer(platform::Window &windowIn)
     : window(&windowIn) {
@@ -45,6 +47,10 @@ void Renderer::update() {
 
     core_->scene().beginFrame();
 
+    if (ecsRadarSyncEnabled && ecsWorld && radarRenderer_) {
+        syncEcsRadar();
+    }
+
     if (radarRenderer_) {
         radarRenderer_->render(core_->context().cameraPosition, core_->context().cameraRotation);
     }
@@ -59,120 +65,76 @@ void Renderer::setEcsWorld(ecs::World *world) {
     ecsWorld = world;
 }
 
-void Renderer::setResourceRegistry(graphics::ResourceRegistry *resources) {
-    contextResources_ = resources;
-}
-
-void Renderer::registerEcsEntity(render_id id) {
-    if (!ecsWorld) {
-        return;
-    }
-    if (ecsEntities.find(id) != ecsEntities.end()) {
-        return;
-    }
-    const ecs::EntityId entity = ecsWorld->createEntity();
-    ecsEntities[id] = entity;
-    ecsWorld->set(entity, ecs::Transform{});
-}
-
-ecs::Transform *Renderer::getEcsTransform(render_id id) {
-    if (!ecsWorld) {
-        return nullptr;
-    }
-    auto it = ecsEntities.find(id);
-    if (it == ecsEntities.end()) {
-        return nullptr;
-    }
-    return ecsWorld->get<ecs::Transform>(it->second);
-}
-
-graphics::EntityId Renderer::getEcsGraphicsEntity(render_id id) const {
-    if (!ecsWorld) {
-        return graphics::kInvalidEntity;
-    }
-    auto it = ecsEntities.find(id);
-    if (it == ecsEntities.end()) {
-        return graphics::kInvalidEntity;
-    }
-    const ecs::RenderEntity *renderEntity = ecsWorld->get<ecs::RenderEntity>(it->second);
-    return renderEntity ? renderEntity->entityId : graphics::kInvalidEntity;
-}
-
-void Renderer::setEcsRenderMesh(render_id id, const std::filesystem::path& modelPath) {
-    if (!ecsWorld) {
-        return;
-    }
-    if (!contextResources_) {
-        spdlog::warn("Renderer: ResourceRegistry unavailable; ECS mesh not set for {}", modelPath.string());
-        return;
-    }
-    auto it = ecsEntities.find(id);
-    if (it == ecsEntities.end()) {
-        return;
-    }
-    graphics::LayerId desiredLayer = core_ ? core_->context().mainLayer : 0;
-    if (const auto *layer = ecsWorld->get<ecs::RenderLayer>(it->second)) {
-        desiredLayer = layer->layer;
-    }
-    if (core_) {
-        const graphics::EntityId gfxEntity = core_->device().createModelEntity(
-            modelPath,
-            desiredLayer,
-            graphics::kInvalidMaterial
-        );
-        if (gfxEntity != graphics::kInvalidEntity) {
-            ecsWorld->set(it->second, ecs::RenderEntity{gfxEntity});
-            ecsWorld->remove<ecs::RenderMesh>(it->second);
-            return;
+void Renderer::syncEcsRadar() {
+    const auto &radarTags = ecsWorld->all<game::renderer::RadarRenderable>();
+    if (radarTags.empty()) {
+        if (!radarEcsEntities_.empty()) {
+            for (const auto &entry : radarEcsEntities_) {
+                radarRenderer_->destroy(entry.second.id);
+            }
+            radarEcsEntities_.clear();
         }
-    }
-    const graphics::MeshId meshId = contextResources_->loadMesh(modelPath);
-    if (meshId == graphics::kInvalidMesh) {
         return;
     }
-    ecsWorld->set(it->second, ecs::RenderMesh{meshId});
-}
 
-render_id Renderer::create() {
-    const render_id id = nextId++;
-    registerEcsEntity(id);
-    if (ecsWorld) {
-        ecsWorld->set(ecsEntities[id], ecs::RenderLayer{core_->context().mainLayer});
-    }
-    return id;
-}
+    const auto &meshes = ecsWorld->all<ecs::MeshComponent>();
+    const auto &transforms = ecsWorld->all<ecs::Transform>();
+    std::unordered_set<ecs::EntityId> seen;
+    seen.reserve(radarTags.size());
 
-render_id Renderer::create(std::string modelPath, bool addToRadar) {
-    const render_id id = nextId++;
-    registerEcsEntity(id);
-    setEcsRenderMesh(id, modelPath);
-    if (ecsWorld) {
-        ecsWorld->set(ecsEntities[id], ecs::RenderLayer{core_->context().mainLayer});
-        if (contextResources_) {
-            ecsWorld->set(ecsEntities[id], ecs::Material{contextResources_->getDefaultMaterial()});
+    for (const auto &pair : radarTags) {
+        const ecs::EntityId entity = pair.first;
+        if (!pair.second.enabled) {
+            continue;
+        }
+        auto meshIt = meshes.find(entity);
+        if (meshIt == meshes.end()) {
+            continue;
+        }
+        const std::string &meshKey = meshIt->second.mesh_key;
+        if (meshKey.empty()) {
+            continue;
+        }
+
+        seen.insert(entity);
+        auto it = radarEcsEntities_.find(entity);
+        if (it == radarEcsEntities_.end()) {
+            const render_id id = nextId++;
+            radarRenderer_->setModel(id, meshKey, true);
+            radarRenderer_->setPosition(id, glm::vec3(0.0f));
+            radarRenderer_->setRotation(id, glm::quat(1.0f, 0.0f, 0.0f, 0.0f));
+            radarRenderer_->setScale(id, glm::vec3(1.0f));
+            radarEcsEntities_.insert({entity, RadarEcsEntry{id, meshKey}});
+            spdlog::info("Renderer: ECS radar sync created (ecs_entity={}, render_id={}, mesh={})",
+                         entity, id, meshKey);
+        } else if (it->second.mesh_key != meshKey) {
+            radarRenderer_->setModel(it->second.id, meshKey, true);
+            it->second.mesh_key = meshKey;
+            spdlog::info("Renderer: ECS radar sync updated (ecs_entity={}, render_id={}, mesh={})",
+                         entity, it->second.id, meshKey);
+        }
+
+        if (auto xformIt = transforms.find(entity); xformIt != transforms.end()) {
+            const ecs::Transform &xform = xformIt->second;
+            const auto &entry = radarEcsEntities_.find(entity)->second;
+            radarRenderer_->setPosition(entry.id, xform.position);
+            radarRenderer_->setRotation(entry.id, xform.rotation);
+            radarRenderer_->setScale(entry.id, xform.scale);
         }
     }
 
-    if (radarRenderer_) {
-        radarRenderer_->setModel(id, modelPath, addToRadar);
-    }
-
-    return id;
-}
-
-void Renderer::setModel(render_id id, const std::filesystem::path& modelPath, bool addToRadar) {
-    registerEcsEntity(id);
-    setEcsRenderMesh(id, modelPath);
-    if (ecsWorld) {
-        ecsWorld->set(ecsEntities[id], ecs::RenderLayer{core_->context().mainLayer});
-        if (contextResources_) {
-            ecsWorld->set(ecsEntities[id], ecs::Material{contextResources_->getDefaultMaterial()});
+    for (auto it = radarEcsEntities_.begin(); it != radarEcsEntities_.end(); ) {
+        if (seen.find(it->first) == seen.end()) {
+            radarRenderer_->destroy(it->second.id);
+            it = radarEcsEntities_.erase(it);
+        } else {
+            ++it;
         }
     }
+}
 
-    if (radarRenderer_) {
-        radarRenderer_->setModel(id, modelPath, addToRadar);
-    }
+render_id Renderer::createRadarId() {
+    return nextId++;
 }
 
 void Renderer::setRadarCircleGraphic(render_id id, float radius) {
@@ -191,20 +153,11 @@ void Renderer::destroy(render_id id) {
     if (radarRenderer_) {
         radarRenderer_->destroy(id);
     }
-    if (ecsWorld) {
-        if (auto it = ecsEntities.find(id); it != ecsEntities.end()) {
-            ecsWorld->destroyEntity(it->second);
-        }
-    }
-    ecsEntities.erase(id);
 }
 
 void Renderer::setPosition(render_id id, const glm::vec3 &position) {
     if (radarRenderer_) {
         radarRenderer_->setPosition(id, position);
-    }
-    if (auto *transform = getEcsTransform(id)) {
-        transform->position = position;
     }
 }
 
@@ -212,41 +165,23 @@ void Renderer::setRotation(render_id id, const glm::quat &rotation) {
     if (radarRenderer_) {
         radarRenderer_->setRotation(id, rotation);
     }
-    if (auto *transform = getEcsTransform(id)) {
-        transform->rotation = rotation;
-    }
 }
 
 void Renderer::setScale(render_id id, const glm::vec3 &scale) {
     if (radarRenderer_) {
         radarRenderer_->setScale(id, scale);
     }
-    if (auto *transform = getEcsTransform(id)) {
-        transform->scale = scale;
-    }
 }
 
 void Renderer::setVisible(render_id id, bool visible) {
-    if (const auto gfxEntity = getEcsGraphicsEntity(id); gfxEntity != graphics::kInvalidEntity) {
-        core_->device().setVisible(gfxEntity, visible);
-    }
     if (radarRenderer_) {
         radarRenderer_->setVisible(id, visible);
     }
 }
 
 void Renderer::setTransparency(render_id id, bool transparency) {
-    if (const auto gfxEntity = getEcsGraphicsEntity(id); gfxEntity != graphics::kInvalidEntity) {
-        core_->device().setTransparency(gfxEntity, transparency);
-    }
-}
-
-void Renderer::setCameraPosition(const glm::vec3 &position) {
-    core_->context().cameraPosition = position;
-}
-
-void Renderer::setCameraRotation(const glm::quat &rotation) {
-    core_->context().cameraRotation = rotation;
+    (void)id;
+    (void)transparency;
 }
 
 graphics::TextureHandle Renderer::getRadarTexture() const {
@@ -257,36 +192,8 @@ graphics_backend::UiRenderTargetBridge* Renderer::getUiRenderTargetBridge() cons
     return core_ ? core_->device().getUiRenderTargetBridge() : nullptr;
 }
 
-void Renderer::setUiOverlayTexture(const ui::RenderOutput& output) {
-    if (!core_) {
-        return;
-    }
-    core_->scene().setUiOverlayTexture(output.texture, output.valid());
-}
-
-void Renderer::renderUiOverlay() {
-    if (!core_) {
-        return;
-    }
-    core_->scene().renderUiOverlay();
-}
-
-void Renderer::setBrightness(float brightness) {
-    if (!core_) {
-        return;
-    }
-    core_->scene().setBrightness(brightness);
-}
-
-void Renderer::present() {
-    if (!core_) {
-        return;
-    }
-    core_->scene().endFrame();
-}
-
 void Renderer::setRadarShaderPath(const std::filesystem::path& vertPath,
-                                const std::filesystem::path& fragPath) {
+                                  const std::filesystem::path& fragPath) {
     if (radarRenderer_) {
         radarRenderer_->setRadarShaderPath(vertPath, fragPath, core_->context().cameraPosition.y);
     }
@@ -302,12 +209,4 @@ glm::mat4 Renderer::getViewMatrix() const {
 
 glm::mat4 Renderer::getProjectionMatrix() const {
     return core_ ? core_->scene().getProjectionMatrix() : glm::mat4(1.0f);
-}
-
-glm::vec3 Renderer::getCameraPosition() const {
-    return core_ ? core_->context().cameraPosition : glm::vec3(0.0f);
-}
-
-glm::vec3 Renderer::getCameraForward() const {
-    return core_ ? core_->scene().getCameraForward() : glm::vec3(0.0f, 0.0f, -1.0f);
 }

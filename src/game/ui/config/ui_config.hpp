@@ -1,6 +1,7 @@
 #pragma once
 
 #include <optional>
+#include <array>
 #include <string>
 
 #include "karma/common/json.hpp"
@@ -9,22 +10,16 @@ namespace ui {
 
 class UiConfig {
 public:
-    static constexpr float kDefaultRenderBrightness = 1.0f;
-    static constexpr float kDefaultRenderScale = 1.0f;
     static constexpr float kMinRenderScale = 0.5f;
     static constexpr float kMaxRenderScale = 1.0f;
-    static constexpr bool kDefaultHudScoreboard = true;
-    static constexpr bool kDefaultHudChat = true;
-    static constexpr bool kDefaultHudRadar = true;
-    static constexpr bool kDefaultHudFps = false;
-    static constexpr bool kDefaultHudCrosshair = true;
-    static constexpr bool kDefaultValidateUi = false;
 
     static float GetRenderBrightness();
     static bool SetRenderBrightness(float value);
     static bool EraseRenderBrightness();
+    static bool GetVsync();
+    static bool SetVsync(bool value);
 
-    static std::optional<float> TryGetRenderScale();
+    static float GetRenderScale();
     static bool SetRenderScale(float value);
     static bool EraseRenderScale();
 
@@ -48,6 +43,7 @@ public:
     static bool GetHudRadar();
     static bool GetHudFps();
     static bool GetHudCrosshair();
+    static std::array<float, 4> GetHudBackgroundColor();
     static bool GetValidateUi();
 
     static bool SetHudScoreboard(bool value);
@@ -55,6 +51,7 @@ public:
     static bool SetHudRadar(bool value);
     static bool SetHudFps(bool value);
     static bool SetHudCrosshair(bool value);
+    static bool SetHudBackgroundColor(const std::array<float, 4> &value);
 };
 
 } // namespace ui

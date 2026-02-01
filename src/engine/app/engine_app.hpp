@@ -1,7 +1,14 @@
 #pragma once
 
+#include "karma/app/engine_config.hpp"
 #include "karma/app/game_interface.hpp"
+#include "karma/core/types.hpp"
 #include "karma/ecs/system_graph.hpp"
+#include "karma/ecs/systems/camera_sync_system.hpp"
+#include "karma/ecs/systems/audio_sync_system.hpp"
+#include "karma/ecs/systems/physics_sync_system.hpp"
+#include "karma/ecs/systems/procedural_mesh_sync_system.hpp"
+#include "karma/ecs/systems/render_sync_system.hpp"
 #include "karma/ecs/world.hpp"
 #include "karma/ecs/systems/renderer_system.hpp"
 #include "karma/graphics/resources.hpp"
@@ -49,16 +56,33 @@ public:
     ~EngineApp();
 
     void setGame(GameInterface *game);
+    void setConfig(const EngineConfig &config);
+    EngineConfig &config();
+    const EngineConfig &config() const;
+    void setOverlay(std::unique_ptr<ui::Overlay> overlay);
+    bool start(GameInterface &game, const EngineConfig &config);
+    void tick();
+    bool isRunning() const;
     EngineContext &context();
     const EngineContext &context() const;
-    int run();
 
 private:
     GameInterface *game_ = nullptr;
+    EngineConfig config_{};
+    bool running_ = false;
+    bool started_ = false;
+    float fixed_accumulator_ = 0.0f;
+    TimeUtils::time last_tick_time_ = TimeUtils::GetCurrentTime();
     EngineContext context_{};
     ecs::World ecsWorld_{};
     ecs::SystemGraph systemGraph_{};
     ecs::RendererSystem rendererSystem_{};
+    ecs::RenderSyncSystem renderSyncSystem_{};
+    ecs::PhysicsSyncSystem physicsSyncSystem_{};
+    ecs::AudioSyncSystem audioSyncSystem_{};
+    ecs::CameraSyncSystem cameraSyncSystem_{};
+    ecs::ProceduralMeshSyncSystem proceduralMeshSyncSystem_{};
     std::unique_ptr<graphics::ResourceRegistry> resources_{};
+    std::unique_ptr<ui::Overlay> owned_overlay_{};
 };
 } // namespace karma::app

@@ -21,6 +21,7 @@ struct ClientCLIOptions {
     bool devQuickStart = false;
     bool strictConfig = true;
     bool uiSmokeTest = false;
+    bool ecsSmokeTest = false;
     int verbose = 0;
     std::string logLevel;
     bool logLevelExplicit = false;

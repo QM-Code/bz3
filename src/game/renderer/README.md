@@ -1,3 +1,3 @@
 # src/game/renderer/README.md
 
-Game-level rendering orchestration and radar rendering.
+Game-owned rendering orchestration and radar rendering.

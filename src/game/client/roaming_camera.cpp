@@ -7,7 +7,8 @@
 
 #include "game/input/actions.hpp"
 #include "karma/input/input.hpp"
-#include "renderer/renderer.hpp"
+#include "karma/ecs/world.hpp"
+#include "karma/ecs/components.hpp"
 
 namespace game_client {
 namespace {
@@ -19,19 +20,23 @@ float clampPitch(float pitch) {
 
 }
 
-void RoamingCameraController::syncFromRenderer(const Renderer &renderer) {
-    position_ = renderer.getCameraPosition();
-    glm::vec3 forward = renderer.getCameraForward();
-    if (glm::length(forward) < 0.0001f) {
-        forward = glm::vec3(0.0f, 0.0f, -1.0f);
-    } else {
-        forward = glm::normalize(forward);
+void RoamingCameraController::syncFromEcs(const ecs::World &world, ecs::EntityId entity) {
+    if (entity == ecs::kInvalidEntity) {
+        return;
     }
-
-    pitch_ = std::asin(std::clamp(forward.y, -1.0f, 1.0f));
-    yaw_ = std::atan2(forward.x, -forward.z);
-    updateRotation();
-    resetMouse();
+    if (const auto *transform = world.get<ecs::Transform>(entity)) {
+        position_ = transform->position;
+        glm::vec3 forward = transform->rotation * glm::vec3(0.0f, 0.0f, -1.0f);
+        if (glm::length(forward) < 0.0001f) {
+            forward = glm::vec3(0.0f, 0.0f, -1.0f);
+        } else {
+            forward = glm::normalize(forward);
+        }
+        pitch_ = std::asin(std::clamp(forward.y, -1.0f, 1.0f));
+        yaw_ = std::atan2(forward.x, -forward.z);
+        updateRotation();
+        resetMouse();
+    }
 }
 
 void RoamingCameraController::setPose(const glm::vec3 &position, const glm::vec3 &target, float yawOffsetDeg) {
@@ -131,9 +136,14 @@ void RoamingCameraController::update(TimeUtils::duration deltaTime,
     }
 }
 
-void RoamingCameraController::apply(Renderer &renderer) const {
-    renderer.setCameraPosition(position_);
-    renderer.setCameraRotation(rotation_);
+void RoamingCameraController::applyToEcs(ecs::World &world, ecs::EntityId entity) const {
+    if (entity == ecs::kInvalidEntity) {
+        return;
+    }
+    if (auto *transform = world.get<ecs::Transform>(entity)) {
+        transform->position = position_;
+        transform->rotation = rotation_;
+    }
 }
 
 void RoamingCameraController::updateRotation() {

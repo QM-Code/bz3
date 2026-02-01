@@ -3,6 +3,7 @@
 #include <optional>
 #include <string>
 #include <functional>
+#include <chrono>
 #include <vector>
 
 #include "ui/models/settings_model.hpp"
@@ -37,17 +38,48 @@ protected:
     void onConfigChanged() override;
 
 private:
+    class DebouncedCommit {
+    public:
+        void markChanged();
+        template <typename Fn>
+        void tryCommit(std::chrono::milliseconds delay, Fn &&commitFn) {
+            if (!pending) {
+                return;
+            }
+            const auto now = std::chrono::steady_clock::now();
+            if (now - lastChange < delay) {
+                return;
+            }
+            pending = false;
+            commitFn();
+        }
+
+    private:
+        bool pending = false;
+        std::chrono::steady_clock::time_point lastChange{};
+    };
     class BrightnessListener;
+    class HudBackgroundListener;
+    class HudBackgroundToggleListener;
     class LanguageListener;
     class HudToggleListener;
+    class RenderToggleListener;
 
     void updateStatus();
+    void refreshDebouncedCommits();
     void applyRenderBrightness(float value, bool fromUser);
     bool commitRenderBrightness();
     void syncRenderBrightnessControls(bool syncSlider);
     void syncRenderBrightnessLabel();
     void syncHudControls();
+    void syncHudBackgroundControls(bool syncSliders);
+    void syncHudBackgroundSwatch();
+    void syncHudBackgroundValues();
+    void handleHudBackgroundInput(bool commit);
+    void handleHudBackgroundToggle();
     void handleHudToggle(Rml::Element *target);
+    void syncRenderControls();
+    void handleRenderToggle(Rml::Element *target);
     void showStatus(const std::string &message, bool isError);
     void rebuildLanguageOptions();
     void applyLanguageSelection(const std::string &code);
@@ -65,7 +97,21 @@ private:
 
     Rml::Element *brightnessSlider = nullptr;
     Rml::Element *brightnessValueLabel = nullptr;
+    Rml::Element *hudBackgroundSwatch = nullptr;
+    Rml::Element *hudBackgroundPopup = nullptr;
+    Rml::Element *hudBackgroundEditButton = nullptr;
+    Rml::Element *hudBackgroundRSlider = nullptr;
+    Rml::Element *hudBackgroundGSlider = nullptr;
+    Rml::Element *hudBackgroundBSlider = nullptr;
+    Rml::Element *hudBackgroundASlider = nullptr;
+    Rml::Element *hudBackgroundRValue = nullptr;
+    Rml::Element *hudBackgroundGValue = nullptr;
+    Rml::Element *hudBackgroundBValue = nullptr;
+    Rml::Element *hudBackgroundAValue = nullptr;
     bool renderBrightnessDragging = false;
+    bool hudBackgroundDragging = false;
+    DebouncedCommit brightnessCommit{};
+    DebouncedCommit hudBackgroundCommit{};
     struct HudToggleButtons {
         Rml::Element *on = nullptr;
         Rml::Element *off = nullptr;
@@ -76,6 +122,7 @@ private:
     HudToggleButtons hudRadarToggle{};
     HudToggleButtons hudFpsToggle{};
     HudToggleButtons hudCrosshairToggle{};
+    HudToggleButtons vsyncToggle{};
     std::function<void(const std::string &)> languageCallback;
     bool suppressLanguageSelection = false;
 };

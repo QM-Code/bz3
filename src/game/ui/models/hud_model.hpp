@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <string>
 #include <vector>
 
@@ -27,6 +28,7 @@ struct HudModel {
     std::vector<std::string> chatLines;
     HudDialog dialog;
     HudVisibility visibility;
+    std::array<float, 4> hudBackgroundColor{0.0f, 0.0f, 0.0f, 1.0f};
     float fpsValue = 0.0f;
 };
 

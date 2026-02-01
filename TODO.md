@@ -29,6 +29,11 @@ Focus is on long-term clarity, engine/game separation, and developer velocity.
 - Keep ImGui/RmlUi feature parity as a hard rule. (done: validator + smoke harness in place)
 - Add a single shared UI state validator to catch frontend divergence. (done: `ui.Validate`)
 - Create a minimal UI smoke harness for regression checks. (done: `--ui-smoke`)
+- VSync toggle: make runtime toggle actually work (engine-level work needed):
+  - SDL window backend `setVsync()` is currently a no-op.
+  - BGFX backend forces `BGFX_RESET_VSYNC` on init + resize.
+  - Diligent backend presents with default interval (no toggle).
+  - Wire `graphics.VSync` into these backends so UI toggle applies immediately.
 
 ## 6) Networking & Protocol
 - Add explicit protocol versioning and compatibility handling.

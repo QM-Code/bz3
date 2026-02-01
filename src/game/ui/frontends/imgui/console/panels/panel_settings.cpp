@@ -81,57 +81,6 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
     }
 
     auto &i18n = karma::i18n::Get();
-    ImGui::TextUnformatted(i18n.get("ui.settings.language_label").c_str());
-    ImGui::SameLine();
-    std::string selectedLangCode = (selectedLanguageIndex >= 0 &&
-                                    selectedLanguageIndex < static_cast<int>(kLanguageCodes.size()))
-        ? kLanguageCodes[static_cast<std::size_t>(selectedLanguageIndex)]
-        : i18n.language();
-    std::string selectedLangLabel = i18n.get("languages." + selectedLangCode);
-    if (selectedLangLabel.empty()) {
-        selectedLangLabel = selectedLangCode;
-    }
-    if (ImGui::BeginCombo("##LanguageSelect", selectedLangLabel.c_str())) {
-        for (std::size_t i = 0; i < kLanguageCodes.size(); ++i) {
-            const std::string &code = kLanguageCodes[i];
-            std::string label = i18n.get("languages." + code);
-            if (label.empty()) {
-                label = code;
-            }
-            const bool isSelected = (selectedLanguageIndex == static_cast<int>(i));
-            if (ImGui::Selectable(label.c_str(), isSelected)) {
-                selectedLanguageIndex = static_cast<int>(i);
-                std::string error;
-                if (!settingsController.setLanguage(code, &error)) {
-                    settingsModel.statusText = error;
-                    settingsModel.statusIsError = true;
-                } else if (languageCallback) {
-                    languageCallback(code);
-                }
-            }
-            if (isSelected) {
-                ImGui::SetItemDefaultFocus();
-            }
-        }
-        ImGui::EndCombo();
-    }
-
-    ImGui::TextUnformatted("Render");
-    ImGui::Spacing();
-    renderBrightnessDragging = false;
-    float brightness = settingsModel.render.brightness();
-    if (ImGui::SliderFloat("Brightness", &brightness, 1.0f, 3.0f, "%.2fx")) {
-        applyRenderBrightness(brightness, true);
-    }
-    renderBrightnessDragging = ImGui::IsItemActive();
-    if (ImGui::IsItemDeactivatedAfterEdit()) {
-        commitRenderBrightness();
-    }
-    ImGui::Separator();
-    ImGui::Spacing();
-
-    ImGui::TextUnformatted("HUD");
-    ImGui::Spacing();
     auto applyHudSetting = [&](const char *name, bool value, auto setter) {
         setter(value, false);
         std::string error;
@@ -140,30 +89,140 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
             settingsModel.statusIsError = true;
         }
     };
-    bool scoreboardVisible = settingsModel.hud.scoreboardVisible();
-    if (DrawOnOffToggle("Scoreboard", scoreboardVisible)) {
-        applyHudSetting("ui.hud.scoreboard", scoreboardVisible,
-                        [&](bool v, bool fromUser) { settingsModel.hud.setScoreboardVisible(v, fromUser); });
-    }
-    bool chatVisible = settingsModel.hud.chatVisible();
-    if (DrawOnOffToggle("Chat", chatVisible)) {
-        applyHudSetting("ui.hud.chat", chatVisible,
-                        [&](bool v, bool fromUser) { settingsModel.hud.setChatVisible(v, fromUser); });
-    }
-    bool radarVisible = settingsModel.hud.radarVisible();
-    if (DrawOnOffToggle("Radar", radarVisible)) {
-        applyHudSetting("ui.hud.radar", radarVisible,
-                        [&](bool v, bool fromUser) { settingsModel.hud.setRadarVisible(v, fromUser); });
-    }
-    bool fpsVisible = settingsModel.hud.fpsVisible();
-    if (DrawOnOffToggle("FPS", fpsVisible)) {
-        applyHudSetting("ui.hud.fps", fpsVisible,
-                        [&](bool v, bool fromUser) { settingsModel.hud.setFpsVisible(v, fromUser); });
-    }
-    bool crosshairVisible = settingsModel.hud.crosshairVisible();
-    if (DrawOnOffToggle("Crosshair", crosshairVisible)) {
-        applyHudSetting("ui.hud.crosshair", crosshairVisible,
-                        [&](bool v, bool fromUser) { settingsModel.hud.setCrosshairVisible(v, fromUser); });
+
+    if (ImGui::BeginTable("SettingsColumns", 3, ImGuiTableFlags_SizingStretchProp)) {
+        ImGui::TableSetupColumn("SettingsLeft", ImGuiTableColumnFlags_WidthStretch, 1.0f);
+        ImGui::TableSetupColumn("SettingsMiddle", ImGuiTableColumnFlags_WidthStretch, 1.0f);
+        ImGui::TableSetupColumn("SettingsRight", ImGuiTableColumnFlags_WidthStretch, 1.0f);
+        ImGui::TableNextRow();
+
+        ImGui::TableSetColumnIndex(0);
+        ImGui::TextUnformatted(i18n.get("ui.settings.language_label").c_str());
+        ImGui::SameLine();
+        std::string selectedLangCode = (selectedLanguageIndex >= 0 &&
+                                        selectedLanguageIndex < static_cast<int>(kLanguageCodes.size()))
+            ? kLanguageCodes[static_cast<std::size_t>(selectedLanguageIndex)]
+            : i18n.language();
+        std::string selectedLangLabel = i18n.get("languages." + selectedLangCode);
+        if (selectedLangLabel.empty()) {
+            selectedLangLabel = selectedLangCode;
+        }
+        if (ImGui::BeginCombo("##LanguageSelect", selectedLangLabel.c_str())) {
+            for (std::size_t i = 0; i < kLanguageCodes.size(); ++i) {
+                const std::string &code = kLanguageCodes[i];
+                std::string label = i18n.get("languages." + code);
+                if (label.empty()) {
+                    label = code;
+                }
+                const bool isSelected = (selectedLanguageIndex == static_cast<int>(i));
+                if (ImGui::Selectable(label.c_str(), isSelected)) {
+                    selectedLanguageIndex = static_cast<int>(i);
+                    std::string error;
+                    if (!settingsController.setLanguage(code, &error)) {
+                        settingsModel.statusText = error;
+                        settingsModel.statusIsError = true;
+                    } else if (languageCallback) {
+                        languageCallback(code);
+                    }
+                }
+                if (isSelected) {
+                    ImGui::SetItemDefaultFocus();
+                }
+            }
+            ImGui::EndCombo();
+        }
+
+        ImGui::Spacing();
+        ImGui::TextUnformatted("Render");
+        ImGui::Spacing();
+        renderBrightnessDragging = false;
+        float brightness = settingsModel.render.brightness();
+        if (ImGui::SliderFloat("Brightness", &brightness, 1.0f, 3.0f, "%.2fx")) {
+            applyRenderBrightness(brightness, true);
+        }
+        renderBrightnessDragging = ImGui::IsItemActive();
+        if (ImGui::IsItemDeactivatedAfterEdit()) {
+            commitRenderBrightness();
+        }
+        ImGui::TableSetColumnIndex(1);
+        ImGui::TextUnformatted("HUD");
+        ImGui::Spacing();
+        const std::string &hudBackgroundLabel = karma::i18n::Get().get("ui.settings.hud_background_label");
+        const std::string &hudBackgroundEditLabel = karma::i18n::Get().get("ui.settings.hud_background_edit");
+        auto bgColor = settingsModel.hud.backgroundColor();
+        ImVec4 bgPreview(bgColor[0], bgColor[1], bgColor[2], bgColor[3]);
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(hudBackgroundLabel.empty() ? "Background" : hudBackgroundLabel.c_str());
+        ImGui::SameLine();
+        if (ImGui::ColorButton("##hud-bg-preview", bgPreview, ImGuiColorEditFlags_NoTooltip, ImVec2(28.0f, 18.0f))) {
+            ImGui::OpenPopup("hud-bg-picker");
+        }
+        ImGui::SameLine();
+        ImGui::TextUnformatted(hudBackgroundEditLabel.empty() ? "Edit" : hudBackgroundEditLabel.c_str());
+        static bool hudBackgroundDirty = false;
+        if (ImGui::BeginPopup("hud-bg-picker")) {
+            float color[4] = {bgPreview.x, bgPreview.y, bgPreview.z, bgPreview.w};
+            if (ImGui::ColorPicker4("##hud-bg-color", color, ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreview)) {
+                settingsModel.hud.setBackgroundColor({color[0], color[1], color[2], color[3]}, true);
+                hudBackgroundDirty = true;
+            }
+            if (ImGui::IsItemDeactivatedAfterEdit() && hudBackgroundDirty) {
+                std::string error;
+                if (!settingsController.saveHudSettings(&error)) {
+                    settingsModel.statusText = error;
+                    settingsModel.statusIsError = true;
+                }
+                hudBackgroundDirty = false;
+            }
+            ImGui::EndPopup();
+        } else if (hudBackgroundDirty) {
+            std::string error;
+            if (!settingsController.saveHudSettings(&error)) {
+                settingsModel.statusText = error;
+                settingsModel.statusIsError = true;
+            }
+            hudBackgroundDirty = false;
+        }
+        bool scoreboardVisible = settingsModel.hud.scoreboardVisible();
+        if (DrawOnOffToggle("Scoreboard", scoreboardVisible)) {
+            applyHudSetting("ui.hud.scoreboard", scoreboardVisible,
+                            [&](bool v, bool fromUser) { settingsModel.hud.setScoreboardVisible(v, fromUser); });
+        }
+        bool chatVisible = settingsModel.hud.chatVisible();
+        if (DrawOnOffToggle("Chat", chatVisible)) {
+            applyHudSetting("ui.hud.chat", chatVisible,
+                            [&](bool v, bool fromUser) { settingsModel.hud.setChatVisible(v, fromUser); });
+        }
+        bool radarVisible = settingsModel.hud.radarVisible();
+        if (DrawOnOffToggle("Radar", radarVisible)) {
+            applyHudSetting("ui.hud.radar", radarVisible,
+                            [&](bool v, bool fromUser) { settingsModel.hud.setRadarVisible(v, fromUser); });
+        }
+        bool fpsVisible = settingsModel.hud.fpsVisible();
+        if (DrawOnOffToggle("FPS", fpsVisible)) {
+            applyHudSetting("ui.hud.fps", fpsVisible,
+                            [&](bool v, bool fromUser) { settingsModel.hud.setFpsVisible(v, fromUser); });
+        }
+        bool crosshairVisible = settingsModel.hud.crosshairVisible();
+        if (DrawOnOffToggle("Crosshair", crosshairVisible)) {
+            applyHudSetting("ui.hud.crosshair", crosshairVisible,
+                            [&](bool v, bool fromUser) { settingsModel.hud.setCrosshairVisible(v, fromUser); });
+        }
+
+        ImGui::TableSetColumnIndex(2);
+        ImGui::TextUnformatted("VSync");
+        ImGui::Spacing();
+        bool vsyncEnabled = settingsModel.render.vsync();
+        if (DrawOnOffToggle("Enabled", vsyncEnabled)) {
+            settingsModel.render.setVsync(vsyncEnabled, true);
+            std::string error;
+            if (!settingsController.saveRenderSettings(&error)) {
+                settingsModel.statusText = error;
+                settingsModel.statusIsError = true;
+            }
+        }
+
+        ImGui::EndTable();
     }
     ImGui::Separator();
     ImGui::Spacing();

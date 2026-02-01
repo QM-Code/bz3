@@ -54,7 +54,9 @@
       }
     },
     "settings": {
-      "language_label": "भाषा"
+      "language_label": "भाषा",
+      "hud_background_label": "पृष्ठभूमि",
+      "hud_background_edit": "संपादित करें"
     }
   }
 }

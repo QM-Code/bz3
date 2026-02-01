@@ -1,17 +1,16 @@
 # src/game/renderer/AGENTS.md
 
 Read `src/game/AGENTS.md` first.
-This directory holds **game-specific rendering orchestration**.
+This directory holds **game-owned rendering orchestration**.
 
 ## Scope
 - Ties game entities to engine renderer core.
-- Manages game render IDs and ECS entity registration.
+- Manages radar-only render IDs and ECS-driven radar sync.
 - Owns radar rendering (offscreen target + overlays).
 
 ## Key files
 - `renderer.*`
   - Game-facing renderer wrapper.
-  - Creates entities, sets meshes/materials, updates transforms.
   - Controls camera and UI overlay composition.
 
 - `radar_renderer.*`

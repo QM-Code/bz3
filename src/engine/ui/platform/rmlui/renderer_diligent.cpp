@@ -49,7 +49,6 @@ uint32_t packColor(const ColorT& color) {
         | (static_cast<uint32_t>(color.blue) << 16)
         | (static_cast<uint32_t>(color.alpha) << 24);
 }
-
 } // namespace
 
 void RenderInterface_Diligent::SetViewport(int width, int height, int offset_x, int offset_y) {

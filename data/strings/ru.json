@@ -54,7 +54,9 @@
       }
     },
     "settings": {
-      "language_label": "Язык"
+      "language_label": "Язык",
+      "hud_background_label": "Фон",
+      "hud_background_edit": "Изменить"
     }
   }
 }

@@ -2,6 +2,8 @@
 
 #include "client/game.hpp"
 #include "spdlog/spdlog.h"
+#include "karma/ecs/components.hpp"
+#include "renderer/radar_components.hpp"
 #include "karma/common/data_path_resolver.hpp"
 #include "karma/common/config_helpers.hpp"
 #include "karma/common/config_store.hpp"
@@ -27,7 +29,9 @@ ClientWorldSession::ClientWorldSession(Game &game, std::string worldDir)
 }
 
 ClientWorldSession::~ClientWorldSession() {
-    game.engine.render->destroy(renderId);
+    if (worldEcsEntity != ecs::kInvalidEntity && game.engine.ecsWorld) {
+        game.engine.ecsWorld->destroyEntity(worldEcsEntity);
+    }
     physics.destroy();
 }
 
@@ -98,7 +102,15 @@ void ClientWorldSession::update() {
         }
 
         const auto worldPath = resolveAssetPath("world");
-        renderId = game.engine.render->create(worldPath.string(), true);
+        worldEcsEntity = game.engine.ecsWorld->createEntity();
+        ecs::Transform worldXform{};
+        game.engine.ecsWorld->set(worldEcsEntity, worldXform);
+        ecs::MeshComponent worldMesh{};
+        worldMesh.mesh_key = worldPath.string();
+        game.engine.ecsWorld->set(worldEcsEntity, worldMesh);
+        game.engine.ecsWorld->set(worldEcsEntity, game::renderer::RadarRenderable{true});
+        spdlog::info("ClientWorldSession: ECS world mesh enabled (entity={}, path={})",
+                     worldEcsEntity, worldPath.string());
         physics = game.engine.physics->createStaticMesh(worldPath.string());
 
         spdlog::info("ClientWorldSession: World initialized from server");

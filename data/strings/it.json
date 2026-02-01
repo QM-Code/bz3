@@ -54,7 +54,9 @@
       }
     },
     "settings": {
-      "language_label": "Lingua"
+      "language_label": "Lingua",
+      "hud_background_label": "Sfondo",
+      "hud_background_edit": "Modifica"
     }
   }
 }

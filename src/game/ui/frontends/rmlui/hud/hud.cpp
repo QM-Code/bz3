@@ -4,6 +4,9 @@
 #include <RmlUi/Core/ElementDocument.h>
 #include <utility>
 
+#include <algorithm>
+#include <cstdio>
+
 #include "karma/common/i18n.hpp"
 #include "ui/frontends/rmlui/translate.hpp"
 
@@ -144,6 +147,25 @@ void RmlUiHud::setCrosshairVisible(bool visible) {
     crosshair.setVisible(visible);
 }
 
+void RmlUiHud::setHudBackgroundColor(const std::array<float, 4> &color) {
+    hudBackgroundColor = color;
+    chat.setBackgroundColor(hudBackgroundColor);
+    scoreboard.setBackgroundColor(hudBackgroundColor);
+    if (fpsElement) {
+        const float r = std::clamp(hudBackgroundColor[0], 0.0f, 1.0f);
+        const float g = std::clamp(hudBackgroundColor[1], 0.0f, 1.0f);
+        const float b = std::clamp(hudBackgroundColor[2], 0.0f, 1.0f);
+        const float a = std::clamp(hudBackgroundColor[3], 0.0f, 1.0f);
+        const int ri = static_cast<int>(r * 255.0f + 0.5f);
+        const int gi = static_cast<int>(g * 255.0f + 0.5f);
+        const int bi = static_cast<int>(b * 255.0f + 0.5f);
+        const int ai = static_cast<int>(a * 255.0f + 0.5f);
+        char buffer[16];
+        std::snprintf(buffer, sizeof(buffer), "#%02X%02X%02X%02X", ri, gi, bi, ai);
+        fpsElement->SetProperty("background-color", buffer);
+    }
+}
+
 void RmlUiHud::setFpsVisible(bool visible) {
     if (visible == fpsVisible) {
         return;
@@ -186,6 +208,7 @@ void RmlUiHud::bindElements() {
     crosshair.bind(document);
     radar.bind(document);
     scoreboard.bind(document, emojiMarkup);
+    setHudBackgroundColor(hudBackgroundColor);
     chat.setVisible(chatVisible);
     scoreboard.setVisible(scoreboardVisible);
     radar.setVisible(radarVisible);

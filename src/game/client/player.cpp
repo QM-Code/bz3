@@ -3,6 +3,8 @@
 #include "karma/core/types.hpp"
 #include "game/net/messages.hpp"
 #include "client/game.hpp"
+#include "karma/ecs/components.hpp"
+#include "karma/common/config_helpers.hpp"
 #include <cmath>
 #include <string>
 #include <utility>
@@ -37,9 +39,17 @@ Player::Player(Game &game,
     lastPosition = glm::vec3(0.0f);
     lastRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
-    renderId = game.engine.render->create();
-    game.engine.render->setRadarCircleGraphic(renderId, 1.2f);
+    radarId = game.engine.render->createRadarId();
+    game.engine.render->setRadarCircleGraphic(radarId, 1.2f);
 
+    if (game.engine.ecsWorld) {
+        ecsEntity = game.engine.ecsWorld->createEntity();
+        ecs::Transform xform{};
+        xform.scale = glm::vec3(1.0f);
+        game.engine.ecsWorld->set(ecsEntity, xform);
+        // Local player mesh rendering is skipped to avoid first-person camera inside the tank.
+        spdlog::info("Player: ECS entity created for local player (ecs_entity={})", ecsEntity);
+    }
 
     // Initialize controller extents from parameters once params are set
     setExtents(glm::vec3(
@@ -49,7 +59,10 @@ Player::Player(Game &game,
 }
 
 Player::~Player() {
-    game.engine.render->destroy(renderId);
+    game.engine.render->destroy(radarId);
+    if (ecsEntity != ecs::kInvalidEntity && game.engine.ecsWorld) {
+        game.engine.ecsWorld->destroyEntity(ecsEntity);
+    }
 }
 
 glm::vec3 Player::getForwardVector() const {
@@ -66,7 +79,13 @@ void Player::earlyUpdate() {
     bool wasGrounded = grounded;
     grounded = physics->isGrounded();
 
-    game.engine.render->setPosition(renderId, state.position);
+    game.engine.render->setPosition(radarId, state.position);
+    if (ecsEntity != ecs::kInvalidEntity && game.engine.ecsWorld) {
+        if (auto *transform = game.engine.ecsWorld->get<ecs::Transform>(ecsEntity)) {
+            transform->position = state.position;
+            transform->rotation = state.rotation;
+        }
+    }
 
     if (state.alive) {
         game.engine.ui->setDialogVisible(false);
@@ -165,11 +184,16 @@ void Player::earlyUpdate() {
 
 void Player::lateUpdate() {
     setLocation(physics->getPosition(), physics->getRotation(), physics->getVelocity());
-    game.engine.render->setCameraPosition(state.position + glm::vec3(0.0f, muzzleOffset.y, 0.0f));
-    game.engine.render->setCameraRotation(state.rotation);
-    const auto &ctx = game.engine.render->mainContext();
-    const float halfVertRad = glm::radians(ctx.fov * 0.5f);
-    const float halfHorizRad = std::atan(std::tan(halfVertRad) * ctx.aspect);
+    if (game.engine.cameraEntity != ecs::kInvalidEntity && game.engine.ecsWorld) {
+        if (auto *transform = game.engine.ecsWorld->get<ecs::Transform>(game.engine.cameraEntity)) {
+            transform->position = state.position + glm::vec3(0.0f, muzzleOffset.y, 0.0f);
+            transform->rotation = state.rotation;
+        }
+    }
+    const float fovDeg = karma::config::ReadRequiredFloatConfig("graphics.Camera.FovDegrees");
+    const float halfVertRad = glm::radians(fovDeg * 0.5f);
+    const float aspect = game.engine.render->mainContext().aspect;
+    const float halfHorizRad = std::atan(std::tan(halfVertRad) * aspect);
     game.engine.render->setRadarFOVLinesAngle(glm::degrees(halfHorizRad * 2.0f));
 
     if (state.alive) {
@@ -199,6 +223,12 @@ void Player::setState(const PlayerState &newState) {
         physics->setPosition(state.position);
         physics->setRotation(state.rotation);
         physics->setVelocity(state.velocity);
+    }
+    if (ecsEntity != ecs::kInvalidEntity && game.engine.ecsWorld) {
+        if (auto *transform = game.engine.ecsWorld->get<ecs::Transform>(ecsEntity)) {
+            transform->position = state.position;
+            transform->rotation = state.rotation;
+        }
     }
 }
 

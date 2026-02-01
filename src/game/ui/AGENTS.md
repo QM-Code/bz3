@@ -89,11 +89,20 @@ and what to tackle next.
 - Rendering order: HUD then Console. Console visibility affects crosshair drawing.
 - `console/console.cpp` owns tab layout; `panel_*` files implement UI.
 - Community refresh should trigger on tab activation or click.
+- Fonts: ImGui does **not** do runtime font fallback like RmlUi. Every font used
+  for headings/body must have fallback glyphs merged into its atlas, or non-Latin
+  text will render as `?`. Keep heading/title fonts merged with the same fallback
+  glyph ranges as the regular font.
 
 ### RmlUi
 - Document load order: HUD document is loaded before console to ensure HUD renders beneath.
 - Panels are instantiated in `backend.cpp` and registered to console view.
 - RML layout lives in `data/client/ui/*.rml` and styles in `*.rcss`.
+
+### ImGui/RmlUi parity
+- UI changes should be mirrored in **both** ImGui and RmlUi, in both directions.
+- Exceptions are allowed only for backend-specific bugs or feature gaps.
+- When in doubt about parity, ask before implementing.
 
 ## Known TODOs
 

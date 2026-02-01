@@ -7,7 +7,6 @@
 #include "karma/ui/bridges/renderer_bridge.hpp"
 #include "karma/common/config_store.hpp"
 #include "karma/common/config_helpers.hpp"
-#include <cstdlib>
 #include "karma/common/i18n.hpp"
 #include <cstdint>
 #include <stdexcept>
@@ -124,7 +123,6 @@ void ClientEngine::step(TimeUtils::duration deltaTime) {
 }
 
 void ClientEngine::lateUpdate(TimeUtils::duration deltaTime) {
-    render->setBrightness(lastBrightness);
     render->update();
     ui->update();
     const std::string currentLanguage = karma::i18n::Get().language();
@@ -134,14 +132,6 @@ void ClientEngine::lateUpdate(TimeUtils::duration deltaTime) {
             ui->setDialogText(game_input::SpawnHintText(*input));
         }
     }
-    const ui::RenderOutput output = ui->getRenderOutput();
-    render->setUiOverlayTexture(output);
-    if (!std::getenv("KARMA_DISABLE_UI_OVERLAY")) {
-        render->renderUiOverlay();
-    }
-    lastBrightness = ui->getRenderBrightness();
-    render->present();
-
     if (ui->consumeKeybindingsReloadRequest()) {
         input->reloadKeyBindings();
         ui->setDialogText(game_input::SpawnHintText(*input));
@@ -156,7 +146,6 @@ void ClientEngine::updateRoamingCamera(TimeUtils::duration deltaTime, bool allow
     }
     const auto settings = ReadRoamingCameraSettings();
     roamingCamera.update(deltaTime, *input, lastEvents, settings, allowInput);
-    roamingCamera.apply(*render);
 }
 
 void ClientEngine::setRoamingModeSession(bool enabled) {

@@ -44,6 +44,11 @@ public:
     }
 
     template <typename T>
+    const T *get(EntityId entity) const {
+        return storeConst<T>().get(entity);
+    }
+
+    template <typename T>
     const std::unordered_map<EntityId, T> &all() const {
         return storeConst<T>().all();
     }
