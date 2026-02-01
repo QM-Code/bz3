@@ -806,6 +806,8 @@ void DiligentBackend::renderUiOverlay() {
         return;
     }
     context_->SetRenderTargets(1, &rtv, nullptr, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+    const float clearColor[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+    context_->ClearRenderTarget(rtv, clearColor, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
 
     const auto& scDesc = swapChain_->GetDesc();
     Diligent::Viewport vp{};
@@ -1521,7 +1523,7 @@ cbuffer Constants
 float4 main(float2 uv : TEXCOORD0) : SV_Target
 {
     float4 color = g_Texture.Sample(g_Texture_sampler, uv);
-    return color * g_Brightness.x;
+    return float4(color.rgb * g_Brightness.x, 1.0f);
 }
 )";
 

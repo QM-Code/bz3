@@ -1,7 +1,6 @@
 #include "ui/core/system.hpp"
 
 #include "ui/core/backend.hpp"
-#include "karma/platform/window.hpp"
 #include "karma/common/i18n.hpp"
 #include "ui/config/ui_config.hpp"
 #include "karma/common/config_store.hpp"

@@ -137,7 +137,7 @@ void ConsoleView::drawSettingsPanel(const MessageColors &colors) {
         ImGui::Spacing();
         renderBrightnessDragging = false;
         float brightness = settingsModel.render.brightness();
-        if (ImGui::SliderFloat("Brightness", &brightness, 1.0f, 3.0f, "%.2fx")) {
+        if (ImGui::SliderFloat("Brightness", &brightness, 0.5f, 1.5f, "%.2fx")) {
             applyRenderBrightness(brightness, true);
         }
         renderBrightnessDragging = ImGui::IsItemActive();

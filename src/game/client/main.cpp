@@ -367,13 +367,6 @@ public:
                 spdlog::warn("Fullscreen toggle had no effect");
             }
         }
-        if (engine_.cameraEntity != ecs::kInvalidEntity && engine_.ecsWorld) {
-            if (engine_.isRoamingModeSession()) {
-                const bool allowInput = !consoleVisible && engine_.ui->isGameplayInputEnabled();
-                engine_.updateRoamingCamera(dt, allowInput);
-                engine_.roamingCameraController().applyToEcs(*engine_.ecsWorld, engine_.cameraEntity);
-            }
-        }
         if (consoleVisible) {
             communityBrowser_.update();
         }

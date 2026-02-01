@@ -1012,6 +1012,7 @@ void BgfxBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId 
             bgfx::setViewRect(kBrightnessView, 0, 0,
                               static_cast<uint16_t>(width),
                               static_cast<uint16_t>(height));
+            bgfx::setViewClear(kBrightnessView, BGFX_CLEAR_COLOR, 0x00000000, 1.0f, 0);
             bgfx::setUniform(brightnessScaleBias, scaleBias);
             bgfx::setUniform(brightnessValue, brightnessData);
             bgfx::setTexture(0, brightnessSampler, sceneTarget.colorTexture);

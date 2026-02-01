@@ -59,8 +59,6 @@ glm::vec3 ReadRequiredVec3Config(const char *path) {
 } // namespace
 
 ClientEngine::ClientEngine(platform::Window &window) {
-    this->window = &window;
-
     network = new ClientNetwork();
     spdlog::trace("ClientEngine: ClientNetwork initialized successfully");
     spdlog::trace("ClientEngine: Renderer initializing");
@@ -108,6 +106,12 @@ void ClientEngine::step(TimeUtils::duration deltaTime) {
 }
 
 void ClientEngine::lateUpdate(TimeUtils::duration deltaTime) {
+    if (cameraEntity != ecs::kInvalidEntity && ecsWorld && isRoamingModeSession()) {
+        const bool consoleVisible = ui && ui->console().isVisible();
+        const bool allowInput = !consoleVisible && (!ui || ui->isGameplayInputEnabled());
+        updateRoamingCamera(deltaTime, allowInput);
+        roamingCamera.applyToEcs(*ecsWorld, cameraEntity);
+    }
     if (render) {
         glm::vec3 camPos(0.0f);
         glm::quat camRot(1.0f, 0.0f, 0.0f, 0.0f);

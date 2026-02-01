@@ -21,7 +21,6 @@ class RendererBridge;
 
 class ClientEngine {
 private:
-    platform::Window *window;
     std::unique_ptr<ui::RendererBridge> uiRenderBridge;
     std::string lastLanguage;
     bool roamingMode = false;

@@ -4,8 +4,8 @@ namespace ui {
 
 class RenderSettings {
 public:
-    static constexpr float kMinBrightness = 1.0f;
-    static constexpr float kMaxBrightness = 3.0f;
+    static constexpr float kMinBrightness = 0.5f;
+    static constexpr float kMaxBrightness = 1.5f;
 
     void loadFromConfig();
     bool saveToConfig() const;
