@@ -1,6 +1,7 @@
 #include "shot.hpp"
 #include "client/game.hpp"
 #include "karma/ecs/components.hpp"
+#include "renderer/radar_components.hpp"
 #include "spdlog/spdlog.h"
 #include <glm/gtc/quaternion.hpp>
 
@@ -15,7 +16,6 @@ Shot::Shot(Game &game,
     position(position),
     prevPosition(position),
     velocity(velocity),
-    radarId(game.engine.render->createRadarId()),
     audioEngine(*game.engine.audio),
     fireAudio(audioEngine.loadClip(game.world->resolveAssetPath("audio.shot.Fire").string(), 20)),
     ricochetAudio(audioEngine.loadClip(game.world->resolveAssetPath("audio.shot.Ricochet").string(), 20))
@@ -30,10 +30,11 @@ Shot::Shot(Game &game,
         mesh.mesh_key = game.world->resolveAssetPath("shotModel").string();
         game.engine.ecsWorld->set(ecsEntity, mesh);
         game.engine.ecsWorld->set(ecsEntity, ecs::Transparency{true});
+        game::renderer::RadarCircle circle{};
+        circle.radius = 0.5f;
+        game.engine.ecsWorld->set(ecsEntity, circle);
         spdlog::info("Shot: ECS render enabled (shot_id={}, ecs_entity={})", id, ecsEntity);
     }
-    game.engine.render->setPosition(radarId, position);
-    game.engine.render->setRadarCircleGraphic(radarId, 0.5f);
 
     fireAudio.play(position);
 }
@@ -51,7 +52,6 @@ Shot::Shot(Game &game, glm::vec3 position, glm::vec3 velocity) : Shot(game, getN
 Shot::Shot(Game &game, shot_id globalId, glm::vec3 position, glm::vec3 velocity) : Shot(game, globalId, true, position, velocity) {};
 
 Shot::~Shot() {
-    game.engine.render->destroy(radarId);
     if (ecsEntity != ecs::kInvalidEntity && game.engine.ecsWorld) {
         game.engine.ecsWorld->destroyEntity(ecsEntity);
     }
@@ -83,7 +83,6 @@ void Shot::update(TimeUtils::duration deltaTime) {
         position = end;
     }
 
-    game.engine.render->setPosition(radarId, position);
     if (ecsEntity != ecs::kInvalidEntity && game.engine.ecsWorld) {
         if (auto *transform = game.engine.ecsWorld->get<ecs::Transform>(ecsEntity)) {
             transform->position = position;

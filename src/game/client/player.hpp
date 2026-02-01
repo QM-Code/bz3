@@ -32,7 +32,6 @@ private:
     glm::vec3 lastPosition;
     glm::quat lastRotation;
 
-    render_id radarId;
     ecs::EntityId ecsEntity = ecs::kInvalidEntity;
     glm::vec3 muzzleOffset{0.0f, 1.18f, 2.22f};
 

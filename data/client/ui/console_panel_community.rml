@@ -10,7 +10,7 @@
                     <select id="community-select">
                         <option>Local Area Network</option>
                     </select>
-                    <button id="community-info-button" class="icon-button">ⓘ</button>
+                    <button id="community-info-button" class="icon-button">?</button>
                 </div>
                 <div class="row">
                     <label>Username</label>

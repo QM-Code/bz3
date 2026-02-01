@@ -15,7 +15,6 @@ class AudioClip;
 class Client : public Actor {
 private:
     AudioClip dieAudio;
-    render_id radarId;
     ecs::EntityId ecsEntity = ecs::kInvalidEntity;
     bool justSpawned = false;
     glm::vec3 lastSpawnPosition{0.0f};

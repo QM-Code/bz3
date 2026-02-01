@@ -939,6 +939,9 @@ void BgfxBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId 
             if (!bgfx::isValid(mesh.vertexBuffer)) {
                 return;
             }
+            if (offscreenPass && mesh.isWorldGrass) {
+                return;
+            }
 
             bgfx::setVertexBuffer(0, mesh.vertexBuffer);
             if (bgfx::isValid(mesh.indexBuffer) && mesh.indexCount > 0) {
@@ -1162,7 +1165,7 @@ void BgfxBackend::renderUiOverlay() {
     indices[5] = 3;
 
     bgfx::setState(BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A |
-                   BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA));
+                   BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_INV_SRC_ALPHA));
     bgfx::setVertexBuffer(0, &tvb);
     bgfx::setIndexBuffer(&tib);
     bgfx::submit(kUiOverlayView, uiOverlayProgram);

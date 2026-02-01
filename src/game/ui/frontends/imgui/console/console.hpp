@@ -137,7 +137,6 @@ private:
 
     std::array<char, 64> usernameBuffer{};
     std::array<char, 128> passwordBuffer{};
-    bool showNewCommunityInput = false;
     std::array<char, 512> listUrlBuffer{};
     int lastCredentialsListIndex = -1;
     std::string storedPasswordHash;

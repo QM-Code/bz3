@@ -51,7 +51,7 @@ Key responsibilities:
 ## 4) Rendering + render outputs
 
 ### ImGui path
-- Uses `ui::RendererBridge` and `engine/graphics/ui_render_target_bridge.hpp` to render into a texture.
+- Uses `ui::RendererBridge` and `ui::UiRenderTargetBridge` to render into a texture.
 - Platform renderers live under `src/engine/ui/platform/imgui/renderer_{bgfx,diligent}.*`.
 - `ImGuiBackend::getRenderOutput()` returns a valid texture + visibility when the console or HUD drew.
 
@@ -124,6 +124,7 @@ Any frontend changes that add UI elements generally require editing these asset 
    - Draws HUD first (if visible), then Console.
    - Renders to UI render target via `RendererBridge`.
 3. Renderer composites `ui::RenderOutput` texture onto the frame.
+   - bgfx UI overlay uses premultiplied blending (`ONE / INV_SRC_ALPHA`).
 
 ### RmlUi path (per frame)
 1. `UiSystem::update()` updates `HudModel` and calls `RmlUiBackend::setHudModel()`.

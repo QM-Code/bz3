@@ -22,7 +22,7 @@ public:
     graphics::TextureHandle getRadarTexture() const override {
         return render ? render->getRadarTexture() : graphics::TextureHandle{};
     }
-    graphics_backend::UiRenderTargetBridge* getUiRenderTargetBridge() const override {
+    ui::UiRenderTargetBridge* getUiRenderTargetBridge() const override {
         return render ? render->getUiRenderTargetBridge() : nullptr;
     }
 
@@ -92,18 +92,9 @@ ClientEngine::~ClientEngine() {
 }
 
 void ClientEngine::earlyUpdate(TimeUtils::duration deltaTime) {
-    if (window) {
-        window->pollEvents();
-    }
     const std::vector<platform::Event> emptyEvents;
     const auto &events = window ? window->events() : emptyEvents;
     lastEvents = events;
-    if (ui) {
-        ui->handleEvents(events);
-    }
-    if (input) {
-        input->update(events);
-    }
     const bool allowGameplayInput = !ui || ui->isGameplayInputEnabled();
     inputState = game_input::BuildInputState(*input);
     if (!allowGameplayInput) {
@@ -111,9 +102,6 @@ void ClientEngine::earlyUpdate(TimeUtils::duration deltaTime) {
         inputState.spawn = false;
         inputState.jump = false;
         inputState.movement = {};
-    }
-    if (window) {
-        window->clearEvents();
     }
     network->update();
 }
@@ -134,7 +122,6 @@ void ClientEngine::lateUpdate(TimeUtils::duration deltaTime) {
         }
         render->renderRadar(camPos, camRot);
     }
-    ui->update();
     const std::string currentLanguage = karma::i18n::Get().language();
     if (currentLanguage != lastLanguage) {
         lastLanguage = currentLanguage;
@@ -147,7 +134,6 @@ void ClientEngine::lateUpdate(TimeUtils::duration deltaTime) {
         ui->setDialogText(game_input::SpawnHintText(*input));
     }
     network->flushPeekedMessages();
-    karma::config::ConfigStore::Tick();
 }
 
 void ClientEngine::updateRoamingCamera(TimeUtils::duration deltaTime, bool allowInput) {

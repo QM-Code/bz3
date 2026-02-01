@@ -113,5 +113,5 @@ and what to tackle next.
 - Console visibility and HUD visibility are deliberately coupled in `UiSystem::update`.
 - ConfigStore has save/merge intervals and revision tracking; use `Revision()` to resync UI state.
 - Start Server panels still write a JSON override file for server instances (left as-is for now).
-- Radar uses an offscreen render target; failures affect both ImGui/RmlUi equally.
+- Radar uses an overlay render target; failures affect both ImGui/RmlUi equally.
 - Radar visibility/orientation was recently stabilized (world mesh on radar + overlayed blips/FOV + horizontal flip); avoid undoing those changes unless you re-test both UI backends.

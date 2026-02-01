@@ -55,7 +55,7 @@ private:
     ui::ImGuiHud hud;
     ui::HudModel hudModel;
     const ui::RendererBridge *rendererBridge = nullptr;
-    graphics_backend::UiRenderTargetBridge* uiBridge = nullptr;
+    ui::UiRenderTargetBridge* uiBridge = nullptr;
     bool languageReloadArmed = false;
     std::optional<std::string> pendingLanguage;
     bool fontsDirty = false;

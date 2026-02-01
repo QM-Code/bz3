@@ -2,7 +2,6 @@
 
 #include "karma/common/data_path_resolver.hpp"
 #include "karma/common/i18n.hpp"
-#include "karma/graphics/ui_render_target_bridge.hpp"
 #include "karma/platform/window.hpp"
 #include "spdlog/spdlog.h"
 #include "karma/ui/bridges/ui_render_bridge.hpp"

@@ -16,7 +16,6 @@ private:
     glm::vec3 velocity;
     glm::vec3 prevPosition;
 
-    render_id radarId;
     ecs::EntityId ecsEntity = ecs::kInvalidEntity;
     Audio& audioEngine;
     AudioClip fireAudio;

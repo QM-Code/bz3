@@ -5,6 +5,7 @@
 #include "client/game.hpp"
 #include "karma/ecs/components.hpp"
 #include "karma/common/config_helpers.hpp"
+#include "renderer/radar_components.hpp"
 #include <cmath>
 #include <string>
 #include <utility>
@@ -39,14 +40,14 @@ Player::Player(Game &game,
     lastPosition = glm::vec3(0.0f);
     lastRotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
 
-    radarId = game.engine.render->createRadarId();
-    game.engine.render->setRadarCircleGraphic(radarId, 1.2f);
-
     if (game.engine.ecsWorld) {
         ecsEntity = game.engine.ecsWorld->createEntity();
         ecs::Transform xform{};
         xform.scale = glm::vec3(1.0f);
         game.engine.ecsWorld->set(ecsEntity, xform);
+        game::renderer::RadarCircle circle{};
+        circle.radius = 1.2f;
+        game.engine.ecsWorld->set(ecsEntity, circle);
         // Local player mesh rendering is skipped to avoid first-person camera inside the tank.
         spdlog::info("Player: ECS entity created for local player (ecs_entity={})", ecsEntity);
     }
@@ -59,7 +60,6 @@ Player::Player(Game &game,
 }
 
 Player::~Player() {
-    game.engine.render->destroy(radarId);
     if (ecsEntity != ecs::kInvalidEntity && game.engine.ecsWorld) {
         game.engine.ecsWorld->destroyEntity(ecsEntity);
     }
@@ -79,11 +79,13 @@ void Player::earlyUpdate() {
     bool wasGrounded = grounded;
     grounded = physics->isGrounded();
 
-    game.engine.render->setPosition(radarId, state.position);
     if (ecsEntity != ecs::kInvalidEntity && game.engine.ecsWorld) {
         if (auto *transform = game.engine.ecsWorld->get<ecs::Transform>(ecsEntity)) {
             transform->position = state.position;
             transform->rotation = state.rotation;
+        }
+        if (auto *circle = game.engine.ecsWorld->get<game::renderer::RadarCircle>(ecsEntity)) {
+            circle->enabled = state.alive;
         }
     }
 
@@ -190,12 +192,6 @@ void Player::lateUpdate() {
             transform->rotation = state.rotation;
         }
     }
-    const float fovDeg = karma::config::ReadRequiredFloatConfig("graphics.Camera.FovDegrees");
-    const float halfVertRad = glm::radians(fovDeg * 0.5f);
-    const float aspect = game.engine.render->mainContext().aspect;
-    const float halfHorizRad = std::atan(std::tan(halfVertRad) * aspect);
-    game.engine.render->setRadarFOVLinesAngle(glm::degrees(halfHorizRad * 2.0f));
-
     if (state.alive) {
         if (glm::distance(lastPosition, state.position) > POSITION_UPDATE_THRESHOLD ||
             angleBetween(lastRotation, state.rotation) > ROTATION_UPDATE_THRESHOLD) {
@@ -208,8 +204,6 @@ void Player::lateUpdate() {
         }
     }
 
-    audioEngine.setListenerPosition(state.position);
-    audioEngine.setListenerRotation(state.rotation);
 }
 
 void Player::update(TimeUtils::duration /*deltaTime*/) {

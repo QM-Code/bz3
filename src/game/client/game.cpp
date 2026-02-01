@@ -1,4 +1,5 @@
 #include "client/game.hpp"
+#include "renderer/radar_renderer.hpp"
 #include "spdlog/spdlog.h"
 #include <algorithm>
 #include "ui/core/system.hpp"
@@ -20,10 +21,10 @@ Game::Game(ClientEngine &engine,
     console = std::make_unique<Console>(*this);
     spdlog::trace("Game: Console created successfully");
 
-    engine.render->setRadarShaderPath(
-        world->resolveAssetPath("shaders.radar.vertex"),
-        world->resolveAssetPath("shaders.radar.fragment")
-    );
+    game::renderer::RadarConfig radarConfig{};
+    radarConfig.shaderVertex = world->resolveAssetPath("shaders.radar.vertex");
+    radarConfig.shaderFragment = world->resolveAssetPath("shaders.radar.fragment");
+    engine.render->configureRadar(radarConfig);
 
     focusState = FOCUS_STATE_GAME;
 };

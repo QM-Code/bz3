@@ -1862,6 +1862,9 @@ void DiligentBackend::renderToTargets(Diligent::ITextureView* rtv,
             if (!mesh.vertexBuffer || !mesh.indexBuffer || mesh.indexCount == 0) {
                 return;
             }
+            if (offscreenPass && mesh.isWorldGrass) {
+                return;
+            }
 
             Diligent::MapHelper<Constants> cb(context_, constantBuffer_, Diligent::MAP_WRITE, Diligent::MAP_FLAG_DISCARD);
             if (cb) {

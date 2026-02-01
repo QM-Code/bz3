@@ -18,6 +18,10 @@ It’s useful for batch‑processing many similar objects and keeping data/behav
   - `karma::app::EngineApp` owns the ECS world and runs the render system each frame.
   - Game adapters feed ECS render components from gameplay objects.
 
+- ECS is **used for audio listener sync**:
+  - `AudioListenerComponent` is attached to the camera entity.
+  - `AudioSyncSystem` uses the listener transform to update engine audio state.
+
 - ECS is **not used for physics**:
   - Physics remains in the engine’s physics system (Jolt/PhysX backends).
   - No physics update loop is driven by ECS.
@@ -37,6 +41,7 @@ It’s useful for batch‑processing many similar objects and keeping data/behav
 ## Recommendation (current stance)
 
 - **Keep ECS for rendering** (already in place and useful).
+- **Use ECS for listener sync** (currently camera listener only).
 - **Do not migrate physics into ECS** unless there is a clear, concrete benefit.
 - Use ECS *selectively* where it simplifies or speeds up the implementation.
 

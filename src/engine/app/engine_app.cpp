@@ -4,7 +4,10 @@
 #include "karma/ui/overlay.hpp"
 #include "karma/ui/types.hpp"
 #include "karma/common/config_helpers.hpp"
+#include "karma/common/config_store.hpp"
+#include "karma/input/input.hpp"
 #include <cstdlib>
+#include <vector>
 
 namespace karma::app {
 EngineApp::EngineApp() {
@@ -50,6 +53,9 @@ bool EngineApp::start(GameInterface &game, const EngineConfig &config) {
         context_.window->setCursorVisible(config_.cursor_visible);
     }
 #ifndef KARMA_SERVER
+    if (!context_.graphics && context_.rendererCore) {
+        context_.graphics = &context_.rendererCore->device();
+    }
     if (context_.graphics) {
         resources_ = std::make_unique<graphics::ResourceRegistry>(*context_.graphics);
         context_.resources = resources_.get();
@@ -103,7 +109,26 @@ void EngineApp::tick() {
         context_.rendererContext.aspect = static_cast<float>(width) / static_cast<float>(height);
     }
 #endif
+    if (context_.window) {
+        context_.window->pollEvents();
+    }
+    const std::vector<platform::Event> emptyEvents;
+    const auto &events = context_.window ? context_.window->events() : emptyEvents;
+#ifndef KARMA_SERVER
+    if (context_.input && context_.window) {
+        context_.input->pumpEvents(events);
+    }
+#endif
+    if (context_.overlay) {
+        context_.overlay->handleEvents(events);
+    }
     game_->onUpdate(dt);
+    if (context_.overlay) {
+        context_.overlay->update();
+    }
+    if (context_.window) {
+        context_.window->clearEvents();
+    }
 #ifndef KARMA_SERVER
     if (config_.enable_ecs_camera_sync) {
         cameraSyncSystem_.update(ecsWorld_, context_.rendererContext);
@@ -127,6 +152,7 @@ void EngineApp::tick() {
     }
 #endif
     systemGraph_.update(dt);
+    karma::config::ConfigStore::Tick();
 #ifndef KARMA_SERVER
     rendererSystem_.update(ecsWorld_, context_.graphics, dt);
 #endif

@@ -67,6 +67,11 @@ Checklist:
 - Camera is now ECS-driven (camera sync enabled by default; renderer camera setters removed).
 - UI overlay composition + present moved into EngineApp tick (engine-owned lifecycle).
 - EngineApp now begins frames + renders main scene (game renderer handles radar only).
+- Audio listener now ECS-driven (audio sync enabled by default in client).
+- ConfigStore ticking moved into EngineApp tick (engine-owned lifecycle).
+- EngineApp now derives graphics device from renderer core when not explicitly wired.
+- Input event polling + Input update moved into EngineApp tick.
+- UI event handling + UI update moved into EngineApp tick (overlay-owned lifecycle).
 
 ## Phase 4 - Engine-Owned Loop (client)
 

@@ -486,7 +486,6 @@ void ConsoleView::show(const std::vector<CommunityBrowserEntry> &newEntries) {
     consoleModel.community.serverDescriptionErrorText.clear();
     consoleModel.community.statusTone = MessageTone::Notice;
     clearPassword();
-    showNewCommunityInput = false;
     listUrlBuffer.fill(0);
 }
 
@@ -624,7 +623,6 @@ void ConsoleView::hide() {
     consoleModel.community.serverDescriptionErrorText.clear();
     consoleModel.community.statusTone = MessageTone::Notice;
     clearPassword();
-    showNewCommunityInput = false;
     thumbnails.shutdown();
 }
 

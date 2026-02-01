@@ -601,8 +601,6 @@ int main(int argc, char *argv[]) {
     app.context().overlay = engine.ui;
     engine.ecsWorld = app.context().ecsWorld;
     engine.render->setEcsWorld(app.context().ecsWorld);
-    engine.render->setEcsRadarSyncEnabled(true);
-    app.context().graphics = engine.render->getGraphicsDevice();
     app.context().rendererCore = engine.render->getRendererCore();
     if (!cliOptions.ecsSmokeTest) {
         auto *ecsWorld = app.context().ecsWorld;
@@ -617,13 +615,15 @@ int main(int argc, char *argv[]) {
             camera.near_plane = karma::config::ReadRequiredFloatConfig("graphics.Camera.NearPlane");
             camera.far_plane = karma::config::ReadRequiredFloatConfig("graphics.Camera.FarPlane");
             ecsWorld->set(engine.cameraEntity, camera);
+            ecsWorld->set(engine.cameraEntity, ecs::AudioListenerComponent{});
         }
     }
     {
         auto &config = app.config();
         config.enable_ecs_render_sync = true;
         config.enable_ecs_camera_sync = true;
-        spdlog::info("ECS render/camera sync enabled (default)");
+        config.enable_ecs_audio_sync = true;
+        spdlog::info("ECS render/camera/audio sync enabled (default)");
     }
     if (cliOptions.ecsSmokeTest) {
         auto &config = app.config();
@@ -654,6 +654,7 @@ int main(int argc, char *argv[]) {
             camera.near_plane = karma::config::ReadRequiredFloatConfig("graphics.Camera.NearPlane");
             camera.far_plane = karma::config::ReadRequiredFloatConfig("graphics.Camera.FarPlane");
             ecsWorld->set(cameraEntity, camera);
+            ecsWorld->set(cameraEntity, ecs::AudioListenerComponent{});
         }
     }
     spdlog::info("EngineApp loop enabled (start/tick)");

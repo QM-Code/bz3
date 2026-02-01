@@ -13,9 +13,8 @@ class Window;
 }
 
 class Input {
-    friend class ClientEngine;
 
-private:
+public:
     input::InputMapper mapper_;
     input::InputMap::DefaultBindingsMap defaultBindings_{};
 
@@ -27,8 +26,7 @@ private:
 
     void loadKeyBindings();
     void update(const std::vector<platform::Event> &events);
-
-public:
+    void pumpEvents(const std::vector<platform::Event> &events);
     bool actionTriggered(std::string_view actionId) const;
     bool actionDown(std::string_view actionId) const;
     void reloadKeyBindings();

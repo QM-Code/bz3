@@ -101,7 +101,7 @@ void ImGuiHud::draw(ImGuiIO &io, ImFont *bigFont) {
     const ImVec2 radarPos = ImVec2(vpPos.x + margin, vpPos.y + vpSize.y - margin - radarSize);
     const ImVec2 radarWindowSize = ImVec2(radarSize, radarSize);
     if (radarVisible) {
-        radar.draw(radarPos, radarWindowSize);
+        radar.draw(radarPos, radarWindowSize, hudBackgroundColor);
     }
 
     const float consoleLeft = vpPos.x + margin + (radarVisible ? radarSize + margin : 0.0f);

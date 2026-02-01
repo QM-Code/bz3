@@ -30,6 +30,8 @@ class UiSystem : public ui::Overlay {
 public:
     ui::ConsoleInterface &console();
     const ui::ConsoleInterface &console() const;
+    void handleEvents(const std::vector<platform::Event> &events) override;
+    void update() override;
 
 private:
     std::unique_ptr<ui_backend::Backend> backend;
@@ -39,14 +41,12 @@ private:
     bool validateHudState = false;
     ui::HudValidator hudValidator;
 
-    void update();
     void reloadFonts();
 
     UiSystem(platform::Window &window);
     ~UiSystem();
 
 public:
-    void handleEvents(const std::vector<platform::Event> &events);
     void setLanguage(const std::string &language);
     void setScoreboardEntries(const std::vector<ScoreboardEntry> &entries);
     void setDialogText(const std::string &text);

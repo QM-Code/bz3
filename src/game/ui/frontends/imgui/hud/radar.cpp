@@ -11,15 +11,16 @@ void ImGuiHudRadar::setTexture(const graphics::TextureHandle& texture) {
     radarTexture = texture;
 }
 
-void ImGuiHudRadar::draw(const ImVec2 &pos, const ImVec2 &size) {
+void ImGuiHudRadar::draw(const ImVec2 &pos, const ImVec2 &size, const ImVec4 &backgroundColor) {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, backgroundColor);
 
     ImGui::SetNextWindowPos(pos, ImGuiCond_Always);
     ImGui::SetNextWindowSize(size, ImGuiCond_Always);
-    ImGui::SetNextWindowBgAlpha(0.0f);
+    ImGui::SetNextWindowBgAlpha(backgroundColor.w);
     ImGui::Begin("##RadarPanel", nullptr,
         ImGuiWindowFlags_NoTitleBar |
         ImGuiWindowFlags_NoResize |
@@ -40,6 +41,7 @@ void ImGuiHudRadar::draw(const ImVec2 &pos, const ImVec2 &size) {
     }
     ImGui::End();
 
+    ImGui::PopStyleColor(1);
     ImGui::PopStyleVar(4);
 }
 
