@@ -84,6 +84,24 @@ void EngineApp::tick() {
     if (context_.rendererCore) {
         context_.rendererContext = context_.rendererCore->context();
     }
+    if (context_.rendererCore && context_.window) {
+        int width = 0;
+        int height = 0;
+        context_.window->getFramebufferSize(width, height);
+        if (height <= 0) {
+            height = 1;
+        }
+        if (width <= 0) {
+            width = 1;
+        }
+        if (width != lastFramebufferWidth_ || height != lastFramebufferHeight_) {
+            lastFramebufferWidth_ = width;
+            lastFramebufferHeight_ = height;
+            context_.rendererCore->scene().resize(width, height);
+        }
+        context_.rendererCore->scene().beginFrame();
+        context_.rendererContext.aspect = static_cast<float>(width) / static_cast<float>(height);
+    }
 #endif
     game_->onUpdate(dt);
 #ifndef KARMA_SERVER
@@ -114,6 +132,7 @@ void EngineApp::tick() {
 #endif
 #ifndef KARMA_SERVER
     if (context_.rendererCore) {
+        context_.rendererCore->scene().renderMain(context_.rendererContext);
         if (context_.overlay) {
             const ui::RenderOutput output = context_.overlay->getRenderOutput();
             context_.rendererCore->scene().setUiOverlayTexture(output.texture, output.valid());

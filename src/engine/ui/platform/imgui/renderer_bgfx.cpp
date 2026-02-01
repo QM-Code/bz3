@@ -241,7 +241,7 @@ void BgfxRenderer::renderImGuiToTarget(ImDrawData* drawData) {
 
                 bgfx::setScissor(cx, cy, cw, ch);
                 bgfx::setState(BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A | BGFX_STATE_MSAA |
-                               BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA));
+                               BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_INV_SRC_ALPHA));
 
                 bgfx::TextureHandle textureHandle = fontTexture_;
                 if (pcmd->TextureId) {

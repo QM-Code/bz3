@@ -19,7 +19,7 @@ void ImGuiHudRadar::draw(const ImVec2 &pos, const ImVec2 &size) {
 
     ImGui::SetNextWindowPos(pos, ImGuiCond_Always);
     ImGui::SetNextWindowSize(size, ImGuiCond_Always);
-    ImGui::SetNextWindowBgAlpha(0.35f);
+    ImGui::SetNextWindowBgAlpha(0.0f);
     ImGui::Begin("##RadarPanel", nullptr,
         ImGuiWindowFlags_NoTitleBar |
         ImGuiWindowFlags_NoResize |

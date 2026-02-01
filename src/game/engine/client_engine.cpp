@@ -4,7 +4,7 @@
 #include "game/input/bindings.hpp"
 #include "game/input/state.hpp"
 #include "spdlog/spdlog.h"
-#include "karma/ui/bridges/renderer_bridge.hpp"
+#include "ui/bridges/renderer_bridge.hpp"
 #include "karma/common/config_store.hpp"
 #include "karma/common/config_helpers.hpp"
 #include "karma/common/i18n.hpp"
@@ -123,7 +123,17 @@ void ClientEngine::step(TimeUtils::duration deltaTime) {
 }
 
 void ClientEngine::lateUpdate(TimeUtils::duration deltaTime) {
-    render->update();
+    if (render) {
+        glm::vec3 camPos(0.0f);
+        glm::quat camRot(1.0f, 0.0f, 0.0f, 0.0f);
+        if (ecsWorld && cameraEntity != ecs::kInvalidEntity) {
+            if (const auto *transform = ecsWorld->get<ecs::Transform>(cameraEntity)) {
+                camPos = transform->position;
+                camRot = transform->rotation;
+            }
+        }
+        render->renderRadar(camPos, camRot);
+    }
     ui->update();
     const std::string currentLanguage = karma::i18n::Get().language();
     if (currentLanguage != lastLanguage) {

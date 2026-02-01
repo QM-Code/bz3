@@ -42,15 +42,11 @@ private:
     ecs::World *ecsWorld = nullptr;
     bool ecsRadarSyncEnabled = false;
 
-    int lastFramebufferWidth = 0;
-    int lastFramebufferHeight = 0;
-    float lastAspect = 1.0f;
 
     Renderer(platform::Window &window);
     ~Renderer();
 
-    void update();
-    void resizeCallback(int width, int height);
+    void renderRadar(const glm::vec3 &cameraPosition, const glm::quat &cameraRotation);
 
     void syncEcsRadar();
 

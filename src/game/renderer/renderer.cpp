@@ -15,50 +15,16 @@ Renderer::Renderer(platform::Window &windowIn)
 
 Renderer::~Renderer() = default;
 
-void Renderer::resizeCallback(int width, int height) {
-    if (core_) {
-        core_->scene().resize(width, height);
-    }
-}
-
-void Renderer::update() {
+void Renderer::renderRadar(const glm::vec3 &cameraPosition, const glm::quat &cameraRotation) {
     if (!core_) {
         return;
     }
-
-    int width = 0;
-    int height = 0;
-    if (window) {
-        window->getFramebufferSize(width, height);
-    }
-    if (height <= 0) {
-        height = 1;
-    }
-    if (width <= 0) {
-        width = 1;
-    }
-
-    if (width != lastFramebufferWidth || height != lastFramebufferHeight) {
-        lastFramebufferWidth = width;
-        lastFramebufferHeight = height;
-        lastAspect = static_cast<float>(width) / static_cast<float>(height);
-        core_->scene().resize(width, height);
-    }
-
-    core_->scene().beginFrame();
-
     if (ecsRadarSyncEnabled && ecsWorld && radarRenderer_) {
         syncEcsRadar();
     }
-
     if (radarRenderer_) {
-        radarRenderer_->render(core_->context().cameraPosition, core_->context().cameraRotation);
+        radarRenderer_->render(cameraPosition, cameraRotation);
     }
-
-    // Render main layer to screen
-    core_->context().aspect = lastAspect;
-    core_->scene().renderMain(core_->context());
-
 }
 
 void Renderer::setEcsWorld(ecs::World *world) {

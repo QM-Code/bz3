@@ -105,6 +105,7 @@ private:
         uint32_t indexCount = 0;
         Diligent::RefCntAutoPtr<Diligent::ITexture> texture;
         Diligent::ITextureView* srv = nullptr;
+        bool isWorldGrass = false;
     };
 
     struct RenderTargetRecord {
@@ -174,6 +175,8 @@ private:
 
     std::unique_ptr<UiRenderTargetBridge> uiBridge_;
 
+    uint64_t configRevision_ = 0;
+
     glm::vec3 cameraPosition{0.0f};
     glm::quat cameraRotation{1.0f, 0.0f, 0.0f, 0.0f};
     bool usePerspective = true;
@@ -200,7 +203,8 @@ private:
                          graphics::LayerId layer,
                          int targetWidth,
                          int targetHeight,
-                         bool drawSkybox);
+                         bool drawSkybox,
+                         bool offscreenPass);
 
     glm::mat4 computeViewMatrix() const;
     glm::mat4 computeProjectionMatrix() const;

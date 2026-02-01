@@ -6,6 +6,7 @@
 
 #include "karma/common/data_path_resolver.hpp"
 #include "karma/common/config_helpers.hpp"
+#include "karma/common/config_store.hpp"
 #include "karma/geometry/mesh_loader.hpp"
 #include "platform/window.hpp"
 
@@ -30,6 +31,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <stdexcept>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -152,6 +154,27 @@ std::string themeSlotForWorldSubmesh(const MeshLoader::MeshData& submesh) {
         return "building-top";
     }
     return "building";
+}
+
+glm::vec4 readVec4ConfigRequired(const char* path) {
+    const auto* value = karma::config::ConfigStore::Get(path);
+    if (!value || !value->is_array() || value->size() < 4) {
+        throw std::runtime_error(std::string("Missing required vec4 config: ") + path);
+    }
+    glm::vec4 out(0.0f);
+    for (size_t i = 0; i < 4; ++i) {
+        const auto& v = (*value)[i];
+        if (v.is_number_float()) {
+            out[static_cast<int>(i)] = static_cast<float>(v.get<double>());
+        } else if (v.is_number_integer()) {
+            out[static_cast<int>(i)] = static_cast<float>(v.get<int64_t>());
+        } else if (v.is_number_unsigned()) {
+            out[static_cast<int>(i)] = static_cast<float>(v.get<uint64_t>());
+        } else {
+            throw std::runtime_error(std::string("Invalid vec4 config type at: ") + path);
+        }
+    }
+    return out;
 }
 
 } // namespace
@@ -379,6 +402,9 @@ void DiligentBackend::setEntityModel(graphics::EntityId entity,
                 themeSlot = "shot";
             } else if (isWorldModelPath(modelPath)) {
                 themeSlot = themeSlotForWorldSubmesh(submesh);
+                if (themeSlot == "grass") {
+                    meshIt->second.isWorldGrass = true;
+                }
             }
 
             if (!themeSlot.empty()) {
@@ -644,6 +670,11 @@ void DiligentBackend::renderLayer(graphics::LayerId layer, graphics::RenderTarge
         return;
     }
 
+    const uint64_t revision = karma::config::ConfigStore::Revision();
+    if (revision != configRevision_) {
+        configRevision_ = revision;
+    }
+
     Diligent::ITextureView* rtv = nullptr;
     Diligent::ITextureView* dsv = nullptr;
     int targetWidth = 0;
@@ -695,7 +726,8 @@ void DiligentBackend::renderLayer(graphics::LayerId layer, graphics::RenderTarge
 
 
     const bool drawSkybox = (target == graphics::kDefaultRenderTarget);
-    renderToTargets(rtv, dsv, layer, targetWidth, targetHeight, drawSkybox);
+    const bool offscreenPass = (target != graphics::kDefaultRenderTarget && layer != 0);
+    renderToTargets(rtv, dsv, layer, targetWidth, targetHeight, drawSkybox, offscreenPass);
 
     if (target == graphics::kDefaultRenderTarget && std::abs(brightness_ - 1.0f) > 0.0001f
         && sceneTargetValid_ && sceneTarget_.srv) {
@@ -1080,7 +1112,7 @@ float4 main(PSInput In) : SV_Target
                   pipelineOffscreen_,
                   shaderBindingOffscreen_,
                   "KARMA Diligent PSO Offscreen");
-    // Overlay entities (radar markers, lines) render without depth.
+    // Overlay entities render without depth.
     buildPipeline(swapRtv,
                   swapDsv,
                   false,
@@ -1729,7 +1761,8 @@ void DiligentBackend::renderToTargets(Diligent::ITextureView* rtv,
                                       graphics::LayerId layer,
                                       int targetWidth,
                                       int targetHeight,
-                                      bool drawSkybox) {
+                                      bool drawSkybox,
+                                      bool offscreenPass) {
     if (!context_ || !pipeline_ || !pipelineOffscreen_) {
         return;
     }
@@ -1753,7 +1786,12 @@ void DiligentBackend::renderToTargets(Diligent::ITextureView* rtv,
     }
 
     const bool useSwapchain = (swapChain_ && rtv == swapChain_->GetCurrentBackBufferRTV());
-    const float clearColor[4] = {0.02f, 0.02f, 0.02f, 1.0f};
+    const float clearColor[4] = {
+        offscreenPass ? 0.0f : 0.02f,
+        offscreenPass ? 0.0f : 0.02f,
+        offscreenPass ? 0.0f : 0.02f,
+        offscreenPass ? 0.0f : 1.0f
+    };
     if (rtv) {
         context_->ClearRenderTarget(rtv, clearColor, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
     }
@@ -1808,16 +1846,12 @@ void DiligentBackend::renderToTargets(Diligent::ITextureView* rtv,
         const glm::mat4 world = translate * rotate * scale;
         const glm::mat4 mvp = viewProj * world;
 
-        Diligent::MapHelper<Constants> cb(context_, constantBuffer_, Diligent::MAP_WRITE, Diligent::MAP_FLAG_DISCARD);
-        if (cb) {
-            std::memcpy(cb->mvp.m, glm::value_ptr(mvp), sizeof(float) * 16);
-            graphics::MaterialDesc desc;
-            auto matIt = materials.find(entity.material);
-            if (matIt != materials.end()) {
-                desc = matIt->second;
-            }
-            cb->color = Diligent::float4(desc.baseColor.x, desc.baseColor.y, desc.baseColor.z, desc.baseColor.w);
+        graphics::MaterialDesc desc;
+        auto matIt = materials.find(entity.material);
+        if (matIt != materials.end()) {
+            desc = matIt->second;
         }
+        const Diligent::float4 baseColor(desc.baseColor.x, desc.baseColor.y, desc.baseColor.z, desc.baseColor.w);
 
         auto drawMesh = [&](graphics::MeshId meshId) {
             auto meshIt = meshes.find(meshId);
@@ -1829,14 +1863,20 @@ void DiligentBackend::renderToTargets(Diligent::ITextureView* rtv,
                 return;
             }
 
+            Diligent::MapHelper<Constants> cb(context_, constantBuffer_, Diligent::MAP_WRITE, Diligent::MAP_FLAG_DISCARD);
+            if (cb) {
+                std::memcpy(cb->mvp.m, glm::value_ptr(mvp), sizeof(float) * 16);
+                cb->color = baseColor;
+            }
+
             Diligent::IBuffer* vbs[] = {mesh.vertexBuffer};
             const Diligent::Uint64 offsets[] = {0};
             context_->SetVertexBuffers(0, 1, vbs, offsets,
                                        Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION,
                                        Diligent::SET_VERTEX_BUFFERS_FLAG_RESET);
             context_->SetIndexBuffer(mesh.indexBuffer, 0, Diligent::RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
-            if (mesh.srv) {
-                if (auto* var = binding->GetVariableByName(Diligent::SHADER_TYPE_PIXEL, "g_Texture")) {
+            if (auto* var = binding->GetVariableByName(Diligent::SHADER_TYPE_PIXEL, "g_Texture")) {
+                if (mesh.srv) {
                     var->Set(mesh.srv);
                 }
             }

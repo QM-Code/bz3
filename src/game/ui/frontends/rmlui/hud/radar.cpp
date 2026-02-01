@@ -1,6 +1,8 @@
 #include "ui/frontends/rmlui/hud/radar.hpp"
 
 #include <RmlUi/Core/ElementDocument.h>
+#include <algorithm>
+#include <cstdio>
 
 namespace ui {
 
@@ -41,6 +43,16 @@ void RmlUiHudRadar::setTexture(const graphics::TextureHandle& textureIn) {
             image->SetAttribute("src", src);
         }
     }
+}
+
+void RmlUiHudRadar::setBackgroundColor(const std::array<float, 4> &color) {
+    if (!panel) {
+        return;
+    }
+    (void)color;
+    char buffer[16];
+    std::snprintf(buffer, sizeof(buffer), "#%02X%02X%02X%02X", 0, 0, 0, 0);
+    panel->SetProperty("background-color", buffer);
 }
 
 void RmlUiHudRadar::setVisible(bool visibleIn) {

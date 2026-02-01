@@ -100,6 +100,7 @@ private:
         bgfx::IndexBufferHandle indexBuffer = BGFX_INVALID_HANDLE;
         uint32_t indexCount = 0;
         bgfx::TextureHandle texture = BGFX_INVALID_HANDLE;
+        bool isWorldGrass = false;
     };
 
     struct RenderTargetRecord {

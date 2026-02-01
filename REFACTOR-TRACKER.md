@@ -66,6 +66,7 @@ Checklist:
 - Removed legacy renderer model creation via render IDs (radar IDs only).
 - Camera is now ECS-driven (camera sync enabled by default; renderer camera setters removed).
 - UI overlay composition + present moved into EngineApp tick (engine-owned lifecycle).
+- EngineApp now begins frames + renders main scene (game renderer handles radar only).
 
 ## Phase 4 - Engine-Owned Loop (client)
 

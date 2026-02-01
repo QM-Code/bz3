@@ -331,7 +331,7 @@ void RenderInterface_BGFX::RenderGeometry(Rml::CompiledGeometryHandle handle,
     }
 
     uint64_t state = BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A |
-                     BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_SRC_ALPHA, BGFX_STATE_BLEND_INV_SRC_ALPHA) |
+                     BGFX_STATE_BLEND_FUNC(BGFX_STATE_BLEND_ONE, BGFX_STATE_BLEND_INV_SRC_ALPHA) |
                      BGFX_STATE_MSAA;
     bgfx::setState(state);
 

@@ -151,6 +151,7 @@ void RmlUiHud::setHudBackgroundColor(const std::array<float, 4> &color) {
     hudBackgroundColor = color;
     chat.setBackgroundColor(hudBackgroundColor);
     scoreboard.setBackgroundColor(hudBackgroundColor);
+    radar.setBackgroundColor(hudBackgroundColor);
     if (fpsElement) {
         const float r = std::clamp(hudBackgroundColor[0], 0.0f, 1.0f);
         const float g = std::clamp(hudBackgroundColor[1], 0.0f, 1.0f);

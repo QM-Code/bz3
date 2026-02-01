@@ -84,5 +84,7 @@ private:
     ecs::ProceduralMeshSyncSystem proceduralMeshSyncSystem_{};
     std::unique_ptr<graphics::ResourceRegistry> resources_{};
     std::unique_ptr<ui::Overlay> owned_overlay_{};
+    int lastFramebufferWidth_ = 0;
+    int lastFramebufferHeight_ = 0;
 };
 } // namespace karma::app

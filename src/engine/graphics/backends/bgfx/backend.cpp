@@ -231,6 +231,27 @@ glm::vec3 readVec3ConfigRequired(const char* path) {
     return out;
 }
 
+glm::vec4 readVec4ConfigRequired(const char* path) {
+    const auto* value = karma::config::ConfigStore::Get(path);
+    if (!value || !value->is_array() || value->size() < 4) {
+        throw std::runtime_error(std::string("Missing required vec4 config: ") + path);
+    }
+    glm::vec4 out(0.0f);
+    for (size_t i = 0; i < 4; ++i) {
+        const auto& v = (*value)[i];
+        if (v.is_number_float()) {
+            out[static_cast<int>(i)] = static_cast<float>(v.get<double>());
+        } else if (v.is_number_integer()) {
+            out[static_cast<int>(i)] = static_cast<float>(v.get<int64_t>());
+        } else if (v.is_number_unsigned()) {
+            out[static_cast<int>(i)] = static_cast<float>(v.get<uint64_t>());
+        } else {
+            throw std::runtime_error(std::string("Invalid vec4 config type at: ") + path);
+        }
+    }
+    return out;
+}
+
 struct TestVertex {
     float x;
     float y;
@@ -549,6 +570,9 @@ void BgfxBackend::setEntityModel(graphics::EntityId entity,
                     slot = isGrass ? "grass" : (isEmbeddedBuildingTop ? "building-top" : "building");
                     spdlog::trace("Graphics(Bgfx): submesh tex='{}' grass={} theme='{}' slot='{}'",
                                  submesh.albedo->key, isGrass, themeName, slot);
+                    if (isGrass) {
+                        meshIt->second.isWorldGrass = true;
+                    }
                 }
                 if (!slot.empty()) {
                     handle = loadThemeTexture(slot);
@@ -832,8 +856,11 @@ void BgfxBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId 
                           static_cast<uint16_t>(framebufferWidth),
                           static_cast<uint16_t>(framebufferHeight));
     }
+    const bool offscreenPass = (target != graphics::kDefaultRenderTarget && layer != 0);
     const bool renderSkybox = (target == graphics::kDefaultRenderTarget);
-    const uint32_t clearColor = (renderSkybox ? 0x0d1620ff : 0xff000000);
+    const uint32_t clearColor = renderSkybox
+        ? 0x0d1620ff
+        : (offscreenPass ? 0x00000000 : 0xff000000);
     bgfx::setViewClear(viewId, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, clearColor, 1.0f, 0);
     bgfx::touch(viewId);
 
@@ -858,8 +885,6 @@ void BgfxBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId 
         cachedSunColor = readVec3ConfigRequired("graphics.lighting.SunColor");
     }
 
-    // Treat only the radar layer as "radar pass" even when rendering to offscreen targets.
-    const bool radarPass = (target != graphics::kDefaultRenderTarget && layer != 0);
     auto renderEntity = [&](const EntityRecord& entity) {
         if (entity.layer != layer || !entity.visible) {
             return;
@@ -876,7 +901,7 @@ void BgfxBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId 
                                   materials.count(entity.material) &&
                                   materials.at(entity.material).transparent);
         uint64_t state = BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A | BGFX_STATE_DEPTH_TEST_LESS;
-        if (radarPass) {
+        if (offscreenPass) {
             state = BGFX_STATE_WRITE_RGB | BGFX_STATE_WRITE_A;
             if (transparent) {
                 state |= BGFX_STATE_BLEND_ALPHA;
@@ -939,7 +964,7 @@ void BgfxBackend::renderLayer(graphics::LayerId layer, graphics::RenderTargetId 
                 bgfx::setTexture(0, meshSamplerUniform, tex);
             }
             if (bgfx::isValid(meshUnlitUniform)) {
-                const glm::vec4 unlit = (isShot || radarPass) ? glm::vec4(1.0f) : glm::vec4(0.0f);
+                const glm::vec4 unlit = (isShot || offscreenPass) ? glm::vec4(1.0f) : glm::vec4(0.0f);
                 bgfx::setUniform(meshUnlitUniform, glm::value_ptr(unlit));
             }
 

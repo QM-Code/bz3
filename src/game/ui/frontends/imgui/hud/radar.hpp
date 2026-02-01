@@ -1,6 +1,7 @@
 #pragma once
 
 struct ImVec2;
+struct ImVec4;
 
 #include "karma/graphics/texture_handle.hpp"
 
