@@ -11,3 +11,5 @@ Input gating:
 - Gameplay input (movement/fire/spawn/jump) is suppressed when UI input is active
   (console visible or chat focused).
 - Global actions (chat/escape/quick quit/fullscreen) remain active.
+EngineApp now pumps window events and drives UI updates; client code consumes
+the resulting input state.

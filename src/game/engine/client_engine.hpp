@@ -26,7 +26,6 @@ private:
     std::string lastLanguage;
     bool roamingMode = false;
     bool roamingModeInitialized = false;
-    std::vector<platform::Event> lastEvents;
     game_client::RoamingCameraController roamingCamera;
 
 public:

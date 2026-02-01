@@ -92,9 +92,6 @@ ClientEngine::~ClientEngine() {
 }
 
 void ClientEngine::earlyUpdate(TimeUtils::duration deltaTime) {
-    const std::vector<platform::Event> emptyEvents;
-    const auto &events = window ? window->events() : emptyEvents;
-    lastEvents = events;
     const bool allowGameplayInput = !ui || ui->isGameplayInputEnabled();
     inputState = game_input::BuildInputState(*input);
     if (!allowGameplayInput) {
@@ -141,7 +138,9 @@ void ClientEngine::updateRoamingCamera(TimeUtils::duration deltaTime, bool allow
         return;
     }
     const auto settings = ReadRoamingCameraSettings();
-    roamingCamera.update(deltaTime, *input, lastEvents, settings, allowInput);
+    const std::vector<platform::Event> emptyEvents;
+    const auto &events = input ? input->events() : emptyEvents;
+    roamingCamera.update(deltaTime, *input, events, settings, allowInput);
 }
 
 void ClientEngine::setRoamingModeSession(bool enabled) {

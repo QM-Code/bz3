@@ -5,7 +5,6 @@
 namespace graphics {
 
 class GraphicsDevice {
-    friend class ClientEngine;
 
 public:
     explicit GraphicsDevice(platform::Window& window);

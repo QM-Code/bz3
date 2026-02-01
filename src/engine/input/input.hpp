@@ -27,6 +27,7 @@ public:
     void loadKeyBindings();
     void update(const std::vector<platform::Event> &events);
     void pumpEvents(const std::vector<platform::Event> &events);
+    const std::vector<platform::Event>& events() const { return lastEvents_; }
     bool actionTriggered(std::string_view actionId) const;
     bool actionDown(std::string_view actionId) const;
     void reloadKeyBindings();

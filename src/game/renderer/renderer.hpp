@@ -25,7 +25,6 @@ namespace graphics {
 }
 
 class Renderer {
-    friend class ClientEngine;
 
 private:
     std::unique_ptr<engine::renderer::RendererCore> core_;
@@ -50,14 +49,12 @@ private:
     bool ecsRadarSyncEnabled = true;
 
 
-    Renderer(platform::Window &window);
-    ~Renderer();
-
-    void renderRadar(const glm::vec3 &cameraPosition, const glm::quat &cameraRotation);
-
     void syncEcsRadar();
 
 public:
+    Renderer(platform::Window &window);
+    ~Renderer();
+    void renderRadar(const glm::vec3 &cameraPosition, const glm::quat &cameraRotation);
     void setEcsWorld(ecs::World *world);
     void setMainLayer(graphics::LayerId layer) { if (core_) { core_->context().mainLayer = layer; } }
     graphics::TextureHandle getRadarTexture() const;

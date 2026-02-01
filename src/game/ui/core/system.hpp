@@ -25,9 +25,11 @@ class Backend;
 }
 
 class UiSystem : public ui::Overlay {
-    friend class ClientEngine;
 
 public:
+    UiSystem(platform::Window &window);
+    ~UiSystem();
+
     ui::ConsoleInterface &console();
     const ui::ConsoleInterface &console() const;
     void handleEvents(const std::vector<platform::Event> &events) override;
@@ -42,9 +44,6 @@ private:
     ui::HudValidator hudValidator;
 
     void reloadFonts();
-
-    UiSystem(platform::Window &window);
-    ~UiSystem();
 
 public:
     void setLanguage(const std::string &language);

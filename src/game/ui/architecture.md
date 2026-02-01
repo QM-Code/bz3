@@ -33,7 +33,7 @@ Key responsibilities:
 - Console interface access: `console()` returns `ui::ConsoleInterface`.
 - Receives HUD state: `setHudModel(const ui::HudModel &)`.
 - Exposes render output: `getRenderOutput()` and `getRenderBrightness()`.
-- Handles input events and UI update loop.
+- Handles input events and UI update loop (driven by `EngineApp`).
 
 ### `ui::ConsoleInterface` (`src/game/ui/console/console_interface.hpp`)
 - Abstracts console operations (show/hide, list options, refresh requests, selections, status).
